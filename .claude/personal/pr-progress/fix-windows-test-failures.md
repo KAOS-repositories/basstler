@@ -1,10 +1,10 @@
 Plan (Windows test failures, draft #220, off main):
-- Fix the Windows-only causes of the suite failures, each with a test that fails on Linux CI first
+- Fix the Windows-only causes of the suite failures, each with a test that fails on Linux CI first where possible
 
 Done:
-- WSL bash, cp1252 text, read-only clone removal, backslash AGENTS.md paths: three code rules with
-  repository-wide checker tests; Windows run 466 failed + 196 errors -> 161 failed, 0 errors
+- Three portability code rules, python3 stub, POSIX paths, file URLs, BashPath, helper backslash, CRLF rows,
+  LICENSE LF, pinned initial branch; Windows run 466 failed + 196 errors -> 39 failed, 0 errors (cee36b88)
 
 Next:
-- Remaining Windows-only causes: python3 Store stub fallback, str(Path) renders, file:// fork URLs,
-  local gh version and credential leaks
+- Decide how to stub gh/bash on Windows (.exe launcher vs shutil.which in production), ~20 tests
+- Lock liveness with MSYS vs Windows PIDs (~6), Windows environment session-start tests (~5), gh login leak

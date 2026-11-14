@@ -104,11 +104,10 @@ Code aliases, which always resolve to the newest model of the family:
 - `opus` - design-heavy, cross-cutting or ambiguous work, where the item must decide how
   something should be built.
 
-Every item carries one: validation refuses a plan with an item that has none. A plan
-saved before the field was required is filled in for you: every session start gives each
-item without one `sonnet` (`"${BASSTLER_PYTHON}" -m basstler.plan_site.recommended_models every-plan`), and
-every plan site build does the same in memory, so no plan drops off the site. Replace the
-default with the model the item's difficulty calls for when you next touch the item.
+Every new item carries one: `item_bootstrap record` refuses a new item without
+`--recommended-model`, and `/plan-create` and `/add-plan-item` set it from the task's
+difficulty. An item saved before the field existed may keep none, and no session start or
+site build gives it a default; set one when you next touch the item.
 
 ### Why `status` is deliberately thin
 

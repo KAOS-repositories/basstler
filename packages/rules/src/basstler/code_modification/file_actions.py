@@ -42,7 +42,9 @@ class FileMove(Action[SourceTree]):
             raise FileActionTargetError(self.destination, FileExpectation.ABSENT)
         return AppliedAction(
             target.with_files(
-                {self.destination: target.files[self.source]}, (self.source,)
+                {self.destination: target.files[self.source]},
+                (self.source,),
+                (self.destination,) if self.source in target.executable else (),
             ),
             FileMove(self.destination, self.source),
         )
@@ -64,11 +66,20 @@ class FileCreation(Action[SourceTree]):
     What the file holds.
     """
 
+    is_executable: bool = False
+    """
+    Whether the file is executable.
+    """
+
     def apply(self, target: SourceTree) -> AppliedAction[SourceTree]:
         if self.path in target.files:
             raise FileActionTargetError(self.path, FileExpectation.ABSENT)
         return AppliedAction(
-            target.with_files({self.path: self.content}),
+            target.with_files(
+                {self.path: self.content},
+                (),
+                (self.path,) if self.is_executable else (),
+            ),
             FileDeletion(self.path, self.content),
         )
 
@@ -93,7 +104,8 @@ class FileDeletion(Action[SourceTree]):
         if target.files.get(self.path) != self.content:
             raise FileActionTargetError(self.path, FileExpectation.CONTENT)
         return AppliedAction(
-            target.with_files({}, (self.path,)), FileCreation(self.path, self.content)
+            target.with_files({}, (self.path,)),
+            FileCreation(self.path, self.content, self.path in target.executable),
         )
 
 

@@ -127,3 +127,31 @@ def test_a_directory_a_write_empties_is_removed(before, tmp_path):
     SourceTree({}).write(tmp_path, before)
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_moved_executable_stays_executable_on_disk(tmp_path):
+    """
+    A file's executable bit travels with it, so a moved script still runs.
+    """
+    script = Path("run.sh")
+    tree = SourceTree({script: b""}, frozenset({script}))
+    tree.write(tmp_path, SourceTree({}))
+    moved = FileMove(script, Path("bin") / script).apply(tree).result
+
+    moved.write(tmp_path, tree)
+
+    assert SourceTree.of_directory(tmp_path).executable == frozenset(
+        {Path("bin") / script}
+    )
+
+
+def test_a_deleted_executable_is_created_executable_again(tmp_path):
+    """
+    Undoing a deletion restores the file's executable bit along with its content.
+    """
+    script = Path("run.sh")
+    tree = SourceTree({script: b""}, frozenset({script}))
+
+    applied = FileDeletion(script, b"").apply(tree)
+
+    assert applied.inverse.apply(applied.result).result == tree

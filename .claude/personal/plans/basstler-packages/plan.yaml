@@ -30,27 +30,10 @@ tracks:
   name: Code rules from krrood
   wave: extensibility
 items:
-- id: break-remaining-cycles
-  title: Break the remaining boundary crossings between distributions
-  track: package-split
-  branch: claude/compassionate-davinci-ontcti
-  pull_request_number: 217
-  session: https://claude.ai/code/session_018wfiv52smwbRFpSJ1ckLAf
-  depends_on: []
-  status: in progress
-  recommended_model: opus
-  notes: 'Draft #217 removes all 18 crossings (new-crossings passes), so CI keeps the map clean.
-    Plan model into basstler.plan.structure, with a hub-side ItemCard for the render fields;
-    notes moves below plan; stack.configuration into github; the open-pull-requests request
-    into upstream_reviews; commit_move back to stack. The per-distribution split of locations,
-    environment and exceptions is split-shared-modules.
-
-    '
 - id: uv-workspace
   title: Move each distribution into packages/<name> as a uv workspace with lockstep versions
   track: package-split
-  depends_on:
-  - break-remaining-cycles
+  depends_on: []
   status: not started
   recommended_model: sonnet
   notes: 'Pure renames. hatch-vcs per package, root ../..; a hatch metadata hook in each sdist
@@ -221,17 +204,15 @@ items:
     Pure refactor, no release label.
 
     '
-
 - id: split-shared-modules
   title: Give each distribution its own locations, environment and exceptions
   track: package-split
-  depends_on:
-  - break-remaining-cycles
+  depends_on: []
   status: not started
   recommended_model: opus
-  notes: 'Split from break-remaining-cycles at its kickoff. Move every name in locations, environment
-    and exceptions that one distribution alone uses into that distribution''s own module; the
-    rule becomes "once, in its own package''s locations". Pure moves.
+  notes: 'Split from break-remaining-cycles at its kickoff. Move every name in locations,
+    environment and exceptions that one distribution alone uses into that distribution''s
+    own module; the rule becomes "once, in its own package''s locations". Pure moves.
 
     '
-landed_item_count: 2
+landed_item_count: 3

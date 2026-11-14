@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from types import ModuleType
 
 from basstler.code_rules.checker import CodeRuleChecker
+from basstler.code_rules.fixes import FixableChecker
 from basstler.code_rules.rule import Section
 
 
@@ -71,4 +72,13 @@ class RuleModule:
             for section in top_level_section.descendants
             for rule in section
             if rule.checker is not None
+        )
+
+    @property
+    def fixable_checkers(self) -> tuple[FixableChecker, ...]:
+        """
+        The checkers among :attr:`checkers` whose rule has a fix.
+        """
+        return tuple(
+            checker for checker in self.checkers if isinstance(checker, FixableChecker)
         )

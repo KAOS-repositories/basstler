@@ -803,6 +803,66 @@ class BashByNameSnippet(PathEnumeration):
     """
 
 
+class CodeModificationSnippet(PathEnumeration):
+    """
+    Source files the code modification tests change.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "code-modification"
+    """
+    The directory holding them.
+    """
+
+    TWO_CALLS = DIRECTORY / "two-calls.py"
+    """
+    A call of :func:`abs` and a call of :func:`round`.
+    """
+
+    TWO_CALLS_FIRST_RENAMED = DIRECTORY / "two-calls-first-renamed.py"
+    """
+    :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
+    """
+
+    NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
+    """
+    A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`
+    next to them.
+    """
+
+    PRINT_CALL = DIRECTORY / "print-call.py"
+    """
+    One call of :func:`print`.
+    """
+
+
+class RuleFixExample(PathEnumeration):
+    """
+    The examples every fix is tested on.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "rule-fixes"
+    """
+    A directory for each fixable checker, named after its class, holding one directory
+    per example with a :class:`RuleFixExampleFile` of each kind.
+    """
+
+
+class RuleFixExampleFile(StrEnum):
+    """
+    The files of one example of a fix.
+    """
+
+    BEFORE = "before.py"
+    """
+    The code breaking the rule.
+    """
+
+    AFTER = "after.py"
+    """
+    The same code once fixed, exactly as the fix writes it.
+    """
+
+
 class LocaleEncodingSnippet(PathEnumeration):
     """
     Source files the check for text read or written in the locale encoding reads.

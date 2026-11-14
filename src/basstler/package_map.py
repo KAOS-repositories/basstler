@@ -89,7 +89,8 @@ class Distribution(StrEnum):
 
     RULES = "basstler-rules"
     """
-    The code rules, their checkers and the generated ``AGENTS.md``.
+    The code rules, their checkers and fixes, the reversible code changes fixes are
+    made of, and the generated ``AGENTS.md``.
     """
 
     GITHUB = "basstler-github"
@@ -310,7 +311,7 @@ PACKAGE_MAP = PackageMap(
         DistributionDeclaration(
             Distribution.RULES,
             Layer.LOCAL_TOOLS,
-            ("code_rules",),
+            ("code_modification", "code_rules"),
             (Distribution.CORE, Distribution.GIT),
         ),
         DistributionDeclaration(

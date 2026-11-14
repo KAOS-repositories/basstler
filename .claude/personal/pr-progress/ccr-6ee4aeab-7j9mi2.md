@@ -1,11 +1,13 @@
 ### Plan
-- Session start installs with uv sync --frozen (checkout) or from a clone of the release tag; setup.dependencies reads the installed distributions
-- Windows without uv: py -3.14/-3.13/-3.12, then python, as full paths
-- CI: one job per distribution with only what it lists; release and windows-setup workflows follow the paths
-- Fix the notes, hub and meta-package suites; update docs and the PR description
+- Read CI on 4ddeda0b: per-distribution test job, lint (uv lock --check, new-crossings prints a notice since #222's base has no workspace), Windows setup
+- Untangle shared test helpers so lower distributions' dev groups need fewer siblings (scratch_repository pulls in notes via setup.steps); propose as a new item on #151
+- Final PR description pass, then mark ready only when the owner says so
 ### Done
-- Stacked on #222; code actions generic; tree actions and ModuleRelocation added
-- One ActionPlan moved sources and tests into packages/<part> (d9dd4b5b)
-- Workspace pyprojects, basstler-build sibling-pin hook, uv.lock; map read from the workspace
+- Stacked on #222; code actions generic (AppliedAction.result); SourceTree, file actions and ModuleRelocation, keeping executable bits
+- One ActionPlan moved sources and tests into packages/<part>; shared helpers into test_support/basstler_testing
+- Workspace pyprojects, basstler-build sibling-pin hook, uv.lock; map read from each package's folder and pyproject
+- Session start: uv sync --frozen (checkout editable, release from a shallow tag clone); py -3.X candidates; requirements from declarations in a checkout
+- CI and every workflow install from uv.lock; rules, AGENTS.md, READMEs updated
+- Local at 4ddeda0b: every distribution's suite passes; hub has only the 32 sandbox Playwright errors; meta-package last seen 681 passed
 ### Next
-- setup.dependencies and session-start install
+- Check CI, fix what it reports

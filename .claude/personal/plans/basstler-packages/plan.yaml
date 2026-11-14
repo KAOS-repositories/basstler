@@ -33,8 +33,11 @@ items:
 - id: uv-workspace
   title: Move each distribution into packages/<name> as a uv workspace with lockstep versions
   track: package-split
+  branch: ccr-6ee4aeab-7j9mi2
+  pull_request_number: 223
+  session: https://claude.ai/code/session_01JxHGiNXmsDWbDmd81sWCfP
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: sonnet
   notes: 'Pure renames. hatch-vcs per package, root ../..; a hatch metadata hook in each sdist
     pins siblings ==version. Committed uv.lock, uv sync --frozen at session start (absorbs

@@ -43,10 +43,14 @@ items:
   track: carried-across
   depends_on: []
   pull_request_number: 12
-  notes: 'Once krrood-core is on PyPI: basstler-core depends on krrood-core>=X,<next-major (a range, never ==) instead of
-    copying its code; the copied class_property, exceptions and PathEnumeration are deleted, and AGENTS.md''s copy-never-import
-    rule changes in the same PR. basstler-rules keeps the rule engine and imports patterns from krrood-core. SiteRepository
-    becomes a Role[Repository] (https://github.com/KAOS-repositories/basstler/pull/105#discussion_r4436512955). #12 predates
-    this and is reworked on v3''s code.'
+  notes: >
+    Once krrood-core is on PyPI: basstler-core depends on krrood-core>=X,<next-major (a range, never
+    ==) instead of copying its code; the copied class_property, exceptions and PathEnumeration are
+    deleted, and AGENTS.md's copy-never-import rule changes in the same PR. basstler-rules keeps the
+    rule engine and imports patterns from krrood-core. SiteRepository becomes a Role[Repository]
+    (https://github.com/KAOS-repositories/basstler/pull/105#discussion_r4436512955). #12 predates
+    this and is reworked on v3's code.
+
+    Move review_triage.python_source into krrood source analysis (#213 review).
   blockers:
   - Waits on krrood-light-core/krrood-distributions being released on PyPI (CRAM notes).

@@ -16,8 +16,9 @@ organization on GitHub. Setting it up: [`docs/SETUP.md`](docs/SETUP.md).
 | --- | --- |
 | `plugin/` | The Claude Code plugin: its manifest, the skills, and the bash hooks the skills and the session start run. |
 | `.claude-plugin/marketplace.json` | The marketplace that lists the plugin, so this repository is what you add it from. |
-| `src/basstler/` | The Python package every hook and skill runs, as `python -m basstler.<module>`. |
-| `tests/` | The test suite, run by `pytest tests`. |
+| `packages/<part>/` | One distribution each (`basstler-core`, `basstler-git`, ... and the `basstler` meta-package): its `pyproject.toml`, its part of the `basstler` namespace package under `src/`, and its tests under `tests/`. Every hook and skill runs the package as `python -m basstler.<module>`. |
+| `test_support/` | The helpers, fixtures and dataset the tests of several distributions share. |
+| `pyproject.toml`, `uv.lock` | The uv workspace of the distributions, its development tools, and the versions it installs at. |
 | `docs/` | The setup guide and the stacked-PR workflow. |
 
 The plugin carries no Python, and the package carries no hooks: a session start installs the
@@ -66,20 +67,20 @@ every project has updated its plugin.
 
 What it installs from depends on where the plugin is:
 
-- **A plugin installed on its own** installs `basstler @ git+https://github.com/KAOS-repositories/basstler@<tag>`,
-  the tag being the release its `plugin.json` names. A plugin naming none - a copy of the
+- **A plugin installed on its own** shallow-clones this repository at `<tag>` into
+  `$BASSTLER_HOME/releases/<tag>`, the tag being the release its `plugin.json` names, and
+  syncs every distribution from that clone's `uv.lock`, not editable. A plugin naming none - a copy of the
   source tree outside a clone - installs nothing: session start says so on its
   `dependencies:` line, every hook stops with the same reason, and setup reports it as
   `mismatched`. Reinstall the plugin from the marketplace.
-- **A plugin run from a clone of this repository** installs that clone editable, so
+- **A plugin run from a clone of this repository** syncs that clone's `uv.lock` editable, so
   `import basstler` is the clone's own source.
 
-The environment comes from `uv` where it is on the path, since `uv` can fetch a supported
-interpreter where none is installed, and otherwise from the newest supported `python3.1x`
-on the path. A machine with neither - one whose only interpreter is too old - gets `uv`
-installed into `$BASSTLER_HOME/uv` with the `pip` it has, and `uv` fetches the interpreter.
-`uv` also does the installing wherever there is one, since `pip` runs inside the
-environment's own interpreter and an older `pip` breaks on a newer one.
+Both create the environment and install with `uv`, the one tool that installs the workspace
+from its lock and fetches a supported interpreter where none is installed. Where no `uv` is
+on the path, it is installed into `$BASSTLER_HOME/uv` with the `pip` of the newest supported
+interpreter - `python3.1x` on the path, then `py -3.1x` on Windows - and otherwise with the
+`pip` on the path.
 
 Three things bound it:
 
@@ -117,12 +118,15 @@ with the interpreter and each module named once in
 ## Developing it
 
 ```bash
-uv venv --python ">=3.12" .venv && uv pip install --python .venv/bin/python --editable . --group dev
+uv sync --frozen --all-packages
 .venv/bin/python -m playwright install chromium
-PATH="$PWD/.venv/bin:$PATH" pytest tests -n auto
+for tests in packages/*/tests; do PATH="$PWD/.venv/bin:$PATH" .venv/bin/python -m pytest "$tests" -n auto; done
 .venv/bin/ruff check .
 .venv/bin/ruff format --check .
 ```
+
+Each distribution's tests run in a pytest process of their own, as CI runs them, each in an
+environment holding only that distribution and what its `pyproject.toml` lists.
 
 The hook tests run `python3`, so the environment has to be first on the path, and the plan
 page's script is tested in the headless Chromium Playwright installs. `ruff check`
@@ -131,7 +135,7 @@ by `python scripts/format_docstrings.py <files>` (ruff format, then docformatter
 keeps its result), also run as a pre-commit hook. The rule-check and AGENTS.md hooks
 run `.venv/bin/python`, so they need the environment set up above. To try a
 change in a real session, start Claude Code with `--plugin-dir plugin`: the plugin then
-sits in this clone, and installs the clone editable.
+sits in this clone, and syncs the clone editable.
 
 ## Licence
 

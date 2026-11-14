@@ -385,7 +385,7 @@ elif [ -z "${MISSING_DEPENDENCIES}" ]; then
   report package_dependencies ok "the basstler package and every requirement it declares are installed for ${BASSTLER_PYTHON}"
 else
   report package_dependencies needs-setup \
-    "not installed for ${BASSTLER_PYTHON}:${MISSING_DEPENDENCIES// / } - a session start installs them, or run: pip --python ${BASSTLER_PYTHON} install '$(basstler_package_source)'"
+    "not installed for ${BASSTLER_PYTHON}:${MISSING_DEPENDENCIES// / } - a session start installs them, or run: $(basstler_install_command; printf '%s' "${BASSTLER_INSTALL_COMMAND[*]}")"
 fi
 
 # %% the package's version
@@ -416,7 +416,7 @@ if requested basstler_version; then
         "basstler ${BASSTLER_INSTALLED_VERSION}, the plugin's own release$(latest_release_note "${BASSTLER_INSTALLED_VERSION}")" ;;
     mismatched)
       report basstler_version mismatched \
-        "the plugin at ${PLUGIN_ROOT} is ${BASSTLER_PLUGIN_RELEASE} but the package is basstler ${BASSTLER_INSTALLED_VERSION} - start a new session, or run: pip --python ${BASSTLER_PYTHON} install '$(basstler_package_source)'" ;;
+        "the plugin at ${PLUGIN_ROOT} is ${BASSTLER_PLUGIN_RELEASE} but the package is basstler ${BASSTLER_INSTALLED_VERSION} - start a new session, or run: $(basstler_install_command; printf '%s' "${BASSTLER_INSTALL_COMMAND[*]}")" ;;
     not-named)
       report basstler_version mismatched \
         "the plugin at ${PLUGIN_ROOT} names no release, so nothing pins basstler ${BASSTLER_INSTALLED_VERSION} to it - reinstall the plugin from the marketplace" ;;

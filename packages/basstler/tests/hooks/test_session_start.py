@@ -1,0 +1,2431 @@
+"""
+Integration tests for session-start.sh's summary report.
+
+Cover the three guards the report exists for: naming which situation a branch with no
+plan item is actually in, surfacing check-setup.sh's verdict rather than leaving it to be
+remembered, and installing the package's dependencies so nothing downstream has to run
+without them. All three stay invisible to anyone who uses neither plans nor personal
+notes.
+
+Run against a scratch project root with a local bare repository standing in for the
+personal-notes remote - no network access or real personal-notes branch involved.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from collections.abc import Mapping
+from enum import StrEnum
+from importlib.metadata import version
+from pathlib import Path
+
+import pytest
+
+from basstler.directory_tree import DirectoryTree
+from basstler.bash import Bash
+from basstler.document_references import CitedNames, ShippedModules
+from basstler.github.release_version import ReleaseVersion
+from basstler.locations import (
+    BasstlerVariable,
+    PackageLocation,
+    PluginLocation,
+    ProjectLocation,
+    WorkflowLocation,
+)
+from basstler.personal_notes import access
+from basstler.plan.merged_items import __main__ as merged_items_command
+from basstler.plan.merged_items.every_plan import (
+    MergedItemsCommand,
+    MergedItemsSummary,
+)
+from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan_site.hub import SiteAddress
+from basstler.setup.report import CheckStatus, SetupCheck
+from basstler.shell_configuration import ShellConfigurationFunction
+from basstler.upstream_reviews.action.branch import InstallationState
+
+from ..bash_path import BashPath
+from basstler_testing.constants.environment import (
+    ConfigurationVariable,
+    FileMode,
+    PullRequestStubVariable,
+    ScrubbedEnvironmentPrefix,
+    SearchPathVariable,
+)
+from basstler_testing.constants.notes import ClaudeLocalSection, ScratchBranch
+from basstler_testing.constants.paths import (
+    DatasetLocation,
+    PersonalNotesPath,
+    RepositoryLocation,
+)
+from basstler_testing.constants.site import SiteRepository
+from basstler_testing.executable_stubs import (
+    ExecutableStubDirectory,
+    path_hiding_executables,
+)
+from basstler_testing.plan_dataset import LandedItemsPlan
+from basstler_testing.plugin_manifest import PluginManifest
+from basstler_testing.project_declaration import ProjectDeclaration
+from basstler_testing.scratch_repository import (
+    SCRATCH_IDENTITY,
+    ScratchRepository,
+    write_interpreter_wrapper,
+)
+from basstler_testing.script_runner import configuration_value
+from basstler_testing.hooks.session_start_summary import (
+    SummaryLine,
+    SummaryMessage,
+    summary_message,
+    summary_value,
+)
+
+
+class StubVariable(StrEnum):
+    """
+    The environment variables the stubs under ``dataset/stubs`` read.
+    """
+
+    PIP_CALL_LOG = "STUB_PIP_CALL_LOG"
+    """
+    The file the ``pip`` stub appends each invocation to.
+    """
+
+    PIP_STATUS = "STUB_PIP_STATUS"
+    """
+    The exit status the ``pip`` stub reports.
+    """
+
+    PIP_INSTALLED_UV = "STUB_PIP_INSTALLED_UV"
+    """
+    The script a ``uv`` installed by the ``pip`` stub runs.
+    """
+
+    UV_CALL_LOG = "STUB_UV_CALL_LOG"
+    """
+    The file the ``uv`` stub appends each invocation to.
+    """
+
+    UV_STATUS = "STUB_UV_STATUS"
+    """
+    The exit status the ``uv`` stub reports.
+    """
+
+    UV_PYTHON = "STUB_UV_PYTHON"
+    """
+    The interpreter an environment the ``uv`` stub creates runs.
+    """
+
+    UV_WATCHED_FILE = "STUB_UV_WATCHED_FILE"
+    """
+    A file the ``uv`` stub copies, as it is while the stub runs.
+    """
+
+    UV_WATCHED_FILE_COPY = "STUB_UV_WATCHED_FILE_COPY"
+    """
+    Where the ``uv`` stub copies :attr:`UV_WATCHED_FILE` to.
+    """
+
+    UV_ENVIRONMENT_INTERPRETER = "STUB_UV_ENVIRONMENT_INTERPRETER"
+    """
+    Where, inside an environment the ``uv`` stub creates, it writes the interpreter.
+    """
+
+
+class EnvironmentInterpreterLayout(StrEnum):
+    """
+    Where a virtual environment keeps its interpreter, relative to the environment, on
+    each platform that lays it out differently.
+    """
+
+    POSIX = "bin/python"
+    """
+    Every platform but Windows.
+    """
+
+    WINDOWS = "Scripts/python.exe"
+    """
+    Windows.
+    """
+
+
+class PackageManager(StrEnum):
+    """
+    The executables the session start installs packages with, each named as it is on
+    ``PATH`` and as its stub is under ``dataset/stubs``.
+    """
+
+    PIP = "pip"
+    """
+    The package installer every interpreter ships, which installs ``uv`` where there is
+    none.
+    """
+
+    UV = "uv"
+    """
+    The package manager that also creates environments and fetches interpreters.
+    """
+
+
+PLAN_MANIFEST = (DatasetLocation.DIRECTORY / "plan.yaml").read_text(encoding="utf-8")
+
+PLAN_MANIFEST_WITH_TRACKING_ISSUE = (
+    DatasetLocation.DIRECTORY / "plan-with-tracking-issue.yaml"
+).read_text(encoding="utf-8")
+
+TRACKING_ISSUE = "55"
+
+PLAN_IDENTIFIER = "test-plan"
+
+
+MANIFEST_PATH = ProjectLocation.PLANS / PLAN_IDENTIFIER / "plan.yaml"
+
+
+def branch_index(plan_identifier_by_branch: Mapping[str, str]) -> str:
+    """
+    Build a branch index mapping each branch to the plan that tracks it.
+
+    :param plan_identifier_by_branch: Plan ids, keyed by the branch each one tracks.
+    :return: The index's tab-separated content.
+    """
+    return "".join(
+        f"{branch}\t{plan_identifier}\n"
+        for branch, plan_identifier in plan_identifier_by_branch.items()
+    )
+
+
+# %% the scratch layout
+
+
+@pytest.fixture
+def session_start_repository(
+    scratch_repository: ScratchRepository,
+) -> ScratchRepository:
+    """
+    A scratch repository carrying the real session-start.sh and everything else a set up
+    clone has, with nothing published to the notes remote yet, and a stand-in for
+    :mod:`basstler.plan.merged_items`'s command that finds no pull request merged.
+
+    :param scratch_repository: The initialized scratch repository and notes remote.
+    :return: The same repository, ready to publish a notes branch and run the hook.
+    """
+    scratch_repository.install_hook_scripts(
+        PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
+        PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
+        PluginLocation.SESSION_START_SCRIPT.name,
+        PluginLocation.SESSION_RULES.name,
+        PluginLocation.SETUP_CHECK_SCRIPT.name,
+        PluginLocation.PLAN_SAVING_SCRIPT.name,
+    )
+    scratch_repository.install_package()
+    scratch_repository.replace_package_module(
+        merged_items_command, DatasetLocation.MERGED_ITEMS_STUB
+    )
+    scratch_repository.install_package_environment()
+    scratch_repository.write_setup_prerequisites()
+    scratch_repository.commit_everything("initial commit")
+    scratch_repository.resolve_notes_remote_to()
+    return scratch_repository
+
+
+def run_session_start(
+    repository: ScratchRepository, environment: Mapping[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run the scratch layout's session-start.sh.
+
+    :param repository: A fixture-built scratch repository.
+    :param environment: Variables to set for this run.
+    :return: The finished subprocess.
+    """
+    return repository.run_hook_script(
+        PluginLocation.SESSION_START_SCRIPT.name, **(environment or {})
+    )
+
+
+def publish_and_run(
+    repository: ScratchRepository,
+    notes_branch_files: Mapping[str, str] | None = None,
+    environment: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """
+    Publish everything a set up notes branch carries, plus *notes_branch_files*, then
+    run session-start.sh against it.
+
+    The recorded git identity is the one this repository already commits with, so the
+    baseline these tests assert against is a clone with nothing left to set up - what
+    the git identity round trip itself does is
+    ``hooks/test_git_identity_sync.py``'s subject, not this module's.
+
+    :param repository: The fixture-built scratch repository.
+    :param notes_branch_files: Extra file contents, keyed by path relative to the
+        project root.
+    :param environment: Variables to set for the hook's run.
+    :return: The finished session-start.sh process.
+    """
+    repository.publish_notes_branch(
+        {
+            ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
+            PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            **(notes_branch_files or {}),
+        }
+    )
+    return run_session_start(repository, environment)
+
+
+# %% a project that has never held anything of Claude Code's
+
+
+def test_runs_in_a_project_with_no_claude_code_directory(
+    session_start_repository: ScratchRepository,
+):
+    """
+    The plugin lives outside the project, so nothing guarantees the project has a
+    ``.claude`` directory for the hook's own records - it makes one.
+    """
+    session_start_repository.publish_notes_branch(
+        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n"}
+    )
+    DirectoryTree(
+        session_start_repository.project_root / ProjectLocation.CLAUDE_CODE_DIRECTORY
+    ).remove()
+
+    result = run_session_start(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).exists()
+
+
+# %% the session rules
+
+
+def test_every_session_loads_the_session_rules(
+    session_start_repository: ScratchRepository,
+):
+    """
+    The local instructions carry the plugin's session rules unchanged, so every skill a
+    session runs is bound by them.
+    """
+    result = publish_and_run(session_start_repository)
+    assert result.returncode == 0, result.stderr
+    claude_local = (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).read_text(encoding="utf-8")
+    assert ClaudeLocalSection.SESSION_RULES.within(claude_local) == (
+        RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name
+    ).read_text(encoding="utf-8")
+
+
+def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
+    session_start_repository: ScratchRepository,
+):
+    """
+    The session rules do not depend on the user having written any notes.
+    """
+    session_start_repository.publish_notes_branch(
+        {PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
+    )
+    result = run_session_start(session_start_repository)
+    assert result.returncode == 0, result.stderr
+    claude_local = (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).read_text(encoding="utf-8")
+    assert ClaudeLocalSection.SESSION_RULES.within(claude_local) == (
+        RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name
+    ).read_text(encoding="utf-8")
+
+
+# %% the names the personal notes cite
+
+
+def test_notes_naming_only_shipped_modules_and_skills_are_reported_current(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.CITED_NAMES) == summary_message(
+        SummaryMessage.CITED_NAMES_CURRENT
+    )
+
+
+def test_every_name_the_notes_cite_that_is_no_longer_shipped_is_listed(
+    session_start_repository: ScratchRepository,
+):
+    """
+    Notes outlive the release they were written against, so a session is told up front
+    which of their commands would fail, and what replaced each.
+    """
+    notes = DatasetLocation.NOTES_CITING_RETIRED_NAMES.read_text(encoding="utf-8")
+    stale = CitedNames.in_text(notes).stale(ShippedModules.installed())
+
+    result = publish_and_run(
+        session_start_repository, {ProjectLocation.PERSONAL_NOTES_DOCUMENT: notes}
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.CITED_NAMES) == summary_message(
+        SummaryMessage.CITED_NAMES_STALE, str(len(stale))
+    )
+    for reference in stale:
+        assert f"    {reference.as_line()}" in result.stdout.splitlines()
+
+
+# %% someone who uses neither plans nor personal notes
+
+
+def test_reports_nothing_when_no_notes_branch_exists(
+    session_start_repository: ScratchRepository,
+):
+    session_start_repository.run_git("checkout", "--quiet", "-b", ScratchBranch.WORK)
+
+    result = run_session_start(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+    assert not (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).exists()
+
+
+# %% a notes repository the session cannot reach
+
+
+@pytest.fixture
+def unreachable_notes_repository(
+    session_start_repository: ScratchRepository,
+) -> ScratchRepository:
+    """
+    The scratch repository, with the access check reporting its notes repository as one
+    this session cannot reach.
+
+    :param session_start_repository: The scratch repository and notes remote.
+    :return: The same repository.
+    """
+    session_start_repository.replace_package_module(
+        access, DatasetLocation.NOTES_ACCESS_STUB
+    )
+    return session_start_repository
+
+
+def test_a_notes_repository_it_cannot_reach_is_reported_under_the_notes_line(
+    unreachable_notes_repository: ScratchRepository,
+):
+    result = publish_and_run(unreachable_notes_repository)
+
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.splitlines()
+    notes_line = lines.index(
+        next(
+            line
+            for line in lines
+            if line.startswith(f"  {SummaryLine.PERSONAL_NOTES}:")
+        )
+    )
+    assert lines[notes_line + 1] == f"    {access.__name__}"
+
+
+def test_a_notes_branch_it_cannot_fetch_from_an_unreachable_repository_is_reported(
+    unreachable_notes_repository: ScratchRepository,
+):
+    """
+    A notes branch that could not be fetched because its repository is not attached is
+    said, instead of the session starting with no word about its notes.
+    """
+    unreachable_notes_repository.run_git(
+        "checkout", "--quiet", "-b", ScratchBranch.WORK
+    )
+
+    result = run_session_start(unreachable_notes_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PERSONAL_NOTES) == summary_message(
+        SummaryMessage.NOTES_NOT_REACHED
+    )
+    assert f"    {access.__name__}" in result.stdout.splitlines()
+
+
+# %% the plan line
+
+
+def test_reports_no_plans_when_none_are_tracked(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
+        SummaryMessage.NO_PLANS_TRACKED, ScratchBranch.PERSONAL_NOTES
+    )
+
+
+def test_names_the_missing_item_when_other_plans_are_tracked(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {
+                    "some-other-branch": PLAN_IDENTIFIER,
+                    "a-third-branch": "another-plan",
+                }
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
+        SummaryMessage.NO_PLAN_ITEM_TRACKS_BRANCH, ScratchBranch.WORK, "2"
+    )
+
+
+def test_reports_the_plan_that_tracks_this_branch(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST_WITH_TRACKING_ISSUE,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
+        SummaryMessage.BRANCH_TRACKED_IN_PLAN, PLAN_IDENTIFIER, TRACKING_ISSUE
+    )
+
+
+def test_reports_a_tracked_plan_that_has_no_tracking_issue(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
+        SummaryMessage.BRANCH_TRACKED_IN_PLAN, PLAN_IDENTIFIER, "none"
+    )
+
+
+def test_reports_a_tracked_branch_whose_manifest_is_missing(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
+        SummaryMessage.PLAN_MANIFEST_MISSING,
+        PLAN_IDENTIFIER,
+        MANIFEST_PATH.as_posix(),
+        ScratchBranch.PERSONAL_NOTES,
+    )
+
+
+# %% the item a tracked branch loads
+
+
+@pytest.fixture
+def tracked_plan() -> LandedItemsPlan:
+    """
+    The three-item plan, with its open item moved onto the work branch.
+    """
+    plan = LandedItemsPlan.read()
+    open_item = plan.item_with_status(ItemStatus.IN_PROGRESS)
+    items = [
+        (
+            {**item.content, ManifestKey.BRANCH.key: str(ScratchBranch.WORK)}
+            if item == open_item
+            else item.content
+        )
+        for item in plan.manifest.items
+    ]
+    return LandedItemsPlan(
+        PlanManifest({**plan.manifest.content, ManifestKey.ITEMS.key: items})
+    )
+
+
+def publish_tracked_plan_and_run(
+    repository: ScratchRepository,
+    manifest: PlanManifest,
+    scratch_directory: Path,
+    environment: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """
+    Publish *manifest* as the plan tracking the work branch and run session-start.sh.
+
+    :param scratch_directory: Where the manifest is written before it is published.
+    :param environment: Variables to set for the hook's run.
+    :return: The finished session-start.sh process.
+    """
+    manifest_path = scratch_directory / PlanDocument.MANIFEST
+    manifest.write(manifest_path)
+    plan_directory = ProjectLocation.PLANS / manifest.identifier
+    return publish_and_run(
+        repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: manifest.identifier}
+            ),
+            plan_directory / PlanDocument.MANIFEST: manifest_path.read_text(
+                encoding="utf-8"
+            ),
+            plan_directory
+            / PlanDocument.ROADMAP: DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(
+                encoding="utf-8"
+            ),
+        },
+        environment,
+    )
+
+
+def run_on_tracked_branch(
+    repository: ScratchRepository, manifest: PlanManifest, scratch_directory: Path
+) -> str:
+    """
+    Publish *manifest* as the plan tracking the work branch, run session-start.sh, and
+    return the CLAUDE.local.md it wrote.
+
+    :param scratch_directory: Where the manifest is written before it is published.
+    """
+    result = publish_tracked_plan_and_run(repository, manifest, scratch_directory)
+    assert result.returncode == 0, result.stderr
+    return (repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS).read_text(
+        encoding="utf-8"
+    )
+
+
+def published_manifest(repository: ScratchRepository, plan_identifier: str) -> Path:
+    """
+    :return: The plan's manifest in a fresh clone of the notes branch.
+    """
+    checkout = repository.clone_notes_branch(repository.project_root.parent / "verify")
+    return checkout / ProjectLocation.PLANS / plan_identifier / PlanDocument.MANIFEST
+
+
+def test_a_tracked_branch_loads_only_its_own_item(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    claude_local = run_on_tracked_branch(
+        session_start_repository, tracked_plan.manifest, tmp_path
+    )
+    manifest = tracked_plan.manifest
+    assert ClaudeLocalSection.PLAN_ITEM.within(claude_local) == manifest.item_summary(
+        manifest.item_on_branch(ScratchBranch.WORK)
+    )
+    queued_item = tracked_plan.item_with_status(ItemStatus.NOT_STARTED)
+    assert queued_item.identifier not in claude_local
+
+
+def test_a_tracked_branch_loads_the_plan_s_standing_rules(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    claude_local = run_on_tracked_branch(
+        session_start_repository, tracked_plan.manifest, tmp_path
+    )
+    assert (
+        DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
+        in claude_local
+    )
+
+
+# %% branches no plan item can ever track
+
+
+# %% every plan's merged items
+
+
+def dropped_items_of(manifest: PlanManifest, *statuses: ItemStatus) -> list[str]:
+    """
+    :param manifest: A plan.
+    :param statuses: The statuses of the items dropped from it.
+    :return: Those items as the merged items line names them.
+    """
+    return sorted(
+        f"{manifest.identifier}/{item.identifier}"
+        for item in manifest.items
+        if item.status in statuses
+    )
+
+
+def test_a_merged_item_of_the_loaded_plan_is_recorded_done_and_dropped(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    """
+    The plan tracking the branch is saved without the item whose pull request merged.
+    """
+    in_progress = tracked_plan.item_with_status(ItemStatus.IN_PROGRESS)
+
+    result = publish_tracked_plan_and_run(
+        session_start_repository,
+        tracked_plan.manifest,
+        tmp_path,
+        {
+            PullRequestStubVariable.RECORDING: str(
+                DatasetLocation.IN_PROGRESS_ITEM_MERGED
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        summary_value(result.stdout, SummaryLine.MERGED_ITEMS)
+        == MergedItemsSummary(
+            dropped_items=dropped_items_of(
+                tracked_plan.manifest, ItemStatus.DONE, ItemStatus.IN_PROGRESS
+            )
+        ).line
+    )
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, tracked_plan.manifest.identifier)
+    )
+    assert (
+        saved
+        == tracked_plan.manifest.with_items_done(
+            {in_progress.identifier}
+        ).without_landed_items()
+    )
+
+
+def test_a_merged_item_of_a_plan_no_branch_here_tracks_is_recorded_done_and_dropped(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    """
+    Every plan on the notes branch is recorded, not only the one tracking this branch.
+    """
+    in_progress = tracked_plan.item_with_status(ItemStatus.IN_PROGRESS)
+    manifest_path = tmp_path / PlanDocument.MANIFEST
+    tracked_plan.manifest.write(manifest_path)
+    plan_directory = ProjectLocation.PLANS / tracked_plan.manifest.identifier
+
+    result = publish_and_run(
+        session_start_repository,
+        {
+            plan_directory / PlanDocument.MANIFEST: manifest_path.read_text(
+                encoding="utf-8"
+            ),
+            plan_directory
+            / PlanDocument.ROADMAP: DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(
+                encoding="utf-8"
+            ),
+        },
+        {
+            PullRequestStubVariable.RECORDING: str(
+                DatasetLocation.IN_PROGRESS_ITEM_MERGED
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, tracked_plan.manifest.identifier)
+    )
+    assert (
+        saved
+        == tracked_plan.manifest.with_items_done(
+            {in_progress.identifier}
+        ).without_landed_items()
+    )
+
+
+def test_plans_with_nothing_landed_are_left_as_they_were(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    unlanded = PlanManifest(
+        {
+            **tracked_plan.manifest.content,
+            ManifestKey.ITEMS.key: [
+                item.content
+                for item in tracked_plan.manifest.items
+                if item.status is not ItemStatus.DONE
+            ],
+        }
+    )
+
+    result = publish_tracked_plan_and_run(session_start_repository, unlanded, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        summary_value(result.stdout, SummaryLine.MERGED_ITEMS)
+        == MergedItemsSummary().line
+    )
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, unlanded.identifier)
+    )
+    assert saved == unlanded
+
+
+def test_unread_pull_requests_are_reported_and_leave_the_plan_as_it_was(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    """
+    Pull requests that cannot be read are reported as not checked.
+    """
+    result = publish_tracked_plan_and_run(
+        session_start_repository,
+        tracked_plan.manifest,
+        tmp_path,
+        {PullRequestStubVariable.RECORDING: str(tmp_path / "no-recording.json")},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.MERGED_ITEMS) == summary_message(
+        SummaryMessage.MERGED_ITEMS_NOT_CHECKED
+    )
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, tracked_plan.manifest.identifier)
+    )
+    assert saved == tracked_plan.manifest
+
+
+def test_the_every_plan_subcommand_matches_the_shell_configuration(
+    session_start_repository: ScratchRepository,
+):
+    assert session_start_repository.configuration_value(
+        "PLAN_MERGED_ITEMS_EVERY_PLAN_COMMAND"
+    ) == str(MergedItemsCommand.EVERY_PLAN)
+
+
+def test_reports_merged_items_as_not_applicable_when_the_notes_hold_no_plans(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.MERGED_ITEMS) == summary_message(
+        SummaryMessage.MERGED_ITEMS_NO_PLANS
+    )
+
+
+def test_reports_plan_as_not_applicable_on_the_default_branch(
+    session_start_repository: ScratchRepository,
+):
+    session_start_repository.publish_notes_branch(
+        {
+            ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST,
+        }
+    )
+    session_start_repository.run_git("checkout", "--quiet", "-b", "main")
+
+    result = run_session_start(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
+        SummaryMessage.PLAN_NOT_APPLICABLE
+    )
+
+
+def test_reports_plan_as_not_applicable_on_the_notes_branch(
+    session_start_repository: ScratchRepository,
+):
+    session_start_repository.publish_notes_branch(
+        {
+            ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST,
+        }
+    )
+    session_start_repository.run_git(
+        "checkout", "--quiet", ScratchBranch.PERSONAL_NOTES
+    )
+
+    result = run_session_start(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
+        SummaryMessage.PLAN_NOT_APPLICABLE
+    )
+
+
+# %% the setup line
+
+
+def test_reports_setup_as_ok_when_every_check_passes(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.SETUP) == summary_message(
+        SummaryMessage.SETUP_OK
+    )
+
+
+def unregister_the_session_start_hook(repository: ScratchRepository) -> None:
+    """
+    Take the plugin's hook registration away, so exactly one setup check fails.
+
+    :param repository: The fixture-built scratch repository.
+    """
+    (repository.plugin_root / PluginLocation.HOOKS.value.name / "hooks.json").unlink()
+
+
+def test_names_every_check_that_needs_setup(
+    session_start_repository: ScratchRepository,
+):
+    unregister_the_session_start_hook(session_start_repository)
+
+    result = publish_and_run(session_start_repository)
+
+    failing_check = "session_start_hook"
+    detail = next(
+        row.split("\t")[2]
+        for row in session_start_repository.run_hook_script(
+            PluginLocation.SETUP_CHECK_SCRIPT.name
+        ).stdout.splitlines()
+        if row.split("\t")[0] == failing_check
+    )
+    assert summary_value(result.stdout, SummaryLine.SETUP) == summary_message(
+        SummaryMessage.CHECKS_NEED_SETUP, "1"
+    )
+    assert f"    {failing_check}: {detail}" in result.stdout
+
+
+def test_names_every_check_that_could_not_be_verified(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(
+        session_start_repository,
+        {WorkflowLocation.PLAN_SITE_DISPATCH: "name: Plan site dispatch\n"},
+    )
+
+    unverified_check, detail = next(
+        (check, detail)
+        for check, status, detail in (
+            row.split("\t")
+            for row in session_start_repository.run_hook_script(
+                PluginLocation.SETUP_CHECK_SCRIPT.name
+            ).stdout.splitlines()
+        )
+        if status == CheckStatus.UNVERIFIED
+    )
+    assert unverified_check == SetupCheck.PLAN_SITE
+    assert summary_value(result.stdout, SummaryLine.SETUP) == summary_message(
+        SummaryMessage.CHECKS_NEED_SETUP, "1"
+    )
+    assert (
+        f"    {unverified_check} ({CheckStatus.UNVERIFIED}): {detail}" in result.stdout
+    )
+
+
+def test_a_failing_setup_check_does_not_fail_the_hook(
+    session_start_repository: ScratchRepository,
+):
+    unregister_the_session_start_hook(session_start_repository)
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).exists()
+
+
+# %% the dependencies line
+
+
+def declaration_file(repository: ScratchRepository) -> Path:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: Where its scratch checkout declares the package's requirements.
+    """
+    return repository.package_declaration
+
+
+def environment_directory(repository: ScratchRepository) -> str:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: The package's own environment, as the summary line names it.
+    """
+    return repository.configuration_value(BasstlerVariable.ENVIRONMENT_DIRECTORY)
+
+
+def package_source(repository: ScratchRepository) -> str:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: What the installer is handed: the scratch checkout the plugin sits in.
+    """
+    return repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE
+    ).strip()
+
+
+SUPPORTED_PYTHON = ProjectDeclaration.of_this_package().requires_python
+"""
+The interpreters the package supports, as its metadata states them and so as the
+environment has to be asked for.
+"""
+
+UNINSTALLABLE_REQUIREMENT = "basstler-no-such-distribution>=1"
+"""
+A distribution nothing can have installed, so the run has something to install.
+
+Its own name says why it is here, which matters because a real name that happened to be
+installed on the machine running the suite would make the test pass without exercising
+anything. The version bound is part of it: what the summary names is the specifier, not
+the bare name.
+"""
+
+
+def require_the_uninstallable(repository: ScratchRepository) -> None:
+    """
+    Leave the scratch clone declaring a dependency that is certainly not installed,
+    beside the package's own name, which is.
+
+    :param repository: The fixture-built scratch repository.
+    """
+    declaration_file(repository).write_text(
+        ProjectDeclaration(
+            name=ProjectDeclaration.of_this_package().name,
+            dependencies=(UNINSTALLABLE_REQUIREMENT,),
+        ).as_toml(),
+        encoding="utf-8",
+    )
+
+
+def environment_interpreter(repository: ScratchRepository) -> str:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: Where the package environment keeps its interpreter, as the shell names it.
+    """
+    return repository.configuration_value(ConfigurationVariable.ENVIRONMENT_INTERPRETER)
+
+
+def uv_installer_call(repository: ScratchRepository, **overrides: str) -> str:
+    """
+    :param repository: The fixture-built scratch repository.
+    :param overrides: Variables the run sets.
+    :return: The arguments ``uv`` is expected to install the package with: the shell's
+        install command after the environment it names and the ``uv`` it runs.
+    """
+    return repository.configuration_output(
+        f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
+        f'printf "%s" "${{{ConfigurationVariable.INSTALL_COMMAND}[*]:3}}"',
+        **overrides,
+    )
+
+
+def environment_call(repository: ScratchRepository) -> str:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: The invocation ``uv`` is expected to create the environment with.
+    """
+    return (
+        f"venv --no-project --python {SUPPORTED_PYTHON} "
+        f"{environment_directory(repository)}"
+    )
+
+
+def test_installs_nothing_when_every_requirement_is_already_installed(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    The common case, and the one that decides whether installing on every start is
+    affordable: nothing is missing, so no installer runs at all.
+    """
+    stub_bin.install(PackageManager.PIP)
+    call_log = tmp_path / "pip-calls"
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_hiding_executables(tmp_path, PackageManager.UV)
+            ),
+            StubVariable.PIP_CALL_LOG: str(call_log),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ALREADY_INSTALLED,
+        environment_directory(session_start_repository),
+    )
+    assert not call_log.exists()
+
+
+def test_marks_the_install_in_progress_only_while_it_runs(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A setup check run during the install reads the marker to say "wait" rather than
+    "missing", so it is there while the installer runs and gone once it returns.
+    """
+    require_the_uninstallable(session_start_repository)
+    stub_bin.install(PackageManager.UV)
+    marker = Path(
+        session_start_repository.configuration_value(
+            ConfigurationVariable.INSTALL_MARKER
+        )
+    )
+    marker_during_install = tmp_path / "marker-during-install"
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+            StubVariable.UV_WATCHED_FILE: str(marker),
+            StubVariable.UV_WATCHED_FILE_COPY: str(marker_during_install),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert marker_during_install.read_text(encoding="utf-8").strip().isdigit()
+    assert not marker.exists()
+
+
+def test_installs_the_package_with_uv_where_there_is_one(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    ``uv`` installs where there is one, since it runs no code of its own inside the
+    environment's interpreter, however new that interpreter is.
+    """
+    require_the_uninstallable(session_start_repository)
+    stub_bin.install(PackageManager.UV)
+    stub_bin.install(PackageManager.PIP)
+    install_log = tmp_path / "uv-calls"
+    pip_log = tmp_path / "pip-calls"
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+            StubVariable.UV_CALL_LOG: str(install_log),
+            StubVariable.PIP_CALL_LOG: str(pip_log),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_INSTALLED,
+        UNINSTALLABLE_REQUIREMENT,
+        environment_directory(session_start_repository),
+    )
+    assert install_log.read_text(encoding="utf-8").splitlines() == [
+        uv_installer_call(
+            session_start_repository,
+            **{
+                SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path()
+            },
+        )
+    ]
+    assert not pip_log.exists()
+
+
+def test_reports_a_failed_install_and_finishes_the_run(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A failing install is reported and the rest of the run still happens.
+
+    The guard the whole design turns on: an install that dies inside the hook takes
+    everything after it down with it, and a session then starts with no notes, no plan
+    and no explanation.
+    """
+    require_the_uninstallable(session_start_repository)
+    stub_bin.install(PackageManager.UV)
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+            StubVariable.UV_STATUS: "1",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES).startswith(
+        summary_message(
+            SummaryMessage.DEPENDENCIES_INSTALL_FAILED,
+            UNINSTALLABLE_REQUIREMENT,
+            environment_directory(session_start_repository),
+            "",
+            "",
+        ).split(" - ")[0]
+    )
+    assert (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).exists()
+    assert summary_value(result.stdout, SummaryLine.PERSONAL_NOTES) != ""
+
+
+def test_reports_that_it_could_not_check_when_the_declaration_will_not_parse(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A declaration that cannot be read is reported as such rather than as an environment
+    with nothing missing - which is what an empty answer means, and would install
+    nothing while saying everything was already there.
+    """
+    declaration_file(session_start_repository).write_text(
+        "this is not toml\n", encoding="utf-8"
+    )
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_NOT_CHECKED
+    )
+
+
+def test_reports_a_missing_installer_without_failing(
+    session_start_repository: ScratchRepository,
+    tmp_path: Path,
+):
+    """
+    No installer on PATH at all is the same case as one that fails: reported, and the
+    run finishes.
+    """
+    require_the_uninstallable(session_start_repository)
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: path_hiding_executables(
+                tmp_path, PackageManager.PIP, PackageManager.UV
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert UNINSTALLABLE_REQUIREMENT in summary_value(
+        result.stdout, SummaryLine.DEPENDENCIES
+    )
+    assert (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).exists()
+
+
+def test_reinstalls_the_package_when_the_plugin_names_another_source(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A plugin update names a new source for the package; the environment, installed from
+    the old one, is installed into again so the hooks and the package stay one release.
+    """
+    Path(
+        session_start_repository.configuration_value(
+            ConfigurationVariable.INSTALLED_SOURCE_FILE
+        )
+    ).write_text("an earlier release\n", encoding="utf-8")
+    stub_bin.install(PackageManager.UV)
+    call_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path()
+    }
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={**search_path, StubVariable.UV_CALL_LOG: str(call_log)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_INSTALLED,
+        package_source(session_start_repository),
+        environment_directory(session_start_repository),
+    )
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
+        uv_installer_call(session_start_repository, **search_path)
+    ]
+
+
+class SampleReleaseTag(StrEnum):
+    """
+    Tags on the scratch repository standing in for the package's own.
+    """
+
+    OLDER = "v0.2.0"
+    """
+    A release before :attr:`LATEST`, whose minor part sorts after its as text.
+    """
+
+    LATEST = "v0.10.0"
+    """
+    The highest release.
+    """
+
+    PRERELEASE = "v1.0.0-rc1"
+    """
+    A tag past :attr:`LATEST` that is not a release.
+    """
+
+    NOT_A_RELEASE = "nightly"
+    """
+    A tag that names no version.
+    """
+
+    @property
+    def version(self) -> str:
+        """:return: The version a released plugin's manifest names for this tag."""
+        return self.removeprefix(ReleaseVersion.tag_prefix)
+
+
+class BasstlerBranch(StrEnum):
+    """
+    Branches of the package's own repository.
+    """
+
+    MAIN = "main"
+    """
+    The default branch, whose workflows a checkout runs.
+    """
+
+
+@pytest.fixture
+def tagged_release_repository(session_start_repository: ScratchRepository) -> str:
+    """
+    :return: The scratch project, tagged with every :class:`SampleReleaseTag`, as the
+        repository URL a released plugin installs its package from.
+    """
+    for tag in SampleReleaseTag:
+        session_start_repository.run_git("tag", tag)
+    return str(session_start_repository.project_root)
+
+
+# %% the release the package is installed at
+
+
+def test_a_released_plugin_installs_the_package_at_its_own_release(
+    session_start_repository: ScratchRepository, tagged_release_repository: str
+):
+    """
+    The package comes from the plugin's own release, never the latest one, so the hooks
+    never call the package with options from another release.
+    """
+    session_start_repository.detach_plugin_from_checkout()
+    session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
+
+    source = session_start_repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE,
+        **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository},
+    ).strip()
+
+    assert source == (
+        f"{PluginManifest.of_this_plugin().name} @ "
+        f"git+{tagged_release_repository}@{SampleReleaseTag.OLDER}"
+    )
+
+
+def test_a_plugin_naming_no_release_has_no_package_to_install(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A plugin that is not a release, as one copied from the source tree, names no package
+    of its own release, so nothing is guessed in its place.
+    """
+    session_start_repository.detach_plugin_from_checkout()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        session_start_repository.configuration_output(
+            ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE
+        )
+
+
+def test_a_workflow_runs_the_plugin_s_release(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A workflow replaying for the session runs the same package, so it follows the
+    plugin's release.
+    """
+    session_start_repository.detach_plugin_from_checkout()
+    session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
+
+    branch_or_tag = session_start_repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
+    ).strip()
+
+    assert branch_or_tag == SampleReleaseTag.OLDER
+
+
+def test_a_workflow_runs_the_default_branch_for_a_checkout(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A checkout's plugin names no release, and runs the default branch's workflows.
+    """
+    branch_or_tag = session_start_repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
+    ).strip()
+
+    assert branch_or_tag == BasstlerBranch.MAIN
+
+
+def test_a_workflow_has_no_release_to_run_for_a_plugin_naming_none(
+    session_start_repository: ScratchRepository,
+):
+    """
+    Outside a checkout, a plugin naming no release has no package for a workflow to run.
+    """
+    session_start_repository.detach_plugin_from_checkout()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        session_start_repository.configuration_output(
+            ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
+        )
+
+
+def test_a_session_start_installs_nothing_for_a_plugin_naming_no_release(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    Session start says the plugin names no release instead of installing a package of
+    some other release for it.
+    """
+    session_start_repository.detach_plugin_from_checkout()
+    stub_bin.install(PackageManager.PIP)
+    call_log = tmp_path / "pip-calls"
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_hiding_executables(tmp_path, PackageManager.UV)
+            ),
+            StubVariable.PIP_CALL_LOG: str(call_log),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_RELEASE_NOT_NAMED,
+        str(session_start_repository.plugin_root),
+    )
+    assert not call_log.exists()
+
+
+# %% a plugin of another release than the installed package
+
+
+def install_latest_release_for_another_plugin(
+    repository: ScratchRepository, release_repository: str
+) -> None:
+    """
+    Install the package, outside a checkout, at :attr:`SampleReleaseTag.LATEST` for a
+    plugin of that release, then make the plugin running now one of
+    :attr:`SampleReleaseTag.OLDER`, as when a sync leaves an older copy that the session
+    still runs.
+
+    :param repository: The fixture-built scratch repository.
+    :param release_repository: The repository standing in for the package's own.
+    """
+    repository.detach_plugin_from_checkout()
+    repository.release_plugin_as(SampleReleaseTag.LATEST.version)
+    repository.install_package_environment(
+        **{ConfigurationVariable.REPOSITORY_URL: release_repository}
+    )
+    repository.release_plugin_as(SampleReleaseTag.OLDER.version)
+
+
+def ready_package(
+    repository: ScratchRepository,
+    release_repository: str,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+) -> Path:
+    """
+    Ready the package as a hook does, with ``uv`` stubbed.
+
+    :param repository: The fixture-built scratch repository.
+    :param release_repository: The repository standing in for the package's own.
+    :param stub_bin: The directory of stub executables.
+    :param tmp_path: The test's scratch directory.
+    :return: The file the ``uv`` stub logs each invocation to.
+    """
+    stub_bin.install(PackageManager.UV)
+    call_log = tmp_path / "uv-calls"
+    repository.configuration_output(
+        ShellConfigurationFunction.READY_BASSTLER_PYTHON,
+        **release_overrides(release_repository, stub_bin),
+        **{StubVariable.UV_CALL_LOG: str(call_log)},
+    )
+    return call_log
+
+
+def release_overrides(
+    release_repository: str, stub_bin: ExecutableStubDirectory
+) -> dict[str, str]:
+    """
+    :param release_repository: The repository standing in for the package's own.
+    :param stub_bin: The directory of stub executables, holding the ``uv`` stub.
+    :return: The variables a hook readying a release's package runs with.
+    """
+    return {
+        ConfigurationVariable.REPOSITORY_URL: release_repository,
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+    }
+
+
+def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
+    session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    The reported case: an older plugin copy ran against the latest release's package,
+    which no longer accepted an option its hooks pass. A hook readies the package at
+    its own plugin's release instead.
+    """
+    install_latest_release_for_another_plugin(
+        session_start_repository, tagged_release_repository
+    )
+    session_start_repository.install_hook_scripts(
+        PluginLocation.ENTRY_POINT_SCRIPT.name
+    )
+
+    call_log = ready_package(
+        session_start_repository, tagged_release_repository, stub_bin, tmp_path
+    )
+
+    overrides = release_overrides(tagged_release_repository, stub_bin)
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
+        uv_installer_call(session_start_repository, **overrides)
+    ]
+    clone = session_start_repository.configuration_output(
+        f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
+        f'printf "%s" "${{{ConfigurationVariable.WORKSPACE}}}"',
+        **overrides,
+    )
+    assert (
+        session_start_repository.run_git("rev-parse", "HEAD", cwd=Path(clone)).stdout
+        == session_start_repository.run_git(
+            "rev-parse", f"{SampleReleaseTag.OLDER}^{{commit}}"
+        ).stdout
+    )
+
+
+def test_an_unchanged_plugin_keeps_the_package_installed_for_it(
+    session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A hook running with the plugin the package was installed for installs nothing,
+    whatever was released since.
+    """
+    session_start_repository.detach_plugin_from_checkout()
+    session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
+    session_start_repository.install_package_environment(
+        **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository}
+    )
+
+    call_log = ready_package(
+        session_start_repository, tagged_release_repository, stub_bin, tmp_path
+    )
+
+    assert not call_log.exists()
+
+
+def test_a_hook_of_a_plugin_naming_no_release_stops(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A hook readying the package for a plugin naming no release stops rather than running
+    against a package of some other release.
+    """
+    session_start_repository.install_package_environment()
+    session_start_repository.detach_plugin_from_checkout()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        ready_package(
+            session_start_repository,
+            session_start_repository.configuration_value(
+                ConfigurationVariable.REPOSITORY_URL
+            ),
+            stub_bin,
+            tmp_path,
+        )
+
+
+def test_a_package_of_another_release_is_named_on_the_release_line(
+    session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
+    tmp_path: Path,
+):
+    """
+    When the install fails, the package left in place is another release than the
+    plugin's, and the summary says so rather than leaving the hooks to fail on it.
+    """
+    install_latest_release_for_another_plugin(
+        session_start_repository, tagged_release_repository
+    )
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            ConfigurationVariable.REPOSITORY_URL: tagged_release_repository,
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: path_hiding_executables(
+                tmp_path, PackageManager.PIP, PackageManager.UV
+            ),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.RELEASE) == summary_message(
+        SummaryMessage.RELEASE_MISMATCHED,
+        SampleReleaseTag.OLDER,
+        version(PackageLocation.DIRECTORY.value.name),
+        session_start_repository.configuration_output(
+            ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE,
+            **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository},
+        ).strip(),
+    )
+
+
+def test_a_package_of_the_plugin_s_release_is_named_on_the_release_line(
+    session_start_repository: ScratchRepository,
+):
+    """
+    The plugin and the package being one release is said too, naming that release.
+    """
+    session_start_repository.detach_plugin_from_checkout()
+    installed_version = version(PackageLocation.DIRECTORY.value.name)
+    session_start_repository.release_plugin_as(installed_version)
+    session_start_repository.install_package_environment()
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.RELEASE) == summary_message(
+        SummaryMessage.RELEASE_MATCHING,
+        f"{ReleaseVersion.tag_prefix}{installed_version}",
+    )
+
+
+def test_tells_the_session_where_the_plugin_is(
+    session_start_repository: ScratchRepository, tmp_path: Path
+):
+    """
+    Only a hook is told where the plugin is; the commands a session runs afterwards
+    learn it from the file Claude Code reads exported variables from.
+    """
+    environment_file = tmp_path / "session-environment"
+
+    publish_and_run(
+        session_start_repository,
+        environment={ScrubbedEnvironmentPrefix.ENVIRONMENT_FILE: str(environment_file)},
+    )
+
+    exported = subprocess.run(
+        Bash.locate(os.environ).command(
+            "-c",
+            f'source "$0" && printf "%s" "${{{BasstlerVariable.PLUGIN_ROOT}}}"',
+            environment_file,
+        ),
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+    assert exported == BashPath(session_start_repository.plugin_root).text
+
+
+def test_tells_the_session_which_interpreter_runs_the_package(
+    session_start_repository: ScratchRepository, tmp_path: Path
+):
+    """
+    The commands a session runs afterwards learn the package's interpreter from the
+    same file, so a skill's module call works without sourcing the configuration.
+    """
+    environment_file = tmp_path / "session-environment"
+
+    publish_and_run(
+        session_start_repository,
+        environment={ScrubbedEnvironmentPrefix.ENVIRONMENT_FILE: str(environment_file)},
+    )
+
+    exported = subprocess.run(
+        Bash.locate(os.environ).command(
+            "-c",
+            f'source "$0" && printf "%s" "${{{BasstlerVariable.PYTHON}}}"',
+            environment_file,
+        ),
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+    assert exported == session_start_repository.configuration_value(
+        ConfigurationVariable.PYTHON
+    )
+
+
+# %% creating the package's environment
+
+
+def without_an_environment(repository: ScratchRepository) -> ScratchRepository:
+    """
+    Take the package's environment away, as on a clone no session start has set up.
+
+    :param repository: The fixture-built scratch repository.
+    :return: The same repository.
+    """
+    DirectoryTree(Path(environment_directory(repository))).remove()
+    return repository
+
+
+def test_creates_the_environment_with_uv_and_installs_the_package_into_it(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A clone with no environment gets one from ``uv``, asked for an interpreter the
+    package supports, with the package installed into it by ``uv`` too.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.UV)
+    stub_bin.install(PackageManager.PIP)
+    environment_log = tmp_path / "uv-calls"
+    install_log = tmp_path / "pip-calls"
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+            StubVariable.UV_CALL_LOG: str(environment_log),
+            StubVariable.UV_PYTHON: sys.executable,
+            StubVariable.PIP_CALL_LOG: str(install_log),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
+        environment_directory(session_start_repository),
+        package_source(session_start_repository),
+    )
+    assert environment_log.read_text(encoding="utf-8").splitlines() == [
+        environment_call(session_start_repository),
+        uv_installer_call(
+            session_start_repository,
+            **{
+                SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path()
+            },
+        ),
+    ]
+    assert not install_log.exists()
+
+
+def path_without_a_supported_interpreter(mirror_parent: Path) -> str:
+    """
+    :param mirror_parent: Where to build the mirror directories.
+    :return: A ``PATH`` offering neither ``uv`` nor any interpreter the environment could
+        be created from, as on a machine whose only interpreter is too old.
+    """
+    return path_hiding_executables(
+        mirror_parent,
+        PackageManager.UV,
+        LAUNCHER,
+        *(
+            f"python{version}"
+            for version in configuration_value(
+                ConfigurationVariable.PYTHON_VERSIONS
+            ).split()
+        ),
+    )
+
+
+LAUNCHER = "py"
+"""
+The Windows launcher, which runs an installed interpreter by its version.
+"""
+
+
+def installed_uv_directory(repository: ScratchRepository) -> Path:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: Where the session start installs ``uv`` for itself.
+    """
+    return Path(repository.configuration_value(ConfigurationVariable.UV_DIRECTORY))
+
+
+def test_installs_uv_when_no_supported_interpreter_is_on_the_path(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A machine with no ``uv`` and only an interpreter too old for the package still gets
+    an environment: ``uv`` is installed with the ``pip`` there is, and fetches one.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.PIP)
+    install_log = tmp_path / "pip-calls"
+    environment_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+            path_without_a_supported_interpreter(tmp_path)
+        )
+    }
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            **search_path,
+            StubVariable.PIP_CALL_LOG: str(install_log),
+            StubVariable.PIP_INSTALLED_UV: str(
+                ExecutableStubDirectory.stub_for(PackageManager.UV)
+            ),
+            StubVariable.UV_CALL_LOG: str(environment_log),
+            StubVariable.UV_PYTHON: sys.executable,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
+        environment_directory(session_start_repository),
+        package_source(session_start_repository),
+    )
+    assert install_log.read_text(encoding="utf-8").splitlines() == [
+        f"install --target {installed_uv_directory(session_start_repository)} "
+        f"{PackageManager.UV}"
+    ]
+    assert environment_log.read_text(encoding="utf-8").splitlines() == [
+        environment_call(session_start_repository),
+        uv_installer_call(session_start_repository, **search_path),
+    ]
+
+
+def test_installs_uv_with_the_pip_of_an_interpreter_found_by_name(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    Without ``uv``, the newest supported interpreter on the path installs it, so a
+    machine with only a supported Python and its pip still gets an environment.
+    """
+    without_an_environment(session_start_repository)
+    newest = configuration_value(ConfigurationVariable.PYTHON_VERSIONS).split()[0]
+    stub_bin.install(f"python{newest}")
+    stub_bin.install(PackageManager.PIP)
+    install_log = tmp_path / "pip-calls"
+    environment_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+            path_without_a_supported_interpreter(tmp_path)
+        )
+    }
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            **search_path,
+            StubVariable.PIP_CALL_LOG: str(install_log),
+            StubVariable.PIP_INSTALLED_UV: str(
+                ExecutableStubDirectory.stub_for(PackageManager.UV)
+            ),
+            StubVariable.UV_CALL_LOG: str(environment_log),
+            StubVariable.UV_PYTHON: sys.executable,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert install_log.read_text(encoding="utf-8").splitlines() == [
+        f"install --target {installed_uv_directory(session_start_repository)} "
+        f"{PackageManager.UV}"
+    ]
+    assert environment_log.read_text(encoding="utf-8").splitlines() == [
+        environment_call(session_start_repository),
+        uv_installer_call(session_start_repository, **search_path),
+    ]
+
+
+def test_reuses_the_uv_it_installed_before(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    The ``uv`` a session start installed is used again rather than installed again.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.PIP)
+    installed_uv = (
+        installed_uv_directory(session_start_repository) / "bin" / PackageManager.UV
+    )
+    installed_uv.parent.mkdir(parents=True)
+    shutil.copy(ExecutableStubDirectory.stub_for(PackageManager.UV), installed_uv)
+    installed_uv.chmod(FileMode.EXECUTABLE)
+    pip_log = tmp_path / "pip-calls"
+    uv_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+            path_without_a_supported_interpreter(tmp_path)
+        )
+    }
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            **search_path,
+            StubVariable.PIP_CALL_LOG: str(pip_log),
+            StubVariable.UV_CALL_LOG: str(uv_log),
+            StubVariable.UV_PYTHON: sys.executable,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
+        environment_directory(session_start_repository),
+        package_source(session_start_repository),
+    )
+    assert uv_log.read_text(encoding="utf-8").splitlines() == [
+        environment_call(session_start_repository),
+        uv_installer_call(session_start_repository, **search_path),
+    ]
+    assert not pip_log.exists()
+
+
+def test_reports_uv_it_could_not_install_and_finishes_the_run(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    With no supported interpreter and no way to install ``uv`` - no network, no ``pip``
+    - the environment is reported as not created, and the run carries on.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.PIP)
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_without_a_supported_interpreter(tmp_path)
+            ),
+            StubVariable.PIP_STATUS: "1",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES).startswith(
+        summary_message(
+            SummaryMessage.DEPENDENCIES_ENVIRONMENT_NOT_CREATED,
+            environment_directory(session_start_repository),
+            "",
+        ).split(" - ")[0]
+    )
+    assert not Path(environment_interpreter(session_start_repository)).exists()
+    assert (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).exists()
+
+
+def test_reports_an_environment_it_could_not_create_and_finishes_the_run(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+):
+    """
+    An environment that cannot be made - no supported interpreter, no network for
+    ``uv`` to fetch one - is reported, nothing is installed, and the run carries on.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.UV)
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+            StubVariable.UV_STATUS: "1",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES).startswith(
+        summary_message(
+            SummaryMessage.DEPENDENCIES_ENVIRONMENT_NOT_CREATED,
+            environment_directory(session_start_repository),
+            "",
+        ).split(" - ")[0]
+    )
+    assert not Path(environment_interpreter(session_start_repository)).exists()
+    assert (
+        session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).exists()
+
+
+# %% finding the environment's interpreter
+
+
+def test_runs_the_package_with_the_interpreter_of_a_windows_environment(
+    session_start_repository: ScratchRepository,
+):
+    """
+    An environment laid out as Windows lays it out is found, rather than passed over for
+    ``python3``.
+    """
+    without_an_environment(session_start_repository)
+    windows_interpreter = write_interpreter_wrapper(
+        Path(environment_directory(session_start_repository))
+        / EnvironmentInterpreterLayout.WINDOWS
+    )
+
+    assert session_start_repository.configuration_value(
+        ConfigurationVariable.PYTHON
+    ) == str(windows_interpreter)
+
+
+# %% the plan site line
+
+SITE_URL = "https://owner.github.io/site/"
+
+HUB_FILE = (
+    f"site_url: {SITE_URL}\nregistry: owner/registry\nrepositories:\n- owner/registry\n"
+)
+
+
+def test_reports_no_hub_when_the_notes_branch_has_no_hub_file(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN_SITE) == summary_message(
+        SummaryMessage.HUB_NOT_REGISTERED, ScratchBranch.PERSONAL_NOTES
+    )
+
+
+def test_links_a_tracked_branch_to_its_plan_on_the_site(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST,
+            ProjectLocation.PLAN_HUB: HUB_FILE,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    site_line = summary_value(result.stdout, SummaryLine.PLAN_SITE)
+    assert site_line.startswith(SITE_URL)
+    assert site_line.endswith(f"/{PLAN_IDENTIFIER}/")
+
+
+def test_links_the_plan_under_the_notes_repository_the_site_lists(
+    session_start_repository: ScratchRepository,
+):
+    """
+    The site files plans under the notes repository, which need not be the checkout's.
+    """
+    session_start_repository.serve_origin_as(SiteRepository.PROJECT.value)
+    session_start_repository.serve_notes_remote_as(SiteRepository.NOTES.value)
+
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST,
+            ProjectLocation.PLAN_HUB: HUB_FILE,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN_SITE) == summary_message(
+        SummaryMessage.HUB_REGISTERED,
+        SITE_URL,
+        SiteAddress(SITE_URL).plan_url(SiteRepository.NOTES.value, PLAN_IDENTIFIER),
+    )
+
+
+# %% the upstream-reviews Action line
+
+
+def run_action_module(repository: ScratchRepository, *arguments: str) -> str:
+    """
+    Run the upstream-reviews Action module against the scratch notes remote, the fork.
+
+    :param repository: A fixture-built scratch repository.
+    :param arguments: The command and its arguments.
+    :return: What it printed.
+    """
+    return repository.configuration_output(
+        '"${BASSTLER_PYTHON}" -m "${UPSTREAM_REVIEWS_ACTION_MODULE}" '
+        '--remote "${NOTES_REMOTE}" ' + " ".join(arguments)
+    ).strip()
+
+
+def session_release(repository: ScratchRepository) -> str:
+    """
+    :param repository: A fixture-built scratch repository.
+    :return: The basstler branch or tag the session's package is installed at.
+    """
+    return repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
+    ).strip()
+
+
+def test_brings_an_action_at_another_release_to_the_session_s_release(
+    session_start_repository: ScratchRepository,
+):
+    """
+    Every release would otherwise leave the fork's Action stale until somebody ran the
+    setup step again.
+    """
+    run_action_module(session_start_repository, "install", "--branch-or-tag", "v0.0.1")
+    release = session_release(session_start_repository)
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        run_action_module(
+            session_start_repository, "status", "--branch-or-tag", release
+        )
+        == f"{InstallationState.CURRENT} {release}"
+    )
+    assert summary_value(
+        result.stdout, SummaryLine.UPSTREAM_REVIEWS_ACTION
+    ) == summary_message(SummaryMessage.ACTION_UPDATED, "v0.0.1", release)
+
+
+def test_installs_no_action_on_a_fork_that_has_none(
+    session_start_repository: ScratchRepository,
+):
+    """
+    Installing the Action is setup's decision; a session start only keeps one current.
+    """
+    release = session_release(session_start_repository)
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        run_action_module(
+            session_start_repository, "status", "--branch-or-tag", release
+        )
+        == InstallationState.MISSING
+    )
+    assert summary_value(
+        result.stdout, SummaryLine.UPSTREAM_REVIEWS_ACTION
+    ) == summary_message(SummaryMessage.ACTION_NOT_INSTALLED)
+
+
+# %% the Actions usage line
+
+
+def test_reports_no_workflow_near_a_ceiling_where_the_budget_sets_none(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A budget without daily ceilings has nothing to compare the runs with, so no run is
+    read and nothing is flagged.
+    """
+    session_start_repository.add_remote("origin", "https://github.com/owner/project")
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.ACTIONS_USAGE) == summary_message(
+        SummaryMessage.ACTIONS_USAGE_WITHIN_BUDGET
+    )
+
+
+def test_reports_usage_as_not_checked_where_the_repository_is_unknown(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.ACTIONS_USAGE) == summary_message(
+        SummaryMessage.ACTIONS_USAGE_NOT_CHECKED
+    )
+
+
+# %% the main tests line
+
+
+def test_reports_main_s_tests_as_not_checked_where_the_repository_is_unknown(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.MAIN_TESTS) == summary_message(
+        SummaryMessage.MAIN_TESTS_NOT_CHECKED
+    )
+
+
+# %% one environment per project
+
+
+def other_project(repository: ScratchRepository) -> Path:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: A second git repository beside its project, sharing its package home.
+    """
+    project = repository.project_root.parent / "other-project"
+    project.mkdir()
+    repository.run_git("init", "--quiet", cwd=project)
+    return project
+
+
+def configuration_value_in(
+    repository: ScratchRepository, project: Path, variable_name: str, **overrides: str
+) -> str:
+    """
+    :param repository: The fixture-built scratch repository, whose plugin is sourced.
+    :param project: The project the session names as its own.
+    :param variable_name: A variable the shell configuration assigns.
+    :param overrides: Further variables the run sets.
+    :return: Its value once the configuration is sourced for *project*.
+    """
+    return repository.configuration_output(
+        f'printf "%s" "${{{variable_name}}}"',
+        **{ScrubbedEnvironmentPrefix.PROJECT_DIRECTORY: str(project), **overrides},
+    )
+
+
+def environment_of(repository: ScratchRepository, project: Path) -> Path:
+    """
+    Stand in for the environment a session start in *project* created, recording the
+    project it belongs to.
+
+    :param repository: The fixture-built scratch repository.
+    :param project: The project the environment belongs to.
+    :return: The environment's directory.
+    """
+    directory = Path(
+        configuration_value_in(
+            repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+        )
+    )
+    directory.mkdir(parents=True)
+    repository.configuration_output(
+        ShellConfigurationFunction.RECORD_BASSTLER_PROJECT,
+        **{ScrubbedEnvironmentPrefix.PROJECT_DIRECTORY: str(project)},
+    )
+    return directory
+
+
+def test_each_project_has_an_environment_of_its_own(
+    session_start_repository: ScratchRepository,
+):
+    """
+    Projects on different plugin releases no longer install over each other's package.
+    """
+    own = Path(environment_directory(session_start_repository))
+    other = Path(
+        configuration_value_in(
+            session_start_repository,
+            other_project(session_start_repository),
+            BasstlerVariable.ENVIRONMENT_DIRECTORY,
+        )
+    )
+
+    assert own != other
+    assert own.parent == other.parent
+
+
+def test_worktrees_of_one_project_share_its_environment(
+    session_start_repository: ScratchRepository,
+):
+    worktree = session_start_repository.project_root.parent / "worktree"
+    session_start_repository.run_git("worktree", "add", "--quiet", str(worktree))
+
+    assert configuration_value_in(
+        session_start_repository, worktree, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    ) == environment_directory(session_start_repository)
+
+
+def test_a_session_keeps_its_environment_in_another_repository(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A session with several repositories attached runs one plugin, so a command run in
+    any of them uses the environment the session start exported.
+    """
+    session_environment = environment_directory(session_start_repository)
+
+    assert (
+        configuration_value_in(
+            session_start_repository,
+            other_project(session_start_repository),
+            BasstlerVariable.ENVIRONMENT_DIRECTORY,
+            **{BasstlerVariable.ENVIRONMENT_DIRECTORY: session_environment},
+        )
+        == session_environment
+    )
+
+
+def test_tells_the_session_which_environment_runs_the_package(
+    session_start_repository: ScratchRepository, tmp_path: Path
+):
+    environment_file = tmp_path / "session-environment"
+
+    publish_and_run(
+        session_start_repository,
+        environment={ScrubbedEnvironmentPrefix.ENVIRONMENT_FILE: str(environment_file)},
+    )
+
+    exported = subprocess.run(
+        Bash.locate(os.environ).command(
+            "-c",
+            'source "$0" && printf "%s" "${!1}"',
+            environment_file,
+            BasstlerVariable.ENVIRONMENT_DIRECTORY,
+        ),
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+    assert exported == environment_directory(session_start_repository)
+
+
+def test_removes_the_environment_of_a_project_that_is_gone(
+    session_start_repository: ScratchRepository,
+):
+    project = other_project(session_start_repository)
+    abandoned = environment_of(session_start_repository, project)
+    DirectoryTree(project).remove()
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert not abandoned.exists()
+    assert summary_value(result.stdout, SummaryLine.ENVIRONMENTS) == summary_message(
+        SummaryMessage.ENVIRONMENTS_REMOVED, str(abandoned)
+    )
+
+
+def test_keeps_the_environment_of_a_project_that_still_exists(
+    session_start_repository: ScratchRepository,
+):
+    kept = environment_of(
+        session_start_repository, other_project(session_start_repository)
+    )
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert kept.is_dir()
+    assert Path(environment_directory(session_start_repository)).is_dir()
+    assert summary_value(result.stdout, SummaryLine.ENVIRONMENTS) == summary_message(
+        SummaryMessage.ENVIRONMENTS_NONE_REMOVED
+    )
+
+
+def test_keeps_the_environment_a_live_install_holds(
+    session_start_repository: ScratchRepository,
+):
+    project = other_project(session_start_repository)
+    installing = environment_of(session_start_repository, project)
+    marker = Path(
+        configuration_value_in(
+            session_start_repository, project, ConfigurationVariable.INSTALL_MARKER
+        )
+    )
+    marker.parent.mkdir(parents=True)
+    marker.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    DirectoryTree(project).remove()
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert installing.is_dir()
+
+
+def test_never_removes_the_environment_the_session_runs(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A session exported an environment whose project has since gone; it still runs it.
+    """
+    project = other_project(session_start_repository)
+    running = environment_of(session_start_repository, project)
+    DirectoryTree(project).remove()
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={BasstlerVariable.ENVIRONMENT_DIRECTORY: str(running)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert running.is_dir()
+
+
+# %% every message renders
+
+
+def test_every_summary_message_renders_something():
+    """
+    Check that every message this module can name resolves to a shell function that
+    prints something.
+
+    Deliberately not an assertion about the wording: every other assertion here renders
+    its expectation from session-start-messages.sh, so a reword moves both sides at once
+    and none of them fail. What is still worth catching is a member naming a function
+    that does not exist, or one that prints nothing - neither of which survives here.
+
+    Three placeholder arguments cover the widest message; a shell function ignores the
+    ones it does not read.
+    """
+    for message in SummaryMessage:
+        assert summary_message(message, "first", "second", "third").strip() != ""

@@ -1,0 +1,6 @@
+[project]
+name = "basstler-git"
+dynamic = ["version", "dependencies"]
+
+[tool.hatch.metadata.hooks.basstler-sibling-pins]
+dependencies = ["basstler-core"]

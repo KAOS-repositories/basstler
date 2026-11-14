@@ -1,10 +1,11 @@
 ### Plan
-- Move modules and resources into packages/<part>/src/basstler (pure renames)
-- Workspace root, per-package pyproject (hatch-vcs), basstler-build sibling-pin hook, uv.lock
-- PackageMap reads modules/dependencies from packages; package_layout reads the namespace
-- Session start: uv sync --frozen (checkout) / clone release tag; Windows py candidates
-- CI per package; release and windows-setup workflows follow the paths
+- Session start installs with uv sync --frozen (checkout) or from a clone of the release tag; setup.dependencies reads the installed distributions
+- Windows without uv: py -3.14/-3.13/-3.12, then python, as full paths
+- CI: one job per distribution with only what it lists; release and windows-setup workflows follow the paths
+- Fix the notes, hub and meta-package suites; update docs and the PR description
 ### Done
-- Kickoff: draft PR #223, item recorded in progress; release source and pin-hook decisions made with the owner
+- Stacked on #222; code actions generic; tree actions and ModuleRelocation added
+- One ActionPlan moved sources and tests into packages/<part> (d9dd4b5b)
+- Workspace pyprojects, basstler-build sibling-pin hook, uv.lock; map read from the workspace
 ### Next
-- Map resources to their owning modules, then the move commit
+- setup.dependencies and session-start install

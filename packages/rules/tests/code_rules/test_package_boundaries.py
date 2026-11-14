@@ -17,27 +17,19 @@ from basstler.code_rules.package_boundaries import (
     PackageBoundaryChecker,
     PackageCrossings,
 )
-from basstler.package_map import PackageMap
+from basstler.package_map import Workspace
 
 from basstler_testing.constants.paths import PackageBoundarySnippet
 
-# %% the dataset's package
+# %% the dataset's workspace
 
 
 @pytest.fixture
-def package_map() -> PackageMap:
+def checker() -> PackageBoundaryChecker:
     """
-    :return: The map the dataset's package declares.
+    :return: A checker of the dataset's workspace.
     """
-    return PackageMap.declared_in(PackageBoundarySnippet.PACKAGE_MAP.value)
-
-
-@pytest.fixture
-def checker(package_map) -> PackageBoundaryChecker:
-    """
-    :return: A checker of the dataset's package.
-    """
-    return PackageBoundaryChecker(package_map, PackageBoundarySnippet.PACKAGE.value)
+    return PackageBoundaryChecker(Workspace(PackageBoundarySnippet.DIRECTORY.value))
 
 
 def violation_lines(checker: PackageBoundaryChecker, path: Path) -> list[int]:
@@ -78,17 +70,6 @@ def test_a_from_import_of_a_module_names_that_module(checker):
 
 
 # %% modules
-
-
-def test_a_module_no_distribution_claims_is_reported_on_its_first_line(checker):
-    """
-    Neither distribution claims ``stray``.
-    """
-    first_line = 1
-
-    assert violation_lines(checker, PackageBoundarySnippet.UNCLAIMED_MODULE) == [
-        first_line
-    ]
 
 
 def test_a_file_outside_the_package_is_not_checked(checker):
@@ -153,20 +134,21 @@ def test_a_crossing_the_base_holds_under_a_module_s_old_name_is_not_new(checker)
 
 
 @pytest.fixture
-def moved_package(
-    scratch_repository, package_map
-) -> tuple[PackageBoundaryChecker, str]:
+def moved_package(scratch_repository) -> tuple[PackageBoundaryChecker, str]:
     """
-    :return: A checker of the dataset's package committed in a scratch repository,
+    :return: A checker of the dataset's workspace committed in a scratch repository,
         and the commit before its lower distribution's importing module was moved.
     """
-    package = scratch_repository.project_root / PackageBoundarySnippet.PACKAGE.name
-    shutil.copytree(PackageBoundarySnippet.PACKAGE.value, package)
-    scratch_repository.commit_everything("add the package")
+    workspace = scratch_repository.project_root / PackageBoundarySnippet.DIRECTORY.name
+    shutil.copytree(PackageBoundarySnippet.DIRECTORY.value, workspace)
+    scratch_repository.commit_everything("add the workspace")
     base_commit = scratch_repository.git.commit_at("HEAD")
-    scratch_repository.run_git("mv", "basstler/low/upward.py", "basstler/low/moved.py")
+    low = workspace / PackageBoundarySnippet.UNLISTED_IMPORT.relative_to(
+        PackageBoundarySnippet.DIRECTORY
+    )
+    scratch_repository.run_git("mv", str(low), str(low.with_name("moved.py")))
     scratch_repository.commit_everything("move the importing module")
-    return PackageBoundaryChecker(package_map, package), base_commit
+    return PackageBoundaryChecker(Workspace(workspace)), base_commit
 
 
 def test_a_module_git_detects_as_moved_is_renamed(moved_package, scratch_repository):
@@ -183,7 +165,7 @@ def test_a_module_git_detects_as_moved_is_renamed(moved_package, scratch_reposit
 # %% the package at another commit
 
 
-def test_the_package_at_a_commit_is_read_under_that_commit_s_map(
+def test_the_package_at_a_commit_is_read_under_that_commit_s_distributions(
     moved_package, scratch_repository, checker
 ):
     """
@@ -192,7 +174,7 @@ def test_the_package_at_a_commit_is_read_under_that_commit_s_map(
     moved_checker, base_commit = moved_package
 
     with PackageAtCommit(
-        scratch_repository.git, base_commit, moved_checker.package_directory
+        scratch_repository.git, base_commit, moved_checker.workspace.root
     ) as base_checker:
         base_crossings = base_checker.package_crossings()
 
@@ -205,7 +187,7 @@ def test_the_package_at_a_commit_is_removed_on_exit(moved_package, scratch_repos
     """
     moved_checker, base_commit = moved_package
     package_at_commit = PackageAtCommit(
-        scratch_repository.git, base_commit, moved_checker.package_directory
+        scratch_repository.git, base_commit, moved_checker.workspace.root
     )
 
     with package_at_commit:
@@ -214,14 +196,15 @@ def test_the_package_at_a_commit_is_removed_on_exit(moved_package, scratch_repos
     assert not package_at_commit.directory.exists()
 
 
-def test_a_commit_declaring_no_map_has_no_checker(scratch_repository):
+def test_a_commit_holding_no_distributions_has_no_checker(scratch_repository):
     """
-    A commit from before the package declared a map has nothing to compare.
+    A commit from before the distributions moved into a workspace has nothing to
+    compare.
     """
-    package = scratch_repository.project_root / PackageBoundarySnippet.PACKAGE.name
-    shutil.copytree(PackageBoundarySnippet.PACKAGE.value, package)
-    (package / PackageBoundarySnippet.PACKAGE_MAP.name).unlink()
-    scratch_repository.commit_everything("add the package without its map")
+    shutil.copy(PackageBoundarySnippet.UNLISTED_IMPORT, scratch_repository.project_root)
+    scratch_repository.commit_everything("a module outside any workspace")
 
-    with PackageAtCommit(scratch_repository.git, "HEAD", package) as base_checker:
+    with PackageAtCommit(
+        scratch_repository.git, "HEAD", scratch_repository.project_root
+    ) as base_checker:
         assert base_checker is None

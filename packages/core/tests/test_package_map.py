@@ -13,40 +13,67 @@ from basstler.exceptions import (
     UndeclaredDistribution,
 )
 from basstler.package_layout import package_modules
+from basstler.locations import PackageLocation
 from basstler.package_map import (
-    PACKAGE_MAP,
     Distribution,
     DistributionDeclaration,
     Layer,
     PackageMap,
+    Workspace,
 )
 
-# %% this package's map
+from basstler_testing.constants.paths import PackageBoundarySnippet
+
+# %% the workspace's map
 
 
-def test_every_module_of_the_package_is_claimed():
+@pytest.fixture
+def package_map() -> PackageMap:
     """
-    A module no distribution claims would ship in none of them.
+    :return: The map this checkout's distributions declare.
+    """
+    return Workspace(PackageLocation.SOURCE_TREE.value).package_map
+
+
+def test_every_module_of_the_package_is_claimed(package_map):
+    """
+    Every installed module sits in the part of ``basstler`` of a distribution of the
+    workspace.
     """
     unclaimed = [
         module.name
         for module in package_modules()
-        if PACKAGE_MAP.claiming(module.name) is None
+        if package_map.claiming(module.name) is None
     ]
 
     assert unclaimed == []
 
 
+def test_a_distribution_ships_its_part_and_lists_what_its_metadata_requires():
+    """
+    The lower distribution of the dataset's workspace ships ``low`` and lists nothing;
+    the higher one ships ``high`` and lists the lower one.
+    """
+    package_map = Workspace(PackageBoundarySnippet.DIRECTORY.value).package_map
+
+    assert package_map.declarations == (
+        DistributionDeclaration(
+            Distribution.GIT, Distribution.GIT.layer, ("high",), (Distribution.CORE,)
+        ),
+        DistributionDeclaration(Distribution.CORE, Distribution.CORE.layer, ("low",)),
+    )
+
+
 # %% looking up a declaration
 
 
-def test_the_map_holds_each_declaration_under_its_distribution():
+def test_the_map_holds_each_declaration_under_its_distribution(package_map):
     """
     The map reads like the mapping it is, from a distribution to its declaration.
     """
-    assert dict(PACKAGE_MAP) == {
+    assert dict(package_map) == {
         declaration.distribution: declaration
-        for declaration in PACKAGE_MAP.declarations
+        for declaration in package_map.declarations
     }
 
 

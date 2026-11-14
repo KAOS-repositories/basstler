@@ -102,7 +102,7 @@ class BasstlerSource(StrEnum):
 
 class ActionTemplate(StrEnum):
     """
-    The templates in :attr:`PackageLocation.TEMPLATES` the Action's files are rendered
+    The templates in :attr:`ShippedPath.TEMPLATES` the Action's files are rendered
     from.
     """
 

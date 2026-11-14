@@ -14,8 +14,8 @@ from types import TracebackType
 from basstler.directory_tree import DirectoryTree
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.git.commands import GitCommandRunner
-from basstler.locations import PackageLocation
-from basstler.package_map import PACKAGE_MAP, PackageMap
+from basstler.locations import PackageLocation, WorkspaceLocation
+from basstler.package_map import Workspace
 
 # %% imports
 
@@ -116,56 +116,44 @@ class PackageCrossings:
 @dataclass(frozen=True)
 class PackageBoundaryChecker(CodeRuleChecker):
     """
-    Reports a module no distribution claims, and an import of a distribution the
-    importing module's distribution does not list.
+    Reports an import of a distribution the importing module's distribution does not
+    list.
     """
 
-    package_map: PackageMap = PACKAGE_MAP
+    workspace: Workspace = field(
+        default_factory=lambda: Workspace(PackageLocation.SOURCE_TREE.value)
+    )
     """
-    The distributions and the modules each one ships.
-    """
-
-    package_directory: Path = PackageLocation.DIRECTORY.value
-    """
-    The ``basstler`` package directory; files outside it are not checked.
+    The distributions checked; files outside their parts of ``basstler`` are not.
     """
 
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         module = self.module_name(path)
         if not module:
             return
-        if self.package_map.claiming(module) is None:
-            yield CodeRuleViolation(
-                path,
-                1,
-                1,
-                f"no distribution claims basstler.{module}; add it to the declaration of "
-                "the distribution owning its subject in basstler.package_map",
-            )
-            return
-        importing = self.package_map.claiming(module)
+        importing = self.workspace.package_map.claiming(module)
         for crossing in self.crossings(path):
-            imported = self.package_map.claiming(crossing.imported_module)
+            imported = self.workspace.package_map.claiming(crossing.imported_module)
             yield CodeRuleViolation(
                 path,
                 crossing.statement.lineno,
                 crossing.statement.end_lineno or crossing.statement.lineno,
                 f"{importing.distribution} imports basstler.{crossing.imported_module} "
-                f"from {imported.distribution}, which it does not list in "
-                "basstler.package_map; move the code or the import",
+                f"from {imported.distribution}, which its pyproject.toml does not list; "
+                "move the code or the import",
             )
 
     def package_crossings(self) -> PackageCrossings:
         """
-        :return: The crossings of every module in :attr:`package_directory`.
+        :return: The crossings of every module of :attr:`workspace`.
         """
         crossings = {
             BoundaryCrossing(
                 importing_module=module, imported_module=crossing.imported_module
             )
-            for path in self.package_directory.rglob("*.py")
+            for directory in self.workspace.namespace_package.directories
+            for path in directory.rglob("*.py")
             if (module := self.module_name(path))
-            and self.package_map.claiming(module) is not None
             for crossing in self.crossings(path)
         }
         return PackageCrossings(
@@ -184,7 +172,7 @@ class PackageBoundaryChecker(CodeRuleChecker):
         """
         :param git: The checkout of the package.
         :param base_commit: The commit the checked out package is compared with.
-        :return: The modules of :attr:`package_directory` git detects as moved since
+        :return: The modules of :attr:`workspace` git detects as moved since
             *base_commit*.
         """
         listing = git.run(
@@ -196,7 +184,7 @@ class PackageBoundaryChecker(CodeRuleChecker):
             base_commit,
             "HEAD",
             "--",
-            str(self.package_directory),
+            str(self.workspace.root / WorkspaceLocation.PACKAGES),
         )
         new_name_by_old_name = {}
         for line in listing.splitlines():
@@ -210,12 +198,19 @@ class PackageBoundaryChecker(CodeRuleChecker):
     def module_name(self, path: Path) -> str | None:
         """
         :param path: A Python source file.
-        :return: Its dotted name within ``basstler``, empty for the package's own
-            ``__init__``; none for a file outside :attr:`package_directory`.
+        :return: Its dotted name within ``basstler``; none for a file outside every
+            distribution's part of it.
         """
         source = path.resolve()
-        directory = self.package_directory.resolve()
-        if not source.is_relative_to(directory):
+        directory = next(
+            (
+                directory.resolve()
+                for directory in self.workspace.namespace_package.directories
+                if source.is_relative_to(directory.resolve())
+            ),
+            None,
+        )
+        if directory is None:
             return None
         parts = source.relative_to(directory).with_suffix("").parts
         return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
@@ -226,10 +221,12 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :return: Every import in it of a module of a distribution the module's own
             distribution does not list.
         """
-        importing = self.package_map.claiming(self.module_name(path))
+        importing = self.workspace.package_map.claiming(self.module_name(path))
         allowed = {importing.distribution, *importing.dependencies}
         for module_import in self.module_imports(path):
-            imported = self.package_map.claiming(module_import.imported_module)
+            imported = self.workspace.package_map.claiming(
+                module_import.imported_module
+            )
             if imported is None or imported.distribution in allowed:
                 continue
             yield module_import
@@ -260,8 +257,11 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :return: The module *name* is, when it is one, else *package*.
         """
         candidate = ".".join(part for part in (package, name) if part)
-        location = self.package_directory.joinpath(*candidate.split("."))
-        if location.is_dir() or location.with_suffix(".py").is_file():
+        location = Path(*candidate.split("."))
+        namespace_package = self.workspace.namespace_package
+        if namespace_package.every(location) or namespace_package.every(
+            location.with_suffix(".py")
+        ):
             return candidate
         return package
 
@@ -272,7 +272,7 @@ class PackageBoundaryChecker(CodeRuleChecker):
 @dataclass
 class PackageAtCommit:
     """
-    The package as one commit holds it, in a detached worktree removed on exit.
+    The workspace as one commit holds it, in a detached worktree removed on exit.
     """
 
     git: GitCommandRunner
@@ -285,9 +285,9 @@ class PackageAtCommit:
     The commit checked out.
     """
 
-    package_directory: Path
+    workspace_root: Path
     """
-    The ``basstler`` package directory in :attr:`git`'s checkout.
+    The workspace's root in :attr:`git`'s checkout.
     """
 
     directory: Path = field(init=False)
@@ -297,22 +297,22 @@ class PackageAtCommit:
 
     def __enter__(self) -> PackageBoundaryChecker | None:
         """
-        :return: A checker of the package at :attr:`commit`, under the package map that
-            commit declares; none when it declares no map.
+        :return: A checker of the workspace at :attr:`commit`, under the package map
+            its distributions declare there; none when it holds no distributions.
         """
         self.directory = Path(tempfile.mkdtemp())
         self.git.run(
             "worktree", "add", "--detach", "--quiet", str(self.directory), self.commit
         )
-        package = self.directory / self.package_directory.resolve().relative_to(
-            self.git.working_directory.resolve()
+        workspace = Workspace(
+            self.directory
+            / self.workspace_root.resolve().relative_to(
+                self.git.working_directory.resolve()
+            )
         )
-        map_file = package / PackageLocation.PACKAGE_MAP.relative_to(
-            PackageLocation.DIRECTORY
-        )
-        if not map_file.is_file():
+        if not workspace.package_directories:
             return None
-        return PackageBoundaryChecker(PackageMap.declared_in(map_file), package)
+        return PackageBoundaryChecker(workspace)
 
     def __exit__(
         self,
@@ -321,7 +321,7 @@ class PackageAtCommit:
         traceback: TracebackType | None,
     ) -> None:
         """
-        Remove the worktree, whether or not the package was read.
+        Remove the worktree, whether or not the workspace was read.
         """
         self.git.attempt("worktree", "remove", "--force", str(self.directory))
         DirectoryTree(self.directory).remove()

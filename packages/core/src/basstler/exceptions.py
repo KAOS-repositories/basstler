@@ -589,7 +589,7 @@ class InconsistentPackageMap(DataclassException, ValueError):
         return f"{', '.join(self.distributions)} {self.inconsistency}"
 
     def suggest_correction(self) -> str:
-        return "correct the declarations in basstler.package_map.PACKAGE_MAP"
+        return "correct the dependencies in the distributions' pyproject.toml files"
 
 
 @dataclass
@@ -607,9 +607,7 @@ class UndeclaredDistribution(DataclassException, KeyError):
         return f"{self.distribution} {PackageMapInconsistency.UNDECLARED_DISTRIBUTION}"
 
     def suggest_correction(self) -> str:
-        return (
-            "declare it in basstler.package_map.PACKAGE_MAP or look up a declared one"
-        )
+        return "add its directory under packages or look up a declared one"
 
 
 @dataclass

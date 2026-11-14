@@ -1,13 +1,6 @@
 """
-What this package contains, discovered rather than listed.
-
-Which modules exist and which of them answer as a command line are both read from the
-package itself - the directory, and each module's own source. Nothing about the package
-is written down here.
-
-No module is held to the standard library: the dependencies are installed before anything
-runs one. A session gets them from ``session-start.sh``, which installs whatever is
-missing on every start, and an Actions workflow installs them in a step of its own.
+What this package contains, read from every installed distribution's part of it and from
+each module's own source rather than listed.
 """
 
 from __future__ import annotations
@@ -17,7 +10,7 @@ from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
-from basstler.locations import PackageLocation
+from basstler.locations import INSTALLED_PACKAGE
 
 
 @dataclass(frozen=True)
@@ -66,17 +59,21 @@ def _has_a_main_block(source: Path) -> bool:
 @cache
 def package_modules() -> tuple[PackageModule, ...]:
     """
-    :return: Every module in this package, in name order.
+    :return: Every module in every installed part of this package, in name order.
     """
     return tuple(
-        PackageModule(
-            ".".join(
-                path.relative_to(PackageLocation.DIRECTORY.value).with_suffix("").parts
+        sorted(
+            (
+                PackageModule(
+                    ".".join(path.relative_to(directory).with_suffix("").parts),
+                    _has_a_main_block(path),
+                )
+                for directory in INSTALLED_PACKAGE.directories
+                for path in directory.rglob("*.py")
+                if path.stem != "__init__"
             ),
-            _has_a_main_block(path),
+            key=lambda module: module.name,
         )
-        for path in sorted(PackageLocation.DIRECTORY.value.rglob("*.py"))
-        if path.stem != "__init__"
     )
 
 

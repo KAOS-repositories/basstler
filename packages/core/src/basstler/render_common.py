@@ -18,7 +18,7 @@ import markdown as markdown_library
 import nh3
 
 from basstler.class_property import classproperty
-from basstler.locations import PackageLocation
+from basstler.locations import INSTALLED_PACKAGE, ShippedPath
 
 
 class AllowedUrlScheme(StrEnum):
@@ -101,7 +101,7 @@ def create_template_environment() -> jinja2.Environment:
     :return: A configured, ready-to-use Jinja2 environment.
     """
     environment = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(PackageLocation.TEMPLATES.value),
+        loader=jinja2.FileSystemLoader(INSTALLED_PACKAGE.every(ShippedPath.TEMPLATES)),
         autoescape=jinja2.select_autoescape(["html"]),
         trim_blocks=True,
         lstrip_blocks=True,
@@ -126,7 +126,7 @@ class TemplatePage(ABC):
     def template(cls) -> str:
         """
         The file name of the template this page is rendered from, in
-        :attr:`PackageLocation.TEMPLATES`.
+        :attr:`~basstler.locations.ShippedPath.TEMPLATES` of a distribution.
         """
 
     def render_template(self, **context: Any) -> str:
@@ -140,7 +140,7 @@ class TemplatePage(ABC):
     def render_named_template(template_name: str, **context: Any) -> str:
         """
         :param template_name: The file name of a template in
-            :attr:`PackageLocation.TEMPLATES`.
+            :attr:`~basstler.locations.ShippedPath.TEMPLATES` of a distribution.
         :param context: The values the template substitutes, by name.
         :return: The rendered template.
         """

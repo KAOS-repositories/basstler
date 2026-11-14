@@ -9,8 +9,12 @@ from pathlib import Path
 
 import pytest
 
-import basstler
-from basstler.locations import PackageLocation, PluginLocation, ProjectLocation
+from basstler.locations import (
+    INSTALLED_PACKAGE,
+    PackageLocation,
+    PluginLocation,
+    ProjectLocation,
+)
 
 # %% a member stands in for its path
 
@@ -79,11 +83,11 @@ def test_members_hash_as_their_paths():
 # %% the package's own files
 
 
-def test_the_package_directory_is_where_the_package_is_imported_from():
+def test_the_package_directory_is_a_part_of_the_package_imported():
     """
-    Every location shipped in the package is found from this one.
+    The core distribution's directory is one the ``basstler`` package is imported from.
     """
-    assert PackageLocation.DIRECTORY.value == Path(basstler.__file__).parent
+    assert PackageLocation.DIRECTORY.value in INSTALLED_PACKAGE.directories
 
 
 @pytest.mark.parametrize(
@@ -100,13 +104,12 @@ def test_every_shipped_location_exists(location: PackageLocation):
     assert location.value.exists()
 
 
-def test_the_package_directory_sits_under_the_source_trees_src_directory():
+def test_the_package_directory_sits_under_its_distributions_src_directory():
     """
-    The package follows the ``src`` layout every other package in this repository uses.
+    Each distribution follows the ``src`` layout under ``packages`` of the workspace.
     """
-    assert (
-        PackageLocation.DIRECTORY.value
-        == PackageLocation.SOURCE_TREE / "src" / PackageLocation.DIRECTORY.value.name
+    assert PackageLocation.DIRECTORY.value.parent.parent.parent == (
+        PackageLocation.SOURCE_TREE / "packages"
     )
 
 

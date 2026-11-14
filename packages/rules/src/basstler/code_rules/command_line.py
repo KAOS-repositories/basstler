@@ -115,17 +115,19 @@ def report_new_crossings(base_commit: str) -> CodeRulesExitCode:
     """
     Report each boundary crossing of the package that *base_commit* does not have.
 
-    The base is read under its own package map, so a crossing only a change of the map
-    creates is new as well; a module moved since keeps the base's crossings.
+    The base is read under the package map its own distributions declare, so a
+    crossing only a change of a distribution's metadata creates is new as well; a module
+    moved since keeps the base's crossings.
 
     :param base_commit: The commit the checked out package is compared with.
     """
     git = GitCommandRunner(Path.cwd())
     checker = PackageBoundaryChecker()
-    with PackageAtCommit(git, base_commit, checker.package_directory) as base_checker:
+    with PackageAtCommit(git, base_commit, checker.workspace.root) as base_checker:
         if base_checker is None:
             logger.info(
-                "%s declares no package map, so nothing is compared", base_commit
+                "%s holds no workspace of distributions, so nothing is compared",
+                base_commit,
             )
             return CodeRulesExitCode.SUCCESS
         base_crossings = base_checker.package_crossings()

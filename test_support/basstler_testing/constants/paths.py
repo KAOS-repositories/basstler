@@ -948,35 +948,27 @@ class TreeRemovalSnippet(PathEnumeration):
 
 class PackageBoundarySnippet(PathEnumeration):
     """
-    A package of two distributions the package boundary check reads.
+    A workspace of two distributions the package boundary check reads.
     """
 
     DIRECTORY = DatasetLocation.DIRECTORY / "package-boundaries"
     """
-    The directory holding them.
+    The workspace's root.
     """
 
-    PACKAGE = DIRECTORY / "basstler"
+    LOWER_DISTRIBUTION = DIRECTORY / "packages" / "low"
     """
-    The package directory, claimed by a lower and a higher distribution.
-    """
-
-    PACKAGE_MAP = PACKAGE / "package_map.py"
-    """
-    The map the package declares for itself.
+    The lower distribution's directory.
     """
 
-    LISTED_IMPORT = PACKAGE / "high" / "caller.py"
+    LISTED_IMPORT = (
+        DIRECTORY / "packages" / "high" / "src" / "basstler" / "high" / "caller.py"
+    )
     """
     The higher distribution importing the lower one it lists, in both import forms.
     """
 
-    UNLISTED_IMPORT = PACKAGE / "low" / "upward.py"
+    UNLISTED_IMPORT = LOWER_DISTRIBUTION / "src" / "basstler" / "low" / "upward.py"
     """
     The lower distribution importing the higher one.
-    """
-
-    UNCLAIMED_MODULE = PACKAGE / "stray.py"
-    """
-    A module neither distribution claims.
     """

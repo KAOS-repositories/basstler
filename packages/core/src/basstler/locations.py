@@ -8,9 +8,11 @@ Every file and directory this package names, each written once.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from enum import ReprEnum
 from pathlib import Path
 
+import basstler
 from basstler.environment import EnvironmentVariable
 
 
@@ -50,58 +52,150 @@ class PathEnumeration(Path, ReprEnum):
         return Path(*path_segments)
 
 
-class PackageLocation(PathEnumeration):
+class ShippedPath(PathEnumeration):
     """
-    The package's own directory and the files shipped in it, as absolute paths.
-    """
-
-    DIRECTORY = Path(__file__).parent
-    """
-    This package's own directory.
+    The files and directories the distributions ship inside the ``basstler`` package,
+    relative to it.
     """
 
-    SOURCE_TREE = DIRECTORY.parent.parent
+    TEMPLATES = Path("templates")
     """
-    The directory holding the package's ``pyproject.toml``, ``README.md`` and ``src`` when
-    the package is imported from a source checkout - through an editable install or
-    ``PYTHONPATH``. Meaningless for a package installed as a copy.
+    The templates pages, workflows and instruction files are rendered from; each
+    distribution ships the templates it renders.
     """
 
-    STACK_CONFIGURATION = DIRECTORY / "stack" / "stack.toml"
+    STACK_CONFIGURATION = Path("stack") / "stack.toml"
     """
     The shipped stack configuration every run starts from, before a project's and a
     user's overrides.
     """
 
-    DEPENDENCY_DECLARATION = SOURCE_TREE / "pyproject.toml"
-    """
-    The package metadata of a source checkout, whose ``[project] dependencies`` this
-    package installs.
-    """
-
-    LICENSE = SOURCE_TREE / "LICENSE"
-    """
-    The licence text of a source checkout.
-    """
-
-    TEMPLATES = DIRECTORY / "templates"
-    """
-    The templates the plan site's pages are rendered from.
-    """
-
-    PACKAGE_MAP = DIRECTORY / "package_map.py"
-    """
-    The module declaring which distribution ships each of the package's modules.
-    """
-
-    QUERIES = DIRECTORY / "github" / "queries"
+    QUERIES = Path("github") / "queries"
     """
     The GraphQL documents the upstream review reader sends.
     """
 
-    PLAN_ITEM_MODE_DEFAULTS = DIRECTORY / "plan" / "plan-item-modes.toml"
+    PLAN_ITEM_MODE_DEFAULTS = Path("plan") / "plan-item-modes.toml"
     """
     The shipped plan-item execution modes.
+    """
+
+
+@dataclass(frozen=True)
+class NamespacePackage:
+    """
+    The parts of the ``basstler`` namespace package, one for each installed distribution
+    or a single one where they are installed into one directory.
+    """
+
+    directories: tuple[Path, ...]
+    """
+    Each part's directory, in the order imports search them.
+    """
+
+    def shipped(self, path: Path) -> Path:
+        """
+        :param path: A path relative to the package.
+        :return: *path* in the first part shipping it; in the first part when none does.
+        """
+        return next(
+            (
+                directory / path
+                for directory in self.directories
+                if (directory / path).exists()
+            ),
+            self.directories[0] / path,
+        )
+
+    def every(self, path: Path) -> tuple[Path, ...]:
+        """
+        :param path: A path relative to the package.
+        :return: *path* in every part shipping it, in the order imports search them.
+        """
+        return tuple(
+            directory / path
+            for directory in self.directories
+            if (directory / path).exists()
+        )
+
+
+INSTALLED_PACKAGE = NamespacePackage(tuple(Path(entry) for entry in basstler.__path__))
+"""
+The parts of the ``basstler`` package this interpreter imports.
+"""
+
+
+class PackageLocation(PathEnumeration):
+    """
+    The core distribution's own directory, the files the distributions ship, and the
+    checkout they are imported from, as absolute paths.
+    """
+
+    DIRECTORY = Path(__file__).parent
+    """
+    The core distribution's part of the ``basstler`` package.
+    """
+
+    SOURCE_TREE = DIRECTORY.parents[3]
+    """
+    The checkout's root, holding the workspace's ``pyproject.toml`` and ``packages``,
+    when the package is imported from a checkout through an editable install.
+    Meaningless for a package installed as a copy.
+    """
+
+    STACK_CONFIGURATION = INSTALLED_PACKAGE.shipped(ShippedPath.STACK_CONFIGURATION)
+    """
+    :attr:`ShippedPath.STACK_CONFIGURATION`, where the stack distribution ships it.
+    """
+
+    DEPENDENCY_DECLARATION = SOURCE_TREE / "pyproject.toml"
+    """
+    The workspace root's metadata in a checkout.
+    """
+
+    LICENSE = SOURCE_TREE / "LICENSE"
+    """
+    The licence text of a checkout.
+    """
+
+    QUERIES = INSTALLED_PACKAGE.shipped(ShippedPath.QUERIES)
+    """
+    :attr:`ShippedPath.QUERIES`, where the github distribution ships them.
+    """
+
+    PLAN_ITEM_MODE_DEFAULTS = INSTALLED_PACKAGE.shipped(
+        ShippedPath.PLAN_ITEM_MODE_DEFAULTS
+    )
+    """
+    :attr:`ShippedPath.PLAN_ITEM_MODE_DEFAULTS`, where the plan distribution ships them.
+    """
+
+
+class WorkspaceLocation(PathEnumeration):
+    """
+    The parts of the uv workspace of basstler's distributions.
+    """
+
+    PACKAGES = Path("packages")
+    """
+    The directory holding a directory for each distribution, relative to the root.
+    """
+
+    METADATA = Path("pyproject.toml")
+    """
+    The metadata of the workspace, relative to its root, and of each distribution,
+    relative to its directory.
+    """
+
+    PACKAGE_SOURCE = Path("src") / "basstler"
+    """
+    A distribution's part of the ``basstler`` package, relative to its directory.
+    """
+
+    LOCK = Path("uv.lock")
+    """
+    The versions every distribution and requirement of the workspace installs at,
+    relative to the root.
     """
 
 
@@ -162,56 +256,62 @@ class SiteTemplate(PathEnumeration):
     The templates the plan site's pages and stylesheet are rendered from.
     """
 
-    STYLESHEET = PackageLocation.TEMPLATES.value / "site.css"
+    STYLESHEET = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site.css")
     """
     The one stylesheet every page of the site links.
     """
 
-    LAYOUT = PackageLocation.TEMPLATES.value / "site_layout.html"
+    LAYOUT = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_layout.html")
     """
     The document every page of the site fills in.
     """
 
-    PARTS = PackageLocation.TEMPLATES.value / "site_parts.html"
+    PARTS = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_parts.html")
     """
     The markup the site's pages share: progress cards, the health banner, dependency
     chips and action buttons.
     """
 
-    HUB = PackageLocation.TEMPLATES.value / "hub.html"
+    HUB = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "hub.html")
     """
     The hub: a card per repository.
     """
 
-    REPOSITORY_INDEX = PackageLocation.TEMPLATES.value / "site_index.html"
+    REPOSITORY_INDEX = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "site_index.html"
+    )
     """
     One repository's index: a card per plan.
     """
 
-    PLAN = PackageLocation.TEMPLATES.value / "site_plan.html"
+    PLAN = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_plan.html")
     """
     One plan's page: a column per wave, a card per item.
     """
 
-    PLAN_SCRIPT = PackageLocation.TEMPLATES.value / "site_plan.js"
+    PLAN_SCRIPT = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_plan.js")
     """
     A plan page's behaviour: copying commands, choosing a model, revealing an item.
     """
 
-    LIVE_STATE_SCRIPT = PackageLocation.TEMPLATES.value / "site_live_state.js"
+    LIVE_STATE_SCRIPT = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "site_live_state.js"
+    )
     """
     The script every site page reads a pull request's live state from GitHub's answer
     with, and re-checks with when the tab is shown again.
     """
 
-    LIVE_PROGRESS_SCRIPT = PackageLocation.TEMPLATES.value / "site_live_progress.js"
+    LIVE_PROGRESS_SCRIPT = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "site_live_progress.js"
+    )
     """
     The hub's and repository indexes' script that recounts every progress card from
     each repository's pull request listing.
     """
 
-    PLAN_PULL_REQUEST_RECHECK_SCRIPT = (
-        PackageLocation.TEMPLATES.value / "site_plan_pull_request_recheck.js"
+    PLAN_PULL_REQUEST_RECHECK_SCRIPT = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "site_plan_pull_request_recheck.js"
     )
     """
     The plan page's script that reads every pull request's state from GitHub in the
@@ -246,7 +346,7 @@ class InstructionsTemplate(PathEnumeration):
     The templates the agent instruction files are rendered from.
     """
 
-    AGENTS = PackageLocation.TEMPLATES.value / "agents.md.jinja"
+    AGENTS = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "agents.md.jinja")
     """
     The content of ``AGENTS.md``: rules under the headings of their sections.
     """

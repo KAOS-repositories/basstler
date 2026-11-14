@@ -136,7 +136,7 @@ class BuildSecret(StrEnum):
 
 class PlanSiteTemplate(StrEnum):
     """
-    The templates in :attr:`PackageLocation.TEMPLATES` the site's workflows and the
+    The templates in :attr:`ShippedPath.TEMPLATES` the site's workflows and the
     token's store command are rendered from.
     """
 

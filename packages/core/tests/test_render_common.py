@@ -5,24 +5,14 @@ rendering (delegated to the `markdown` library, plus a heading-level shift on to
 
 from __future__ import annotations
 
-import pytest
 
-from basstler.locations import PackageLocation, SiteTemplate
-from basstler.plan_site.hub_page import HubPage
-from basstler.plan_site.plan_page import PlanPage
 from basstler.render_common import (
-    TemplatePage,
     create_template_environment,
     render_markdown_to_html,
     sanitize_http_url,
 )
 
 # %% create_template_environment
-
-
-def test_template_environment_finds_the_committed_templates():
-    environment = create_template_environment()
-    assert environment.get_template(SiteTemplate.PLAN.name)
 
 
 def test_template_environment_autoescapes_html():
@@ -151,10 +141,3 @@ def test_sanitize_http_url_rejects_a_data_url():
 
 def test_sanitize_http_url_passes_through_none():
     assert sanitize_http_url(None) is None
-
-
-@pytest.mark.parametrize("page", [PlanPage, HubPage])
-def test_every_page_names_a_template_the_package_ships(
-    page: type[TemplatePage],
-) -> None:
-    assert (PackageLocation.TEMPLATES.value / page.template).is_file()

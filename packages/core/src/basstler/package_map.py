@@ -5,22 +5,26 @@ each one ships.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
+import re
+import tomllib
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from functools import cached_property
 from itertools import combinations
 from pathlib import Path
+from typing import Annotated, Self
 
 import rustworkx
+from pydantic import Field
 
 from basstler.exceptions import (
     InconsistentPackageMap,
     PackageMapInconsistency,
     UndeclaredDistribution,
 )
+from basstler.json_model import ValidatedJSONModel
+from basstler.locations import NamespacePackage, WorkspaceLocation
 
 # %% layers and distributions
 
@@ -79,56 +83,76 @@ class Layer(IntEnum):
 
 class Distribution(StrEnum):
     """
-    A distribution this package is released as, by its package name.
+    A distribution this package is released as, by its package name, and the layer it
+    sits in.
     """
 
-    CORE = "basstler-core"
+    layer: Layer
+    """
+    The layer the distribution sits in.
+    """
+
+    def __new__(cls, name: str, layer: Layer) -> Self:
+        """
+        :param name: The distribution's package name, the member's value.
+        :param layer: The layer it sits in.
+        """
+        member = str.__new__(cls, name)
+        member._value_ = name
+        member.layer = layer
+        return member
+
+    BUILD = "basstler-build", Layer.CORE
+    """
+    The hatch hook every distribution is built with.
+    """
+
+    CORE = "basstler-core", Layer.CORE
     """
     The foundation every other distribution imports.
     """
 
-    GIT = "basstler-git"
+    GIT = "basstler-git", Layer.LOCAL_TOOLS
     """
     Git commands and branches.
     """
 
-    RULES = "basstler-rules"
+    RULES = "basstler-rules", Layer.LOCAL_TOOLS
     """
-    The code rules, their checkers and fixes, the reversible code changes fixes are
-    made of, and the generated ``AGENTS.md``.
+    The code rules, their checkers and the generated ``AGENTS.md``.
     """
 
-    GITHUB = "basstler-github"
+    GITHUB = "basstler-github", Layer.GITHUB
     """
     The GitHub client and the models of GitHub's data.
     """
 
-    REVIEWS = "basstler-reviews"
+    REVIEWS = "basstler-reviews", Layer.COLLABORATION
     """
     Reading an upstream pull request's checks and review threads.
     """
 
-    STACK = "basstler-stack"
+    STACK = "basstler-stack", Layer.COLLABORATION
     """
     Stacked pull request maintenance.
     """
 
-    PLAN = "basstler-plan"
-    """
-    Plans and their items.
-    """
-
-    NOTES = "basstler-notes"
+    NOTES = "basstler-notes", Layer.NOTES
     """
     Personal notes, pull request progress notes and their setup.
     """
 
-    HUB = "basstler-hub"
+    PLAN = "basstler-plan", Layer.PLANS
+    """
+    Plans and their items.
+    """
+
+    HUB = "basstler-hub", Layer.USER_FACING
     """
     The plan site.
     """
 
-    META_PACKAGE = "basstler"
+    META_PACKAGE = "basstler", Layer.META_PACKAGE
     """
     The command tree every command is mounted on, installing every default
     distribution.
@@ -164,6 +188,39 @@ class DistributionDeclaration:
     """
     The distributions it may import.
     """
+
+    @classmethod
+    def read(cls, directory: Path) -> DistributionDeclaration:
+        """
+        :param directory: A distribution's directory in the workspace.
+        :return: The distribution its ``pyproject.toml`` names, shipping every module and
+            subpackage of its part of ``basstler``, listing every basstler distribution
+            it requires.
+        """
+        metadata = DistributionMetadata.from_json(
+            tomllib.loads(
+                (directory / WorkspaceLocation.METADATA).read_text(encoding="utf-8")
+            )
+        )
+        distribution = Distribution(metadata.project.name)
+        source = directory / WorkspaceLocation.PACKAGE_SOURCE
+        modules = sorted(
+            entry.stem
+            for entry in source.iterdir()
+            if (entry.suffix == ".py" and entry.stem != "__init__")
+            or (entry.is_dir() and any(entry.rglob("*.py")))
+        )
+        names = {member.value for member in Distribution}
+        return cls(
+            distribution,
+            distribution.layer,
+            tuple(modules),
+            tuple(
+                Distribution(name)
+                for name in metadata.requirement_names
+                if name in names
+            ),
+        )
 
     def claim_length(self, module: str) -> int:
         """
@@ -263,140 +320,167 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
         )
         return declaration if claim_length else None
 
-    @staticmethod
-    def declared_in(module_file: Path) -> PackageMap:
-        """
-        Load another copy of this module, such as one checked out at an earlier commit.
 
-        :param module_file: The copy's source file.
-        :return: The map the copy declares as :data:`PACKAGE_MAP`.
+# %% the distributions' metadata
+
+REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+"""
+The distribution name a requirement specifier starts with.
+"""
+
+
+class SiblingPinsSettings(ValidatedJSONModel):
+    """
+    The settings of the hatch hook pinning a distribution's basstler requirements.
+    """
+
+    dependencies: tuple[str, ...] = ()
+    """
+    The distribution's requirement specifiers, its basstler requirements unpinned.
+    """
+
+
+class MetadataHooks(ValidatedJSONModel):
+    """
+    The hatch metadata hooks a distribution is built with.
+    """
+
+    sibling_pins: Annotated[
+        SiblingPinsSettings, Field(alias="basstler-sibling-pins")
+    ] = SiblingPinsSettings()
+    """
+    The hook pinning its basstler requirements to its own version.
+    """
+
+
+class HatchMetadata(ValidatedJSONModel):
+    """
+    How hatch builds a distribution's metadata.
+    """
+
+    hooks: MetadataHooks = MetadataHooks()
+    """
+    The hooks that fill in the metadata's dynamic fields.
+    """
+
+
+class HatchSettings(ValidatedJSONModel):
+    """
+    A distribution's hatch settings.
+    """
+
+    metadata: HatchMetadata = HatchMetadata()
+    """
+    How its metadata is built.
+    """
+
+
+class ToolSettings(ValidatedJSONModel):
+    """
+    The settings of the tools a distribution is built with.
+    """
+
+    hatch: HatchSettings = HatchSettings()
+    """
+    Its hatch settings.
+    """
+
+
+class ProjectTable(ValidatedJSONModel):
+    """
+    A distribution's ``[project]`` table.
+    """
+
+    name: str
+    """
+    The distribution's package name.
+    """
+
+    dependencies: tuple[str, ...] = ()
+    """
+    The requirement specifiers it states itself, when they are not dynamic.
+    """
+
+
+class DistributionMetadata(ValidatedJSONModel):
+    """
+    A distribution's ``pyproject.toml``.
+    """
+
+    project: ProjectTable
+    """
+    Its ``[project]`` table.
+    """
+
+    tool: ToolSettings = ToolSettings()
+    """
+    Its ``[tool]`` table.
+    """
+
+    @property
+    def requirement_names(self) -> tuple[str, ...]:
         """
-        specification = importlib.util.spec_from_file_location(
-            f"{__name__}@{module_file.resolve()}", module_file
+        The names of the distributions it requires, whether stated in ``[project]`` or
+        through the sibling-pins hook.
+        """
+        return tuple(
+            REQUIREMENT_NAME.match(specifier).group()
+            for specifier in (
+                *self.project.dependencies,
+                *self.tool.hatch.metadata.hooks.sibling_pins.dependencies,
+            )
         )
-        module = importlib.util.module_from_spec(specification)
-        sys.modules[specification.name] = module
-        specification.loader.exec_module(module)
-        return module.PACKAGE_MAP
 
 
-# %% this package's map
+# %% the workspace
 
-PACKAGE_MAP = PackageMap(
-    (
-        DistributionDeclaration(
-            Distribution.CORE,
-            Layer.CORE,
-            (
-                "bash",
-                "class_property",
-                "command_line",
-                "credential_origin",
-                "directory_tree",
-                "email_address",
-                "environment",
-                "exceptions",
-                "exit_codes",
-                "json_model",
-                "locations",
-                "package_layout",
-                "package_map",
-                "plugin_root",
-                "render_common",
-                "shell_configuration",
-                "standard_streams",
-            ),
-        ),
-        DistributionDeclaration(
-            Distribution.GIT,
-            Layer.LOCAL_TOOLS,
-            ("git",),
-            (Distribution.CORE,),
-        ),
-        DistributionDeclaration(
-            Distribution.RULES,
-            Layer.LOCAL_TOOLS,
-            ("code_modification", "code_rules"),
-            (Distribution.CORE, Distribution.GIT),
-        ),
-        DistributionDeclaration(
-            Distribution.GITHUB,
-            Layer.GITHUB,
-            ("github",),
-            (Distribution.CORE, Distribution.GIT),
-        ),
-        DistributionDeclaration(
-            Distribution.REVIEWS,
-            Layer.COLLABORATION,
-            ("upstream_reviews",),
-            (Distribution.CORE, Distribution.GIT, Distribution.GITHUB),
-        ),
-        DistributionDeclaration(
-            Distribution.STACK,
-            Layer.COLLABORATION,
-            ("maintenance", "stack"),
-            (
-                Distribution.CORE,
-                Distribution.GIT,
-                Distribution.GITHUB,
-                Distribution.REVIEWS,
-            ),
-        ),
-        DistributionDeclaration(
-            Distribution.NOTES,
-            Layer.NOTES,
-            ("document_references", "personal_notes", "setup"),
-            (
-                Distribution.CORE,
-                Distribution.GIT,
-                Distribution.GITHUB,
-                Distribution.REVIEWS,
-                Distribution.STACK,
-            ),
-        ),
-        DistributionDeclaration(
-            Distribution.PLAN,
-            Layer.PLANS,
-            ("plan",),
-            (
-                Distribution.CORE,
-                Distribution.GIT,
-                Distribution.GITHUB,
-                Distribution.NOTES,
-            ),
-        ),
-        DistributionDeclaration(
-            Distribution.HUB,
-            Layer.USER_FACING,
-            ("plan_site",),
-            (
-                Distribution.CORE,
-                Distribution.GIT,
-                Distribution.GITHUB,
-                Distribution.REVIEWS,
-                Distribution.STACK,
-                Distribution.PLAN,
-                Distribution.NOTES,
-            ),
-        ),
-        DistributionDeclaration(
-            Distribution.META_PACKAGE,
-            Layer.META_PACKAGE,
-            ("__main__",),
-            (
-                Distribution.CORE,
-                Distribution.GIT,
-                Distribution.RULES,
-                Distribution.GITHUB,
-                Distribution.REVIEWS,
-                Distribution.STACK,
-                Distribution.PLAN,
-                Distribution.NOTES,
-                Distribution.HUB,
-            ),
-        ),
-    )
-)
-"""
-Every distribution this package is released as.
-"""
+
+@dataclass(frozen=True)
+class Workspace:
+    """
+    The uv workspace of basstler's distributions, one directory each under
+    ``packages``.
+    """
+
+    root: Path
+    """
+    The workspace's root, holding ``packages``.
+    """
+
+    @cached_property
+    def package_directories(self) -> tuple[Path, ...]:
+        """
+        Each distribution's directory, in name order.
+        """
+        return tuple(
+            sorted(
+                metadata.parent
+                for metadata in (self.root / WorkspaceLocation.PACKAGES).glob(
+                    f"*/{WorkspaceLocation.METADATA}"
+                )
+            )
+        )
+
+    @cached_property
+    def package_map(self) -> PackageMap:
+        """
+        The map the distributions' directories and metadata declare.
+        """
+        return PackageMap(
+            tuple(
+                DistributionDeclaration.read(directory)
+                for directory in self.package_directories
+            )
+        )
+
+    @cached_property
+    def namespace_package(self) -> NamespacePackage:
+        """
+        Each distribution's part of the ``basstler`` package.
+        """
+        return NamespacePackage(
+            tuple(
+                directory / WorkspaceLocation.PACKAGE_SOURCE
+                for directory in self.package_directories
+            )
+        )

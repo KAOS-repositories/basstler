@@ -41,11 +41,13 @@ items:
   status: in progress
   recommended_model: sonnet
   notes: >
-    Draft #223, stacked on #222, implemented at 4ddeda0b; CI not read yet. One code_modification
-    ActionPlan moved sources and tests into packages/<part>; uv workspace with basstler-build's
-    sibling pins and uv.lock; session start syncs the lock (a release from a tag clone); each
-    distribution's tests run in their own CI environment. Open: shared test helpers still pull
-    the stack into lower distributions' dev groups.
+    Draft #223, stacked on #222, merged with its base at cb13f576 (merge probe clean). CI at
+    4ddeda0b failed on ruff format and on notes' tests needing the installed meta-package; both
+    fixed at cb13f576, and every distribution passes locally in its own environment. Next: read CI
+    at cb13f576.
+
+    Open: shared test helpers still pull the stack into lower distributions' dev groups; notes' dev
+    group now lists the meta-package.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split

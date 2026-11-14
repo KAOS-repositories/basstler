@@ -62,13 +62,15 @@ from basstler_testing.constants.paths import (
     RepositoryLocation,
 )
 from basstler_testing.constants.site import SiteRepository
-from basstler_testing.executable_stubs import ExecutableStubDirectory, path_hiding_executables
+from basstler_testing.executable_stubs import (
+    ExecutableStubDirectory,
+    path_hiding_executables,
+)
 from basstler_testing.plan_dataset import LandedItemsPlan
 from basstler_testing.plugin_manifest import PluginManifest
 from basstler_testing.project_declaration import ProjectDeclaration
 from basstler_testing.scratch_repository import (
     SCRATCH_IDENTITY,
-    PackageSourceFile,
     ScratchRepository,
     write_interpreter_wrapper,
 )
@@ -101,16 +103,6 @@ class StubVariable(StrEnum):
     The script a ``uv`` installed by the ``pip`` stub runs.
     """
 
-    PIP_WATCHED_FILE = "STUB_PIP_WATCHED_FILE"
-    """
-    A file the ``pip`` stub copies, as it is while the stub runs.
-    """
-
-    PIP_WATCHED_FILE_COPY = "STUB_PIP_WATCHED_FILE_COPY"
-    """
-    Where the ``pip`` stub copies :attr:`PIP_WATCHED_FILE` to.
-    """
-
     UV_CALL_LOG = "STUB_UV_CALL_LOG"
     """
     The file the ``uv`` stub appends each invocation to.
@@ -124,6 +116,16 @@ class StubVariable(StrEnum):
     UV_PYTHON = "STUB_UV_PYTHON"
     """
     The interpreter an environment the ``uv`` stub creates runs.
+    """
+
+    UV_WATCHED_FILE = "STUB_UV_WATCHED_FILE"
+    """
+    A file the ``uv`` stub copies, as it is while the stub runs.
+    """
+
+    UV_WATCHED_FILE_COPY = "STUB_UV_WATCHED_FILE_COPY"
+    """
+    Where the ``uv`` stub copies :attr:`UV_WATCHED_FILE` to.
     """
 
     UV_ENVIRONMENT_INTERPRETER = "STUB_UV_ENVIRONMENT_INTERPRETER"
@@ -157,7 +159,8 @@ class PackageManager(StrEnum):
 
     PIP = "pip"
     """
-    The package installer every interpreter ships, used where there is no ``uv``.
+    The package installer every interpreter ships, which installs ``uv`` where there is
+    none.
     """
 
     UV = "uv"
@@ -966,7 +969,7 @@ def declaration_file(repository: ScratchRepository) -> Path:
     :param repository: The fixture-built scratch repository.
     :return: Where its scratch checkout declares the package's requirements.
     """
-    return repository.checkout_root / PackageSourceFile.METADATA
+    return repository.package_declaration
 
 
 def environment_directory(repository: ScratchRepository) -> str:
@@ -1028,26 +1031,17 @@ def environment_interpreter(repository: ScratchRepository) -> str:
     return repository.configuration_value(ConfigurationVariable.ENVIRONMENT_INTERPRETER)
 
 
-def pip_installer_call(repository: ScratchRepository) -> str:
+def uv_installer_call(repository: ScratchRepository, **overrides: str) -> str:
     """
     :param repository: The fixture-built scratch repository.
-    :return: The one invocation ``pip`` is expected to receive, where there is no ``uv``.
+    :param overrides: Variables the run sets.
+    :return: The arguments ``uv`` is expected to install the package with: the shell's
+        install command after the environment it names and the ``uv`` it runs.
     """
-    return (
-        f"--python {environment_interpreter(repository)} install --editable "
-        f"{package_source(repository)}"
-    )
-
-
-def uv_installer_call(repository: ScratchRepository) -> str:
-    """
-    :param repository: The fixture-built scratch repository.
-    :return: The install invocation ``uv`` is expected to receive, where there is one.
-    """
-    return (
-        f"{PackageManager.PIP} install --python {environment_interpreter(repository)} "
-        f"--editable "
-        f"{package_source(repository)}"
+    return repository.configuration_output(
+        f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
+        f'printf "%s" "${{{ConfigurationVariable.INSTALL_COMMAND}[*]:3}}"',
+        **overrides,
     )
 
 
@@ -1092,41 +1086,6 @@ def test_installs_nothing_when_every_requirement_is_already_installed(
     assert not call_log.exists()
 
 
-def test_installs_the_package_with_pip_when_a_requirement_is_missing(
-    session_start_repository: ScratchRepository,
-    stub_bin: ExecutableStubDirectory,
-    tmp_path: Path,
-):
-    """
-    A missing requirement is installed without anyone being asked, by installing the
-    package editable into its own environment - with ``pip`` where there is no ``uv`` -
-    and the run says so.
-    """
-    require_the_uninstallable(session_start_repository)
-    stub_bin.install(PackageManager.PIP)
-    call_log = tmp_path / "pip-calls"
-
-    result = publish_and_run(
-        session_start_repository,
-        environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_hiding_executables(tmp_path, PackageManager.UV)
-            ),
-            StubVariable.PIP_CALL_LOG: str(call_log),
-        },
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
-        SummaryMessage.DEPENDENCIES_INSTALLED,
-        UNINSTALLABLE_REQUIREMENT,
-        environment_directory(session_start_repository),
-    )
-    assert call_log.read_text(encoding="utf-8").splitlines() == [
-        pip_installer_call(session_start_repository)
-    ]
-
-
 def test_marks_the_install_in_progress_only_while_it_runs(
     session_start_repository: ScratchRepository,
     stub_bin: ExecutableStubDirectory,
@@ -1137,7 +1096,7 @@ def test_marks_the_install_in_progress_only_while_it_runs(
     "missing", so it is there while the installer runs and gone once it returns.
     """
     require_the_uninstallable(session_start_repository)
-    stub_bin.install(PackageManager.PIP)
+    stub_bin.install(PackageManager.UV)
     marker = Path(
         session_start_repository.configuration_value(
             ConfigurationVariable.INSTALL_MARKER
@@ -1148,11 +1107,9 @@ def test_marks_the_install_in_progress_only_while_it_runs(
     result = publish_and_run(
         session_start_repository,
         environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_hiding_executables(tmp_path, PackageManager.UV)
-            ),
-            StubVariable.PIP_WATCHED_FILE: str(marker),
-            StubVariable.PIP_WATCHED_FILE_COPY: str(marker_during_install),
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+            StubVariable.UV_WATCHED_FILE: str(marker),
+            StubVariable.UV_WATCHED_FILE_COPY: str(marker_during_install),
         },
     )
 
@@ -1192,7 +1149,12 @@ def test_installs_the_package_with_uv_where_there_is_one(
         environment_directory(session_start_repository),
     )
     assert install_log.read_text(encoding="utf-8").splitlines() == [
-        uv_installer_call(session_start_repository)
+        uv_installer_call(
+            session_start_repository,
+            **{
+                SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path()
+            },
+        )
     ]
     assert not pip_log.exists()
 
@@ -1210,15 +1172,13 @@ def test_reports_a_failed_install_and_finishes_the_run(
     and no explanation.
     """
     require_the_uninstallable(session_start_repository)
-    stub_bin.install(PackageManager.PIP)
+    stub_bin.install(PackageManager.UV)
 
     result = publish_and_run(
         session_start_repository,
         environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_hiding_executables(tmp_path, PackageManager.UV)
-            ),
-            StubVariable.PIP_STATUS: "1",
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+            StubVariable.UV_STATUS: "1",
         },
     )
 
@@ -1300,17 +1260,15 @@ def test_reinstalls_the_package_when_the_plugin_names_another_source(
             ConfigurationVariable.INSTALLED_SOURCE_FILE
         )
     ).write_text("an earlier release\n", encoding="utf-8")
-    stub_bin.install(PackageManager.PIP)
-    call_log = tmp_path / "pip-calls"
+    stub_bin.install(PackageManager.UV)
+    call_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path()
+    }
 
     result = publish_and_run(
         session_start_repository,
-        environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_hiding_executables(tmp_path, PackageManager.UV)
-            ),
-            StubVariable.PIP_CALL_LOG: str(call_log),
-        },
+        environment={**search_path, StubVariable.UV_CALL_LOG: str(call_log)},
     )
 
     assert result.returncode == 0, result.stderr
@@ -1320,7 +1278,7 @@ def test_reinstalls_the_package_when_the_plugin_names_another_source(
         environment_directory(session_start_repository),
     )
     assert call_log.read_text(encoding="utf-8").splitlines() == [
-        pip_installer_call(session_start_repository)
+        uv_installer_call(session_start_repository, **search_path)
     ]
 
 
@@ -1387,7 +1345,7 @@ def test_a_released_plugin_installs_the_package_at_its_own_release(
     The package comes from the plugin's own release, never the latest one, so the hooks
     never call the package with options from another release.
     """
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
     session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
 
     source = session_start_repository.configuration_output(
@@ -1408,7 +1366,7 @@ def test_a_plugin_naming_no_release_has_no_package_to_install(
     A plugin that is not a release, as one copied from the source tree, names no package
     of its own release, so nothing is guessed in its place.
     """
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
 
     with pytest.raises(subprocess.CalledProcessError):
         session_start_repository.configuration_output(
@@ -1423,7 +1381,7 @@ def test_a_workflow_runs_the_plugin_s_release(
     A workflow replaying for the session runs the same package, so it follows the
     plugin's release.
     """
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
     session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
 
     branch_or_tag = session_start_repository.configuration_output(
@@ -1452,7 +1410,7 @@ def test_a_workflow_has_no_release_to_run_for_a_plugin_naming_none(
     """
     Outside a checkout, a plugin naming no release has no package for a workflow to run.
     """
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
 
     with pytest.raises(subprocess.CalledProcessError):
         session_start_repository.configuration_output(
@@ -1469,7 +1427,7 @@ def test_a_session_start_installs_nothing_for_a_plugin_naming_no_release(
     Session start says the plugin names no release instead of installing a package of
     some other release for it.
     """
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
     stub_bin.install(PackageManager.PIP)
     call_log = tmp_path / "pip-calls"
 
@@ -1506,7 +1464,7 @@ def install_latest_release_for_another_plugin(
     :param repository: The fixture-built scratch repository.
     :param release_repository: The repository standing in for the package's own.
     """
-    declaration_file(repository).unlink()
+    repository.detach_plugin_from_checkout()
     repository.release_plugin_as(SampleReleaseTag.LATEST.version)
     repository.install_package_environment(
         **{ConfigurationVariable.REPOSITORY_URL: release_repository}
@@ -1521,27 +1479,36 @@ def ready_package(
     tmp_path: Path,
 ) -> Path:
     """
-    Ready the package as a hook does, with ``pip`` stubbed and no ``uv``.
+    Ready the package as a hook does, with ``uv`` stubbed.
 
     :param repository: The fixture-built scratch repository.
     :param release_repository: The repository standing in for the package's own.
     :param stub_bin: The directory of stub executables.
     :param tmp_path: The test's scratch directory.
-    :return: The file the ``pip`` stub logs each invocation to.
+    :return: The file the ``uv`` stub logs each invocation to.
     """
-    stub_bin.install(PackageManager.PIP)
-    call_log = tmp_path / "pip-calls"
+    stub_bin.install(PackageManager.UV)
+    call_log = tmp_path / "uv-calls"
     repository.configuration_output(
         ShellConfigurationFunction.READY_BASSTLER_PYTHON,
-        **{
-            ConfigurationVariable.REPOSITORY_URL: release_repository,
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_hiding_executables(tmp_path, PackageManager.UV)
-            ),
-            StubVariable.PIP_CALL_LOG: str(call_log),
-        },
+        **release_overrides(release_repository, stub_bin),
+        **{StubVariable.UV_CALL_LOG: str(call_log)},
     )
     return call_log
+
+
+def release_overrides(
+    release_repository: str, stub_bin: ExecutableStubDirectory
+) -> dict[str, str]:
+    """
+    :param release_repository: The repository standing in for the package's own.
+    :param stub_bin: The directory of stub executables, holding the ``uv`` stub.
+    :return: The variables a hook readying a release's package runs with.
+    """
+    return {
+        ConfigurationVariable.REPOSITORY_URL: release_repository,
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
+    }
 
 
 def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
@@ -1566,11 +1533,21 @@ def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
         session_start_repository, tagged_release_repository, stub_bin, tmp_path
     )
 
-    manifest = PluginManifest.of_this_plugin()
+    overrides = release_overrides(tagged_release_repository, stub_bin)
     assert call_log.read_text(encoding="utf-8").splitlines() == [
-        f"--python {environment_interpreter(session_start_repository)} install "
-        f"{manifest.name} @ git+{tagged_release_repository}@{SampleReleaseTag.OLDER}"
+        uv_installer_call(session_start_repository, **overrides)
     ]
+    clone = session_start_repository.configuration_output(
+        f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
+        f'printf "%s" "${{{ConfigurationVariable.WORKSPACE}}}"',
+        **overrides,
+    )
+    assert (
+        session_start_repository.run_git("rev-parse", "HEAD", cwd=Path(clone)).stdout
+        == session_start_repository.run_git(
+            "rev-parse", f"{SampleReleaseTag.OLDER}^{{commit}}"
+        ).stdout
+    )
 
 
 def test_an_unchanged_plugin_keeps_the_package_installed_for_it(
@@ -1583,7 +1560,7 @@ def test_an_unchanged_plugin_keeps_the_package_installed_for_it(
     A hook running with the plugin the package was installed for installs nothing,
     whatever was released since.
     """
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
     session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
     session_start_repository.install_package_environment(
         **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository}
@@ -1606,7 +1583,7 @@ def test_a_hook_of_a_plugin_naming_no_release_stops(
     against a package of some other release.
     """
     session_start_repository.install_package_environment()
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
 
     with pytest.raises(subprocess.CalledProcessError):
         ready_package(
@@ -1660,7 +1637,7 @@ def test_a_package_of_the_plugin_s_release_is_named_on_the_release_line(
     """
     The plugin and the package being one release is said too, naming that release.
     """
-    declaration_file(session_start_repository).unlink()
+    session_start_repository.detach_plugin_from_checkout()
     installed_version = version(PackageLocation.DIRECTORY.value.name)
     session_start_repository.release_plugin_as(installed_version)
     session_start_repository.install_package_environment()
@@ -1777,49 +1754,14 @@ def test_creates_the_environment_with_uv_and_installs_the_package_into_it(
     )
     assert environment_log.read_text(encoding="utf-8").splitlines() == [
         environment_call(session_start_repository),
-        uv_installer_call(session_start_repository),
+        uv_installer_call(
+            session_start_repository,
+            **{
+                SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path()
+            },
+        ),
     ]
     assert not install_log.exists()
-
-
-def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
-    session_start_repository: ScratchRepository,
-    stub_bin: ExecutableStubDirectory,
-    tmp_path: Path,
-):
-    """
-    Without ``uv``, the environment is made from an interpreter on the path that the
-    package supports - a real one, so the environment is a real one too.
-    """
-    without_an_environment(session_start_repository)
-    stub_bin.install(PackageManager.PIP)
-
-    result = publish_and_run(
-        session_start_repository,
-        environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_hiding_executables(tmp_path, PackageManager.UV)
-            ),
-        },
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
-        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
-        environment_directory(session_start_repository),
-        package_source(session_start_repository),
-    )
-    version = subprocess.run(
-        [
-            environment_interpreter(session_start_repository),
-            "-c",
-            "import sys; print(sys.version_info >= (3, 12))",
-        ],
-        capture_output=True,
-        encoding="utf-8",
-        check=True,
-    )
-    assert version.stdout.strip() == str(True)
 
 
 def path_without_a_supported_interpreter(mirror_parent: Path) -> str:
@@ -1831,8 +1773,20 @@ def path_without_a_supported_interpreter(mirror_parent: Path) -> str:
     return path_hiding_executables(
         mirror_parent,
         PackageManager.UV,
-        *configuration_value(ConfigurationVariable.INTERPRETER_CANDIDATES).split(),
+        LAUNCHER,
+        *(
+            f"python{version}"
+            for version in configuration_value(
+                ConfigurationVariable.PYTHON_VERSIONS
+            ).split()
+        ),
     )
+
+
+LAUNCHER = "py"
+"""
+The Windows launcher, which runs an installed interpreter by its version.
+"""
 
 
 def installed_uv_directory(repository: ScratchRepository) -> Path:
@@ -1856,13 +1810,16 @@ def test_installs_uv_when_no_supported_interpreter_is_on_the_path(
     stub_bin.install(PackageManager.PIP)
     install_log = tmp_path / "pip-calls"
     environment_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+            path_without_a_supported_interpreter(tmp_path)
+        )
+    }
 
     result = publish_and_run(
         session_start_repository,
         environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_without_a_supported_interpreter(tmp_path)
-            ),
+            **search_path,
             StubVariable.PIP_CALL_LOG: str(install_log),
             StubVariable.PIP_INSTALLED_UV: str(
                 ExecutableStubDirectory.stub_for(PackageManager.UV)
@@ -1884,7 +1841,52 @@ def test_installs_uv_when_no_supported_interpreter_is_on_the_path(
     ]
     assert environment_log.read_text(encoding="utf-8").splitlines() == [
         environment_call(session_start_repository),
-        uv_installer_call(session_start_repository),
+        uv_installer_call(session_start_repository, **search_path),
+    ]
+
+
+def test_installs_uv_with_the_pip_of_an_interpreter_found_by_name(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    Without ``uv``, the newest supported interpreter on the path installs it, so a
+    machine with only a supported Python and its pip still gets an environment.
+    """
+    without_an_environment(session_start_repository)
+    newest = configuration_value(ConfigurationVariable.PYTHON_VERSIONS).split()[0]
+    stub_bin.install(f"python{newest}")
+    stub_bin.install(PackageManager.PIP)
+    install_log = tmp_path / "pip-calls"
+    environment_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+            path_without_a_supported_interpreter(tmp_path)
+        )
+    }
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            **search_path,
+            StubVariable.PIP_CALL_LOG: str(install_log),
+            StubVariable.PIP_INSTALLED_UV: str(
+                ExecutableStubDirectory.stub_for(PackageManager.UV)
+            ),
+            StubVariable.UV_CALL_LOG: str(environment_log),
+            StubVariable.UV_PYTHON: sys.executable,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert install_log.read_text(encoding="utf-8").splitlines() == [
+        f"install --target {installed_uv_directory(session_start_repository)} "
+        f"{PackageManager.UV}"
+    ]
+    assert environment_log.read_text(encoding="utf-8").splitlines() == [
+        environment_call(session_start_repository),
+        uv_installer_call(session_start_repository, **search_path),
     ]
 
 
@@ -1906,13 +1908,16 @@ def test_reuses_the_uv_it_installed_before(
     installed_uv.chmod(FileMode.EXECUTABLE)
     pip_log = tmp_path / "pip-calls"
     uv_log = tmp_path / "uv-calls"
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+            path_without_a_supported_interpreter(tmp_path)
+        )
+    }
 
     result = publish_and_run(
         session_start_repository,
         environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
-                path_without_a_supported_interpreter(tmp_path)
-            ),
+            **search_path,
             StubVariable.PIP_CALL_LOG: str(pip_log),
             StubVariable.UV_CALL_LOG: str(uv_log),
             StubVariable.UV_PYTHON: sys.executable,
@@ -1927,7 +1932,7 @@ def test_reuses_the_uv_it_installed_before(
     )
     assert uv_log.read_text(encoding="utf-8").splitlines() == [
         environment_call(session_start_repository),
-        uv_installer_call(session_start_repository),
+        uv_installer_call(session_start_repository, **search_path),
     ]
     assert not pip_log.exists()
 
@@ -1966,40 +1971,6 @@ def test_reports_uv_it_could_not_install_and_finishes_the_run(
     assert (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
     ).exists()
-
-
-def test_installs_into_the_interpreter_a_windows_environment_was_created_with(
-    session_start_repository: ScratchRepository,
-    stub_bin: ExecutableStubDirectory,
-    tmp_path: Path,
-):
-    """
-    An environment created with the Windows layout has the package installed into its
-    own interpreter, not into one where every other platform keeps it.
-    """
-    without_an_environment(session_start_repository)
-    stub_bin.install(PackageManager.UV)
-    environment_log = tmp_path / "uv-calls"
-
-    result = publish_and_run(
-        session_start_repository,
-        environment={
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of_inherited_path(),
-            StubVariable.UV_CALL_LOG: str(environment_log),
-            StubVariable.UV_PYTHON: sys.executable,
-            StubVariable.UV_ENVIRONMENT_INTERPRETER: EnvironmentInterpreterLayout.WINDOWS,
-        },
-    )
-
-    assert result.returncode == 0, result.stderr
-    windows_interpreter = (
-        Path(environment_directory(session_start_repository))
-        / EnvironmentInterpreterLayout.WINDOWS
-    )
-    assert environment_log.read_text(encoding="utf-8").splitlines()[-1] == (
-        f"{PackageManager.PIP} install --python {windows_interpreter} --editable "
-        f"{package_source(session_start_repository)}"
-    )
 
 
 def test_reports_an_environment_it_could_not_create_and_finishes_the_run(

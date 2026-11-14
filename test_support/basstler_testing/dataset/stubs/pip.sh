@@ -6,10 +6,7 @@ set -uo pipefail
 # them. Copied into place as an executable named `pip`, earlier on PATH than
 # the real one; see the stub_bin fixture in conftest.py.
 #
-# Recognizes only the two invocations the hooks make:
-#   `--python <interpreter> install [--editable] <source>`, from
-#     install_basstler_into_environment: editable for a checkout, a release's
-#     requirement for a plugin outside one;
+# Recognizes only the invocation the hooks make:
 #   `install --target <directory> uv`, from install_uv, which it answers by
 #     writing <directory>/bin/uv as a script running bash on
 #     STUB_PIP_INSTALLED_UV.
@@ -17,18 +14,12 @@ set -uo pipefail
 #   STUB_PIP_STATUS      - exit status to report, default 0; anything else
 #                          installs nothing
 #   STUB_PIP_INSTALLED_UV - the script an installed uv runs
-#   STUB_PIP_WATCHED_FILE - a file whose content, as it is while the stub
-#                          runs, is copied to STUB_PIP_WATCHED_FILE_COPY
 #
 # Exits 64 on an unrecognized invocation for the same reason gh.sh does: a
 # changed call must fail a test rather than pass by accident.
 
 if [ -n "${STUB_PIP_CALL_LOG:-}" ]; then
   printf '%s\n' "$*" >> "${STUB_PIP_CALL_LOG}"
-fi
-
-if [ -n "${STUB_PIP_WATCHED_FILE:-}" ]; then
-  cat "${STUB_PIP_WATCHED_FILE}" > "${STUB_PIP_WATCHED_FILE_COPY}" 2>/dev/null
 fi
 
 STATUS="${STUB_PIP_STATUS:-0}"
@@ -46,17 +37,5 @@ if [ "${1:-}" = "install" ] && [ "${2:-}" = "--target" ] && [ -n "${3:-}" ] \
   exit 0
 fi
 
-SOURCE="${4:-}"
-[ "${SOURCE}" = "--editable" ] && SOURCE="${5:-}"
-if [ "${1:-}" != "--python" ] || [ -z "${2:-}" ] || [ "${3:-}" != "install" ] \
-    || [ -z "${SOURCE}" ]; then
-  echo "pip stub: unrecognized invocation: $*" >&2
-  exit 64
-fi
-
-if [ "${STATUS}" = "0" ]; then
-  echo "Successfully installed ${SOURCE}"
-  exit 0
-fi
-echo "ERROR: stub pip refused to install ${SOURCE}" >&2
-exit "${STATUS}"
+echo "pip stub: unrecognized invocation: $*" >&2
+exit 64

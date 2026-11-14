@@ -18,8 +18,14 @@ from basstler.locations import PluginLocation
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from ..bash_path import BashPath
-from basstler_testing.constants.environment import ConfigurationVariable, SearchPathVariable
-from basstler_testing.executable_stubs import ExecutableStubDirectory, path_hiding_executables
+from basstler_testing.constants.environment import (
+    ConfigurationVariable,
+    SearchPathVariable,
+)
+from basstler_testing.executable_stubs import (
+    ExecutableStubDirectory,
+    path_hiding_executables,
+)
 from basstler_testing.scratch_repository import ScratchRepository
 from .test_session_start import PackageManager, StubVariable
 
@@ -102,13 +108,13 @@ def a_process_that_has_exited() -> int:
     return finished.pid
 
 
-def pip_only_path(stub_bin: ExecutableStubDirectory, tmp_path: Path) -> str:
+def uv_stub_path(stub_bin: ExecutableStubDirectory, tmp_path: Path) -> str:
     """
-    :param stub_bin: The stub directory, holding the ``pip`` stub.
+    :param stub_bin: The stub directory, holding the ``uv`` stub.
     :param tmp_path: pytest's per-test temporary directory.
-    :return: A ``PATH`` finding the ``pip`` stub and no ``uv``.
+    :return: A ``PATH`` finding the ``uv`` stub ahead of any real ``uv``.
     """
-    stub_bin.install(PackageManager.PIP)
+    stub_bin.install(PackageManager.UV)
     return stub_bin.ahead_of(path_hiding_executables(tmp_path, PackageManager.UV))
 
 
@@ -136,17 +142,15 @@ def test_an_install_that_never_finished_is_completed_before_the_module_runs(
     """
     installed_source_file(entry_point_repository).unlink()
     hold_install_lock(entry_point_repository, a_process_that_has_exited())
-    call_log = tmp_path / "pip-calls"
+    call_log = tmp_path / "uv-calls"
 
     result = run_entry_point(
         entry_point_repository,
         MODULE_WITH_HELP,
         "--help",
         **{
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: pip_only_path(
-                stub_bin, tmp_path
-            ),
-            StubVariable.PIP_CALL_LOG: str(call_log),
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: uv_stub_path(stub_bin, tmp_path),
+            StubVariable.UV_CALL_LOG: str(call_log),
         },
     )
 
@@ -160,6 +164,9 @@ def test_an_install_still_running_is_waited_for_rather_than_repeated(
     stub_bin: ExecutableStubDirectory,
     tmp_path: Path,
 ):
+    """
+    An install another live process holds the lock for is waited for, not run twice.
+    """
     source_file = installed_source_file(entry_point_repository)
     source = source_file.read_text(encoding="utf-8")
     source_file.unlink()
@@ -175,17 +182,15 @@ def test_an_install_still_running_is_waited_for_rather_than_repeated(
         )
     )
     hold_install_lock(entry_point_repository, running_install.pid)
-    call_log = tmp_path / "pip-calls"
+    call_log = tmp_path / "uv-calls"
 
     result = run_entry_point(
         entry_point_repository,
         MODULE_WITH_HELP,
         "--help",
         **{
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: pip_only_path(
-                stub_bin, tmp_path
-            ),
-            StubVariable.PIP_CALL_LOG: str(call_log),
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: uv_stub_path(stub_bin, tmp_path),
+            StubVariable.UV_CALL_LOG: str(call_log),
         },
     )
     running_install.wait()
@@ -202,18 +207,20 @@ def test_a_failed_install_is_one_line_naming_what_to_run(
     stub_bin: ExecutableStubDirectory,
     tmp_path: Path,
 ):
+    """
+    A failed install ends the hook with one line naming the command that installs it.
+    """
     installed_source_file(entry_point_repository).unlink()
+    search_path = {
+        SearchPathVariable.EXECUTABLE_SEARCH_PATH: uv_stub_path(stub_bin, tmp_path)
+    }
 
     result = run_entry_point(
         entry_point_repository,
         MODULE_WITH_HELP,
         "--help",
-        **{
-            SearchPathVariable.EXECUTABLE_SEARCH_PATH: pip_only_path(
-                stub_bin, tmp_path
-            ),
-            StubVariable.PIP_STATUS: "1",
-        },
+        **search_path,
+        **{StubVariable.UV_STATUS: "1"},
     )
 
     source = entry_point_repository.configuration_output(
@@ -223,7 +230,9 @@ def test_a_failed_install_is_one_line_naming_what_to_run(
     assert result.stdout == ""
     (line,) = result.stderr.splitlines()
     assert line.startswith(f"could not install {source}: ")
-    assert f" - run: {PackageManager.PIP} --python " in line
+    assert line.endswith(
+        f" - run: {entry_point_repository.install_command(**search_path)}"
+    )
 
 
 def test_an_install_held_by_a_live_process_past_the_wait_is_one_line_naming_the_lock(

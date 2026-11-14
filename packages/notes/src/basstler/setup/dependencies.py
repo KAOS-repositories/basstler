@@ -1,26 +1,13 @@
 #!/usr/bin/env python3
 """
-What this package needs installed, and which of it this environment is missing.
-
-The declaration is ``pyproject.toml``'s ``[project]`` table: the package's own name and its
-``dependencies``, so there is one list rather than a metadata table and a requirements file
-that can disagree. A package installed as a copy, from its repository, carries no
-``pyproject.toml``; its installed metadata states the same list. An
-environment runs the package only with the package itself installed in it, so the package
-counts as a requirement of its own.
-
-Kept as a module rather than as a snippet inside the shell that calls it: the bash entry
-points ask this question before anything is installed, and a question with parsing in it
-is real, testable code wherever it is written.
+What this package needs installed, and which of it this environment is missing: read
+from the checkout's declarations, else from the installed distributions' metadata.
 
 Usage:
     "${BASSTLER_PYTHON}" -m basstler.setup.dependencies [--declaration <pyproject.toml>]
 
-Prints one requirement specifier per missing requirement, and nothing at all when the
-environment already has them all.
-
-..note:: Imports nothing outside the standard library. It runs before any install, so a
-    dependency of its own would be the one thing it could never report.
+..note:: Imports nothing outside the standard library, since it runs before any
+    install.
 """
 
 from __future__ import annotations
@@ -32,13 +19,13 @@ import tomllib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
-from importlib.metadata import PackageNotFoundError, distribution, distributions
+from importlib.metadata import distributions
 from pathlib import Path
 from typing import Any
 
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, ExitCode
-from basstler.locations import PackageLocation
+from basstler.locations import PackageLocation, WorkspaceLocation
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -64,7 +51,33 @@ class PyprojectKey(StrEnum):
 
     DEPENDENCIES = "dependencies"
     """
-    The field of that table listing the requirement specifiers.
+    The field of that table, and of the sibling-pins hook's, listing the requirement
+    specifiers.
+    """
+
+    TOOL = "tool"
+    """
+    The table every tool's settings sit under.
+    """
+
+    HATCH = "hatch"
+    """
+    The build backend's table.
+    """
+
+    METADATA = "metadata"
+    """
+    The backend's table of how the metadata is built.
+    """
+
+    HOOKS = "hooks"
+    """
+    The table of the hooks filling in the metadata's dynamic fields.
+    """
+
+    SIBLING_PINS = "basstler-sibling-pins"
+    """
+    The hook holding a distribution's requirements, its basstler ones unpinned.
     """
 
 
@@ -164,6 +177,16 @@ class Dependency:
         return self.constraint_start.split(self.specifier, maxsplit=1)[0].strip()
 
     @property
+    def is_basstler_distribution(self) -> bool:
+        """
+        :return: Whether this requirement names ``basstler`` or one of its
+            ``basstler-`` distributions.
+        """
+        family = PackageLocation.DIRECTORY.value.name
+        name = self.distribution_name.lower()
+        return name == family or name.startswith(f"{family}-")
+
+    @property
     def is_missing(self) -> bool:
         """
         Presence rather than version: an installed distribution is left alone, which is
@@ -200,14 +223,11 @@ class RequirementSource(ABC):
     @staticmethod
     def for_this_package() -> RequirementSource:
         """
-        :return: The source checkout's ``pyproject.toml`` where the package runs from
-            one, else the package's installed metadata.
+        :return: The checkout's workspace where the package runs from one, else the
+            installed ``basstler`` distribution.
         """
-        declaration = DependencyDeclaration(
-            PackageLocation.DEPENDENCY_DECLARATION.value
-        )
-        if declaration.path.is_file():
-            return declaration
+        if PackageLocation.META_PACKAGE_METADATA.value.is_file():
+            return WorkspaceDeclaration(PackageLocation.SOURCE_TREE.value)
         return InstalledDistribution(PackageLocation.DIRECTORY.value.name)
 
 
@@ -225,20 +245,26 @@ class InstalledDistribution(RequirementSource):
     def requirements(self) -> tuple[Dependency, ...]:
         """
         :return: The distribution itself, then every requirement its metadata states
-            without an extra, in the order stated; only itself when it is not installed.
+            without an extra, in the order stated, each basstler distribution among them
+            followed by its own; only itself when it is not installed.
         """
-        try:
-            stated = distribution(self.name).requires or []
-        except PackageNotFoundError:
+        installed = next(iter(distributions(name=self.name)), None)
+        if installed is None:
             return (Dependency(self.name),)
-        return (
-            Dependency(self.name),
-            *(
-                Dependency(specifier)
-                for specifier in stated
-                if RequirementMarker.EXTRA not in specifier
-            ),
-        )
+        found = [Dependency(self.name)]
+        for specifier in installed.requires or []:
+            if RequirementMarker.EXTRA in specifier:
+                continue
+            dependency = Dependency(specifier)
+            stated = (
+                InstalledDistribution(dependency.distribution_name).requirements()
+                if dependency.is_basstler_distribution
+                else (dependency,)
+            )
+            found.extend(
+                requirement for requirement in stated if requirement not in found
+            )
+        return tuple(found)
 
 
 @dataclass(frozen=True)
@@ -252,14 +278,6 @@ class DependencyDeclaration(RequirementSource):
     The ``pyproject.toml`` to read.
     """
 
-    @classmethod
-    def of_this_package(cls) -> DependencyDeclaration:
-        """
-        :return: This package's own metadata, found beside the modules it declares the
-            dependencies of.
-        """
-        return cls(PackageLocation.DEPENDENCY_DECLARATION.value)
-
     def project(self) -> Dependency:
         """
         :return: The package's own distribution, as a requirement of an environment that
@@ -270,12 +288,24 @@ class DependencyDeclaration(RequirementSource):
 
     def dependencies(self) -> tuple[Dependency, ...]:
         """
-        :return: Every dependency it declares, in the order it declares them.
+        :return: Every dependency it declares, in ``[project]`` and then in the
+            sibling-pins hook, in the order it declares them.
         :raises UnreadableDependencyDeclarationError: If the file is absent.
         """
+        document = self._document()
+        hook = (
+            document.get(PyprojectKey.TOOL, {})
+            .get(PyprojectKey.HATCH, {})
+            .get(PyprojectKey.METADATA, {})
+            .get(PyprojectKey.HOOKS, {})
+            .get(PyprojectKey.SIBLING_PINS, {})
+        )
         return tuple(
             Dependency(specifier)
-            for specifier in self._project_table().get(PyprojectKey.DEPENDENCIES, [])
+            for specifier in (
+                *document[PyprojectKey.PROJECT].get(PyprojectKey.DEPENDENCIES, []),
+                *hook.get(PyprojectKey.DEPENDENCIES, []),
+            )
         )
 
     def requirements(self) -> tuple[Dependency, ...]:
@@ -292,13 +322,80 @@ class DependencyDeclaration(RequirementSource):
         :raises UnreadableDependencyDeclarationError: If the file is absent.
         :raises MalformedDependencyDeclarationError: If the file is not valid TOML.
         """
+        return self._document()[PyprojectKey.PROJECT]
+
+    def _document(self) -> dict[str, Any]:
+        """
+        :return: The whole ``pyproject.toml``.
+        :raises UnreadableDependencyDeclarationError: If the file is absent.
+        :raises MalformedDependencyDeclarationError: If the file is not valid TOML.
+        """
         if not self.path.is_file():
             raise UnreadableDependencyDeclarationError(self.path)
         try:
-            declaration = tomllib.loads(self.path.read_text(encoding="utf-8"))
+            return tomllib.loads(self.path.read_text(encoding="utf-8"))
         except tomllib.TOMLDecodeError as error:
             raise MalformedDependencyDeclarationError(self.path) from error
-        return declaration[PyprojectKey.PROJECT]
+
+
+@dataclass(frozen=True)
+class WorkspaceDeclaration(RequirementSource):
+    """
+    A checkout's workspace, whose ``basstler`` distribution requires what its own
+    ``pyproject.toml`` and those of the basstler distributions it lists declare.
+    """
+
+    root: Path
+    """
+    The workspace's root.
+    """
+
+    def requirements(self) -> tuple[Dependency, ...]:
+        """
+        :return: The ``basstler`` distribution, then each requirement its declaration
+            lists, each workspace distribution among them followed by its own.
+        :raises UnreadableDependencyDeclarationError: If a declaration is absent.
+        """
+        declarations = {
+            declaration.project().specifier: declaration
+            for declaration in (
+                DependencyDeclaration(path)
+                for path in sorted(
+                    (self.root / WorkspaceLocation.PACKAGES).glob(
+                        f"*/{WorkspaceLocation.METADATA}"
+                    )
+                )
+            )
+        }
+        return self.reached(
+            declarations, Dependency(PackageLocation.DIRECTORY.value.name), []
+        )
+
+    def reached(
+        self,
+        declarations: dict[str, DependencyDeclaration],
+        requirement: Dependency,
+        found: list[Dependency],
+    ) -> tuple[Dependency, ...]:
+        """
+        :param declarations: Each workspace distribution's declaration, by its name.
+        :param requirement: A requirement to add to *found*.
+        :param found: The requirements reached so far, extended in place.
+        :return: *found*, with *requirement* and, for a workspace distribution, what it
+            declares in turn.
+        """
+        declaration = declarations.get(requirement.distribution_name)
+        if declaration is None:
+            if requirement not in found:
+                found.append(requirement)
+            return tuple(found)
+        own = Dependency(requirement.distribution_name)
+        if own in found:
+            return tuple(found)
+        found.append(own)
+        for dependency in declaration.dependencies():
+            self.reached(declarations, dependency, found)
+        return tuple(found)
 
 
 def main() -> DependencyExitCode:

@@ -1,17 +1,20 @@
 """
-The package's dependency declaration, and which of it this environment is missing.
+What the package requires, read from the installed distributions or a declaration, and
+which of it this environment is missing.
 
-The declaration is read from ``pyproject.toml``, so these tests read it there too rather
-than restating the four distributions - what they hold is the reading, not the list.
+The expected requirements are read from the workspace's own metadata rather than
+restated: what these tests hold is the reading, not the list.
 """
 
 from __future__ import annotations
 
+import tomllib
 from importlib.metadata import distributions
 
 import pytest
 
 from basstler.locations import PackageLocation
+from basstler.package_map import Distribution, DistributionMetadata, Workspace
 from basstler.setup import dependencies
 from basstler.setup.dependencies import (
     Dependency,
@@ -19,6 +22,7 @@ from basstler.setup.dependencies import (
     InstalledDistribution,
     MalformedDependencyDeclarationError,
     PyprojectKey,
+    RequirementSource,
     UnreadableDependencyDeclarationError,
 )
 
@@ -29,22 +33,87 @@ from basstler_testing.script_runner import PythonModuleRunner
 # %% the declaration
 
 
-def test_the_declared_dependencies_are_the_ones_pyproject_states():
+def installed_requirement_names(name: str) -> list[str]:
     """
-    One declaration: what the package installs is what its metadata says it needs.
+    :param name: An installed distribution.
+    :return: The name of each requirement it has, in order.
     """
-    assert [
-        dependency.specifier
-        for dependency in DependencyDeclaration.of_this_package().dependencies()
-    ] == list(ProjectDeclaration.of_this_package().dependencies)
+    return [
+        requirement.distribution_name
+        for requirement in InstalledDistribution(name).requirements()
+    ]
 
 
-def test_the_declaration_is_static_so_a_reader_needs_no_build():
+def test_the_package_requires_every_distribution_the_command_tree_reaches():
     """
-    ``dependencies`` resolved by the build backend is invisible to anything that reads
-    the file - which is what this module, the session start and the workflows all do.
+    The ``basstler`` distribution requires each distribution its metadata lists, and
+    each of those what its own lists, down to the core.
     """
-    assert PyprojectKey.DEPENDENCIES not in ProjectDeclaration.of_this_package().dynamic
+    package_map = Workspace(PackageLocation.SOURCE_TREE.value).package_map
+    reached = set(reachable_distributions(package_map, Distribution.META_PACKAGE))
+
+    assert {
+        name
+        for name in installed_requirement_names(Distribution.META_PACKAGE.value)
+        if Dependency(name).is_basstler_distribution
+    } == {distribution.value for distribution in reached}
+
+
+def test_a_checkout_requires_what_its_declarations_reach_from_the_command_tree():
+    """
+    Run from a checkout, the package requires what the workspace's declarations list, so
+    a dependency a pull adds is missing before anything reinstalls the package.
+    """
+    package_map = Workspace(PackageLocation.SOURCE_TREE.value).package_map
+    reached = reachable_distributions(package_map, Distribution.META_PACKAGE)
+
+    assert {
+        requirement.distribution_name
+        for requirement in RequirementSource.for_this_package().requirements()
+        if requirement.is_basstler_distribution
+    } == {distribution.value for distribution in reached}
+
+
+def test_an_installed_distribution_requires_what_its_metadata_and_its_siblings_list():
+    """
+    The git distribution requires itself, the core distribution it lists, and what the
+    core distribution's own metadata lists.
+    """
+    git, core = (
+        PackageLocation.SOURCE_TREE.value / "packages" / part / "pyproject.toml"
+        for part in ("git", "core")
+    )
+
+    assert installed_requirement_names(Distribution.GIT.value) == [
+        Distribution.GIT.value,
+        *metadata_requirement_names(git),
+        *metadata_requirement_names(core),
+    ]
+
+
+def metadata_requirement_names(path) -> tuple[str, ...]:
+    """
+    :param path: A distribution's ``pyproject.toml``.
+    :return: The names of the requirements it lists.
+    """
+    return DistributionMetadata.from_json(
+        tomllib.loads(path.read_text(encoding="utf-8"))
+    ).requirement_names
+
+
+def reachable_distributions(
+    package_map, distribution: Distribution
+) -> set[Distribution]:
+    """
+    :param package_map: The workspace's map.
+    :param distribution: Where to start.
+    :return: *distribution* and every distribution it lists, directly or through
+        another.
+    """
+    reached = {distribution}
+    for dependency in package_map[distribution].dependencies:
+        reached |= reachable_distributions(package_map, dependency)
+    return reached
 
 
 def test_a_declaration_naming_no_dependencies_is_read_as_needing_none(tmp_path):
@@ -52,7 +121,7 @@ def test_a_declaration_naming_no_dependencies_is_read_as_needing_none(tmp_path):
     Distinct from unreadable: a package that declares nothing needs nothing, so the
     caller installs nothing rather than being told it could not check.
     """
-    declaration = tmp_path / PackageLocation.DEPENDENCY_DECLARATION.name
+    declaration = tmp_path / PackageLocation.META_PACKAGE_METADATA.name
     declaration.write_text(
         f'[{PyprojectKey.PROJECT}]\n{PyprojectKey.NAME} = "nothing"\n', encoding="utf-8"
     )
@@ -117,14 +186,16 @@ def test_a_dependency_spelled_differently_from_its_installed_distribution_is_pre
 
 def test_the_requirements_are_the_package_itself_then_its_dependencies():
     """
-    An environment runs the package only with the package installed in it, so the
-    package is the first thing it requires.
+    An environment runs a package only with the package installed in it, so the package
+    is the first thing it requires.
     """
-    declared = ProjectDeclaration.of_this_package()
+    declared = ProjectDeclaration.read(DatasetLocation.PARTLY_INSTALLED_PROJECT.value)
 
     assert [
         requirement.specifier
-        for requirement in DependencyDeclaration.of_this_package().requirements()
+        for requirement in DependencyDeclaration(
+            DatasetLocation.PARTLY_INSTALLED_PROJECT.value
+        ).requirements()
     ] == [declared.name, *declared.dependencies]
 
 
@@ -142,8 +213,10 @@ def test_missing_requirements_are_a_subset_of_what_is_declared():
     """
     What the caller installs is drawn from the declaration and nothing else.
     """
-    missing = DependencyDeclaration.of_this_package().missing()
-    declared = ProjectDeclaration.of_this_package()
+    missing = DependencyDeclaration(
+        DatasetLocation.PARTLY_INSTALLED_PROJECT.value
+    ).missing()
+    declared = ProjectDeclaration.read(DatasetLocation.PARTLY_INSTALLED_PROJECT.value)
 
     assert {dependency.specifier for dependency in missing} <= {
         declared.name,
@@ -157,7 +230,7 @@ def test_an_absent_declaration_raises_rather_than_declaring_nothing(tmp_path):
     caller that nothing is missing.
     """
     absent = DependencyDeclaration(
-        tmp_path / PackageLocation.DEPENDENCY_DECLARATION.value.name
+        tmp_path / PackageLocation.META_PACKAGE_METADATA.value.name
     )
 
     with pytest.raises(UnreadableDependencyDeclarationError):
@@ -169,7 +242,7 @@ def test_a_declaration_that_is_not_toml_raises_naming_itself(tmp_path):
     A declaration that will not parse is reported as the file it is, so a caller can say
     which file to fix.
     """
-    malformed = tmp_path / PackageLocation.DEPENDENCY_DECLARATION.value.name
+    malformed = tmp_path / PackageLocation.META_PACKAGE_METADATA.value.name
     malformed.write_text("this is not toml\n", encoding="utf-8")
 
     with pytest.raises(MalformedDependencyDeclarationError) as raised:
@@ -181,29 +254,11 @@ def test_a_declaration_that_is_not_toml_raises_naming_itself(tmp_path):
 # %% an installed copy, which carries no pyproject.toml
 
 
-def test_an_installed_distribution_requires_what_pyproject_declares():
-    """
-    A package installed from its repository rather than run from a checkout has no
-    ``pyproject.toml`` beside it; its installed metadata states the same dependencies.
-
-    Compared without their order, which the build backend is free to change: hatchling
-    writes them sorted.
-    """
-    declared = ProjectDeclaration.of_this_package()
-
-    assert sorted(
-        requirement.specifier
-        for requirement in InstalledDistribution(declared.name).requirements()
-    ) == sorted([declared.name, *declared.dependencies])
-
-
 def test_an_installed_distribution_this_environment_has_misses_nothing():
     """
     The suite's own environment has the package installed with everything it needs.
     """
-    declared = ProjectDeclaration.of_this_package()
-
-    assert InstalledDistribution(declared.name).missing() == ()
+    assert InstalledDistribution(Distribution.META_PACKAGE.value).missing() == ()
 
 
 def test_a_distribution_nothing_installed_is_missing_itself():
@@ -242,7 +297,7 @@ def test_the_command_line_prints_one_specifier_per_missing_requirement():
     assert result.returncode == 0, result.stderr
     assert result.stdout.split() == [
         dependency.specifier
-        for dependency in DependencyDeclaration.of_this_package().missing()
+        for dependency in RequirementSource.for_this_package().missing()
     ]
 
 

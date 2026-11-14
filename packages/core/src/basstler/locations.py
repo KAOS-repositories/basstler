@@ -148,9 +148,10 @@ class PackageLocation(PathEnumeration):
     :attr:`ShippedPath.STACK_CONFIGURATION`, where the stack distribution ships it.
     """
 
-    DEPENDENCY_DECLARATION = SOURCE_TREE / "pyproject.toml"
+    META_PACKAGE_METADATA = SOURCE_TREE / "packages" / "basstler" / "pyproject.toml"
     """
-    The workspace root's metadata in a checkout.
+    The ``basstler`` distribution's metadata in a checkout: its name, the interpreters
+    it supports and where its version is read from.
     """
 
     LICENSE = SOURCE_TREE / "LICENSE"

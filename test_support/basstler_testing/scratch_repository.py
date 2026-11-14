@@ -22,7 +22,6 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from types import ModuleType
 
-import basstler
 from basstler.directory_tree import DirectoryTree
 from basstler.bash import Bash
 from basstler.git.commands import GitCommandRunner
@@ -49,17 +48,27 @@ class PackageSourceFile(StrEnum):
 
     METADATA = "pyproject.toml"
     """
-    The package's metadata, declaring its dependencies.
+    The workspace's metadata, and each distribution's.
+    """
+
+    LOCK = "uv.lock"
+    """
+    The versions the workspace installs at.
     """
 
     README = "README.md"
     """
-    The readme the metadata names.
+    The repository's readme.
+    """
+
+    PACKAGES = "packages"
+    """
+    The directory holding a directory for each distribution.
     """
 
     SOURCE = "src"
     """
-    The directory holding the package itself.
+    The directory of a distribution holding its part of the package.
     """
 
 
@@ -89,14 +98,24 @@ def install_package_into(checkout_root: Path) -> None:
     :param checkout_root: The checkout to copy it into.
     """
     checkout_root.mkdir(parents=True, exist_ok=True)
-    for file in (PackageSourceFile.METADATA, PackageSourceFile.README):
+    for file in (
+        PackageSourceFile.METADATA,
+        PackageSourceFile.LOCK,
+        PackageSourceFile.README,
+    ):
         shutil.copy(RepositoryLocation.ROOT / file, checkout_root / file)
-    shutil.copytree(
-        RepositoryLocation.ROOT / PackageSourceFile.SOURCE,
-        checkout_root / PackageSourceFile.SOURCE,
-        ignore=shutil.ignore_patterns("__pycache__", "*.egg-info"),
-        dirs_exist_ok=True,
-    )
+    for distribution in (
+        RepositoryLocation.ROOT / PackageSourceFile.PACKAGES
+    ).iterdir():
+        destination = checkout_root / PackageSourceFile.PACKAGES / distribution.name
+        destination.mkdir(parents=True, exist_ok=True)
+        shutil.copy(distribution / PackageSourceFile.METADATA, destination)
+        shutil.copytree(
+            distribution / PackageSourceFile.SOURCE,
+            destination / PackageSourceFile.SOURCE,
+            ignore=shutil.ignore_patterns("__pycache__", "*.egg-info"),
+            dirs_exist_ok=True,
+        )
 
 
 def write_interpreter_wrapper(destination: Path) -> Path:
@@ -244,6 +263,22 @@ class ScratchRepository:
         The scratch basstler checkout the plugin under test sits in, beside the project.
         """
         return self.project_root.parent / "basstler-checkout"
+
+    @property
+    def package_declaration(self) -> Path:
+        """
+        The scratch checkout's ``basstler`` distribution metadata, which a checkout's
+        requirements are read from.
+        """
+        return self.checkout_root / PackageLocation.META_PACKAGE_METADATA.relative_to(
+            PackageLocation.SOURCE_TREE
+        )
+
+    def detach_plugin_from_checkout(self) -> None:
+        """
+        Make the scratch plugin one installed on its own, outside a checkout.
+        """
+        (self.checkout_root / PackageSourceFile.LOCK).unlink()
 
     @property
     def plugin_root(self) -> Path:
@@ -397,12 +432,22 @@ class ScratchRepository:
         :param module: The real module, whose file is replaced.
         :param stand_in: The module to run in its place.
         """
-        package_root = Path(basstler.__file__).parent.parent
         shutil.copy(
             stand_in,
             self.checkout_root
-            / PackageSourceFile.SOURCE
-            / Path(module.__file__).relative_to(package_root),
+            / Path(module.__file__).resolve().relative_to(RepositoryLocation.ROOT),
+        )
+
+    def install_command(self, **overrides: str) -> str:
+        """
+        :param overrides: Variables the run sets.
+        :return: The command the scratch plugin's shell configuration installs the
+            package with, as a hint names it.
+        """
+        return self.configuration_output(
+            f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
+            f'printf "%s" "${{{ConfigurationVariable.INSTALL_COMMAND}[*]}}"',
+            **overrides,
         )
 
     def configuration_value(self, variable_name: str) -> str:

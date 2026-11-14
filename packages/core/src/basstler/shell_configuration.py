@@ -90,6 +90,12 @@ class ShellConfigurationFunction(StrEnum):
     repository at the plugin's own release.
     """
 
+    BASSTLER_INSTALL_COMMAND = "basstler_install_command"
+    """
+    Sets the command installing the package into its environment, from the checkout or
+    the plugin's release.
+    """
+
     BASSTLER_BRANCH_OR_TAG = "basstler_branch_or_tag"
     """
     Prints the basstler branch or tag the package is installed at outside a checkout:

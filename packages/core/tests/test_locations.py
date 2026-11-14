@@ -119,7 +119,7 @@ def test_the_dependency_declaration_is_the_source_trees_own_metadata():
     rather than shipped inside the package.
     """
     assert (
-        PackageLocation.DEPENDENCY_DECLARATION.value
+        PackageLocation.META_PACKAGE_METADATA.value
         == PackageLocation.SOURCE_TREE / "pyproject.toml"
     )
 

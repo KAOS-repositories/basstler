@@ -23,6 +23,7 @@ import pytest
 
 from basstler.bash import Bash
 from basstler.environment import GitBashVariable
+from basstler.package_map import Workspace
 from basstler.locations import (
     ClaudeCodeVariable,
     PackageLocation,
@@ -37,7 +38,10 @@ from basstler.package_layout import (
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
 
-from basstler_testing.constants.environment import ConfigurationVariable, SearchPathVariable
+from basstler_testing.constants.environment import (
+    ConfigurationVariable,
+    SearchPathVariable,
+)
 from basstler_testing.constants.paths import DatasetLocation, RepositoryLocation
 from basstler_testing.plugin_manifest import PluginManifestKey
 from basstler_testing.project_declaration import HatchVersionSource, ProjectDeclaration
@@ -146,13 +150,18 @@ def installs_the_dependencies(caller_source: str) -> bool:
 
 def test_a_caller_imports_the_checkouts_own_source_with_no_install():
     """
-    What a bash caller of a plugin sitting in a checkout imports is that checkout's
-    source tree, even where nothing is installed: ``-S`` leaves site-packages, and with it any install, out of the search.
+    What a bash caller of a plugin sitting in a checkout imports is every distribution's
+    part of the package in that checkout, even where nothing is installed: ``-S`` leaves
+    site-packages, and with it any install, out of the search.
     """
-    result = run_as_a_caller("-S", "-c", "import basstler; print(basstler.__file__)")
+    result = run_as_a_caller(
+        "-S", "-c", "import basstler; print(*basstler.__path__, sep='\\n')"
+    )
 
     assert result.returncode == 0, result.stderr
-    assert Path(result.stdout.strip()) == PackageLocation.DIRECTORY / "__init__.py"
+    assert {Path(part) for part in result.stdout.splitlines()} == set(
+        Workspace(PackageLocation.SOURCE_TREE.value).namespace_package.directories
+    )
 
 
 def test_the_build_reads_its_version_from_the_release_tag():

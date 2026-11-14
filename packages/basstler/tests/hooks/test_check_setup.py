@@ -8,7 +8,6 @@ personal-notes remote - no network access or real personal-notes branch involved
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from enum import StrEnum
 from importlib.metadata import version
@@ -16,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-import basstler
 from basstler.environment import EnvironmentFlag
 from basstler.exit_codes import SetupCheckExitCode
 from basstler.locations import (
@@ -33,13 +31,15 @@ from basstler.plan_site.hub import HubFileKey
 from basstler.setup.report import CheckResult, CheckStatus, SetupCheck, SetupReport
 
 from ..bash_path import BashPath
-from basstler_testing.constants.environment import ConfigurationVariable, ScrubbedEnvironmentPrefix
+from basstler_testing.constants.environment import (
+    ConfigurationVariable,
+    ScrubbedEnvironmentPrefix,
+)
 from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.constants.paths import DatasetLocation, PersonalNotesPath
 from basstler_testing.project_declaration import ProjectDeclaration
 from basstler_testing.scratch_repository import (
     SCRATCH_IDENTITY,
-    PackageSourceFile,
     ScratchRepository,
     SetupPrerequisiteFile,
     initialize_bare_repository,
@@ -316,13 +316,7 @@ def with_build_start_stub(
         ProjectLocation.PLAN_HUB,
         f"{HubFileKey.SITE_URL}: https://an-owner.github.io/plans/\n",
     )
-    package_root = Path(basstler.__file__).parent.parent
-    shutil.copy(
-        stub,
-        repository.checkout_root
-        / PackageSourceFile.SOURCE
-        / Path(build_start.__file__).relative_to(package_root),
-    )
+    repository.replace_package_module(build_start, stub)
     return repository
 
 
@@ -421,13 +415,7 @@ def with_dispatch_check_stub(
     repository.update_notes_branch_file(
         WorkflowLocation.PLAN_SITE_DISPATCH, "name: Plan site dispatch\n"
     )
-    package_root = Path(basstler.__file__).parent.parent
-    shutil.copy(
-        stub,
-        repository.checkout_root
-        / PackageSourceFile.SOURCE
-        / Path(dispatch_check.__file__).relative_to(package_root),
-    )
+    repository.replace_package_module(dispatch_check, stub)
     return repository
 
 
@@ -534,15 +522,6 @@ def test_a_latest_release_that_cannot_be_read_says_where_it_was_looked_for(
     assert str(check_setup_repository.project_root) in version.detail
 
 
-def remove_checkout_around_plugin(repository: ScratchRepository) -> None:
-    """
-    Make the scratch plugin one installed on its own, outside a checkout.
-
-    :param repository: A fixture-built scratch repository.
-    """
-    (repository.checkout_root / PackageSourceFile.METADATA).unlink()
-
-
 def test_a_package_of_another_release_than_the_plugin_s_is_mismatched(
     check_setup_repository: ScratchRepository,
 ):
@@ -550,7 +529,7 @@ def test_a_package_of_another_release_than_the_plugin_s_is_mismatched(
     Hooks of one release calling the package of another can pass options it no longer
     accepts, so the pair being two releases is a status of its own, failing the run.
     """
-    remove_checkout_around_plugin(check_setup_repository)
+    check_setup_repository.detach_plugin_from_checkout()
     check_setup_repository.release_plugin_as("0.0.1")
 
     report = run_check_setup(check_setup_repository)
@@ -566,7 +545,7 @@ def test_a_plugin_naming_no_release_outside_a_checkout_is_mismatched(
     Nothing pins the package to a plugin that names no release, so the pair cannot be
     told apart from two releases.
     """
-    remove_checkout_around_plugin(check_setup_repository)
+    check_setup_repository.detach_plugin_from_checkout()
 
     report = run_check_setup(check_setup_repository)
 
@@ -579,7 +558,7 @@ def test_a_package_of_the_plugin_s_release_passes(
     """
     The package installed at the plugin's own release is what every hook expects.
     """
-    remove_checkout_around_plugin(check_setup_repository)
+    check_setup_repository.detach_plugin_from_checkout()
     check_setup_repository.release_plugin_as(
         version(PackageLocation.DIRECTORY.value.name)
     )
@@ -753,7 +732,10 @@ def test_reports_a_claude_local_md_that_is_not_gitignored(
 def test_reports_declared_dependencies_that_are_not_installed(
     check_setup_repository: ScratchRepository,
 ):
-    (check_setup_repository.checkout_root / PackageSourceFile.METADATA).write_text(
+    """
+    A requirement the checkout declares and nothing installed fails the check, naming it.
+    """
+    check_setup_repository.package_declaration.write_text(
         DatasetLocation.PARTLY_INSTALLED_PROJECT.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
@@ -779,7 +761,7 @@ def test_reports_a_declaration_it_cannot_read_rather_than_nothing_missing(
     A declaration the lookup cannot parse says nothing about what is installed, so it is
     not reported as an environment with nothing missing.
     """
-    (check_setup_repository.checkout_root / PackageSourceFile.METADATA).write_text(
+    check_setup_repository.package_declaration.write_text(
         "this is not toml\n", encoding="utf-8"
     )
 

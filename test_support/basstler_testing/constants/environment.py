@@ -70,6 +70,16 @@ class ConfigurationVariable(StrEnum):
     The interpreter every caller runs a module of the package with.
     """
 
+    WORKSPACE = "BASSTLER_WORKSPACE"
+    """
+    The workspace the package is installed from: the checkout, or a release's clone.
+    """
+
+    INSTALL_COMMAND = "BASSTLER_INSTALL_COMMAND"
+    """
+    The array holding the command that installs the package into its environment.
+    """
+
     INSTALLED_SOURCE_FILE = "BASSTLER_INSTALLED_SOURCE_FILE"
     """
     The file recording what the environment's package was installed from.
@@ -96,9 +106,9 @@ class ConfigurationVariable(StrEnum):
     The interpreters the package supports.
     """
 
-    INTERPRETER_CANDIDATES = "BASSTLER_INTERPRETER_CANDIDATES"
+    PYTHON_VERSIONS = "BASSTLER_PYTHON_VERSIONS"
     """
-    The supported interpreters looked for by name, separated by spaces.
+    The supported Python versions, newest first, separated by spaces.
     """
 
     HOME = "BASSTLER_HOME"

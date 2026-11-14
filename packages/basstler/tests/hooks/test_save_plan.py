@@ -26,7 +26,6 @@ from basstler.plan.merged_items import __main__ as merged_items_command
 from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
 from basstler.plan_site import build_start
 from basstler.plan_site.hub import HubFileKey, PlanHub, SiteAddress
-from basstler.shell_configuration import ShellConfigurationFunction
 
 from basstler_testing.constants.environment import PullRequestStubVariable
 from basstler_testing.constants.notes import ScratchBranch
@@ -49,7 +48,7 @@ from basstler_testing.plan.concurrent_edits import (
 )
 from basstler_testing.plan_dataset import LandedItemsPlan
 from basstler_testing.project_declaration import ProjectDeclaration
-from basstler_testing.scratch_repository import PackageSourceFile, ScratchRepository
+from basstler_testing.scratch_repository import ScratchRepository
 
 
 class DatasetPlan(StrEnum):
@@ -136,7 +135,7 @@ def declaration_file(repository: ScratchRepository) -> Path:
     :param repository: A fixture-built scratch repository.
     :return: Where its scratch checkout declares the package's requirements.
     """
-    return repository.checkout_root / PackageSourceFile.METADATA
+    return repository.package_declaration
 
 
 def test_refuses_when_a_declared_dependency_is_not_installed(
@@ -159,10 +158,7 @@ def test_refuses_when_a_declared_dependency_is_not_installed(
 
     assert result.returncode == 1
     assert UNINSTALLABLE_REQUIREMENT in result.stderr
-    assert (
-        f"install '{save_plan_repository.configuration_output(ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE).strip()}'"
-        in result.stderr
-    )
+    assert save_plan_repository.install_command() in result.stderr
 
 
 def test_refuses_when_the_declaration_cannot_be_read(

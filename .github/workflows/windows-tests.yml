@@ -1,10 +1,11 @@
 name: Windows tests
 
-# Runs the whole suite on a Windows runner for every pull request, since what breaks only
-# on Windows passes the Linux tests unnoticed. A push to main runs nothing here: the pull
-# request already ran it, and a Windows runner costs twice the minutes of a Linux one.
+# Runs the whole suite on a Windows runner for every pull request ready for review, since
+# what breaks only on Windows passes the Linux tests unnoticed. A draft and a push to main
+# run nothing here: a Windows runner costs twice the minutes of a Linux one.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: windows-tests-${{ github.ref }}
@@ -16,6 +17,7 @@ permissions:
 jobs:
   test:
     name: pytest on Windows
+    if: "!github.event.pull_request.draft"
     runs-on: windows-latest
     timeout-minutes: 30
     steps:

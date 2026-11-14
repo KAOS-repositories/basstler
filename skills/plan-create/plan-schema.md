@@ -104,10 +104,13 @@ Code aliases, which always resolve to the newest model of the family:
 - `opus` - design-heavy, cross-cutting or ambiguous work, where the item must decide how
   something should be built.
 
-Every new item carries one: `item_bootstrap record` refuses a new item without
+Every new item carries one: `save-plan.sh` refuses an item the saved plan does not hold yet
+unless it has a `recommended_model`, `item_bootstrap record` refuses a new item without
 `--recommended-model`, and `/plan-create` and `/add-plan-item` set it from the task's
-difficulty. An item saved before the field existed may keep none, and no session start or
-site build gives it a default; set one when you next touch the item.
+difficulty. An item saved before the field existed may keep none, and nothing fills in a
+default for it. Session start names the branch's plan's items that have none (the
+`recommended models` line): judge each by difficulty and set it with `item_bootstrap update
+--recommended-model`.
 
 ### Why `status` is deliberately thin
 

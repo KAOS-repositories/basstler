@@ -36,17 +36,17 @@ items:
   branch: ccr-6ee4aeab-7j9mi2
   pull_request_number: 223
   session: https://claude.ai/code/session_01JxHGiNXmsDWbDmd81sWCfP
-  depends_on: []
+  depends_on:
+  - review-triage/rule-fixes
   status: in progress
   recommended_model: sonnet
-  notes: 'Pure renames. hatch-vcs per package, root ../..; a hatch metadata hook in each sdist
-    pins siblings ==version. Committed uv.lock, uv sync --frozen at session start (absorbs
-    locked-install); package_layout reads importlib.metadata. CI tests each package alone,
-    all on any change. Each package''s folder and pyproject become the map''s source: modules
-    and dependencies are read, not declared in PACKAGE_MAP. Windows without uv: py -3.14/-3.13/-3.12,
-    then python on PATH, as full paths (absorbs windows-interpreter-candidates). release:major.
-
-    '
+  notes: >
+    Draft #223, stacked on #222. The moves are one ActionPlan of reversible move and
+    import-rewrite actions added to basstler.code_modification. Tests move to
+    packages/<part>/tests. hatch-vcs per package, root ../..; basstler-build's hatch hook pins
+    siblings ==version. Committed uv.lock, uv sync --frozen at session start; a release clones
+    its tag and syncs from it. Map read from each package's folder and pyproject. Windows
+    without uv: py -3.14/-3.13/-3.12, then python, as full paths. release:major.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split

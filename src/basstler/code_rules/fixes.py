@@ -144,7 +144,7 @@ class FixablePlace:
     """
 
     @property
-    def action(self) -> Action:
+    def action(self) -> Action[libcst.Module]:
         """
         The action making the fix's change at the place.
         """
@@ -167,7 +167,7 @@ class SourceFixer:
     The checkers whose fixes are applied.
     """
 
-    def fixed(self, module: libcst.Module) -> AppliedAction:
+    def fixed(self, module: libcst.Module) -> AppliedAction[libcst.Module]:
         """
         :param module: The module to fix, which is left as it is.
         :return: The module with every place the checkers report fixed, and the action
@@ -175,11 +175,11 @@ class SourceFixer:
         :raises FixDoesNotConvergeError: If a round of fixes leaves at least as many
             places breaking a rule as there were before it.
         """
-        inverses: list[Action] = []
+        inverses: list[Action[libcst.Module]] = []
         places = self.places(module)
         while places:
             applied = self.round_of_fixes(places).apply(module)
-            module = applied.module
+            module = applied.result
             inverses.append(applied.inverse)
             remaining = self.places(module)
             if len(remaining) >= len(places):
@@ -203,7 +203,7 @@ class SourceFixer:
         ]
 
     @staticmethod
-    def round_of_fixes(places: list[FixablePlace]) -> ActionPlan:
+    def round_of_fixes(places: list[FixablePlace]) -> ActionPlan[libcst.Module]:
         """
         :param places: Places breaking a rule, some perhaps inside others.
         :return: The fixes of every place that overlaps no place before it, outermost

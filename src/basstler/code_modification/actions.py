@@ -1,5 +1,6 @@
 """
-Actions that change a module and know their exact inverse, and plans composing them.
+Actions that change a module or a source tree and know their exact inverse, and plans
+composing them.
 """
 
 from __future__ import annotations
@@ -16,39 +17,39 @@ from basstler.code_modification.positions import PositionedModule
 # %% actions
 
 
-class Action(ABC):
+class Action[Target](ABC):
     """
-    A change to a module that can be undone exactly.
+    A change to a target that can be undone exactly.
     """
 
     @abstractmethod
-    def apply(self, module: libcst.Module) -> AppliedAction:
+    def apply(self, target: Target) -> AppliedAction[Target]:
         """
-        :param module: The module to change, which is left as it is.
-        :return: The changed module, and the action that turns it back into *module*.
-        :raises ActionTargetMissingError: If *module* lacks what the action changes.
+        :param target: The target to change, which is left as it is.
+        :return: The changed target, and the action that turns it back into *target*.
+        :raises ActionTargetMissingError: If *target* lacks what the action changes.
         """
 
 
 @dataclass(frozen=True)
-class AppliedAction:
+class AppliedAction[Target]:
     """
     The outcome of applying an action.
     """
 
-    module: libcst.Module
+    result: Target
     """
-    The changed module.
+    The changed target.
     """
 
-    inverse: Action
+    inverse: Action[Target]
     """
-    The action that turns :attr:`module` back into the module the action was applied to.
+    The action that turns :attr:`result` back into the target the action was applied to.
     """
 
 
 @dataclass(frozen=True)
-class NodeReplacement(Action):
+class NodeReplacement(Action[libcst.Module]):
     """
     Replaces the node at one location by another.
     """
@@ -68,9 +69,9 @@ class NodeReplacement(Action):
     The node put in its place.
     """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        positions = PositionedModule(module).positions
-        target = next(
+    def apply(self, target: libcst.Module) -> AppliedAction[libcst.Module]:
+        positions = PositionedModule(target).positions
+        original = next(
             (
                 node
                 for node, code_range in positions.items()
@@ -78,10 +79,10 @@ class NodeReplacement(Action):
             ),
             None,
         )
-        if target is None:
+        if original is None:
             raise ActionTargetMissingError(self.location, type(self.original).__name__)
         replaced = libcst.ensure_type(
-            module.deep_replace(target, self.replacement), libcst.Module
+            target.deep_replace(original, self.replacement), libcst.Module
         )
         replacement_location = PositionedModule(replaced).positions[self.replacement]
         return AppliedAction(
@@ -94,21 +95,21 @@ class NodeReplacement(Action):
 
 
 @dataclass(frozen=True)
-class ActionPlan(Action):
+class ActionPlan[Target](Action[Target]):
     """
-    Actions applied in order, each to the module the one before it produced, and undone
+    Actions applied in order, each to the target the one before it produced, and undone
     in the reverse order.
     """
 
-    actions: tuple[Action, ...] = ()
+    actions: tuple[Action[Target], ...] = ()
     """
     The actions, in the order they are applied.
     """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        inverses: list[Action] = []
+    def apply(self, target: Target) -> AppliedAction[Target]:
+        inverses: list[Action[Target]] = []
         for action in self.actions:
-            applied = action.apply(module)
-            module = applied.module
+            applied = action.apply(target)
+            target = applied.result
             inverses.append(applied.inverse)
-        return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))
+        return AppliedAction(target, ActionPlan(tuple(reversed(inverses))))

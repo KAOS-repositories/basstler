@@ -94,7 +94,7 @@ def fix(paths: list[Path] | None = None) -> CodeRulesExitCode:
     fixed_sources = {
         path: fixer.fixed(
             libcst.parse_module(path.read_text(encoding="utf-8"))
-        ).module.code
+        ).result.code
         for path in paths or []
     }
     changed = {

@@ -45,7 +45,7 @@ def fixed(example: FixExample) -> libcst.Module:
     :return: The example's code breaking the rule, fixed.
     """
     before = libcst.parse_module(example.before.read_text(encoding="utf-8"))
-    return SourceFixer((example.checker,)).fixed(before).module
+    return SourceFixer((example.checker,)).fixed(before).result
 
 
 # %% every fix on its examples
@@ -77,7 +77,7 @@ def test_undoing_a_fix_restores_each_example_exactly(example):
     before = libcst.parse_module(example.before.read_text(encoding="utf-8"))
     applied = SourceFixer((example.checker,)).fixed(before)
 
-    assert applied.inverse.apply(applied.module).module.code == before.code
+    assert applied.inverse.apply(applied.result).result.code == before.code
 
 
 @pytest.mark.parametrize("example", EXAMPLES, ids=lambda example: example.identifier)

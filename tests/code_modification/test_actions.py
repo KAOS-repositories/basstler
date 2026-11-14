@@ -52,7 +52,7 @@ def test_a_replacement_changes_only_its_node(two_calls):
     """
     applied = first_call_replacement(two_calls, "float").apply(two_calls.module)
 
-    assert applied.module.code == (
+    assert applied.result.code == (
         CodeModificationSnippet.TWO_CALLS_FIRST_RENAMED.read_text(encoding="utf-8")
     )
 
@@ -64,7 +64,7 @@ def test_the_inverse_of_a_replacement_restores_the_module_exactly(two_calls):
     """
     applied = first_call_replacement(two_calls, "float").apply(two_calls.module)
 
-    assert applied.inverse.apply(applied.module).module.code == two_calls.module.code
+    assert applied.inverse.apply(applied.result).result.code == two_calls.module.code
 
 
 def test_a_replacement_whose_node_is_gone_raises(two_calls):
@@ -75,7 +75,7 @@ def test_a_replacement_whose_node_is_gone_raises(two_calls):
     applied = replacement.apply(two_calls.module)
 
     with pytest.raises(ActionTargetMissingError):
-        replacement.apply(applied.module)
+        replacement.apply(applied.result)
 
 
 # %% plans
@@ -87,9 +87,9 @@ def test_a_plan_is_undone_in_the_reverse_order_it_was_applied(two_calls):
     exactly, the second action first.
     """
     first = first_call_replacement(two_calls, "float")
-    renamed = PositionedModule(first.apply(two_calls.module).module)
+    renamed = PositionedModule(first.apply(two_calls.module).result)
     plan = ActionPlan((first, first_call_replacement(renamed, "int")))
 
     applied = plan.apply(two_calls.module)
 
-    assert applied.inverse.apply(applied.module).module.code == two_calls.module.code
+    assert applied.inverse.apply(applied.result).result.code == two_calls.module.code

@@ -142,8 +142,8 @@ the plan's `tracking_issue` — `${PLANS_DIR}/README.md`'s "Proposing structural
 changes" section governs. Either way the proposal ends with `save-plan.sh`
 in the same turn, whose push rebuilds the plan's page on the plan site.
 
-**If the outcome is a new item**, give it the `recommended_model` its difficulty calls
-for - `plan-schema.md`'s "Choosing the recommended model" - and pass it as
+**If the outcome is a new item**, invoke the `plan-recommend-models` skill (`Skill` tool) for the item to get the `recommended_model`
+its difficulty calls for, and pass it as
 `--recommended-model <alias>`, which `record` requires for a new item. The `record` operation of
 `"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" plan.item_bootstrap` writes its `plan.yaml` entry and `roadmap.md` section and runs the save
 for you — `record` only, never `open`, which creates the branch and pull request

@@ -103,9 +103,8 @@ to read it.
 For a single piece of work rather than a whole plan, `/add-plan-item` runs that
 same decision on its own and is the lighter-weight way in.
 
-Give every item the `recommended_model` its difficulty calls for, as
-[`plan-schema.md`](plan-schema.md)'s "Choosing the recommended model" says: a design-heavy
-item gets a more capable model than a mechanical one.
+Give every item its `recommended_model` by invoking the `plan-recommend-models` skill (`Skill` tool, `<plan-id>`) on the
+drafted `plan.yaml` before the first save.
 
 Write only what a future session needs to act, whether drafting fresh or
 migrating a source doc. Structured facts (branch, PR, status, blockers)

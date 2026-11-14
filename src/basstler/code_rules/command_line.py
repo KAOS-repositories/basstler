@@ -1,17 +1,19 @@
 """
-The ``basstler code-rules`` commands: checking code against the rules, and generating
-``AGENTS.md`` from them.
+The ``basstler code-rules`` commands: checking code against the rules, fixing it, and
+generating ``AGENTS.md`` from them.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import libcst
 from cyclopts import App
 
 from basstler.code_rules import rules
 from basstler.code_rules.checker import CodeRulesCheck, StagedLines
 from basstler.code_rules.commands import CodeRulesCommand
+from basstler.code_rules.fixes import SourceFixer
 from basstler.code_rules.instructions import AgentsInstructions
 from basstler.code_rules.package_boundaries import (
     PackageAtCommit,
@@ -48,7 +50,10 @@ class CodeRulesExitCode(ExitCode):
 
 code_rules_app = App(
     name=CodeRulesCommand.GROUP,
-    help="Check code against the repository's rules, and generate AGENTS.md from them.",
+    help=(
+        "Check code against the repository's rules, fix it, and generate AGENTS.md "
+        "from them."
+    ),
 )
 """
 The ``code-rules`` command group.
@@ -73,6 +78,34 @@ def check(
     for violation in violations:
         logger.error(violation.render())
     if violations:
+        return CodeRulesExitCode.CHANGES_NEEDED
+    return CodeRulesExitCode.SUCCESS
+
+
+@code_rules_app.command(name=CodeRulesCommand.FIX)
+def fix(paths: list[Path] | None = None) -> CodeRulesExitCode:
+    """
+    Rewrite each file in *paths* that breaks a rule with a fix, applying the fix to
+    every place that breaks it; a file is written only once every file is fixed.
+
+    :param paths: The Python files to fix.
+    """
+    fixer = SourceFixer(RuleModule(rules).fixable_checkers)
+    fixed_sources = {
+        path: fixer.fixed(
+            libcst.parse_module(path.read_text(encoding="utf-8"))
+        ).module.code
+        for path in paths or []
+    }
+    changed = {
+        path: source
+        for path, source in fixed_sources.items()
+        if source != path.read_text(encoding="utf-8")
+    }
+    for path, source in changed.items():
+        path.write_text(source, encoding="utf-8")
+        logger.info("Fixed %s", path)
+    if changed:
         return CodeRulesExitCode.CHANGES_NEEDED
     return CodeRulesExitCode.SUCCESS
 

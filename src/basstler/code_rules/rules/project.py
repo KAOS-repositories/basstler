@@ -13,6 +13,7 @@ from basstler.code_rules import rules
 from basstler.code_rules.bash_by_name import BashByNameChecker
 from basstler.code_rules.checker import CodeRuleChecker
 from basstler.code_rules.commands import CodeRulesCommand
+from basstler.code_rules.fixes import CodeFix, FixableChecker
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 from basstler.code_rules.package_boundaries import PackageBoundaryChecker
 from basstler.code_rules.rule import CodeReference, Section
@@ -120,6 +121,15 @@ class AgentInstructionsRules(Section):
         "A script that finds code breaking a rule is a "
         f"{CodeReference(CodeRuleChecker).path}, set as that rule's "
         "`checker`, so the rule and its check are declared together"
+    )
+
+    DECLARE_EACH_FIX_ON_ITS_CHECKER = (
+        "Where every violation of a rule has one correct fix, its checker is a "
+        f"{CodeReference(FixableChecker).path}: its {CodeReference(CodeFix).path} builds "
+        "the replacement and declares whether behaviour changes. Give the fix examples "
+        "as `before.py` and `after.py` in `tests/dataset/rule-fixes/<checker class>/"
+        "<example>/`, which the suite tests, and apply it with "
+        f"`{CodeRulesCommand.FIX.invocation}`, never by hand"
     )
 
 

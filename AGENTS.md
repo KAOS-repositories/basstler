@@ -177,6 +177,7 @@
 <!-- from AgentInstructionsRules in basstler/code_rules/rules/project.py -->
 - `AGENTS.md` is generated from the sections in `basstler.code_rules.rules`; change a rule there and run `basstler code-rules agents-md`, never edit the file
 - A script that finds code breaking a rule is a `basstler.code_rules.checker.CodeRuleChecker`, set as that rule's `checker`, so the rule and its check are declared together
+- Where every violation of a rule has one correct fix, its checker is a `basstler.code_rules.fixes.FixableChecker`: its `basstler.code_rules.fixes.CodeFix` builds the replacement and declares whether behaviour changes. Give the fix examples as `before.py` and `after.py` in `tests/dataset/rule-fixes/<checker class>/<example>/`, which the suite tests, and apply it with `basstler code-rules fix`, never by hand
 
 ## Releases
 <!-- from ReleasesRules in basstler/code_rules/rules/project.py -->

@@ -9,12 +9,15 @@ import pytest
 from basstler.code_rules.command_line import (
     CodeRulesExitCode,
     check,
+    fix,
     generate_agents_instructions,
     report_new_crossings,
 )
 from basstler.code_rules.instructions import AgentsInstructions
+from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 
 from ..constants.paths import DocstringSnippet, ProseSnippet
+from .fix_example import FixExample
 
 # %% checking
 
@@ -34,6 +37,44 @@ def test_checking_passes_when_nothing_breaks_a_rule():
     """
     assert check([DocstringSnippet.DOCUMENTED_MODULE], all_lines=True) == (
         CodeRulesExitCode.SUCCESS
+    )
+
+
+# %% fixing
+
+
+@pytest.fixture
+def example() -> FixExample:
+    """
+    :return: The first example of the fix to text read and written as UTF-8.
+    """
+    return FixExample.all_of(LocaleEncodingChecker())[0]
+
+
+def test_fixing_rewrites_a_file_breaking_a_rule_as_its_fix_does(example, tmp_path):
+    """
+    A file breaking a rule with a fix is rewritten as the fixed code, and the command
+    reports the change.
+    """
+    source = tmp_path / example.before.name
+    source.write_text(example.before.read_text(encoding="utf-8"), encoding="utf-8")
+
+    assert fix([source]) == CodeRulesExitCode.CHANGES_NEEDED
+    assert source.read_text(encoding="utf-8") == example.after.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_fixing_a_file_breaking_no_rule_writes_nothing(example, tmp_path):
+    """
+    A file that is already fixed is left as it is.
+    """
+    source = tmp_path / example.after.name
+    source.write_text(example.after.read_text(encoding="utf-8"), encoding="utf-8")
+
+    assert fix([source]) == CodeRulesExitCode.SUCCESS
+    assert source.read_text(encoding="utf-8") == example.after.read_text(
+        encoding="utf-8"
     )
 
 

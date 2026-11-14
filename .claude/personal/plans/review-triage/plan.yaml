@@ -89,10 +89,12 @@ items:
   track: pattern-fixes
   depends_on: [keyword-argument-triage, rule-fixes]
   status: not started
-  notes: 'basstler-review-triage depends on basstler-rules. The triage recomputes each
-    fix from the base and allows the difference where it reproduces the head, alongside
-    renames and imports; a new change kind names the rule. Rule-fix files are marked
-    viewed like other mechanical kinds. Expect most of #220 mechanical.'
+  notes: >
+    Goal: #220 mostly marked viewed; done when its triage report marks its rule-fix files mechanical
+    (107 of 129 .py files from the UTF-8 fix alone; most of the rest once directory-and-bash-fixes
+    lands). basstler-review-triage depends on basstler-rules; the triage recomputes each fix from
+    the base and allows the difference where it reproduces the head, alongside renames and imports;
+    a new change kind names the rule; such files are marked viewed like other mechanical kinds.
 
 - id: reduced-review-diff
   title: Show a reviewer only what is left once rule fixes are reversed

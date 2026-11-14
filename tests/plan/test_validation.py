@@ -172,11 +172,17 @@ def test_a_save_requires_a_recommended_model_on_an_item_the_saved_plan_lacks():
 
 
 def test_a_save_of_a_plan_not_saved_before_requires_a_model_on_every_item():
-    items = [manifest_item("a", recommended_model=None)]
+    items = [
+        manifest_item("a", recommended_model=None),
+        manifest_item("b", recommended_model=None),
+    ]
     validator = PlanValidator(
         minimal_plan(items=items), saved_item_identifiers=frozenset()
     )
-    assert validator.problems == [MissingRecommendedModel(item_identifier="a")]
+    assert validator.problems == [
+        MissingRecommendedModel(item_identifier="a"),
+        MissingRecommendedModel(item_identifier="b"),
+    ]
 
 
 def test_a_save_accepts_a_new_item_that_has_a_recommended_model():

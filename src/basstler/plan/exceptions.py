@@ -347,7 +347,8 @@ class MissingRecommendedModel(ValidationProblem):
 
     def suggest_correction(self) -> str:
         return (
-            "give the item the model its difficulty calls for (opus, sonnet or haiku): "
+            "give the item the model its difficulty calls for (opus, sonnet or haiku; see "
+            "plugin/skills/plan-create/plan-schema.md, 'Choosing the recommended model'): "
             "set recommended_model in plan.yaml, or pass --recommended-model to "
             "basstler.plan.item_bootstrap's record or update"
         )

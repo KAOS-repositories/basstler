@@ -20,6 +20,7 @@ items:
   track: packages
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: >
     Replace basstler/command_line.py's argparse Command base (declare_arguments) and port
     maintenance/__main__.py, maintenance/commands.py and plan/item_bootstrap/commands.py; the
@@ -30,6 +31,7 @@ items:
   track: packages
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: >
     Port upstream_reviews/__main__.py, request.py, action/__main__.py, helper/__main__.py and
     helper/fetch.py.
@@ -38,6 +40,7 @@ items:
   track: packages
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: >
     Port plan_site/__main__.py and plan_site/hub.py. Open #141 and #140 also change these files;
     probe with stack merge-probe before starting.
@@ -46,6 +49,7 @@ items:
   track: packages
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: >
     Port setup/steps.py, setup/dependencies.py, setup/personal_notes.py,
     personal_notes/progress_notes.py, release_version.py, actions_usage.py and actions_budget.py,

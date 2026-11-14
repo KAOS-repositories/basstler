@@ -37,6 +37,7 @@ items:
   - mcp-server
   - basstler-packages/playbook-model
   status: not started
+  recommended_model: sonnet
   notes: 'Each SKILL.md at most about 2 KB; no reference documents to read. Native plan mode
     replaces the auto/plan/ask execution modes. claude plugin eval cases fail CI when a skill
     run exceeds its token or wall-time budget.
@@ -54,6 +55,7 @@ items:
   - basstler-v3-plans/item-brief
   - basstler-packages/playbook-model
   status: not started
+  recommended_model: opus
   notes: 'A FastMCP server (the official mcp SDK) in the plugin''s .mcp.json, used by every
     client: 5 to 8 tools with output schemas, each returning a brief or recording a result,
     so a skill never composes a shell command. The CLI stays for scripts and Actions. Never
@@ -69,6 +71,7 @@ items:
   depends_on:
   - short-skills
   status: not started
+  recommended_model: sonnet
   notes: 'No install, release lookup, default-branch sync, settings sync or Action upgrade
     at start: each happens on the command that needs it, or in an Action.
 
@@ -82,6 +85,7 @@ items:
   - slim-session-start
   - basstler-v3-stacks/maintenance-action
   status: not started
+  recommended_model: opus
   notes: 'Removes the bash layer, the dashboards and the old maintenance; plan.yaml and its tooling stay
     while basstler-v3-plans is deferred. Major release: removed commands, files and settings. Release
     notes list each removed command with its replacement.

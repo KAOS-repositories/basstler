@@ -20,6 +20,7 @@ items:
   track: core
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: 'Second slice of payload-key-models: WorkflowKey (workflows, plan_site/workflows),
     PyprojectKey, HubFileKey, BoardKey and the upstream_reviews action/helper exchange keys
     become the dataclasses that read and write those files, on the pydantic base payload-key-models
@@ -29,6 +30,7 @@ items:
   track: core
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: 'Third slice of payload-key-models: the command-report key enums (ReportKey, MaintenanceReportKey,
     ItemBriefKey, ReadinessField, UsageOutputKey, ...) become report dataclasses with to_json,
     and tests read reports through them, reversing report-keys-in-tests (#145).'
@@ -37,6 +39,7 @@ items:
   track: core
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: Split from payload-key-models (owner). Replace PullRequestRecord and the PullRequestField,
     PullRequestHeadKey, AccountField and PullRequestFieldShape enums in maintenance/board.py
     with a pydantic pull request model; ~30 modules read the record, the plan site's live
@@ -48,6 +51,7 @@ items:
   track: core
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: 'From KAOS-repositories/basstler#140 review (workflows.py template_values). PlanSiteWorkflow.template_values
     returns a dict[str, Any] whose keys repeat each Jinja placeholder by hand in SiteWorkflow,
     DispatchWorkflow and MergeWorkflow (and UserSteps.store_token_command once #140 lands).

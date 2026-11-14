@@ -34,6 +34,7 @@ items:
   track: status
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: Judge by the latest run after the last configuration change, not by failure counts.
     A 403 on the secrets endpoint or an unreadable other repository must not leave the row
     unverified; separate "cannot read from this environment" from "unverified".
@@ -42,11 +43,13 @@ items:
   track: status
   depends_on: []
   status: not started
+  recommended_model: haiku
   notes: Details move to the skill; no raw 403 JSON in the summary.
 - id: fewer-questions
   title: Reuse the recorded site repository and name needed attachments up front
   track: setup-flow
   status: not started
+  recommended_model: sonnet
   notes: 'Do not ask when the notes branch records the site repository. State which repositories
     need add_repo and with what access before asking; the session attached stack-board with
     push access and never needed it. From Hesham87/Platform_maintainer: the Claude App must
@@ -58,6 +61,7 @@ items:
   depends_on:
   - run-as-proof
   status: not started
+  recommended_model: sonnet
   notes: The dispatch workflow already accepts workflow_dispatch. Add a --trigger option on
     plan_site.publication that starts the site workflow and reports the result. Once a run
     succeeded, print done instead of repeating the token steps.
@@ -65,6 +69,7 @@ items:
   title: List missing labels in one call
   track: setup-flow
   status: not started
+  recommended_model: haiku
   notes: setup.steps lists missing labels, or a cached list is used, when the session has
     no token, instead of one get_label call per label. An invalid GH_TOKEN made setup skip
     its owner and label checks silently (main-red went unnoticed); report them unchecked.
@@ -72,6 +77,7 @@ items:
   title: Retry the gh workflow run step of the dispatch workflow
   track: setup-flow
   status: not started
+  recommended_model: haiku
   notes: Dispatch run 76 failed with a 502 from gh workflow run, so a notes push started no
     build. Retry the step with a growing wait in templates/plan_site_dispatch_workflow.yml.
     test_publication.py pins the step's command and must change with it; deployed workflows
@@ -90,6 +96,7 @@ items:
     '
   depends_on: []
   status: not started
+  recommended_model: haiku
 - id: gh-prerequisite
   title: Every printed gh line comes after the steps to install and log in to gh
   branch: null
@@ -103,6 +110,7 @@ items:
     '
   depends_on: []
   status: not started
+  recommended_model: haiku
 - id: try-before-instructing
   title: With a logged-in gh, setup takes every step itself and prints only the ones that
     failed
@@ -121,6 +129,7 @@ items:
   - gh-prerequisite
   - fork-issues
   status: not started
+  recommended_model: sonnet
 - id: build-failure-report
   title: Report the plan site's failed builds, with GitHub's reason, where the user sees them
   track: status
@@ -128,6 +137,7 @@ items:
   - run-as-proof
   - basstler-packages/uv-workspace
   status: not started
+  recommended_model: sonnet
   session: https://claude.ai/code/session_018wfiv8ntWsdS2nU92PrJbr
   notes: 'On 2026-11-07, eleven plan saves printed "Started the plan site build" while every
     run failed in 2 s with no step run: GitHub locked the account over billing, shown only

@@ -18,6 +18,7 @@ items:
   title: Move the test modules' module-level constants into tests/constants.py
   branch: null
   status: deferred
+  recommended_model: haiku
   track: conversion
   depends_on: []
   pull_request_number: null

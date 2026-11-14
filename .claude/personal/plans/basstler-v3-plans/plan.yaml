@@ -23,6 +23,7 @@ items:
   track: plans
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: 'Item scope, dependency readiness, its pull request''s checks, unresolved threads, the mirrored
     upstream state and tracking-issue comments naming it, built by code so a skill never fetches or reads
     reference docs to assemble context. Builds on core-robustness/lean-kickoff (#97): reuse its brief

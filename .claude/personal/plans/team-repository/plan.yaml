@@ -24,6 +24,7 @@ items:
     of it
   branch: null
   status: not started
+  recommended_model: opus
   track: team-store
   depends_on: []
   notes: 'Plans come from a configured plan store: the team repository''s default branch holds the shared
@@ -33,6 +34,7 @@ items:
   title: Set up a team repository in an organisation, and onboard a member with one command
   branch: null
   status: not started
+  recommended_model: sonnet
   track: team-store
   depends_on:
   - team-notes-store
@@ -48,6 +50,7 @@ items:
   title: Move the domain-models plan from the CRAM fork's notes to the team repository
   branch: null
   status: not started
+  recommended_model: sonnet
   track: team-store
   depends_on:
   - team-repo-setup
@@ -58,6 +61,7 @@ items:
   title: /malloche picks the next ready item, claims it, and starts it
   branch: null
   status: not started
+  recommended_model: sonnet
   track: picker
   depends_on:
   - work-recommender/ranked-work-list
@@ -73,6 +77,7 @@ items:
   title: Hand an item to a teammate, who implements it on their own fork
   track: team-store
   status: not started
+  recommended_model: sonnet
   depends_on:
   - team-repo-setup
   - basstler-service/plan-write-api

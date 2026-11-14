@@ -30,6 +30,7 @@ items:
   track: record
   depends_on: []
   status: not started
+  recommended_model: opus
   notes: 'A validated model on the notes branch beside the hub: goal, sandbox (fork, scratch repository
     or branch), stage, verdict and session. Stages: described, running, accepted, dropped, split, upstream.
     Each stage declares its allowed moves once (described: plan first, experiment first, one PR; running:
@@ -44,6 +45,7 @@ items:
   depends_on:
   - experiment-record
   status: not started
+  recommended_model: sonnet
   notes: 'When a task is described, a rule in plugin/hooks/session-rules.md offers the described stage''s
     moves with a recommended one, before the persistent-plan rule. /experiment (plugin/skills/experiment/SKILL.md)
     opens the sandbox, records the entry and iterates until the user picks a move; at every stage it offers
@@ -57,6 +59,7 @@ items:
   depends_on:
   - experiment-record
   status: not started
+  recommended_model: sonnet
   notes: The hub page lists running and accepted experiments, each with its goal, sandbox link, stage,
     verdict and one link per allowed move (Split into a plan, Open upstream, Drop, ...), read from the
     same model as the session's prompt. Dropped and finished experiments sink into a collapsed section.
@@ -70,6 +73,7 @@ items:
   depends_on:
   - experiment-skill
   status: not started
+  recommended_model: opus
   notes: From an accepted experiment, one session drafts a plan of independently testable items with tracks
     and waves (through /plan-create, sandbox diff and conversation as source), then implements each item
     from the sandbox's diff, opens the stacked draft PRs and records each one through plan.item_bootstrap
@@ -83,6 +87,7 @@ items:
   depends_on:
   - experiment-skill
   status: not started
+  recommended_model: sonnet
   notes: Opens the working result as one draft pull request from the fork to the upstream, never pushing
     to the upstream, and records it on the entry, which moves to upstream. Keep as a fork-only PR opens
     it on the fork instead. Shares the promotion path with basstler-v3-stacks/upstream-promotion once

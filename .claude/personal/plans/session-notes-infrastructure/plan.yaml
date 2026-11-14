@@ -36,6 +36,7 @@ items:
   branch: null
   pull_request_number: null
   status: not started
+  recommended_model: haiku
   track: handover
   depends_on: []
   notes: 'From the review of #173 (https://github.com/KAOS-repositories/basstler/pull/173#discussion_r4511800322):
@@ -52,6 +53,7 @@ items:
   branch: null
   pull_request_number: null
   status: not started
+  recommended_model: sonnet
   track: handover
   depends_on:
   - session-start-tests-split
@@ -76,3 +78,4 @@ items:
     rule-enforcement/rule-layers. release:minor.
   depends_on: []
   status: not started
+  recommended_model: opus

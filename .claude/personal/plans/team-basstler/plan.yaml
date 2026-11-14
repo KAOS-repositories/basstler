@@ -19,6 +19,7 @@ items:
 - id: stalled-dependency-drift
   title: Flag an item stacked on a deferred or closed dependency on the plan site
   status: not started
+  recommended_model: sonnet
   track: site
   depends_on: []
   notes: 'Replaces plan-dashboards/deferred-dependency-drift-check (draft #47, closed: it
@@ -30,6 +31,7 @@ items:
 - id: untracked-pull-requests
   title: List each repository's open pull requests that no plan item tracks
   status: not started
+  recommended_model: sonnet
   track: site
   depends_on: []
   notes: 'From plan-dashboards. On 2026-10-21 a cleanup found basstler #9, #32 and #33 open
@@ -41,6 +43,7 @@ items:
 - id: pull-request-size-and-conflict-chips
   title: Show lines changed and a merge-conflict chip on plan page items
   status: not started
+  recommended_model: sonnet
   track: site
   depends_on: []
   notes: 'From plan-dashboards/shared-pr-state-chips. The site already shows CI chips; add

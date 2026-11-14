@@ -40,6 +40,7 @@ items:
   title: Depend on krrood-core and use its patterns
   branch: claude/magical-albattani-9fbkd5
   status: blocked
+  recommended_model: sonnet
   track: carried-across
   depends_on: []
   pull_request_number: 12

@@ -29,6 +29,7 @@ items:
   title: Defer, restore and delete an item from its card's menu
   track: commands
   status: not started
+  recommended_model: sonnet
   depends_on:
   - basstler-service/site-actions
   notes: A card's menu sends defer, restore or delete through basstler-service/site-actions
@@ -39,6 +40,7 @@ items:
     section
   track: commands
   status: not started
+  recommended_model: sonnet
   depends_on:
   - item-commands
   notes: Same write path as item-commands, acting on the plan's plan.yaml. Deferred plans
@@ -49,6 +51,7 @@ items:
     mark
   track: display
   status: not started
+  recommended_model: sonnet
   depends_on: []
   notes: A plan's last activity is the later of the last notes commit touching its directory
     and the newest updated_at of its items' pull requests; the notes fetch keeps enough history
@@ -59,6 +62,7 @@ items:
     on every plan page
   track: display
   status: not started
+  recommended_model: opus
   depends_on: []
   notes: Design tokens, one type scale, light and dark; sticky header with breadcrumbs, search
     and a slot for the Refresh button; keyboard-accessible item menu; toasts. The plan page
@@ -71,6 +75,7 @@ items:
     site defaults
   track: display
   status: in progress
+  recommended_model: sonnet
   branch: claude/plan-site-ui-themes-8hqtdk
   pull_request_number: 212
   session: https://claude.ai/code/session_018wfiv8TNFzr6VY6TbNCbE6
@@ -86,6 +91,7 @@ items:
     item, or another pull request'
   track: display
   status: not started
+  recommended_model: sonnet
   depends_on: []
   notes: 'The build reads each item''s pull request base from GitHub. A card gets a base chip,
     always a link: the default branch, linking to its branch page; a branch some plan item
@@ -97,6 +103,7 @@ items:
   track: lifecycle
   depends_on: []
   status: not started
+  recommended_model: sonnet
   session: https://claude.ai/code/session_018wfiv7jmDwVqQj2xLpXnwJ
   notes: 'From Hesham87/Platform_maintainer: taking the site away was manual: the dispatch
     workflow, the hub entry and the merge workflow branch and pull request by hand, then the
@@ -107,6 +114,7 @@ items:
   track: lifecycle
   depends_on: []
   status: not started
+  recommended_model: sonnet
   session: https://claude.ai/code/session_018wfiv7jmDwVqQj2xLpXnwJ
   notes: Pages on a personal Free account is public. basstler plan-site open fetches the notes
     branches with the user's own git and gh credentials, so private repositories work; rebuilds
@@ -120,6 +128,7 @@ items:
   depends_on:
   - local-site-open
   status: not started
+  recommended_model: sonnet
   session: https://claude.ai/code/session_018wfiv7jmDwVqQj2xLpXnwJ
   notes: 'Setup installs a launcher that runs plan-site open: a .desktop entry on Linux, an
     app in ~/Applications on macOS, a Start-menu and desktop shortcut on Windows (windows-support).
@@ -130,6 +139,7 @@ items:
   title: Each action button preselects the recommended Claude model for its task
   track: display
   status: in progress
+  recommended_model: sonnet
   branch: claude/plan-site-ui-model-recommendation-ra1w52
   pull_request_number: 209
   session: https://claude.ai/code/session_018wfiv8Ms8MFF2MJcxPWn2w
@@ -146,6 +156,7 @@ items:
     the change
   track: display
   status: not started
+  recommended_model: sonnet
   depends_on: []
   notes: The plan page shows account rules and notes, repository rules and notes, plan rules
     (roadmap.md) and plan and item notes, each labelled with where it lives. Selecting text

@@ -36,6 +36,7 @@ items:
   title: The Basstler GitHub App is registered from a committed App manifest in one command
   track: github-app
   status: not started
+  recommended_model: sonnet
   depends_on:
   - basstler-packages/uv-workspace
   notes: A committed App manifest declares read-only metadata, contents, pull requests, checks and statuses,
@@ -48,6 +49,7 @@ items:
   title: The plan service is one container anyone can run, deployed in one command
   track: service
   status: not started
+  recommended_model: opus
   depends_on:
   - basstler-packages/uv-workspace
   notes: A Starlette app in the basstler-hub-server distribution of this repository, beside basstler-hub;
@@ -59,6 +61,7 @@ items:
   title: The service verifies GitHub's webhooks and maps each to the plans it changes
   track: github-app
   status: not started
+  recommended_model: sonnet
   depends_on:
   - app-manifest
   - service-deploy
@@ -72,6 +75,7 @@ items:
   title: The service renders the hub and plan pages on request from the notes branches
   track: service
   status: not started
+  recommended_model: opus
   depends_on:
   - service-deploy
   - app-manifest
@@ -85,6 +89,7 @@ items:
   title: An open page updates within seconds of the change GitHub reports
   track: service
   status: not started
+  recommended_model: opus
   depends_on:
   - webhook-intake
   - served-pages
@@ -98,6 +103,7 @@ items:
   title: Viewers sign in with GitHub and see only plans their account can read
   track: access
   status: not started
+  recommended_model: opus
   depends_on:
   - served-pages
   notes: >-
@@ -110,6 +116,7 @@ items:
   title: The service is the only writer of plans, and sessions edit through it
   track: writes
   status: not started
+  recommended_model: opus
   depends_on:
   - github-sign-in
   notes: >-
@@ -123,6 +130,7 @@ items:
     signed-in viewer
   track: writes
   status: not started
+  recommended_model: sonnet
   depends_on:
   - plan-write-api
   notes: >-
@@ -135,6 +143,7 @@ items:
   title: Remove the Pages publication, its tokens and the site repository
   track: retirement
   status: not started
+  recommended_model: sonnet
   depends_on:
   - live-pages
   - github-sign-in
@@ -149,6 +158,7 @@ items:
   title: The plan service also deploys to any server that runs Docker
   track: service
   status: not started
+  recommended_model: sonnet
   depends_on:
   - service-deploy
   notes: 'A second deploy target beside Cloud Run, for a university, KAOS or rented server: one command
@@ -160,6 +170,7 @@ items:
   title: basstler's own BasstlerHub instance deploys every release from its own repository
   track: service
   status: not started
+  recommended_model: sonnet
   depends_on:
   - service-deploy
   - app-manifest

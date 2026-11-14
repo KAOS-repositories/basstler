@@ -31,6 +31,7 @@ items:
   track: manifest
   depends_on: []
   status: in progress
+  recommended_model: sonnet
   pull_request_number: 55
   session: https://claude.ai/code/session_015LhBh1bQL2RDTPBjwCgtpQ
   notes: 'Package half is draft #55 on #10: basstler.changed_libraries selects the matrix

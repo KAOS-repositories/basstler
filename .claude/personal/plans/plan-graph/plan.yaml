@@ -45,6 +45,7 @@ items:
   track: model
   depends_on: []
   status: not started
+  recommended_model: opus
   notes: '`src/basstler/plan_graph.py`. Dataclass nodes (Plan, Item, and a Package > Module
     > Class > Function hierarchy keyed by dotted path) and edges (DependsOn, Introduces, Modifies,
     Overlaps, Acknowledged), schema-versioned, assembled in memory, never written as one file.
@@ -59,6 +60,7 @@ items:
   depends_on:
   - graph-model
   status: not started
+  recommended_model: opus
   notes: '`plans/<plan-id>/design.yaml`, one per plan so plans never contend for one file:
     per item, introduces and modifies, each a package, module, class or function by dotted
     path with a one-line intent, plus paths. Written only through `plan_graph claim add|update|remove`,
@@ -73,6 +75,7 @@ items:
   depends_on:
   - graph-model
   status: not started
+  recommended_model: opus
   notes: '`src/basstler/definitions.py`. Per branch against its merge base with `main`, and
     on main for every symbol a plan names: `ast` records packages (their `__init__` docstring),
     modules, classes, functions and methods as `Definition`s - dotted path, kind, file, bases,
@@ -88,6 +91,7 @@ items:
   - definition-catalogue
   - declared-claims
   status: not started
+  recommended_model: opus
   notes: '`src/basstler/overlaps.py`. Compares every unlanded item''s definitions pairwise,
     declared and derived alike, skipping pairs already in an ancestor relationship. Signals,
     strongest first: same name in different files; same path added by both; normalized name
@@ -102,6 +106,7 @@ items:
   - overlap-detector
   - findings-and-resolutions
   status: not started
+  recommended_model: sonnet
   notes: 'At kickoff, resolve and every save of an item with a branch, compare its declared
     claims with the catalogue''s derived definitions: a definition built but not claimed,
     or claimed but not built, is a ClaimDrift finding. This is what keeps declared claims
@@ -114,6 +119,7 @@ items:
   depends_on:
   - overlap-detector
   status: not started
+  recommended_model: opus
   notes: Finding types (DuplicateIntroduction, SharedModification, SimilarIntent, ClaimDrift,
     UnresolvedReference, CrossPlanCycle), each with a severity and a closed list of Resolutions
     (FOLD_INTO, EXTRACT_COMMON_PARENT, ADD_DEPENDENCY, RENAME, ACKNOWLEDGE). `plan_graph resolve
@@ -129,6 +135,7 @@ items:
   - common-parent
   - basstler-packages/playbook-model
   status: not started
+  recommended_model: sonnet
   notes: 'The skill only judges: it reads a finding''s evidence, picks one of its enumerated
     resolutions and runs `plan_graph resolve`; the script does the work. A PostToolUse hook
     on save-plan, kickoff and add-plan-item, and session start for open findings, add "run
@@ -142,6 +149,7 @@ items:
   depends_on:
   - definition-catalogue
   status: not started
+  recommended_model: opus
   notes: '`src/basstler/common_parent.py`, carrying out EXTRACT_COMMON_PARENT. Extracting
     a shared parent and changing direction mid-plan are one operation in two phases. `probe`
     runs `git merge-tree --write-tree` per branch against the proposed base, reusing the non-mutating
@@ -158,6 +166,7 @@ items:
   - overlap-detector
   - basstler-packages/playbook-model
   status: not started
+  recommended_model: sonnet
   notes: 'A Graph tab in the plan page header, and a graph link on each item card opening
     it on that item; rebuilt every render from plan_graph''s query output, so never stale.
     Cytoscape with ELK layered layout, pinned on cdnjs, in the site''s light and dark tokens.

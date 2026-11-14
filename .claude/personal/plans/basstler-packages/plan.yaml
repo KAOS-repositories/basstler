@@ -38,6 +38,7 @@ items:
   session: https://claude.ai/code/session_018wfiv52smwbRFpSJ1ckLAf
   depends_on: []
   status: in progress
+  recommended_model: opus
   notes: 'Draft #217 removes all 18 crossings (new-crossings passes), so CI keeps the map clean.
     Plan model into basstler.plan.structure, with a hub-side ItemCard for the render fields;
     notes moves below plan; stack.configuration into github; the open-pull-requests request
@@ -51,6 +52,7 @@ items:
   depends_on:
   - break-remaining-cycles
   status: not started
+  recommended_model: sonnet
   notes: 'Pure renames. hatch-vcs per package, root ../..; a hatch metadata hook in each sdist
     pins siblings ==version. Committed uv.lock, uv sync --frozen at session start (absorbs
     locked-install); package_layout reads importlib.metadata. CI tests each package alone,
@@ -65,6 +67,7 @@ items:
   depends_on:
   - uv-workspace
   status: not started
+  recommended_model: sonnet
   notes: After release.yml tags, uv build --all-packages and pypa/gh-action-pypi-publish via
     OIDC (no token); every package every release, TestPyPI first. The owner registers a pending
     trusted publisher per name on PyPI and TestPyPI. Session start installs basstler==<plugin
@@ -79,6 +82,7 @@ items:
   depends_on:
   - uv-workspace
   status: not started
+  recommended_model: opus
   notes: 'basstler.playbook in core: component kinds CommandGroup, SkillDefinition, HookDefinition,
     McpTool, ActionsWorkflow, Ruleset[RuleKind], SitePanel (hub tab or sidebar), ItemAttribute
     (typed item fields basstler-plan validates without depending on their owner), and the
@@ -91,6 +95,7 @@ items:
   depends_on:
   - uv-workspace
   status: not started
+  recommended_model: sonnet
   notes: 'Parity with krrood@be69c37d: one module per top-level section, project rules in
     a root agent_rules package, checker as a rule''s third element with Section.checkers and
     check --all-lines, ImportsRules, SerializationRules, ExceptionModellingRules, leading-preposition
@@ -108,6 +113,7 @@ items:
   - playbook-setup-wizard
   - item-lifecycle
   status: not started
+  recommended_model: haiku
   notes: 'A README per distribution: what it holds, depends on, and how to install it alone.
     The guide''s worked example is the owner''s own playbook adding basstler-recommender (work-recommender)
     to DefaultPlaybook, with its SitePanel and ItemAttribute components, then dropping a contribution
@@ -120,6 +126,7 @@ items:
   depends_on:
   - uv-workspace
   status: not started
+  recommended_model: opus
   notes: Labels (with description and colour), discussion categories and item stages become
     base classes a user's own enum extends. basstler.github gets one small abstract interface
     per capability (read pull requests, write labels, comment, read stacks, read workflows)
@@ -132,6 +139,7 @@ items:
   depends_on:
   - playbook-model
   status: not started
+  recommended_model: opus
   notes: Owners whose repositories may be written to, notes branch and its place (per repository
     or central), merge or rebase, force-push allowed or never, GitHub-native stacks or basstler
     restacking, commit attribution policy, protected branches, command name. Defaults equal
@@ -143,6 +151,7 @@ items:
   - playbook-settings
   - extension-points
   status: deferred
+  recommended_model: haiku
   notes: 'Folded into rule-enforcement/playbook-guard (2026-11-09, owner''s decision). Was:
     new opt-in distribution basstler-guard (git, github), in DefaultPlaybook. Every CommandGroup
     command declares who may run it: the session alone, the session when told, or only the
@@ -155,6 +164,7 @@ items:
   depends_on:
   - playbook-model
   status: not started
+  recommended_model: sonnet
   notes: 'SessionReportSection component kind: each section reports that something holds (CI
     red, conflict, threads waiting, stale base), never the detail, and fails alone and visibly.
     Today''s session-start messages become the default sections. release:minor.'
@@ -164,6 +174,7 @@ items:
   depends_on:
   - playbook-model
   status: not started
+  recommended_model: opus
   notes: 'An ItemLifecycle model: stages, allowed transitions and whether a session or only
     the person makes each, with labels from extension-points. Default lifecycle equals today''s
     item statuses. Item priority and a proof (a failing test the code runs itself) as ItemAttribute
@@ -176,6 +187,7 @@ items:
   - rule-enforcement/playbook-guard
   - session-report-sections
   status: not started
+  recommended_model: sonnet
   notes: 'A few questions, the recommended choice first, each answer becoming a playbook setting;
     writes the repository''s basstler_playbook and verifies every step. Never changes repository
     settings: detects issues, Discussions, Actions or branch auto-delete being off and gives
@@ -186,6 +198,7 @@ items:
   depends_on:
   - uv-workspace
   status: not started
+  recommended_model: sonnet
   notes: 'Extends PackageBoundaryChecker from basstler imports to third-party ones, as krrood''s
     CoreBoundary does (#546): map each imported top-level package to its distributions with
     importlib.metadata.packages_distributions(), and allow the distribution''s own requirements
@@ -199,6 +212,7 @@ items:
   track: package-split
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: 'Asked on #210 (discussion_r4567106354). github.pull_request_record reads a pull
     request as a raw Mapping through PullRequestField, PullRequestHeadKey and AccountField;
     replace them with a ValidatedJSONModel parsed once at the boundary, its nested head and
@@ -214,6 +228,7 @@ items:
   depends_on:
   - break-remaining-cycles
   status: not started
+  recommended_model: opus
   notes: 'Split from break-remaining-cycles at its kickoff. Move every name in locations, environment
     and exceptions that one distribution alone uses into that distribution''s own module; the
     rule becomes "once, in its own package''s locations". Pure moves.

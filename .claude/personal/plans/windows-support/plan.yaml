@@ -19,6 +19,7 @@ items:
   title: Create the package environment on Windows without uv
   branch: null
   status: deferred
+  recommended_model: haiku
   track: fixes
   depends_on:
   - basstler-packages/uv-workspace

@@ -29,6 +29,7 @@ items:
   track: model
   depends_on: []
   status: not started
+  recommended_model: opus
   notes: 'Explanation: what happened, why, and the fixing commands as Command values. Rendered
     as text with each command alone in a fenced bash block, and as JSON for typed tools. Replaces
     the shape of DataclassException.suggest_correction and CredentialOrigin.suggest_renewal.
@@ -41,6 +42,7 @@ items:
   depends_on:
   - explanations
   status: not started
+  recommended_model: opus
   notes: 'Attempt: one technique with its outcome, and an Explanation when it fails. An attempt
     sequence tries fallbacks in order, stops at the first success and logs each through the
     package logger. Each outcome appends one JSON line (attempt or check, verdict, head commit,
@@ -54,6 +56,7 @@ items:
   depends_on:
   - explanations
   status: not started
+  recommended_model: opus
   notes: 'Reaction: the session calls a tool, the session asks the user, or the user runs
     commands. A choice holds options, marks one recommended and says why; it renders as the
     session''s AskUserQuestion with the recommended option first, and as JSON. The answer
@@ -67,6 +70,7 @@ items:
   - attempts
   - reactions
   status: not started
+  recommended_model: sonnet
   notes: 'plan_site/build_start (#139): reading the default branch and dispatching are attempts;
     the cloud session''s attach-or-ask guidance and the local gh auth login guidance are reactions.
     Deletes the hand-built strings in BuildStart.describe.
@@ -78,6 +82,7 @@ items:
   depends_on:
   - reactions
   status: not started
+  recommended_model: sonnet
   notes: 'plan_site/user_steps: each PendingStep''s command line and browser steps become
     a user reaction with its explanation. Deletes PendingStep.render.
 
@@ -88,6 +93,7 @@ items:
   depends_on:
   - explanations
   status: not started
+  recommended_model: sonnet
   notes: 'DataclassException.suggest_correction and CredentialOrigin.suggest_renewal return
     explanations instead of strings. Coordinate with basstler-reliability/described-exit-codes,
     whose exit code descriptions should print the same explanation.
@@ -99,6 +105,7 @@ items:
   depends_on:
   - reactions
   status: not started
+  recommended_model: sonnet
   notes: 'setup/report rows that are not ok carry an explanation and the reaction that fixes
     them (the session runs a step, or asks the user), instead of a free-text detail with an
     embedded command.
@@ -110,6 +117,7 @@ items:
   depends_on:
   - attempts
   status: not started
+  recommended_model: sonnet
   notes: 'upstream_reviews ReadSource and maintenance UpstreamReadRoute become one attempt
     sequence (REST, GraphQL, the fork''s Action) chosen and logged by the model, instead of
     a branch on the cloud-session flag.
@@ -122,6 +130,7 @@ items:
   depends_on:
   - reactions
   status: not started
+  recommended_model: opus
   notes: 'From the review of #169 (manifest_tools.py, discussion_r4508207555). Today skills and
     printed text tell the session in prose to act, for example to attach a repository with
     add_repo. Research and try out a controllable channel instead (MCP tools, hooks, structured

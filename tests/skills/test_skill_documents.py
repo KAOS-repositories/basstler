@@ -298,10 +298,12 @@ def test_every_skill_links_how_to_run_commands_with_its_plugin_root(
     Each skill links the shared rules for running commands and says what plugin root
     they name.
     """
-    running_commands = os.path.relpath(
-        RepositoryLocation.PLUGIN / SkillDirectory.RUNNING_COMMANDS_DOCUMENT,
-        document.parent,
-    )
+    running_commands = Path(
+        os.path.relpath(
+            RepositoryLocation.PLUGIN / SkillDirectory.RUNNING_COMMANDS_DOCUMENT,
+            document.parent,
+        )
+    ).as_posix()
     mapping_paragraphs = [
         paragraph
         for paragraph in document.read_text(encoding="utf-8").split("\n\n")
@@ -325,10 +327,12 @@ def test_the_resolve_skill_links_the_pull_request_rules() -> None:
         / SkillDirectory.PLAN_ITEM_RESOLVE
         / SkillDocumentName.SKILL
     )
-    pull_request_rules = os.path.relpath(
-        RepositoryLocation.PLUGIN / SkillDirectory.PULL_REQUEST_RULES_DOCUMENT,
-        document.parent,
-    )
+    pull_request_rules = Path(
+        os.path.relpath(
+            RepositoryLocation.PLUGIN / SkillDirectory.PULL_REQUEST_RULES_DOCUMENT,
+            document.parent,
+        )
+    ).as_posix()
 
     assert pull_request_rules in linked_files(document.read_text(encoding="utf-8"))
 

@@ -89,7 +89,9 @@ class FailedJob:
         """
         Where a check's own output link carries the job that produced it.
         """
-        return re.compile(rf"/actions/runs/\d+/job/(?P<{cls.identifier_group}>\d+)")
+        return re.compile(
+            rf"/actions/runs/[0-9]+/job/(?P<{cls.identifier_group}>[0-9]+)"
+        )
 
     @classmethod
     def behind(cls, result: CheckResult) -> FailedJob | None:

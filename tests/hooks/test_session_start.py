@@ -47,6 +47,7 @@ from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
 from basstler.upstream_reviews.action.branch import InstallationState
 
+from ..bash_path import BashPath
 from ..constants.environment import (
     ConfigurationVariable,
     FileMode,
@@ -1697,7 +1698,7 @@ def test_tells_the_session_where_the_plugin_is(
         encoding="utf-8",
         check=True,
     ).stdout
-    assert Path(exported) == session_start_repository.plugin_root
+    assert exported == BashPath(session_start_repository.plugin_root).text
 
 
 def test_tells_the_session_which_interpreter_runs_the_package(

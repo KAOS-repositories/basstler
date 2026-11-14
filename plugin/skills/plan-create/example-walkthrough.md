@@ -149,9 +149,11 @@ plus a model dropdown next to it:
 ![An item's "Resume" button with its model dropdown open](./example/screenshots/plan-page-action-buttons.png)
 
 Clicking a button **copies the command** to your clipboard (a web page
-can't start a session itself) — paste it into a fresh session to run it. If
-you pick a model from the dropdown first, a `/model MODEL_ID` line is
-prepended so the pasted session starts on that model.
+can't start a session itself) — paste it into a fresh session to run it. The
+copied text is the skill command alone, because a pasted second line would be read as part
+of the first. The model you picked (the item's `recommended_model`, preselected) is
+shown on the button as "Copied - run /model sonnet first": run that in the session, then
+paste.
 
 - **Kick off a not-started item** — `retry-metrics`'s "Start now"
   button copies `/plan-item-kickoff notification-retry-overhaul

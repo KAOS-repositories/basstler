@@ -19,12 +19,14 @@ from basstler.plan.exceptions import (
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
+    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
     SelfPlanReference,
     SharedBranch,
     UnknownDependency,
     UnknownDependencyPlan,
+    UnknownRecommendedModel,
     UnknownStatus,
     UnknownTrack,
     UnknownWave,
@@ -35,6 +37,7 @@ from basstler.plan.dependencies import (
     PlanDirectory,
 )
 from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.validation import PlanValidator
 
 from ..constants.paths import DatasetLocation
@@ -143,6 +146,58 @@ def test_validation_rejects_unknown_status():
     assert any(isinstance(problem, UnknownStatus) for problem in error.value.problems)
 
 
+def test_validation_rejects_a_recommended_model_that_is_no_alias():
+    items = [manifest_item("a", recommended_model="claude-opus-5")]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(minimal_plan(items=items)).validate()
+    assert any(
+        isinstance(problem, UnknownRecommendedModel) for problem in error.value.problems
+    )
+
+
+def test_validation_accepts_an_item_with_no_recommended_model():
+    items = [manifest_item("a", recommended_model=None)]
+    PlanValidator(minimal_plan(items=items)).validate()
+
+
+def test_a_save_requires_a_recommended_model_on_an_item_the_saved_plan_lacks():
+    items = [
+        manifest_item("old", recommended_model=None),
+        manifest_item("new", recommended_model=None),
+    ]
+    validator = PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset({"old"})
+    )
+    assert validator.problems == [MissingRecommendedModel(item_identifier="new")]
+
+
+def test_a_save_of_a_plan_not_saved_before_requires_a_model_on_every_item():
+    items = [
+        manifest_item("a", recommended_model=None),
+        manifest_item("b", recommended_model=None),
+    ]
+    validator = PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset()
+    )
+    assert validator.problems == [
+        MissingRecommendedModel(item_identifier="a"),
+        MissingRecommendedModel(item_identifier="b"),
+    ]
+
+
+def test_a_save_accepts_a_new_item_that_has_a_recommended_model():
+    items = [manifest_item("new", recommended_model=ModelAlias.OPUS)]
+    PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset()
+    ).validate()
+
+
+@pytest.mark.parametrize("recommended_model", list(ModelAlias))
+def test_validation_accepts_every_alias(recommended_model):
+    items = [manifest_item("a", recommended_model=recommended_model)]
+    PlanValidator(minimal_plan(items=items)).validate()
+
+
 @pytest.mark.parametrize("status", ["in_progress", ItemStatus.IN_PROGRESS.value])
 def test_validation_accepts_a_status_in_either_spelling(status):
     """
@@ -150,7 +205,14 @@ def test_validation_accepts_a_status_in_either_spelling(status):
     spaces, and stays readable beside the current one.
     """
     items = [
-        {"id": "a", "title": "A", "branch": "a", "track": "track-1", "status": status}
+        {
+            "id": "a",
+            "title": "A",
+            "branch": "a",
+            "track": "track-1",
+            "status": status,
+            "recommended_model": ModelAlias.SONNET.value,
+        }
     ]
     PlanValidator(minimal_plan(items=items)).validate()
 

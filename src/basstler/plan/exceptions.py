@@ -309,6 +309,52 @@ class UnknownStatus(ValidationProblem):
 
 
 @dataclass
+class UnknownRecommendedModel(ValidationProblem):
+    """
+    An item's ``recommended_model`` isn't one of :class:`ModelAlias`'s values.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    recommended_model: Any
+    """
+    Whatever ``recommended_model`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} has unknown recommended_model "
+            f"{self.recommended_model!r}"
+        )
+
+
+@dataclass
+class MissingRecommendedModel(ValidationProblem):
+    """
+    A new item carries no ``recommended_model``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    def error_message(self) -> str:
+        return f"new item {self.item_identifier!r} has no recommended_model"
+
+    def suggest_correction(self) -> str:
+        return (
+            "give the item the model its difficulty calls for (opus, sonnet or haiku; see "
+            "plugin/skills/plan-create/plan-schema.md, 'Choosing the recommended model'): "
+            "set recommended_model in plan.yaml, or pass --recommended-model to "
+            "basstler.plan.item_bootstrap's record or update"
+        )
+
+
+@dataclass
 class InvalidDependsOn(ValidationProblem):
     """
     An item's ``depends_on`` isn't a list.

@@ -23,6 +23,7 @@ from basstler.plan.item_bootstrap.exceptions import (
 from basstler.plan.item_bootstrap.manifest_text import ManifestText
 from basstler.plan.item_bootstrap.record import ItemRecordRequest
 from basstler.plan.item_bootstrap.vocabulary import PlanItemBootstrapExitCode
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemStatus,
     KeySpecification,
@@ -98,6 +99,7 @@ def test_a_new_item_matches_the_existing_items_indentation_rather_than_a_fixed_o
         status=ItemStatus.NOT_STARTED,
         title="A brand new item",
         track="a-track",
+        recommended_model=ModelAlias.SONNET,
     )
     manifest = ManifestText.from_text(NARROWLY_INDENTED_MANIFEST)
 

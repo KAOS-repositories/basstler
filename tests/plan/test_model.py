@@ -191,3 +191,21 @@ def test_a_plan_document_path_is_slash_separated_on_windows(document, monkeypatc
     assert document.path_within_notes_branch(PLAN_IDENTIFIER) == (
         f"{ProjectLocation.PLANS.as_posix()}/{PLAN_IDENTIFIER}/{document}"
     )
+
+
+# %% items without a recommended model
+
+
+def test_a_manifest_lists_the_items_that_carry_no_recommended_model():
+    manifest = PlanManifest(
+        minimal_plan(
+            items=[
+                manifest_item("a", recommended_model=None),
+                manifest_item("b", recommended_model="opus"),
+            ]
+        )
+    )
+
+    assert [item.identifier for item in manifest.items_without_recommended_model] == [
+        "a"
+    ]

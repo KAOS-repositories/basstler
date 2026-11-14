@@ -9,11 +9,10 @@ fork - so installing, requesting and collecting a result are exercised as git co
 
 from __future__ import annotations
 
-
 import json
-from http import HTTPStatus
 import subprocess
 from dataclasses import dataclass, field, replace
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
@@ -23,21 +22,27 @@ import basstler.upstream_reviews.action.__main__
 import basstler.upstream_reviews.action.read
 import basstler.upstream_reviews.action.run
 from basstler.environment import GitVariable
+from basstler.git.commands import GitCommandRunner
+from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.client import GitHubReader
+from basstler.github.credential import CredentialProvider
+from basstler.github.exceptions import GitHubRequestFailed
+from basstler.github.repository import Repository
+from basstler.github.run_listing import RunListing
 from basstler.locations import PackageLocation
-from basstler.repository import Repository
 from basstler.upstream_reviews.action.__main__ import (
     ActionCommand,
     ActionExitCode,
     main,
 )
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.maintenance.remote_branch import RemoteBranch
 from basstler.upstream_reviews.action.branch import (
     AbandonedRequests,
+    ActionBranch,
+    ActionFile,
     ActionInstallation,
+    BasstlerSource,
     InstallationState,
 )
-from basstler.github.run_listing import RunListing
 from basstler.upstream_reviews.action.exchange import ActionAnswer
 from basstler.upstream_reviews.action.read import ActionRead
 from basstler.upstream_reviews.action.recording import (
@@ -46,9 +51,6 @@ from basstler.upstream_reviews.action.recording import (
     ReplayingGraphQLClient,
 )
 from basstler.upstream_reviews.action.run import ActionRun
-from basstler.github.client import GitHubReader
-from basstler.github.credential import CredentialProvider
-from basstler.github.exceptions import GitHubRequestFailed
 from basstler.upstream_reviews.clients import (
     GitHubCommandLineClient,
 )
@@ -64,20 +66,15 @@ from basstler.upstream_reviews.readers import UpstreamPullRequestReader
 from basstler.upstream_reviews.request import (
     UpstreamReadRequest,
 )
-from basstler.upstream_reviews.action.branch import (
-    ActionBranch,
-    ActionFile,
-    BasstlerSource,
-)
 
 from ..constants.paths import RepositoryLocation
+from .replay import RecordedJobLog, RecordedResponse
 from .test_command_line import (
     RECORDED_PULL_REQUEST_NUMBER,
     UPSTREAM,
     Example,
     failing_job_identifier,
 )
-from .replay import RecordedJobLog, RecordedResponse
 
 BRANCH_OR_TAG = "v9.9.9"
 """
@@ -328,9 +325,11 @@ class Fork:
     remote: Path
 
     @property
-    def branch(self) -> RemoteBranch:
+    def branch(self) -> GitHubRemoteBranch:
         """:return: The Action branch on the fork."""
-        return RemoteBranch(ActionBranch.NAME, GitCommandRunner(self.clone), "origin")
+        return GitHubRemoteBranch(
+            ActionBranch.NAME, GitCommandRunner(self.clone), "origin"
+        )
 
     def files(self) -> dict[str, str]:
         """:return: Every file on the remote's Action branch, by path, without its
@@ -343,9 +342,11 @@ class Fork:
             for name in names
         }
 
-    def request_branch(self, identifier: str = REQUEST_IDENTIFIER) -> RemoteBranch:
+    def request_branch(
+        self, identifier: str = REQUEST_IDENTIFIER
+    ) -> GitHubRemoteBranch:
         """:return: The branch of the request with *identifier*."""
-        return RemoteBranch(
+        return GitHubRemoteBranch(
             ActionBranch.for_request(identifier), GitCommandRunner(self.clone), "origin"
         )
 

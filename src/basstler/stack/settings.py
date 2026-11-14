@@ -16,14 +16,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from basstler.github.repository import Repository
 from basstler.locations import PackageLocation, ProjectLocation
-from basstler.repository import Repository
 from basstler.shell_configuration import (
     FetchedBranchReference,
     ShellConfigurationFunction,
 )
 from basstler.stack.checkout import CurrentCheckout, GitArgument
-from basstler.stack.configuration import (
+from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
 )

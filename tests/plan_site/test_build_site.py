@@ -13,9 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from basstler.exceptions import PlanValidationError
+from basstler.plan.exceptions import PlanValidationError
 from basstler.github.exceptions import GitHubRequestFailed
-from basstler.maintenance.board import PullRequestField
+from basstler.github.pull_request_record import (
+    PullRequestField,
+)
+from basstler.github.pull_request_source import GitHubPullRequestSource
+from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
+from basstler.github.states import CombinedCheckState
 from basstler.plan.dependencies import DependencyReference, DependencyResolver
 from basstler.plan.model import ItemStatus, PlanDocument
 from basstler.plan.repository_rules import RepositoryRules
@@ -27,19 +32,17 @@ from basstler.plan_site.__main__ import (
     SiteDigest,
     SiteFile,
 )
-from basstler.plan_site.chip_tone import ChipTone
 from basstler.plan_site.cards import LiveStateAttribute, PlanTimeAttribute
+from basstler.plan_site.chip_tone import ChipTone
 from basstler.plan_site.hub import NotesBranch, PlanHub, SiteAddress
 from basstler.plan_site.hub_page import PlanSummary, SiteStylesheet, SkippedPage
 from basstler.plan_site.item_classifier import ItemClassifier
-from basstler.plan_site.plan import Plan
-from basstler.pull_request_source import GitHubPullRequestSource
-from basstler.pull_request_state import PullRequestRecord, PullRequestState
-from basstler.github.states import CombinedCheckState
+from basstler.plan.structure import Plan
 
 from ..constants.paths import DatasetLocation
 from ..constants.site import SitePlan, SiteRepository, SiteSampleText
 from ..github.pull_request_api import api_pull_request, details_of, listing_path
+from ..github.recorded_client import RecordedGitHubClient
 from ..recorded_pull_requests import RecordedPullRequestSource
 from .first_plan import (
     ELSEWHERE_PULL_REQUEST,
@@ -48,7 +51,6 @@ from .first_plan import (
     OPEN_PULL_REQUEST,
     PLAN_REPOSITORY,
 )
-from ..github.recorded_client import RecordedGitHubClient
 
 NOTES_REPOSITORY = SiteRepository.NOTES.value
 """
@@ -251,8 +253,11 @@ def test_build_looks_up_every_referenced_pull_request_in_its_own_repository(
 def test_live_pull_requests_leave_out_a_number_the_repository_does_not_have(
     pull_request_source: RecordedPullRequestSource,
 ):
+    """
+    A pull request number its repository does not have is not in the live state.
+    """
     live_pull_requests = pull_request_source.live_pull_requests_of(
-        DependencyResolver(FIRST_PLAN)
+        DependencyResolver(FIRST_PLAN).pull_request_references
     )
     assert live_pull_requests.pull_requests_by_repository == {
         str(PLAN_REPOSITORY): {

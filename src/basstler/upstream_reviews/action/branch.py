@@ -12,13 +12,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from basstler.branch import Branch
 from basstler.class_property import classproperty
-from basstler.maintenance.constants import CommitTrailer
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.maintenance.remote_branch import RemoteBranch
+from basstler.git.branch import Branch
+from basstler.git.commands import CommitTrailer, GitCommandRunner
+from basstler.git.remote_branch import RemoteBranch
 from basstler.render_common import create_template_environment
-
 
 # %% the Action branch's names
 

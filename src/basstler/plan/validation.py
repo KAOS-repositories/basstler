@@ -1,6 +1,6 @@
 """
 Checks a freshly loaded plan.yaml against the schema rules in plan-schema.md, reporting
-every :class:`~basstler.exceptions.ValidationProblem` it carries at once.
+every :class:`~basstler.plan.exceptions.ValidationProblem` it carries at once.
 """
 
 from __future__ import annotations
@@ -12,13 +12,13 @@ from typing import Any
 
 import rustworkx
 
-from basstler.exceptions import (
+from basstler.plan.exceptions import (
     DependencyCycle,
     DuplicateItemId,
     InvalidBlockers,
     InvalidDependsOn,
-    InvalidManifestRoot,
     InvalidLandedItemCount,
+    InvalidManifestRoot,
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
@@ -33,14 +33,13 @@ from basstler.exceptions import (
     UnknownWave,
     ValidationProblem,
 )
+from basstler.github.repository import Repository
 from basstler.plan.dependencies import (
     DependencyReference,
     PlanDirectory,
     ResolvedDependency,
 )
 from basstler.plan.model import ItemStatus, ManifestKey
-from basstler.repository import Repository
-
 
 # %% dependency cycles
 

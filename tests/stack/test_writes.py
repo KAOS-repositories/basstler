@@ -23,15 +23,13 @@ from basstler.stack.label_write import LabelWrite
 from basstler.stack.promotion_link import PromotionLink, PromotionLinkParameter
 
 from ..constants.stack import RemoteName, StackBranch, StackLabel
-
 from .dataset import (
     StackRepository,
     StackSampleText,
+    a_deep_stack_beside_an_independent_branch,
     make_configuration,
     prefilled,
-    a_deep_stack_beside_an_independent_branch,
 )
-
 
 # %% label writes
 

@@ -13,21 +13,21 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import IntEnum
 
-from basstler.github_labels import GitHubLabel
+from basstler.github.states import CombinedCheckState
+from basstler.github.tooling_labels import GitHubLabel
 from basstler.maintenance.fast_forward import FastForwardOutcome, FastForwardReport
 from basstler.maintenance.promotion import Promotion
 from basstler.maintenance.report import MaintenanceReport
 from basstler.maintenance.restack_steps import BranchOutcome, RestackOutcome
 from basstler.stack.model import (
-    IntegrationStrategy,
     PullRequest,
     Reparent,
     SkippedPullRequest,
     SkipReason,
     Stack,
 )
+from basstler.git.commands import IntegrationStrategy
 from basstler.stack.promotion_link import PromotionLink
-from basstler.github.states import CombinedCheckState
 
 from .fork import (
     A_SESSION_LINK,

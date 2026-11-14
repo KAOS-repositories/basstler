@@ -31,27 +31,26 @@ from enum import StrEnum
 from pathlib import Path
 
 from basstler.exit_codes import ExitCode
-from basstler.maintenance.git_commands import GitCommandFailed, GitCommandRunner
-from basstler.maintenance.remote_branch import RemoteBranch
-from basstler.repository import Repository
+from basstler.git.commands import GitCommandFailed, GitCommandRunner
+from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.client import GitHubRestClient
+from basstler.github.repository import Repository
 from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.action.branch import (
     AbandonedRequests,
+    ActionBranch,
+    ActionFile,
     ActionInstallation,
 )
 from basstler.upstream_reviews.action.read import (
     ActionRead,
 )
 from basstler.upstream_reviews.action.run import ActionRun
-from basstler.github.client import GitHubRestClient
-from basstler.upstream_reviews.exceptions import (
-    ActionUnavailable,
-    UpstreamReadError,
-)
+from basstler.upstream_reviews.exceptions import ActionUnavailable
+from basstler.github.exceptions import UpstreamReadError
 from basstler.upstream_reviews.request import (
     UpstreamReadRequest,
 )
-from basstler.upstream_reviews.action.branch import ActionBranch, ActionFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -165,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
             ActionRun(arguments.request, git, arguments.remote).publish_answer()
             AbandonedRequests(git, arguments.remote).delete()
             return 0
-        branch = RemoteBranch(ActionBranch.NAME, git, arguments.remote)
+        branch = GitHubRemoteBranch(ActionBranch.NAME, git, arguments.remote)
         if arguments.command == ActionCommand.INSTALL:
             installation = ActionInstallation(arguments.branch_or_tag)
             changed = installation.install(branch)

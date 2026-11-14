@@ -1,0 +1,139 @@
+"""
+Tests for github/repository.py: reading a GitHub repository out of a reference or a
+remote URL.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from basstler.github.repository import (
+    GitHubAddress,
+    MalformedRepositoryError,
+    PullRequestReference,
+    Repository,
+)
+from basstler.setup.steps import Host
+
+REPOSITORY = Repository("an-owner", "a-repository")
+"""
+The repository every well-formed reference and remote URL in these tests names.
+"""
+
+# %% repository references
+
+
+def test_repository_splits_a_reference_into_owner_and_name():
+    assert Repository.parse(REPOSITORY.full_name) == REPOSITORY
+
+
+def test_repository_round_trips_through_the_form_github_uses():
+    assert str(Repository.parse(REPOSITORY.full_name)) == REPOSITORY.full_name
+
+
+@pytest.mark.parametrize("malformed", ["no-separator", "/no-owner", "no-name/"])
+def test_repository_rejects_a_reference_that_is_not_owner_and_name(malformed: str):
+    """
+    A half-parsed reference would silently target the wrong repository.
+    """
+    with pytest.raises(MalformedRepositoryError):
+        Repository.parse(malformed)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"{Host.GITHUB.url}/{REPOSITORY.full_name}.git",
+        f"{Host.GITHUB.url}/{REPOSITORY.full_name}",
+        f"git@{Host.GITHUB}:{REPOSITORY.full_name}.git",
+        f"http://127.0.0.1:41729/git/{REPOSITORY.full_name}",
+    ],
+)
+def test_repository_reads_the_owner_and_name_from_a_remote_url(url: str):
+    """
+    Every shape a fork remote takes names the same repository.
+
+    A cloud session reaches GitHub through a local proxy, so the URL it sees shares
+    neither host nor scheme with the one a laptop clone has.
+    """
+    assert Repository.from_remote_url(url) == REPOSITORY
+
+
+@pytest.mark.parametrize("malformed", ["", f"{Host.GITHUB.url}/only-one-segment"])
+def test_repository_rejects_a_remote_url_naming_no_repository(malformed: str):
+    with pytest.raises(MalformedRepositoryError):
+        Repository.from_remote_url(malformed)
+
+
+# %% clone roots
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"git@{Host.GITHUB}:{REPOSITORY.full_name}.git",
+        REPOSITORY.clone_url_under(GitHubAddress.SSH),
+    ],
+)
+def test_an_ssh_remote_s_repositories_are_reached_over_ssh(url: str):
+    """
+    Both ways git writes an SSH address keep other repositories on SSH.
+    """
+    assert GitHubAddress.clone_root_for(url) is GitHubAddress.SSH
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        REPOSITORY.clone_url,
+        f"http://127.0.0.1:41729/git/{REPOSITORY.full_name}",
+    ],
+)
+def test_any_other_remote_s_repositories_are_reached_over_https(url: str):
+    """
+    A cloud session's local proxy keeps reaching other repositories over HTTPS.
+    """
+    assert GitHubAddress.clone_root_for(url) is GitHubAddress.WEB
+
+
+# %% pages
+
+
+def test_a_workflow_run_url_is_the_run_s_page_under_the_repository_s_actions():
+    assert REPOSITORY.workflow_run_url(7) == f"{REPOSITORY.url}/actions/runs/7"
+
+
+def test_the_settings_url_is_the_settings_page_under_the_repository():
+    """
+    The settings page is under the repository's page.
+    """
+    assert REPOSITORY.settings_url == f"{REPOSITORY.url}/settings"
+
+
+def test_the_new_actions_secret_form_is_under_the_repository_s_settings():
+    """
+    The new Actions secret form is the repository's secrets settings page.
+    """
+    assert REPOSITORY.new_actions_secret_url == (
+        f"{REPOSITORY.settings_url}/secrets/actions/new"
+    )
+
+
+# %% REST paths
+
+
+def test_a_job_log_path_is_the_one_the_actions_api_serves_it_from():
+    assert (
+        REPOSITORY.job_log_path(7)
+        == f"repos/{REPOSITORY.full_name}/actions/jobs/7/logs"
+    )
+
+
+# %% pull request references
+
+
+def test_a_pull_request_s_api_url_is_the_one_the_pulls_api_serves_it_from():
+    reference = PullRequestReference(REPOSITORY, 7)
+    assert reference.api_url == (
+        f"https://api.github.com/repos/{REPOSITORY.full_name}/pulls/7"
+    )

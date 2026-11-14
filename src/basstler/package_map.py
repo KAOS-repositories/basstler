@@ -5,11 +5,14 @@ each one ships.
 
 from __future__ import annotations
 
+import importlib.util
+import sys
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from functools import cached_property
 from itertools import combinations
+from pathlib import Path
 
 import rustworkx
 
@@ -45,7 +48,7 @@ class Layer(IntEnum):
 
     COLLABORATION = 4
     """
-    Work on pull requests: upstream reviews, stacked pull requests and plans.
+    Work on pull requests: upstream reviews and stacked pull requests.
     """
 
     NOTES = 5
@@ -53,17 +56,22 @@ class Layer(IntEnum):
     The personal notes and their setup.
     """
 
-    USER_FACING = 6
+    PLANS = 6
+    """
+    Plans and their items, kept on the personal-notes branch.
+    """
+
+    USER_FACING = 7
     """
     What a user reads or invokes directly: the plan site hub and the skills.
     """
 
-    MCP = 7
+    MCP = 8
     """
     The Model Context Protocol server.
     """
 
-    META_PACKAGE = 8
+    META_PACKAGE = 9
     """
     The ``basstler`` distribution, which installs every default distribution.
     """
@@ -254,6 +262,22 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
         )
         return declaration if claim_length else None
 
+    @staticmethod
+    def declared_in(module_file: Path) -> PackageMap:
+        """
+        Load another copy of this module, such as one checked out at an earlier commit.
+
+        :param module_file: The copy's source file.
+        :return: The map the copy declares as :data:`PACKAGE_MAP`.
+        """
+        specification = importlib.util.spec_from_file_location(
+            f"{__name__}@{module_file.resolve()}", module_file
+        )
+        module = importlib.util.module_from_spec(specification)
+        sys.modules[specification.name] = module
+        specification.loader.exec_module(module)
+        return module.PACKAGE_MAP
+
 
 # %% this package's map
 
@@ -266,6 +290,7 @@ PACKAGE_MAP = PackageMap(
                 "bash",
                 "class_property",
                 "command_line",
+                "credential_origin",
                 "email_address",
                 "environment",
                 "exceptions",
@@ -283,12 +308,7 @@ PACKAGE_MAP = PackageMap(
         DistributionDeclaration(
             Distribution.GIT,
             Layer.LOCAL_TOOLS,
-            (
-                "branch",
-                "maintenance.git_commands",
-                "maintenance.remote_branch",
-                "stack.commit_move",
-            ),
+            ("git",),
             (Distribution.CORE,),
         ),
         DistributionDeclaration(
@@ -300,25 +320,7 @@ PACKAGE_MAP = PackageMap(
         DistributionDeclaration(
             Distribution.GITHUB,
             Layer.GITHUB,
-            (
-                "actions_budget",
-                "actions_usage",
-                "github",
-                "github_labels",
-                "main_failure",
-                "maintenance.constants",
-                "maintenance.description",
-                "maintenance.github",
-                "pull_request_source",
-                "pull_request_state",
-                "release_version",
-                "repository",
-                "repository_attachment",
-                "upstream_reviews.pull_request_models",
-                "upstream_reviews.rest_models",
-                "upstream_reviews.review_models",
-                "workflows",
-            ),
+            ("github",),
             (Distribution.CORE, Distribution.GIT),
         ),
         DistributionDeclaration(
@@ -339,12 +341,6 @@ PACKAGE_MAP = PackageMap(
             ),
         ),
         DistributionDeclaration(
-            Distribution.PLAN,
-            Layer.COLLABORATION,
-            ("plan",),
-            (Distribution.CORE, Distribution.GIT, Distribution.GITHUB),
-        ),
-        DistributionDeclaration(
             Distribution.NOTES,
             Layer.NOTES,
             ("document_references", "personal_notes", "setup"),
@@ -354,6 +350,17 @@ PACKAGE_MAP = PackageMap(
                 Distribution.GITHUB,
                 Distribution.REVIEWS,
                 Distribution.STACK,
+            ),
+        ),
+        DistributionDeclaration(
+            Distribution.PLAN,
+            Layer.PLANS,
+            ("plan",),
+            (
+                Distribution.CORE,
+                Distribution.GIT,
+                Distribution.GITHUB,
+                Distribution.NOTES,
             ),
         ),
         DistributionDeclaration(

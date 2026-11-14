@@ -4,15 +4,14 @@ The failures of a call to the GitHub REST API.
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 from http import HTTPStatus
 
 from basstler.class_property import classproperty
-from basstler.exceptions import DataclassException
+from basstler.credential_origin import CredentialOrigin
+from basstler.exceptions import DataclassException, ExternalCallFailed
 from basstler.exit_codes import CommandFailure, StackExitCode
-from basstler.github.credential import CredentialOrigin
-from basstler.maintenance.exceptions import ExternalCallFailed
-
 
 REDIRECTION_STATUSES = range(HTTPStatus.MULTIPLE_CHOICES, HTTPStatus.BAD_REQUEST)
 """
@@ -178,3 +177,33 @@ class GitHubUnreachableError(GitHubCallFailed, ConnectionError):
 
     def suggest_correction(self) -> str:
         return "Check the network connection to GitHub, then run the command again."
+
+
+# %% reading an upstream pull request
+
+
+class UpstreamReadError(DataclassException, ABC):
+    """
+    Base class for every failure reading an upstream pull request.
+    """
+
+
+@dataclass
+class GraphQLErrorsReturned(UpstreamReadError):
+    """
+    Raised when GitHub answers with an ``errors`` array instead of data.
+    """
+
+    messages: list[str]
+    """
+    Every message GitHub reported.
+    """
+
+    def error_message(self) -> str:
+        return "GitHub answered with errors: " + "; ".join(self.messages)
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the upstream repository and pull request exist and that the "
+            "logged-in account can read them"
+        )

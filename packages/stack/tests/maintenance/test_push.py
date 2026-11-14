@@ -14,7 +14,12 @@ from basstler.git.commands import GitCommandFailed
 from basstler.maintenance.commands import PushCommand
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
-from basstler_testing.maintenance.fork import FixtureFile, ForkCheckout, a_parent_and_child, the_board
+from basstler_testing.maintenance.fork import (
+    FixtureFile,
+    ForkCheckout,
+    a_parent_and_child,
+    the_board,
+)
 from .recorded_fork import AlreadyResolvedPass
 
 # %% a push the move checks clear

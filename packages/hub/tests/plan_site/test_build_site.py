@@ -41,7 +41,11 @@ from basstler.plan.structure import Plan
 
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.site import SitePlan, SiteRepository, SiteSampleText
-from basstler_testing.github.pull_request_api import api_pull_request, details_of, listing_path
+from basstler_testing.github.pull_request_api import (
+    api_pull_request,
+    details_of,
+    listing_path,
+)
 from basstler_testing.github.recorded_client import RecordedGitHubClient
 from basstler_testing.recorded_pull_requests import RecordedPullRequestSource
 from basstler_testing.plan_site.first_plan import (

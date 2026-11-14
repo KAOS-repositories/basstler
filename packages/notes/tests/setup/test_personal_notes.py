@@ -53,9 +53,17 @@ from basstler_testing.constants.environment import (
     ShellExitStatus,
 )
 from basstler_testing.constants.notes import ScratchBranch
-from basstler_testing.constants.paths import DatasetLocation, PersonalNotesPath, RepositoryLocation
+from basstler_testing.constants.paths import (
+    DatasetLocation,
+    PersonalNotesPath,
+    RepositoryLocation,
+)
 from basstler_testing.executable_stubs import ExecutableStubDirectory
-from basstler_testing.scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
+from basstler_testing.scratch_repository import (
+    SCRATCH_IDENTITY,
+    GitIdentity,
+    ScratchRepository,
+)
 
 SCRIPTS_UNDER_TEST = (
     PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,

@@ -17,7 +17,11 @@ import pytest
 from basstler.document_references import PACKAGE_NAME, CitedNames
 from basstler.locations import PluginLocation
 
-from basstler_testing.constants.paths import PersonalNotesPath, RepositoryLocation, SkillDirectory
+from basstler_testing.constants.paths import (
+    PersonalNotesPath,
+    RepositoryLocation,
+    SkillDirectory,
+)
 
 # %% what the starter notes may not name
 

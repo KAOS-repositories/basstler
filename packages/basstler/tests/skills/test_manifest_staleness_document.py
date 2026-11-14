@@ -25,7 +25,11 @@ from basstler.bash import Bash
 from basstler.locations import PluginLocation
 from basstler.shell_configuration import ShellConfigurationFunction
 
-from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory, SkillFile
+from basstler_testing.constants.paths import (
+    RepositoryLocation,
+    SkillDirectory,
+    SkillFile,
+)
 
 # %% shell constants
 

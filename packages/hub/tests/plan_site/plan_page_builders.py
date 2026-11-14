@@ -19,7 +19,11 @@ from basstler.plan.model import ItemStatus
 from basstler.plan.structure import Item, Plan, Track, Wave
 from basstler.plan_site.plan_page import PlanPage
 
-from basstler_testing.constants.paths import DatasetLocation, RepositoryLocation, SkillDirectory
+from basstler_testing.constants.paths import (
+    DatasetLocation,
+    RepositoryLocation,
+    SkillDirectory,
+)
 from basstler_testing.fixture_plans import (
     PLAN_UNDER_TEST_ID,
     FixturePlanId,

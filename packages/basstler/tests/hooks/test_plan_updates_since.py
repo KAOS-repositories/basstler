@@ -27,7 +27,10 @@ from basstler.plan.updates_since_support import (
     no_default_repository_message,
 )
 
-from basstler_testing.constants.environment import ScrubbedEnvironmentPrefix, SearchPathVariable
+from basstler_testing.constants.environment import (
+    ScrubbedEnvironmentPrefix,
+    SearchPathVariable,
+)
 from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.executable_stubs import (

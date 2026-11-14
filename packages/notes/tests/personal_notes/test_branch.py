@@ -29,7 +29,10 @@ from basstler.setup.steps import PersonalNotesSetting
 
 from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.constants.paths import DatasetLocation
-from basstler_testing.scratch_repository import ScratchRepository, initialize_bare_repository
+from basstler_testing.scratch_repository import (
+    ScratchRepository,
+    initialize_bare_repository,
+)
 
 NOTES_FILE = PurePosixPath(".claude/personal/cram-notes.md")
 """

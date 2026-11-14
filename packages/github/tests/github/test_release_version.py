@@ -37,7 +37,10 @@ from basstler.upstream_reviews.action.branch import BasstlerSource
 from basstler_testing.constants.environment import SearchPathVariable
 from basstler_testing.constants.paths import RepositoryLocation
 from basstler_testing.plugin_manifest import PluginSource
-from basstler_testing.scratch_repository import ScratchRepository, initialize_bare_repository
+from basstler_testing.scratch_repository import (
+    ScratchRepository,
+    initialize_bare_repository,
+)
 from basstler_testing.script_runner import BashCommandRunner
 from basstler_testing.workflow_definition import Workflow
 

@@ -22,7 +22,12 @@ from basstler.plan.model import (
 )
 
 from basstler_testing.constants.paths import DatasetLocation
-from basstler_testing.fixture_plans import FixturePlanId, ForeignItemId, fixture_item, fixture_manifest
+from basstler_testing.fixture_plans import (
+    FixturePlanId,
+    ForeignItemId,
+    fixture_item,
+    fixture_manifest,
+)
 from basstler_testing.manifest_builders import manifest_item, minimal_plan
 from basstler_testing.plan.concurrent_edits import PLAN_IDENTIFIER
 

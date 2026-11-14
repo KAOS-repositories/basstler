@@ -12,7 +12,11 @@ import pytest
 
 from basstler.setup.report import CheckStatus, RepositoryCheck, SetupCheck
 
-from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory, SkillFile
+from basstler_testing.constants.paths import (
+    RepositoryLocation,
+    SkillDirectory,
+    SkillFile,
+)
 
 SETUP_SKILL = (
     RepositoryLocation.PLUGIN

@@ -12,7 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory, SkillFile
+from basstler_testing.constants.paths import (
+    RepositoryLocation,
+    SkillDirectory,
+    SkillFile,
+)
 from .test_skill_documents import document_identifier, linked_files, skill_documents
 
 # %% the limits

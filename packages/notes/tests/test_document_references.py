@@ -18,7 +18,11 @@ from basstler.document_references import (
     ShippedModules,
 )
 
-from basstler_testing.constants.paths import DatasetLocation, RepositoryLocation, SkillDirectory
+from basstler_testing.constants.paths import (
+    DatasetLocation,
+    RepositoryLocation,
+    SkillDirectory,
+)
 
 # %% personal notes written against another release
 

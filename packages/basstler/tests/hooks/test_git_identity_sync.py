@@ -21,7 +21,11 @@ from basstler.shell_configuration import ShellConfigurationFunction
 
 from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.constants.paths import PersonalNotesPath
-from basstler_testing.scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
+from basstler_testing.scratch_repository import (
+    SCRATCH_IDENTITY,
+    GitIdentity,
+    ScratchRepository,
+)
 from basstler_testing.hooks.session_start_summary import (
     SummaryLine,
     SummaryMessage,

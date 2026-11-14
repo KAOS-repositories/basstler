@@ -26,7 +26,10 @@ from basstler.personal_notes.progress_notes import (
 
 from basstler_testing.constants.notes import ProgressBranch
 from basstler_testing.constants.paths import DatasetLocation
-from basstler_testing.scratch_repository import ScratchRepository, initialize_bare_repository
+from basstler_testing.scratch_repository import (
+    ScratchRepository,
+    initialize_bare_repository,
+)
 
 PULL_REQUESTS = json.loads(
     DatasetLocation.PULL_REQUESTS_BY_BRANCH.read_text(encoding="utf-8")

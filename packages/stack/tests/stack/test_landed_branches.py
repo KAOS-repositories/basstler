@@ -11,7 +11,11 @@ from basstler.exceptions import UnresolvableReferenceError
 from basstler.stack.checkout import CurrentCheckout, LandedBranches
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
-from basstler_testing.maintenance.fork import UPSTREAM_BASE, ForkCheckout, make_configuration
+from basstler_testing.maintenance.fork import (
+    UPSTREAM_BASE,
+    ForkCheckout,
+    make_configuration,
+)
 
 # %% a parent branch on the fork, and whether the upstream has it
 

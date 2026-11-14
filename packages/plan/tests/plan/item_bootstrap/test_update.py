@@ -19,7 +19,12 @@ from basstler.plan.model import (
 )
 
 from basstler_testing.scratch_repository import ScratchRepository
-from basstler_testing.plan.concurrent_edits import FIRST_ITEM, blocked, deferred, read_version
+from basstler_testing.plan.concurrent_edits import (
+    FIRST_ITEM,
+    blocked,
+    deferred,
+    read_version,
+)
 from .bootstrap_scenario import (
     EXISTING_ITEM,
     LITERALLY_NOTED_ITEM,

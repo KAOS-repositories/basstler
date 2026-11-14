@@ -18,7 +18,11 @@ from basstler.personal_notes.progress_notes import (
 )
 from basstler.plan.size_limits import Measure
 
-from basstler_testing.constants.notes import ClaudeLocalSection, ProgressBranch, ScratchBranch
+from basstler_testing.constants.notes import (
+    ClaudeLocalSection,
+    ProgressBranch,
+    ScratchBranch,
+)
 from basstler_testing.constants.paths import PersonalNotesPath
 from basstler_testing.scratch_repository import ScratchRepository
 

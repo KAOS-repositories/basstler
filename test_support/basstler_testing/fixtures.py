@@ -1,12 +1,9 @@
 """
-Fixtures shared by every suite in this directory.
+Fixtures every distribution's tests use: the package's environment as CI has it, and
+directories of stubbed executables.
 
-basstler is imported from its editable install, which is this clone's own source under
-basstler/src, as CI installs it and as a session start installs it into basstler/.venv.
-
-This suite runs in the lightweight test_basstler CI job with --confcutdir pointed
-here, so the repository-root test/conftest.py - which imports the robotics stack that
-job does not install - is never loaded for it.
+basstler is imported from the workspace's editable installs, as CI and a session start
+install it.
 """
 
 from __future__ import annotations
@@ -14,16 +11,14 @@ from __future__ import annotations
 import os
 import shutil
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
 
 # A session running the plugin exports BASSTLER_PLUGIN_ROOT as its synced copy, which
 # basstler.locations reads on import; pinned before anything imports it, so the suite
 # tests this checkout's plugin rather than whichever release that session synced.
-os.environ["BASSTLER_PLUGIN_ROOT"] = str(Path(__file__).resolve().parents[1] / "plugin")
+os.environ["BASSTLER_PLUGIN_ROOT"] = str(Path(__file__).resolve().parents[2] / "plugin")
 
 from .constants.environment import (
     ConfigurationVariable,
@@ -31,9 +26,6 @@ from .constants.environment import (
     SearchPathVariable,
 )
 from .executable_stubs import ExecutableStubDirectory
-from .maintenance.fork import ForkCheckout
-from .scratch_repository import ScratchRepository
-from .upstream_reviews.replay import RecordedResponse, ReplayingClient
 
 # %% the package's environment, as CI has it
 
@@ -65,8 +57,8 @@ def package_environment_of_the_suite(
 
     :param tmp_path: pytest's per-test temporary directory.
     :param monkeypatch: Sets both variables for this test only.
-    :param python3_directory: Where ``python3`` is, when the interpreter's own
-        directory has none.
+    :param python3_directory: Where ``python3`` is, when the interpreter's own directory
+        has none.
     """
     monkeypatch.setenv(ConfigurationVariable.HOME, str(tmp_path / "basstler-home"))
     search_path = [str(Path(sys.executable).parent)]
@@ -80,19 +72,7 @@ def package_environment_of_the_suite(
     )
 
 
-# %% scratch repositories and stubs
-
-
-@pytest.fixture
-def scratch_repository(tmp_path: Path) -> ScratchRepository:
-    """
-    An initialized scratch project root and its bare notes remote, with nothing
-    committed and no personal-notes branch published yet.
-
-    :param tmp_path: pytest's per-test temporary directory.
-    :return: The scratch repository.
-    """
-    return ScratchRepository.create(tmp_path)
+# %% stubbed executables
 
 
 @pytest.fixture
@@ -105,47 +85,3 @@ def stub_bin(tmp_path: Path) -> ExecutableStubDirectory:
     :return: The stub directory.
     """
     return ExecutableStubDirectory.create(tmp_path)
-
-
-@pytest.fixture
-def paginated_client() -> ReplayingClient:
-    """:return: A client replaying both pages of the recorded review threads."""
-    return ReplayingClient(
-        [
-            RecordedResponse.PULL_REQUEST_PAGE_ONE.load(),
-            RecordedResponse.PULL_REQUEST_PAGE_TWO.load(),
-        ]
-    )
-
-
-@pytest.fixture
-def fork_checkout(tmp_path: Path) -> ForkCheckout:
-    """
-    A real fork checkout with both remotes wired to local bare repositories.
-
-    :param tmp_path: pytest's per-test temporary directory.
-    :return: The checkout.
-    """
-    return ForkCheckout.create(tmp_path)
-
-
-@pytest.fixture(scope="session")
-def browser() -> Iterator[Browser]:
-    """
-    :return: A headless Chromium, shared by every test of the session.
-    """
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
-        yield browser
-        browser.close()
-
-
-@pytest.fixture
-def browser_page(browser: Browser) -> Iterator[Page]:
-    """
-    :param browser: The session's headless Chromium.
-    :return: A fresh page in it, closed after the test.
-    """
-    page = browser.new_page()
-    yield page
-    page.close()

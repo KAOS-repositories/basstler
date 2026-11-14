@@ -1,79 +1,22 @@
-# Installed into basstler's own environment by every session start that finds it missing or
-# out of date: from the plugin's own release of this repository, or editable from a clone the
-# plugin runs from.
+# The uv workspace of every basstler distribution: each lives in packages/<part> with a
+# pyproject.toml of its own, and uv.lock pins what they install together. The root is
+# no distribution itself; it holds the development tools and their configuration.
 
-[build-system]
-requires = ["hatchling>=1.24", "hatch-vcs>=0.4"]
-build-backend = "hatchling.build"
+[tool.uv.workspace]
+members = ["packages/*"]
 
-[project]
-name = "basstler"
-description = "Workflow tooling: stacked-pull-request maintenance, the plan site, personal-notes hooks and upstream review reading."
-readme = "README.md"
-requires-python = ">=3.12"
-license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
-authors = [
-    {name = "Abdelrhman Bassiouny", email = "bido.bassuny@gmail.com"}
-]
-maintainers = [
-    {name = "Abdelrhman Bassiouny", email = "bido.bassuny@gmail.com"}
-]
-keywords = ["stacked-pull-requests", "developer-tooling", "github", "workflow", "agents"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Topic :: Software Development :: Version Control :: Git",
-    "Topic :: Utilities",
-]
-
-# Stated here and nowhere else: a session start, an Actions workflow and `pip install .` all
-# install from this one list. `basstler.setup.dependencies` is what reads it.
-dependencies = [
-    "pyyaml>=6",
-    "jinja2>=3",
-    "markdown>=3",
-    "nh3>=0.2",
-    "rustworkx>=0.15",
-    "cyclopts>=5.3",
-    "pydantic>=2.11",
-    "libcst>=1.8",
-]
-dynamic = ["version"]
-
-# The command each v3 command is mounted on; `python -m basstler` runs the same tree.
-[project.scripts]
-basstler = "basstler.__main__:app"
-
-[project.urls]
-"Source" = "https://github.com/KAOS-repositories/basstler"
-"Bug Tracker" = "https://github.com/KAOS-repositories/basstler/issues"
-
-# One release for the package and the plugin: the tag the release workflow puts on a merge
-# commit. The build reads the version from that tag, so no file names it and nothing is
-# committed after a merge; a commit past the latest tag builds as the next development
-# version, and a source with no git history at all as 0.0.0.
-[tool.hatch.version]
-source = "vcs"
-fallback-version = "0.0.0"
-
-# The whole package directory, so the files the modules resolve beside themselves rather
-# than by an argument - all named in locations.py: the page templates, the GraphQL
-# documents and the committed defaults - ship with it. An install that left them out would
-# import and then fail at the first render, the first configuration read, or the first
-# query.
-[tool.hatch.build.targets.wheel]
-packages = ["src/basstler"]
-
-# Docstrings are formatted by docformatter on top of ruff format - scripts/format_docstrings.py
-# runs both, keeping docformatter's change only where ruff leaves it alone.
-[tool.docformatter]
-make-summary-multi-line = true
-pre-summary-newline = true
-close-quotes-on-newline = true
-black = true
+[tool.uv.sources]
+basstler = { workspace = true }
+basstler-build = { workspace = true }
+basstler-core = { workspace = true }
+basstler-git = { workspace = true }
+basstler-rules = { workspace = true }
+basstler-github = { workspace = true }
+basstler-reviews = { workspace = true }
+basstler-stack = { workspace = true }
+basstler-notes = { workspace = true }
+basstler-plan = { workspace = true }
+basstler-hub = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -82,11 +25,21 @@ dev = [
     "pytest-xdist",
     "ruff==0.17.3",
 ]
+# Docstrings are formatted by docformatter on top of ruff format - scripts/format_docstrings.py
+# runs both, keeping docformatter's change only where ruff leaves it alone.
+[tool.docformatter]
+make-summary-multi-line = true
+pre-summary-newline = true
+close-quotes-on-newline = true
+black = true
+
 
 # The mechanical code rules: AGENTS.md states only what a linter cannot check.
 [tool.ruff]
 target-version = "py312"
-src = ["src"]
+src = ["packages/*/src", "packages/*", "test_support"]
+# basstler is a namespace package each distribution ships a part of.
+namespace-packages = ["packages/*/src/basstler"]
 
 [tool.ruff.lint]
 select = [
@@ -128,13 +81,18 @@ ban-relative-imports = "all"
 "unittest.TestCase".msg = "write plain pytest test functions or classes"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = [
+"{packages/*/tests,test_support}/**" = [
     "ANN",      # test functions and fixtures need no annotations
     "S101",     # tests assert
     "TID252",   # a test imports another test module relatively
     "B018",     # a bare attribute access inside pytest.raises is the call under test
 ]
 # Imports a fixture from a sibling test module, which pytest finds by its parameter name.
-"tests/upstream_reviews/test_open_pull_requests_action.py" = ["F401", "F811"]
+"packages/reviews/tests/upstream_reviews/test_open_pull_requests_action.py" = ["F401", "F811"]
 # Lower case like the builtin property it stands beside.
-"src/basstler/class_property.py" = ["N801"]
+"packages/core/src/basstler/class_property.py" = ["N801"]
+
+# Each distribution's tests are run on their own; the helpers several of them share are
+# imported from test_support.
+[tool.pytest.ini_options]
+pythonpath = ["test_support"]

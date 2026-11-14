@@ -22,4 +22,4 @@ Renames applied - check them once here instead of in every file:
 | `notes.md` | rename |
 | `package/constants.py` (from `constants.py`) | move |
 
-<sub>Declare a rename the triage missed, or reject one it found, in the description: `<!-- review-triage` then YAML with `renames: {old: new}` or `rejected_renames: [old]`, then `-->`.</sub>
+<sub>Declare a rename the triage missed, or reject one it found, in the description: `<!-- review-triage` then YAML with `renames: {old: new}` or `rejected_renames: [old]`, then `-->`; `basstler review-triage declare` writes the comment.</sub>

@@ -176,3 +176,24 @@ class GitHubUnreachableError(GitHubCallFailed, ConnectionError):
 
     def suggest_correction(self) -> str:
         return "Check the network connection to GitHub, then run the command again."
+
+
+@dataclass
+class GraphQLMutationRefused(DataclassException):
+    """
+    Raised when GitHub answers a GraphQL mutation with errors.
+    """
+
+    messages: tuple[str, ...]
+    """
+    Every message GitHub reported.
+    """
+
+    def error_message(self) -> str:
+        return "GitHub refused the mutation: " + "; ".join(self.messages)
+
+    def suggest_correction(self) -> str:
+        return (
+            "Run it where GitHub's GraphQL API is reachable, with a credential of the "
+            "account the mutation acts for: gh auth status"
+        )

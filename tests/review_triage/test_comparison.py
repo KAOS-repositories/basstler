@@ -9,10 +9,9 @@ from pathlib import PurePosixPath
 
 import pytest
 
+from basstler.git.commit_range import FileChange
 from basstler.review_triage.comparison import (
     ChangeKind,
-    ChangeKinds,
-    FileChange,
     FileJudgment,
     FileNeedingReview,
     FileTriager,
@@ -143,7 +142,9 @@ class GeneratedFileJudgment(FileJudgment):
     def applies_to(self, change: FileChange) -> bool:
         return change.path.parts[0] == "generated"
 
-    def changes(self, change: FileChange, renames: RenameMap) -> ChangeKinds | None:
+    def changes(
+        self, change: FileChange, renames: RenameMap
+    ) -> frozenset[ChangeKind] | None:
         return frozenset({GeneratedChange.GENERATED})
 
 

@@ -1,22 +1,21 @@
 """
-The pull request triaged, as GitHub's REST API describes it, and the files it changes,
-as git reads them.
+A pull request as GitHub's REST API describes it, and the files it changes, as git reads
+them.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import PurePosixPath
 from typing import Annotated
 
 from pydantic import Field
 
+from basstler.git.commands import GitCommandRunner
+from basstler.git.commit_range import CommitRange, FileChange
 from basstler.github.client import GitHubReader
+from basstler.github.repository import Repository
 from basstler.github.web_page import AbsentAsEmpty
 from basstler.json_model import ValidatedJSONModel
-from basstler.git.commands import GitCommandRunner
-from basstler.github.repository import Repository
-from basstler.review_triage.comparison import FileChange
 
 # %% the pull request
 
@@ -37,9 +36,9 @@ class BranchTip(ValidatedJSONModel):
     """
 
 
-class TriagedPullRequest(ValidatedJSONModel):
+class RestPullRequest(ValidatedJSONModel):
     """
-    The pull request whose files are triaged.
+    One pull request as REST describes it, read for its description and its two ends.
     """
 
     number: int
@@ -75,92 +74,23 @@ class TriagedPullRequest(ValidatedJSONModel):
         return f"refs/pull/{self.number}/head"
 
 
-# %% the changed files
-
-
-@dataclass(frozen=True)
-class CommitRange:
-    """
-    The change between a pull request's merge base and its head commit, as GitHub shows
-    it.
-    """
-
-    git: GitCommandRunner
-    """
-    The checkout holding both commits.
-    """
-
-    base_commit: str
-    """
-    Where the pull request's branch left its base branch.
-    """
-
-    head_commit: str
-    """
-    The pull request's head commit.
-    """
-
-    def changes(self) -> tuple[FileChange, ...]:
-        """
-        :return: Every file the range changes, in the order git lists them.
-        """
-        listing = iter(
-            self.git.run(
-                "diff",
-                "--numstat",
-                "-z",
-                "--find-renames",
-                self.base_commit,
-                self.head_commit,
-            ).split("\0")
-        )
-        changes: list[FileChange] = []
-        for entry in listing:
-            if not entry:
-                continue
-            added, _, path = entry.split("\t", 2)
-            previous_path = None
-            if not path:
-                previous_path = PurePosixPath(next(listing))
-                path = next(listing)
-            changes.append(
-                self.change(PurePosixPath(path), previous_path, added == "-")
-            )
-        return tuple(changes)
-
-    def change(
-        self, path: PurePosixPath, previous_path: PurePosixPath | None, is_binary: bool
-    ) -> FileChange:
-        """
-        :param path: Where the file is in the head commit.
-        :param previous_path: Where it was in the base commit, when it moved.
-        :param is_binary: Whether git compares it as binary.
-        :return: The file's change, its texts read unless it is binary.
-        """
-        if is_binary:
-            return FileChange(path, None, None, previous_path, is_binary)
-        return FileChange(
-            path,
-            self.git.file_at(self.base_commit, previous_path or path),
-            self.git.file_at(self.head_commit, path),
-            previous_path,
-        )
+# %% the pull request with its changes
 
 
 @dataclass(frozen=True)
 class PullRequestChanges:
     """
-    A pull request and the files it changes, everything a triage reads.
+    A pull request and the files it changes.
     """
 
-    pull_request: TriagedPullRequest
+    pull_request: RestPullRequest
     """
     The pull request.
     """
 
     commits: CommitRange
     """
-    The commits its change runs between.
+    The commits its change runs between, from its merge base to its head commit.
     """
 
     files: tuple[FileChange, ...]
@@ -169,11 +99,8 @@ class PullRequestChanges:
     """
 
 
-# %% reading a pull request
-
-
 @dataclass(frozen=True)
-class PullRequestReader:
+class PullRequestChangesReader:
     """
     Reads pull requests of GitHub and their changes in one checkout.
     """
@@ -195,7 +122,7 @@ class PullRequestReader:
         :return: The pull request and its changes, its commits fetched first when the
             checkout lacks either end.
         """
-        pull_request = TriagedPullRequest.from_json(
+        pull_request = RestPullRequest.from_json(
             self.github.get(repository.pull_request_path(number))
         )
         if None in (

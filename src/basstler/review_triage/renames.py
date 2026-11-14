@@ -9,6 +9,10 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from functools import cached_property
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from basstler.review_triage.rename_sources import RenameSource
 
 # %% one rename
 
@@ -29,9 +33,9 @@ class Rename:
     The identifier the head commit uses in its place.
     """
 
-    found_by: str
+    found_by: RenameSource
     """
-    The label of the rename source that found it.
+    The rename source that found it.
     """
 
 
@@ -72,7 +76,7 @@ class RenameMap:
     """
 
     @classmethod
-    def of(cls, decisions: Iterable[RenameDecisions]) -> RenameMap:
+    def from_decisions(cls, decisions: Iterable[RenameDecisions]) -> RenameMap:
         """
         :param decisions: The decisions of each rename source, a later source's
             outranking an earlier one's.

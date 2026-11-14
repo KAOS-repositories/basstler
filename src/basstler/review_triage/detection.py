@@ -6,79 +6,24 @@ from __future__ import annotations
 
 import difflib
 from dataclasses import dataclass
-from enum import IntEnum
 
 from basstler.class_property import classproperty
-from basstler.git.commands import GitCommandRunner
+from basstler.git.commit_tree import CommitTree
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.comparison import PythonComparison
-from basstler.review_triage.pull_request import PullRequestChanges
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import Rename, RenameCandidates, RenameDecisions
 
-# %% the tree search
-
-
-class GitGrepExitCode(IntEnum):
-    """
-    What ``git grep`` exits with.
-    """
-
-    MATCH = 0
-    """
-    At least one line matched.
-    """
-
-    NO_MATCH = 1
-    """
-    Nothing matched.
-    """
-
-
-@dataclass(frozen=True)
-class CommitTree:
-    """
-    The files of one commit, searched for identifiers.
-    """
-
-    git: GitCommandRunner
-    """
-    The checkout holding the commit.
-    """
-
-    commit: str
-    """
-    The commit searched.
-    """
-
-    def mentions(self, identifier: str) -> bool:
-        """
-        :param identifier: A name.
-        :return: Whether any file of the commit holds it as a whole word.
-        :raises GitCommandFailed: If the search itself fails.
-        """
-        search = self.git.attempt(
-            "grep",
-            "--quiet",
-            "--word-regexp",
-            "--fixed-strings",
-            "-e",
-            identifier,
-            self.commit,
-        )
-        if search.exit_status == GitGrepExitCode.NO_MATCH:
-            return False
-        return search.raise_if_failed().succeeded
-
-
 # %% detection
 
 
+@dataclass(frozen=True)
 class RenameDetection(RenameSource):
     """
     Detects a rename as an identifier the diff consistently replaces by another, where
-    the old identifier is gone from the head commit and the new one absent from the
-    base commit.
+    the old identifier is gone from the head commit and the new one absent from the base
+    commit.
     """
 
     @classproperty
@@ -98,7 +43,7 @@ class RenameDetection(RenameSource):
         head = CommitTree(changes.commits.git, changes.commits.head_commit)
         return RenameDecisions(
             tuple(
-                Rename(old, new, self.label)
+                Rename(old, new, self)
                 for old, new in sorted(candidates.consistent().items())
                 if not head.mentions(old) and not base.mentions(new)
             )

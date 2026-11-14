@@ -9,7 +9,7 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from basstler.review_triage.comparison import FileChange
+from basstler.git.commit_range import FileChange
 
 from ..constants.paths import DatasetLocation
 

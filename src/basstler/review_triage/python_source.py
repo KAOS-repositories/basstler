@@ -12,19 +12,65 @@ import keyword
 import tokenize
 from collections.abc import Iterator
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import cached_property
 
 from basstler.review_triage.renames import RenameMap
 
 # %% names in the syntax tree
 
-IDENTIFIER_FIELDS = frozenset(
-    {"id", "attr", "name", "arg", "asname", "module", "names", "rest", "kwd_attrs"}
-)
-"""
-The fields of a syntax tree node that hold an identifier, or a list of them, wherever
-the node type has such a field.
-"""
+
+class IdentifierField(StrEnum):
+    """
+    The fields of a syntax tree node that hold an identifier, or a list of them,
+    wherever the node type has such a field.
+    """
+
+    IDENTIFIER = "id"
+    """
+    The name a :class:`ast.Name` refers to.
+    """
+
+    ATTRIBUTE = "attr"
+    """
+    The attribute an :class:`ast.Attribute` reads.
+    """
+
+    NAME = "name"
+    """
+    The name a definition or a pattern binds, or the name an import alias imports.
+    """
+
+    ARGUMENT = "arg"
+    """
+    The name of a parameter or of a keyword argument.
+    """
+
+    ALIAS = "asname"
+    """
+    The name an import binds its module or member to.
+    """
+
+    MODULE = "module"
+    """
+    The module an ``import ... from`` reads.
+    """
+
+    NAMES = "names"
+    """
+    The names a ``global`` or ``nonlocal`` statement declares.
+    """
+
+    REST = "rest"
+    """
+    The name a mapping pattern binds the remaining keys to.
+    """
+
+    KEYWORD_ATTRIBUTES = "kwd_attrs"
+    """
+    The attributes a class pattern matches by keyword.
+    """
+
 
 FUTURE_MODULE = "__future__"
 """
@@ -32,16 +78,16 @@ The module whose imports change how the rest of the file is compiled.
 """
 
 
+@dataclass(frozen=True)
 class IdentifierRenamer(ast.NodeVisitor):
     """
     Replaces, in place, every identifier of a syntax tree that a rename map renames.
     """
 
-    def __init__(self, renames: RenameMap) -> None:
-        """
-        :param renames: The renames to apply.
-        """
-        self.renames = renames
+    renames: RenameMap
+    """
+    The renames to apply.
+    """
 
     def generic_visit(self, node: ast.AST) -> None:
         """
@@ -50,11 +96,13 @@ class IdentifierRenamer(ast.NodeVisitor):
         :param node: The node visited.
         """
         for field_name, value in ast.iter_fields(node):
-            if field_name not in IDENTIFIER_FIELDS:
+            if field_name not in IdentifierField:
                 continue
             if isinstance(value, str):
                 setattr(node, field_name, self.renames.renamed_identifier(value))
-            elif isinstance(value, list) and all(isinstance(v, str) for v in value):
+            elif isinstance(value, list) and all(
+                isinstance(item, str) for item in value
+            ):
                 setattr(
                     node,
                     field_name,

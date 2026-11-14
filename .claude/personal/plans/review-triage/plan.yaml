@@ -66,6 +66,7 @@ items:
   title: Declare reversible fixes on code rules and apply them with code-rules fix
   track: pattern-fixes
   status: in progress
+  recommended_model: opus
   branch: claude/pattern-checkers-mechanical-marking-arg9pe
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 222
@@ -80,6 +81,7 @@ items:
   track: pattern-fixes
   depends_on: [rule-fixes]
   status: not started
+  recommended_model: sonnet
   notes: 'rmtree(x) becomes DirectoryTree(x).remove(); with ignore_errors=True the fix
     keeps ignoring errors through a declared DirectoryTree option, unless the rule wants
     it to raise, and declares that. Bash.locate fix only where an environment is in scope.'
@@ -89,6 +91,7 @@ items:
   track: pattern-fixes
   depends_on: [keyword-argument-triage, rule-fixes]
   status: not started
+  recommended_model: opus
   notes: >
     Goal: #220 mostly marked viewed; done when its triage report marks its rule-fix files mechanical
     (107 of 129 .py files from the UTF-8 fix alone; most of the rest once directory-and-bash-fixes
@@ -101,5 +104,6 @@ items:
   track: pattern-fixes
   depends_on: [rule-fix-triage]
   status: not started
+  recommended_model: sonnet
   notes: 'For a file mixing a rule fix and a real change, reverse the fix''s actions on
     the head and show the remaining diff against the base in the report.'

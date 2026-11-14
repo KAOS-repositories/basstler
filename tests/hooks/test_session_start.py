@@ -35,7 +35,6 @@ from basstler.locations import (
 )
 from basstler.personal_notes import access
 from basstler.plan.merged_items import __main__ as merged_items_command
-from basstler.plan_site.recommended_models.every_plan import RecommendedModelsCommand
 from basstler.plan.merged_items.every_plan import (
     MergedItemsCommand,
     MergedItemsSummary,
@@ -802,25 +801,6 @@ def test_the_every_plan_subcommand_matches_the_shell_configuration(
     assert session_start_repository.configuration_value(
         "PLAN_MERGED_ITEMS_EVERY_PLAN_COMMAND"
     ) == str(MergedItemsCommand.EVERY_PLAN)
-
-
-def test_the_recommended_models_subcommand_matches_the_shell_configuration(
-    session_start_repository: ScratchRepository,
-):
-    assert session_start_repository.configuration_value(
-        "PLAN_RECOMMENDED_MODELS_EVERY_PLAN_COMMAND"
-    ) == str(RecommendedModelsCommand.EVERY_PLAN)
-
-
-def test_reports_recommended_models_as_not_applicable_when_the_notes_hold_no_plans(
-    session_start_repository: ScratchRepository,
-):
-    result = publish_and_run(session_start_repository)
-
-    assert result.returncode == 0, result.stderr
-    assert summary_value(
-        result.stdout, SummaryLine.RECOMMENDED_MODELS
-    ) == summary_message(SummaryMessage.RECOMMENDED_MODELS_NO_PLANS)
 
 
 def test_reports_merged_items_as_not_applicable_when_the_notes_hold_no_plans(

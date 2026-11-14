@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 import yaml
 
-from basstler.exceptions import (
+from basstler.plan.exceptions import (
     DependencyCycle,
     DuplicateItemId,
     InvalidBlockers,
@@ -19,7 +19,6 @@ from basstler.exceptions import (
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
-    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
     SelfPlanReference,
@@ -155,15 +154,9 @@ def test_validation_rejects_a_recommended_model_that_is_no_alias():
     )
 
 
-def test_validation_requires_every_item_to_carry_a_recommended_model():
+def test_validation_accepts_an_item_with_no_recommended_model():
     items = [manifest_item("a", recommended_model=None)]
-    with pytest.raises(PlanValidationError) as error:
-        PlanValidator(minimal_plan(items=items)).validate()
-    assert [
-        problem
-        for problem in error.value.problems
-        if isinstance(problem, MissingRecommendedModel)
-    ] == [MissingRecommendedModel(item_identifier="a")]
+    PlanValidator(minimal_plan(items=items)).validate()
 
 
 @pytest.mark.parametrize("recommended_model", list(ModelAlias))

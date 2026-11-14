@@ -13,7 +13,6 @@ import pytest
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
 from basstler.plan import model
-from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemStatus,
     ManifestKey,
@@ -192,29 +191,3 @@ def test_a_plan_document_path_is_slash_separated_on_windows(document, monkeypatc
     assert document.path_within_notes_branch(PLAN_IDENTIFIER) == (
         f"{ProjectLocation.PLANS.as_posix()}/{PLAN_IDENTIFIER}/{document}"
     )
-
-
-# %% filling in recommended models
-
-
-def test_a_manifest_gets_the_fallback_for_every_item_without_a_recommended_model():
-    manifest = PlanManifest(
-        minimal_plan(
-            items=[
-                manifest_item("a", recommended_model=None),
-                manifest_item("b", recommended_model=ModelAlias.OPUS.value),
-            ]
-        )
-    )
-
-    filled = manifest.with_recommended_models(ModelAlias.HAIKU)
-
-    assert [
-        item.content[ManifestKey.RECOMMENDED_MODEL.key] for item in filled.items
-    ] == [ModelAlias.HAIKU.value, ModelAlias.OPUS.value]
-
-
-def test_a_manifest_with_every_recommended_model_is_returned_as_it_is():
-    manifest = PlanManifest(minimal_plan())
-
-    assert manifest.with_recommended_models(ModelAlias.HAIKU) == manifest

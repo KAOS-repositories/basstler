@@ -54,11 +54,6 @@ class SummaryLine(StrEnum):
     and dropped.
     """
 
-    RECOMMENDED_MODELS = "recommended models"
-    """
-    Which plans had items without a recommended model, now given the default.
-    """
-
     PLAN_SITE = "plan site"
     """
     The plan site, and where this session's work sits on it.
@@ -158,16 +153,6 @@ class SummaryMessage(StrEnum):
     MERGED_ITEMS_NOT_CHECKED = "merged_items_line_not_checked"
     """
     Recording every plan's merged items failed, and nothing was changed.
-    """
-
-    RECOMMENDED_MODELS_NO_PLANS = "recommended_models_line_no_plans"
-    """
-    The notes branch holds no plans, so there were no items to fill.
-    """
-
-    RECOMMENDED_MODELS_NOT_CHECKED = "recommended_models_line_not_checked"
-    """
-    Filling every plan's recommended models failed, and nothing was changed.
     """
 
     CITED_NAMES_CURRENT = "cited_names_line_current"

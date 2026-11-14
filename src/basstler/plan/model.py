@@ -20,7 +20,6 @@ import yaml
 
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
-from basstler.plan.model_alias import ModelAlias
 
 
 class ItemStatus(StrEnum):
@@ -824,25 +823,6 @@ class PlanManifest:
                         if item.identifier in identifiers
                         else item.content
                     )
-                    for item in self.items
-                ],
-            }
-        )
-
-    def with_recommended_models(self, fallback: ModelAlias) -> PlanManifest:
-        """
-        :param fallback: The model to give every item that has none.
-        :return: This manifest with *fallback* as the ``recommended_model`` of each item
-            that carries none, or this manifest when none lacks one.
-        """
-        key = ManifestKey.RECOMMENDED_MODEL.key
-        if all(key in item.content for item in self.items):
-            return self
-        return PlanManifest(
-            {
-                **self.content,
-                ManifestKey.ITEMS.key: [
-                    {**item.content, key: item.content.get(key, fallback.value)}
                     for item in self.items
                 ],
             }

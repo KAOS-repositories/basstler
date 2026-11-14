@@ -34,6 +34,7 @@ from basstler.stack.model import PullRequest
 
 from ..constants.stack import StackBranch, StackLabel
 from .fork import (
+    ListedRepository,
     A_SESSION_LINK,
     ChecksReportedOn,
     ForkCheckout,
@@ -322,29 +323,6 @@ def test_a_head_that_does_not_name_its_commit_is_rejected():
 
 
 # %% the board command
-
-
-@dataclass(frozen=True)
-class ListedRepository(ChecksReportedOn, PullRequestReader):
-    """
-    A repository answering its open pull requests and its commits' checks from fixed
-    records.
-    """
-
-    records: tuple[dict, ...] = ()
-    """
-    Its open pull requests, as the REST API returns them.
-    """
-
-    def open_pull_requests(self) -> list[dict]:
-        return list(self.records)
-
-    def pull_request(self, number: int) -> dict:
-        return next(
-            record
-            for record in self.records
-            if record[PullRequestField.NUMBER.key] == number
-        )
 
 
 @dataclass(frozen=True)

@@ -34,7 +34,7 @@ from ..maintenance.fork import (
     an_api_record,
     make_configuration,
 )
-from ..maintenance.test_board import ListedRepository
+from ..maintenance.fork import ListedRepository
 from .test_action import (
     BRANCH_OR_TAG,
     REQUEST_IDENTIFIER,

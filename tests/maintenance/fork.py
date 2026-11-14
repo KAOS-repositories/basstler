@@ -29,6 +29,7 @@ from basstler.github.pull_request_record import (
     PullRequestRecord,
 )
 from basstler.github.repository import Repository
+from basstler.github.repository_access import PullRequestReader
 from basstler.github.states import CombinedCheckState
 from basstler.locations import ProjectLocation
 from basstler.maintenance.board import (
@@ -611,3 +612,26 @@ def the_board(labels: list[str] | None = None) -> list[PullRequest]:
             head_repository=PullRequestHeadRepository.FORK.value.full_name,
         ),
     ]
+
+
+@dataclass(frozen=True)
+class ListedRepository(ChecksReportedOn, PullRequestReader):
+    """
+    A repository answering its open pull requests and its commits' checks from fixed
+    records.
+    """
+
+    records: tuple[dict, ...] = ()
+    """
+    Its open pull requests, as the REST API returns them.
+    """
+
+    def open_pull_requests(self) -> list[dict]:
+        return list(self.records)
+
+    def pull_request(self, number: int) -> dict:
+        return next(
+            record
+            for record in self.records
+            if record[PullRequestField.NUMBER.key] == number
+        )

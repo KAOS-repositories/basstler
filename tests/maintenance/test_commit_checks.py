@@ -20,7 +20,7 @@ from basstler.github.states import CombinedCheckState
 
 from ..github.recorded_client import RecordedGitHubClient
 from ..upstream_reviews.replay import RecordedRestResponse
-from ..upstream_reviews.test_rest import (
+from ..upstream_reviews.recorded_rest_pull_request import (
     HEAD_SHA,
     NUMBER,
     make_reader,

@@ -19,7 +19,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import ModuleType
 
 import basstler
@@ -631,6 +631,15 @@ class ScratchRepository:
             str(destination),
         )
         return destination
+
+    def published_file(self, path: PurePosixPath) -> str | None:
+        """
+        :param path: A file's path on the notes branch.
+        :return: *path*'s content on the notes remote's branch, if it exists there.
+        """
+        checkout = self.clone_notes_branch(self.project_root.parent / "verify")
+        file = checkout / path
+        return file.read_text(encoding="utf-8") if file.exists() else None
 
     def update_notes_branch_file(
         self, relative_path: str | os.PathLike[str], content: str

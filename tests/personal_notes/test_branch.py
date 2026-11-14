@@ -60,15 +60,6 @@ def notes_branch(repository: ScratchRepository) -> PersonalNotesBranch:
     )
 
 
-def published_file(repository: ScratchRepository, path: PurePosixPath) -> str | None:
-    """
-    :return: *path*'s content on the notes remote's branch, if it exists there.
-    """
-    checkout = repository.clone_notes_branch(repository.project_root.parent / "verify")
-    file = checkout / path
-    return file.read_text(encoding="utf-8") if file.exists() else None
-
-
 def notes_commit_count(repository: ScratchRepository) -> int:
     """
     :return: How many commits the notes remote's branch holds.
@@ -131,16 +122,22 @@ def test_fetching_a_missing_branch_names_every_remote_tried(notes_repository):
 
 
 def test_writing_pushes_the_file(notes_repository):
+    """
+    A written file reaches the notes remote's branch.
+    """
     path = PurePosixPath(".claude/personal/pr-progress/work.md")
     writer = NotesBranchWriter(notes_branch(notes_repository))
     outcome = writer.write(
         NotesFileChanges({path: "- Next: a step.\n"}), "Save progress"
     )
     assert outcome == NotesWriteOutcome.PUSHED
-    assert published_file(notes_repository, path) == "- Next: a step.\n"
+    assert notes_repository.published_file(path) == "- Next: a step.\n"
 
 
 def test_writing_ignores_the_projects_commit_hooks(notes_repository):
+    """
+    A pre-commit hook of the project that rejects every commit does not stop the write.
+    """
     hook = notes_repository.project_root / ".git" / "hooks" / "pre-commit"
     shutil.copy(DatasetLocation.REJECTING_PRE_COMMIT_HOOK, hook)
     path = PurePosixPath(".claude/personal/pr-progress/work.md")
@@ -149,7 +146,7 @@ def test_writing_ignores_the_projects_commit_hooks(notes_repository):
         NotesFileChanges({path: "- Next: a step.\n"}), "Save progress"
     )
     assert outcome == NotesWriteOutcome.PUSHED
-    assert published_file(notes_repository, path) == "- Next: a step.\n"
+    assert notes_repository.published_file(path) == "- Next: a step.\n"
 
 
 def test_writing_unchanged_content_pushes_nothing(notes_repository):
@@ -161,10 +158,13 @@ def test_writing_unchanged_content_pushes_nothing(notes_repository):
 
 
 def test_writing_none_removes_the_path(notes_repository):
+    """
+    Writing no content for a path removes it from the notes remote's branch.
+    """
     writer = NotesBranchWriter(notes_branch(notes_repository))
     outcome = writer.write(NotesFileChanges({NOTES_FILE: None}), "Remove notes")
     assert outcome == NotesWriteOutcome.PUSHED
-    assert published_file(notes_repository, NOTES_FILE) is None
+    assert notes_repository.published_file(NOTES_FILE) is None
 
 
 def test_writing_leaves_no_worktree_behind(notes_repository):

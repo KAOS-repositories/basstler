@@ -56,7 +56,7 @@ from basstler.upstream_reviews.request import (
 from ..constants.paths import DatasetLocation
 from .replay import RecordedRestResponse as Recorded
 from .replay import ReplayingRestClient
-from .test_rest import (
+from .recorded_rest_pull_request import (
     NUMBER,
     ROUTE,
     UPSTREAM,

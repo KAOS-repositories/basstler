@@ -21,7 +21,6 @@ from basstler.plan.repository_rules_command import (
 )
 
 from ..constants.paths import DatasetLocation
-from ..personal_notes.test_branch import published_file
 from ..scratch_repository import ScratchRepository
 
 # %% the notes branch
@@ -61,7 +60,7 @@ def published_rules(repository: ScratchRepository) -> RepositoryRules:
     """
     :return: The rules the notes remote carries now.
     """
-    return RepositoryRules.from_yaml(published_file(repository, RULES_FILE) or "")
+    return RepositoryRules.from_yaml(repository.published_file(RULES_FILE) or "")
 
 
 # %% editing

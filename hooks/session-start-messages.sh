@@ -99,7 +99,7 @@ recommended_models_line_all_set() {
 recommended_models_line_unset() {
   local plan_id="$1"
   local item_identifiers="$2"
-  printf "'%s' items without one: %s - judge each by difficulty and set it with basstler.plan.item_bootstrap update --recommended-model" "${plan_id}" "${item_identifiers}"
+  printf "'%s' items without one: %s - judge each by difficulty (plan-schema.md, \"Choosing the recommended model\") and set it with basstler.plan.item_bootstrap update --recommended-model" "${plan_id}" "${item_identifiers}"
 }
 
 # %% the hub line

@@ -1,0 +1,59 @@
+name: Windows tests
+
+# Runs the whole suite on a Windows runner for every pull request ready for review, since
+# what breaks only on Windows passes the Linux tests unnoticed. A draft and a push to main
+# run nothing here: a Windows runner costs twice the minutes of a Linux one.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: windows-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: pytest on Windows
+    if: "!github.event.pull_request.draft"
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      # The tags give the installed package its release version, which the tests read.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Every distribution and the test runner, at the versions uv.lock names, into the
+      # interpreter setup-python put on PATH.
+      - name: Install the workspace and the test runner
+        shell: bash
+        run: |
+          python -m pip install uv
+          UV_PROJECT_ENVIRONMENT="$(python -c 'import sys; print(sys.prefix)')" \
+            uv sync --frozen --all-packages
+
+      # The plan page's script is tested in a headless Chromium.
+      - name: Install the browser the page tests run in
+        run: python -m playwright install chromium
+
+      - name: Run each distribution's tests
+        shell: bash
+        run: |
+          failed=""
+          for directory in packages/*/; do
+            echo "::group::${directory}"
+            python -m pytest "${directory}tests" -n auto || failed="${failed} ${directory}"
+            echo "::endgroup::"
+          done
+          if [ -n "${failed}" ]; then
+            echo "Tests failed for:${failed}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi

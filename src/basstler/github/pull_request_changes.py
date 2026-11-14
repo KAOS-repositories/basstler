@@ -124,8 +124,8 @@ class PullRequestChangesReader:
         :param number: The pull request's number.
         :param since: The commit to read the changes from, such as the head commit a
             reviewer last read; the merge base when ``None``.
-        :return: The pull request and its changes, its commits fetched first when the
-            checkout lacks either end.
+        :return: The pull request and the changes of the files it changes, its commits
+            fetched first when the checkout lacks either end.
         """
         pull_request = RestPullRequest.from_json(
             self.github.get(repository.pull_request_path(number))
@@ -139,10 +139,19 @@ class PullRequestChangesReader:
                 pull_request.head_reference,
                 pull_request.base.branch,
             )
-        start = (
-            self.git.merge_base(pull_request.base.commit, pull_request.head.commit)
-            if since is None
-            else self.git.commit_at(since)
+        whole_change = CommitRange(
+            self.git,
+            self.git.merge_base(pull_request.base.commit, pull_request.head.commit),
+            pull_request.head.commit,
         )
-        commits = CommitRange(self.git, start, pull_request.head.commit)
-        return PullRequestChanges(pull_request, commits, commits.file_versions())
+        if since is None:
+            return PullRequestChanges(
+                pull_request, whole_change, whole_change.file_versions()
+            )
+        commits = CommitRange(
+            self.git, self.git.commit_at(since), pull_request.head.commit
+        )
+        own_paths = frozenset(change.path for change in whole_change.file_changes())
+        return PullRequestChanges(
+            pull_request, commits, commits.file_versions(own_paths)
+        )

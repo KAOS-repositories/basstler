@@ -104,21 +104,33 @@ def test_the_changes_start_at_the_commit_given(reviewed_history: ReviewedHistory
     assert changes.commits.base_commit == reviewed_history.reviewed_commit
 
 
-# %% the verdicts
-
-
-def test_files_only_the_base_branch_changed_since_the_review_are_mechanical(
+def test_only_files_the_pull_request_changes_are_read_since_a_commit(
     reviewed_history: ReviewedHistory,
 ):
     """
-    A file the pull request left alone and one whose own change the merge left as it was
-    are both attributed to the merge.
+    A file only the base branch changed is not part of the pull request, so GitHub could
+    not mark it viewed.
+    """
+    changes = reviewed_history.read(reviewed_history.reviewed_commit)
+    assert [file.path for file in changes.files] == [
+        PurePosixPath("greeting.py"),
+        PurePosixPath("numbers.py"),
+    ]
+
+
+# %% the verdicts
+
+
+def test_a_file_whose_own_change_a_merge_kept_is_mechanical(
+    reviewed_history: ReviewedHistory,
+):
+    """
+    A file whose own change the merge left as it was is attributed to the merge.
     """
     triage = PullRequestTriager().triage(
         reviewed_history.read(reviewed_history.reviewed_commit)
     )
     assert {file.change.path: file.kinds for file in triage.mechanical_files} == {
-        PurePosixPath("limits.py"): frozenset({MechanicalChange.BASE_BRANCH_MERGE}),
         PurePosixPath("numbers.py"): frozenset({MechanicalChange.BASE_BRANCH_MERGE}),
     }
 

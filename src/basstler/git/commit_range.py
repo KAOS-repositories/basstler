@@ -177,9 +177,13 @@ class CommitRange:
             line for line in lines[first_hunk:] if not line.startswith(HUNK_HEADER)
         )
 
-    def file_versions(self) -> tuple[FileVersions, ...]:
+    def file_versions(
+        self, paths: frozenset[PurePosixPath] | None = None
+    ) -> tuple[FileVersions, ...]:
         """
-        :return: Every file the range changes, with its texts read unless it is binary.
+        :param paths: The head paths of the files to read, every changed file when
+            ``None``.
+        :return: Those files the range changes, with their texts read unless binary.
         """
         return tuple(
             FileVersions(**asdict(change))
@@ -192,4 +196,5 @@ class CommitRange:
                 head_text=self.git.file_at(self.head_commit, change.path),
             )
             for change in self.file_changes()
+            if paths is None or change.path in paths
         )

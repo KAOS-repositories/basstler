@@ -6,13 +6,17 @@ file does or says, otherwise in need of review.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from functools import cached_property
 
 from basstler.class_property import classproperty
 from basstler.git.commit_range import FileChange
+from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
+from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
-from basstler.review_triage.renames import RenameMap
+from basstler.review_triage.renames import RenameDecisions, RenameMap
+from basstler.review_triage.definitions import DefinitionIndex
 
 # %% what a mechanical change consists of
 
@@ -29,6 +33,12 @@ class ChangeKind(StrEnum):
         The kinds of change of two versions that are equal: none.
         """
         return frozenset()
+
+
+ChangeKinds = frozenset[ChangeKind]
+"""
+The kinds of change one judgment found.
+"""
 
 
 class MechanicalChange(ChangeKind):
@@ -56,6 +66,28 @@ class MechanicalChange(ChangeKind):
     FORMATTING = "formatting"
     """
     Only the layout of code, docstrings or comments changed.
+    """
+
+    EMPTY_PACKAGE = "empty package"
+    """
+    An empty package initializer was added, making its directory a package.
+    """
+
+    DEFINITIONS_MOVED_IN = "definitions moved in"
+    """
+    Definitions moved unchanged out of another module were added, with the imports
+    they need and their section headers.
+    """
+
+    DEFINITIONS_MOVED_OUT = "definitions moved out"
+    """
+    Definitions another module now holds were removed, with their section headers.
+    """
+
+    SUBCLASS_SUBSTITUTED = "class replaced by subclass"
+    """
+    A class was replaced by a subclass the pull request adds, holding only members
+    moved down from the class unchanged.
     """
 
 
@@ -127,6 +159,49 @@ class FileSuffix(StrEnum):
     """
 
 
+@dataclass(frozen=True)
+class JudgmentContext:
+    """
+    What a judgment may consult about the pull request beyond the file it judges.
+    """
+
+    renames: RenameMap = RenameMap()
+    """
+    The renames the pull request makes throughout.
+    """
+
+    base_definitions: DefinitionIndex = field(default_factory=DefinitionIndex)
+    """
+    The functions, methods and classes the base commit defines.
+    """
+
+    moved_definitions: MovedDefinitions = MovedDefinitions()
+    """
+    The definitions the pull request moves between modules.
+    """
+
+    substitutions: RenameMap = RenameMap()
+    """
+    Classes a file may replace by a subclass the pull request adds, as renames.
+    """
+
+    @cached_property
+    def substituted(self) -> JudgmentContext:
+        """
+        This context with :attr:`substitutions` applied as renames.
+        """
+        return replace(
+            self,
+            renames=RenameMap.from_decisions(
+                [
+                    RenameDecisions(self.renames.renames),
+                    RenameDecisions(self.substitutions.renames),
+                ]
+            ),
+            substitutions=RenameMap(),
+        )
+
+
 class FileJudgment(ABC):
     """
     Decides whether the change of the files it applies to is mechanical.
@@ -141,11 +216,11 @@ class FileJudgment(ABC):
 
     @abstractmethod
     def changes(
-        self, change: FileChange, renames: RenameMap
-    ) -> frozenset[ChangeKind] | None:
+        self, change: FileChange, context: JudgmentContext
+    ) -> ChangeKinds | None:
         """
         :param change: A file this judgment applies to.
-        :param renames: The renames the pull request makes throughout.
+        :param context: What the judgment may consult about the pull request.
         :return: What the change consists of, ``None`` when it is not provably
             mechanical.
         """
@@ -166,12 +241,12 @@ class ContentComparison(FileJudgment, ABC):
 
     @abstractmethod
     def text_changes(
-        self, base_text: str, head_text: str, renames: RenameMap
-    ) -> frozenset[ChangeKind] | None:
+        self, base_text: str, head_text: str, context: JudgmentContext
+    ) -> ChangeKinds | None:
         """
         :param base_text: The file's content in the base commit.
         :param head_text: The file's content in the head commit.
-        :param renames: The renames the pull request makes throughout.
+        :param context: What the judgment may consult about the pull request.
         :return: What the change consists of, ``None`` when it is not provably
             mechanical.
         """
@@ -184,9 +259,9 @@ class ContentComparison(FileJudgment, ABC):
         )
 
     def changes(
-        self, change: FileChange, renames: RenameMap
-    ) -> frozenset[ChangeKind] | None:
-        return self.text_changes(change.base_text, change.head_text, renames)
+        self, change: FileChange, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        return self.text_changes(change.base_text, change.head_text, context)
 
 
 class ProseComparison(ContentComparison):
@@ -201,11 +276,11 @@ class ProseComparison(ContentComparison):
         )
 
     def text_changes(
-        self, base_text: str, head_text: str, renames: RenameMap
-    ) -> frozenset[ChangeKind] | None:
+        self, base_text: str, head_text: str, context: JudgmentContext
+    ) -> ChangeKinds | None:
         if base_text == head_text:
             return ChangeKind.no_change
-        renamed = renames.renamed_prose(base_text)
+        renamed = context.renames.renamed_prose(base_text)
         if renamed == head_text:
             return frozenset({MechanicalChange.RENAME})
         if base_text.split() == head_text.split():
@@ -232,18 +307,42 @@ class PythonComparison(ContentComparison):
         return frozenset({FileSuffix.PYTHON, FileSuffix.PYTHON_STUB})
 
     def text_changes(
-        self, base_text: str, head_text: str, renames: RenameMap
-    ) -> frozenset[ChangeKind] | None:
-        base = PythonSource(base_text)
-        head = PythonSource(head_text)
-        kinds: set[ChangeKind] = set()
-        head_code = head.code(RenameMap())
-        if base.code(RenameMap()) != head_code:
-            if base.code(renames) != head_code:
-                return None
-            kinds.add(MechanicalChange.RENAME)
+        self, base_text: str, head_text: str, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        return self.source_changes(
+            PythonSource(base_text), PythonSource(head_text), context
+        )
+
+    def changes(
+        self, change: FileChange, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        """
+        :meth:`ContentComparison.changes`, resolving each version's relative imports
+        against the directory holding it.
+        """
+        base_path = change.previous_path or change.path
+        return self.source_changes(
+            PythonSource(change.base_text, base_path.parent.parts),
+            PythonSource(change.head_text, change.path.parent.parts),
+            context,
+        )
+
+    def source_changes(
+        self, base: PythonSource, head: PythonSource, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        """
+        :param base: The file's base version.
+        :param head: The file's head version.
+        :param context: What the judgment may consult about the pull request.
+        :return: What the change consists of, ``None`` when it is not provably
+            mechanical.
+        """
+        code_kinds = self.code_changes(base, head, context)
+        if code_kinds is None:
+            return None
+        kinds = set(code_kinds)
         if base.import_statements != head.import_statements:
-            if not base.imports(renames).agrees_with(head.imports(RenameMap())):
+            if not base.imports(context.renames).agrees_with(head.import_bindings):
                 return None
             kinds.add(MechanicalChange.IMPORTS)
         prose_pairs = [
@@ -251,13 +350,67 @@ class PythonComparison(ContentComparison):
             (base.comments, head.comments),
         ]
         for base_prose, head_prose in prose_pairs:
-            prose_kinds = self.prose.text_changes(base_prose, head_prose, renames)
+            prose_kinds = self.prose.text_changes(base_prose, head_prose, context)
             if prose_kinds is None:
                 return None
             kinds |= prose_kinds
-        if not kinds and base_text != head_text:
+        if not kinds and base.text != head.text:
             kinds.add(MechanicalChange.FORMATTING)
         return frozenset(kinds)
+
+    def code_changes(
+        self, base: PythonSource, head: PythonSource, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        """
+        :param base: The file's base version.
+        :param head: The file's head version.
+        :param context: What the judgment may consult about the pull request.
+        :return: What the change of the code, imports and docstrings aside, consists
+            of, ``None`` when it is not provably mechanical.
+        """
+        head_code = head.code(RenameMap())
+        if base.code(RenameMap()) == head_code:
+            return ChangeKind.no_change
+        if base.code(context.renames) == head_code:
+            return frozenset({MechanicalChange.RENAME})
+        return None
+
+
+class EmptyPackageAddition(FileJudgment):
+    """
+    Judges an added package initializer holding nothing but whitespace as mechanical.
+    """
+
+    def applies_to(self, change: FileChange) -> bool:
+        return (
+            change.base_text is None
+            and change.head_text is not None
+            and change.path.name == PACKAGE_INITIALIZER
+        )
+
+    def changes(
+        self, change: FileChange, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        if change.head_text.strip():
+            return None
+        return frozenset({MechanicalChange.EMPTY_PACKAGE})
+
+
+class RenamedTextComparison(FileJudgment):
+    """
+    Judges a text file of any other type: mechanical only when the renames alone turn
+    its base version into its head version, since its whitespace may carry meaning.
+    """
+
+    def applies_to(self, change: FileChange) -> bool:
+        return change.base_text is not None and change.head_text is not None
+
+    def changes(
+        self, change: FileChange, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        if context.renames.renamed_prose(change.base_text) == change.head_text:
+            return frozenset({MechanicalChange.RENAME})
+        return None
 
 
 # %% judging a file
@@ -270,12 +423,17 @@ class FileTriager:
     judgment applies to is mechanical only when its content is unchanged.
     """
 
-    renames: RenameMap
+    context: JudgmentContext
     """
-    The renames the pull request makes throughout.
+    What the judgments may consult about the pull request.
     """
 
-    judgments: tuple[FileJudgment, ...] = (PythonComparison(), ProseComparison())
+    judgments: tuple[FileJudgment, ...] = (
+        PythonComparison(),
+        ProseComparison(),
+        EmptyPackageAddition(),
+        RenamedTextComparison(),
+    )
     """
     The judgments, tried in order.
     """
@@ -300,7 +458,23 @@ class FileTriager:
         """
         if change.head_text is not None and change.base_text == change.head_text:
             return ChangeKind.no_change
-        for judgment in self.judgments:
-            if judgment.applies_to(change):
-                return judgment.changes(change, self.renames)
-        return None
+        judgment = next(
+            (judgment for judgment in self.judgments if judgment.applies_to(change)),
+            None,
+        )
+        if judgment is None:
+            return None
+        kinds = judgment.changes(change, self.context)
+        substituted_class = self.context.substitutions.word_pattern
+        if (
+            kinds is not None
+            or substituted_class is None
+            or not substituted_class.search(change.base_text or "")
+        ):
+            return kinds
+        substituted = judgment.changes(change, self.context.substituted)
+        if substituted is None:
+            return None
+        return substituted - {MechanicalChange.RENAME} | {
+            MechanicalChange.SUBCLASS_SUBSTITUTED
+        }

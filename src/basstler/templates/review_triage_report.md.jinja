@@ -2,12 +2,12 @@
 
 **{{ outcome.files_needing_review | length }} of {{ outcome.files | length }} files need review**; the other {{ outcome.mechanical_files | length }} change only mechanically.
 
-{% if outcome.renames.renames %}
+{% if outcome.renames.identifier_renames %}
 Renames applied - check them once here instead of in every file:
 
 | Old | New | Found by |
 | --- | --- | --- |
-{% for rename in outcome.renames.renames %}
+{% for rename in outcome.renames.identifier_renames %}
 | `{{ rename.old }}` | `{{ rename.new }}` | {{ rename.found_by.label }} |
 {% endfor %}
 

@@ -5,10 +5,10 @@ Finding the renames a pull request makes throughout from its diff alone.
 from __future__ import annotations
 
 import difflib
+import tokenize
 from dataclasses import dataclass
 
 from basstler.class_property import classproperty
-from basstler.git.commit_tree import CommitTree
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.comparison import PythonComparison
 from basstler.review_triage.python_source import PythonSource
@@ -39,8 +39,8 @@ class RenameDetection(RenameSource):
                     PythonSource(change.head_text),
                     candidates,
                 )
-        base = CommitTree(changes.commits.git, changes.commits.base_commit)
-        head = CommitTree(changes.commits.git, changes.commits.head_commit)
+        base = changes.commits.base_tree
+        head = changes.commits.head_tree
         return RenameDecisions(
             tuple(
                 Rename(old, new, self)
@@ -60,8 +60,31 @@ class RenameDetection(RenameSource):
         :param head: The file's head version.
         :param candidates: The substitutions found so far.
         """
-        base_tokens = base.significant_tokens
-        head_tokens = head.significant_tokens
+        lines = difflib.SequenceMatcher(
+            a=base.text.splitlines(), b=head.text.splitlines(), autojunk=False
+        )
+        for tag, base_start, base_end, head_start, head_end in lines.get_opcodes():
+            if tag == "replace":
+                RenameDetection.collect_tokens(
+                    base.tokens_on_lines(base_start + 1, base_end + 1),
+                    head.tokens_on_lines(head_start + 1, head_end + 1),
+                    candidates,
+                )
+
+    @staticmethod
+    def collect_tokens(
+        base_tokens: tuple[tokenize.TokenInfo, ...],
+        head_tokens: tuple[tokenize.TokenInfo, ...],
+        candidates: RenameCandidates,
+    ) -> None:
+        """
+        Add each identifier of a replaced block of lines that the head version puts in
+        place of another to *candidates*.
+
+        :param base_tokens: The block's significant tokens in the base version.
+        :param head_tokens: Those of the lines replacing it in the head version.
+        :param candidates: The substitutions found so far.
+        """
         matcher = difflib.SequenceMatcher(
             a=[token.string for token in base_tokens],
             b=[token.string for token in head_tokens],

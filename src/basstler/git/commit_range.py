@@ -5,9 +5,11 @@ The files changed between two commits, each in both its versions.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import PurePosixPath
 
 from basstler.git.commands import GitCommandRunner
+from basstler.git.commit_tree import CommitTree
 
 # %% one file's change
 
@@ -67,6 +69,20 @@ class CommitRange:
     """
     The commit the change ends at.
     """
+
+    @cached_property
+    def base_tree(self) -> CommitTree:
+        """
+        The files of :attr:`base_commit`.
+        """
+        return CommitTree(self.git, self.base_commit)
+
+    @cached_property
+    def head_tree(self) -> CommitTree:
+        """
+        The files of :attr:`head_commit`.
+        """
+        return CommitTree(self.git, self.head_commit)
 
     def changes(self) -> tuple[FileChange, ...]:
         """

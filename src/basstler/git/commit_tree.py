@@ -4,7 +4,8 @@ Searching the files of one commit.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
@@ -31,7 +32,7 @@ class GitGrepExitCode(ExitCode):
 @dataclass(frozen=True)
 class CommitTree:
     """
-    The files of one commit, searched for words.
+    The files of one commit, searched for words and paths.
     """
 
     git: GitCommandRunner
@@ -42,6 +43,13 @@ class CommitTree:
     commit: str
     """
     The commit searched.
+    """
+
+    held_paths: dict[PurePosixPath, bool] = field(
+        default_factory=dict, compare=False, repr=False
+    )
+    """
+    :meth:`holds` for each path asked about so far.
     """
 
     def mentions(self, word: str) -> bool:
@@ -62,3 +70,14 @@ class CommitTree:
         if search.exit_status == GitGrepExitCode.NO_MATCH:
             return False
         return search.raise_if_failed().succeeded
+
+    def holds(self, path: PurePosixPath) -> bool:
+        """
+        :param path: A path from the commit's root.
+        :return: Whether the commit has a file there.
+        """
+        if path not in self.held_paths:
+            self.held_paths[path] = self.git.attempt(
+                "cat-file", "-e", f"{self.commit}:{path}"
+            ).succeeded
+        return self.held_paths[path]

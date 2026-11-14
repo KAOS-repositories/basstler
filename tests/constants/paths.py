@@ -81,6 +81,12 @@ class RepositoryLocation(PathEnumeration):
     changing what the setup runs.
     """
 
+    WINDOWS_TESTS_WORKFLOW = WORKFLOWS / "windows-tests.yml"
+    """
+    The workflow that runs the whole suite on Windows for every pull request ready for
+    review.
+    """
+
     MAIN_FAILURE_WORKFLOW = WORKFLOWS / "main-failure.yml"
     """
     The workflow that records each run of the tests on main in its failure issue.
@@ -350,6 +356,11 @@ class DatasetLocation(PathEnumeration):
     per fixture plan.
     """
 
+    BASH_PATH_SCRIPT = DIRECTORY / "bash-path.sh"
+    """
+    Prints a path as the bash running it writes it.
+    """
+
     STUBS = DIRECTORY / "stubs"
     """
     Executables copied onto a scratch ``PATH`` to stand in for a real ``gh``, ``curl`` or
@@ -379,6 +390,14 @@ class DatasetLocation(PathEnumeration):
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, saying this session
     cannot start the build yet.
+    """
+
+    BUILD_START_NEEDS_ACCESS_WINDOWS_LINES_STUB = (
+        STUBS / "build_start_needs_access_windows_lines.py"
+    )
+    """
+    :attr:`BUILD_START_NEEDS_ACCESS_STUB` with its lines ending in a carriage return and
+    a line feed, as Python writes them on Windows.
     """
 
     BUILD_START_HAS_ACCESS_STUB = STUBS / "build_start_has_access.py"

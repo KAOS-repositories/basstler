@@ -17,6 +17,7 @@ from basstler.bash import Bash
 from basstler.locations import PluginLocation
 from basstler.shell_configuration import ShellConfigurationFunction
 
+from ..bash_path import BashPath
 from ..constants.environment import ConfigurationVariable, SearchPathVariable
 from ..executable_stubs import ExecutableStubDirectory, path_hiding_executables
 from ..scratch_repository import ScratchRepository
@@ -240,4 +241,4 @@ def test_an_install_held_by_a_live_process_past_the_wait_is_one_line_naming_the_
 
     assert result.returncode == 1
     (line,) = result.stderr.splitlines()
-    assert str(lock) in line
+    assert BashPath(lock).text in line

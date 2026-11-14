@@ -105,7 +105,7 @@ class ProgressNotesDirectory:
         :return: The branch every progress-notes file in the directory belongs to.
         """
         return sorted(
-            str(file.relative_to(self.path))[: -len(ProgressNotesFile.SUFFIX)]
+            file.relative_to(self.path).as_posix()[: -len(ProgressNotesFile.SUFFIX)]
             for file in self.path.rglob(f"*{ProgressNotesFile.SUFFIX}")
         )
 

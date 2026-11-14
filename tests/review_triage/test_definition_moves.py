@@ -18,7 +18,11 @@ from basstler.review_triage.triage import PullRequestTriager
 
 from ..scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
-from .samples import DefinitionMoveFromMovedModuleSample, DefinitionMoveSample
+from .samples import (
+    SECTIONED_BOARD,
+    DefinitionMoveFromMovedModuleSample,
+    DefinitionMoveSample,
+)
 
 # %% the sample
 
@@ -68,6 +72,32 @@ def with_moved_in_module(
         files=tuple(
             replace(change, head_text=head_text)
             if change.path == MOVED_IN_MODULE
+            else change
+            for change in changes.files
+        ),
+    )
+
+
+SOURCE_MODULE = PurePosixPath("package/board.py")
+"""
+The module of the definition-move sample that classes move out of.
+"""
+
+
+def with_source_module(
+    changes: PullRequestChanges, base_text: str, head_text: str
+) -> PullRequestChanges:
+    """
+    :param changes: The definition-move sample.
+    :param base_text: Another base version of :data:`SOURCE_MODULE`.
+    :param head_text: Another head version of it.
+    :return: The sample with those versions in place of the committed ones.
+    """
+    return replace(
+        changes,
+        files=tuple(
+            replace(change, base_text=base_text, head_text=head_text)
+            if change.path == SOURCE_MODULE
             else change
             for change in changes.files
         ),
@@ -157,6 +187,39 @@ def test_a_new_module_of_definitions_moved_out_of_a_moved_module_is_mechanical(
             {MechanicalChange.DEFINITIONS_MOVED_IN}
         ),
     }
+
+
+@pytest.mark.parametrize(
+    "versions",
+    [
+        pytest.param(("board_base.py", "board_head.py"), id="section-kept"),
+        pytest.param(
+            ("board_base.py", "board_header_dropped_head.py"), id="header-dropped"
+        ),
+        pytest.param(
+            ("board_emptied_section_base.py", "board_emptied_section_head.py"),
+            id="section-emptied",
+        ),
+    ],
+)
+def test_a_module_losing_definitions_keeps_the_headers_of_sections_left(
+    definition_move: PullRequestChanges, versions: tuple[str, str]
+):
+    """
+    A section header above definitions that move out leaves with them when they were all
+    its section held, and otherwise may stay or go.
+    """
+    base_name, head_name = versions
+    triage = PullRequestTriager().triage(
+        with_source_module(
+            definition_move,
+            (SECTIONED_BOARD / base_name).read_text(),
+            (SECTIONED_BOARD / head_name).read_text(),
+        )
+    )
+    assert {file.change.path: file.kinds for file in triage.mechanical_files}[
+        SOURCE_MODULE
+    ] == frozenset({MechanicalChange.DEFINITIONS_MOVED_OUT})
 
 
 # %% what a received definition may not change

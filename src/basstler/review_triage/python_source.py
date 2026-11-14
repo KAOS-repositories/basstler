@@ -506,19 +506,41 @@ class PythonSource:
         first = min([statement.lineno, *(node.lineno for node in decorators)])
         return LineSpan(first, statement.end_lineno or statement.lineno)
 
-    def section_header_before(self, span: LineSpan) -> LineSpan | None:
+    @cached_property
+    def lines(self) -> tuple[str, ...]:
+        """
+        The file's lines, without their line ends.
+        """
+        return tuple(self.text.splitlines())
+
+    def header_above(self, span: LineSpan) -> LineSpan | None:
         """
         :param span: Lines of the file.
         :return: The section header opening right above them, past blank lines,
             ``None`` when there is none.
         """
-        lines = self.text.splitlines()
-        line = span.first - 1
-        while line > 0 and not lines[line - 1].strip():
-            line -= 1
-        if line == 0 or not lines[line - 1].startswith(SECTION_HEADER):
+        header = span.first - 1
+        while header > 0 and not self.lines[header - 1].strip():
+            header -= 1
+        if header == 0 or not self.lines[header - 1].startswith(SECTION_HEADER):
             return None
-        return LineSpan(line, line)
+        return LineSpan(header, header)
+
+    def section_holds_only(self, header: LineSpan, spans: tuple[LineSpan, ...]) -> bool:
+        """
+        :param header: A section header of the file.
+        :param spans: Lines of the file.
+        :return: Whether the section it opens holds nothing but blank lines and the
+            spans' lines.
+        """
+        covered = {line for span in spans for line in range(span.first, span.last + 1)}
+        for number in range(header.last + 1, len(self.lines) + 1):
+            line = self.lines[number - 1]
+            if line.startswith(SECTION_HEADER):
+                return True
+            if number not in covered and line.strip():
+                return False
+        return True
 
     def lines_of(self, span: LineSpan) -> str:
         """

@@ -177,8 +177,8 @@ class DefinitionMoveComparison(FileJudgment):
             return self.comparison.changes(change, context)
         head = PythonSource(change.head_text, change.path.parent.parts)
         base = PythonSource(change.base_text or "", base_path.parent.parts)
-        head_rest = head.without(self.spans(head, arriving))
-        base_rest = base.without(self.spans(base, leaving))
+        head_rest = head.without(self.spans(head, arriving, base))
+        base_rest = base.without(self.spans(base, leaving, head))
         arrival_kinds = self.arrival_changes(head, arriving, context)
         if arrival_kinds is None or not self.imports_only_moved_names(
             base_rest, head_rest, arriving, leaving, context.renames
@@ -196,19 +196,30 @@ class DefinitionMoveComparison(FileJudgment):
 
     @staticmethod
     def spans(
-        source: PythonSource, definitions: tuple[MovedDefinition, ...]
+        source: PythonSource,
+        definitions: tuple[MovedDefinition, ...],
+        other_version: PythonSource,
     ) -> tuple[LineSpan, ...]:
         """
-        :param source: A module.
-        :param definitions: Definitions it holds.
-        :return: Their lines, with the section header opening right above each.
+        :param source: One version of a module.
+        :param definitions: Definitions it holds that the other version does not.
+        :param other_version: The module's other version.
+        :return: The definitions' lines, with the section header right above each
+            when they alone fill its section or the other version lacks the header.
         """
-        spans: list[LineSpan] = []
-        for definition in definitions:
-            span = source.definition_span(definition.name)
-            header = source.section_header_before(span)
-            spans.extend([span] if header is None else [span, header])
-        return tuple(spans)
+        spans = tuple(
+            source.definition_span(definition.name) for definition in definitions
+        )
+        headers = {
+            header
+            for span in spans
+            if (header := source.header_above(span)) is not None
+            and (
+                source.section_holds_only(header, spans)
+                or source.lines[header.first - 1] not in other_version.lines
+            )
+        }
+        return spans + tuple(sorted(headers, key=lambda header: header.first))
 
     def arrival_changes(
         self,

@@ -208,6 +208,11 @@ class SubclassSubstitutionSample(SampleTrees):
         return "subclass-substitution"
 
 
+SECTIONED_BOARD = DatasetLocation.REVIEW_TRIAGE / "definition-move-sectioned"
+"""
+Versions of the definition-move sample's board module that hold section headers.
+"""
+
 TEMPLATE_REINDENTED = (
     DatasetLocation.REVIEW_TRIAGE / "template-renamed" / "reindented.py.jinja"
 )

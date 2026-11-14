@@ -1,7 +1,7 @@
 Plan
-- Design: rule fixes (checker + reversible fix) feeding review triage; relate to krracker's analyzer/spec/planner/action design
+- #222 (draft, stacked on #220): reversible rule fixes, code-rules fix, UTF-8 fix
 Done
-- Measured #220: 107 of 129 .py files are exactly base + UTF-8 fix
-- Read krracker / krracker_simple on the CRAM fork
+- code_modification core, FixableChecker/CodeFix/SourceFixer, UTF-8 fix, examples tested, AGENTS.md
+- Suite 2732 passed; ruff, format, code-rules check clean; reproduces 107/129 of #220
 Next
-- User decisions (dependency, libcst, viewed policy, rmtree), then /add-plan-item
+- Await review; then directory-and-bash-fixes (rmtree keeps ignore_errors via a declared option)

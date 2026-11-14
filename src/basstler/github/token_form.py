@@ -13,6 +13,11 @@ from basstler.locations import GitHubTemplate
 from basstler.render_common import TemplatePage
 from basstler.github.repository import GitHubAddress, Repository
 
+FINE_GRAINED_TOKEN_PAGE = f"{GitHubAddress.WEB}/settings/personal-access-tokens/new"
+"""
+Where a fine-grained token is created.
+"""
+
 # %% the form's parameters
 
 
@@ -127,7 +132,7 @@ class FineGrainedTokenForm:
                 **self.permissions,
             }
         )
-        return f"{GitHubAddress.WEB}/settings/personal-access-tokens/new?{query}"
+        return f"{FINE_GRAINED_TOKEN_PAGE}?{query}"
 
 
 # %% one token for several jobs

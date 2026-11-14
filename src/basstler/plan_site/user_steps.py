@@ -21,7 +21,7 @@ from basstler.github.pull_request import NewPullRequest
 from basstler.github.repository import GitHubAddress, Repository
 from basstler.github.rest_models import RestPullRequestSummary
 from basstler.github.run_listing import ListedRun
-from basstler.github.token_form import SharedToken, TokenUse
+from basstler.github.token_form import FINE_GRAINED_TOKEN_PAGE, SharedToken, TokenUse
 from basstler.plan_site import token_storage
 from basstler.plan_site.build_start import CodeFence
 from basstler.plan_site.site_repository import SiteRepository
@@ -379,7 +379,7 @@ class PrivateRepositoryAccess:
             )
             if len(owners) > 1
             else (
-                f"Open {SiteRepository.token_page}.",
+                f"Open {FINE_GRAINED_TOKEN_PAGE}.",
                 f"Name the token and set Resource owner to {owners[0]}.",
                 "Under Repository access, choose Only select repositories and "
                 f"select {names}.",

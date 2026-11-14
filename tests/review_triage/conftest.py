@@ -128,7 +128,7 @@ def committed_pull_request(
     payload["base"]["sha"] = commits.base_commit
     payload["head"]["sha"] = commits.head_commit
     return PullRequestChanges(
-        RestPullRequest.from_json(payload), commits, commits.changes()
+        RestPullRequest.from_json(payload), commits, commits.file_versions()
     )
 
 

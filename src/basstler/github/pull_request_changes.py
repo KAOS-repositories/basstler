@@ -11,7 +11,7 @@ from typing import Annotated
 from pydantic import Field
 
 from basstler.git.commands import GitCommandRunner
-from basstler.git.commit_range import CommitRange, FileChange
+from basstler.git.commit_range import CommitRange, FileVersions
 from basstler.github.client import GitHubReader
 from basstler.github.repository import Repository
 from basstler.github.web_page import AbsentAsEmpty
@@ -93,7 +93,7 @@ class PullRequestChanges:
     The commits its change runs between, from its merge base to its head commit.
     """
 
-    files: tuple[FileChange, ...]
+    files: tuple[FileVersions, ...]
     """
     Every file it changes.
     """
@@ -134,8 +134,8 @@ class PullRequestChangesReader:
                 pull_request.head_reference,
                 pull_request.base.branch,
             )
-        merge_base = self.git.run(
-            "merge-base", pull_request.base.commit, pull_request.head.commit
+        merge_base = self.git.merge_base(
+            pull_request.base.commit, pull_request.head.commit
         )
         commits = CommitRange(self.git, merge_base, pull_request.head.commit)
-        return PullRequestChanges(pull_request, commits, commits.changes())
+        return PullRequestChanges(pull_request, commits, commits.file_versions())

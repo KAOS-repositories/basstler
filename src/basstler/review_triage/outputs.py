@@ -14,7 +14,7 @@ from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.github.client import GitHubWriter
-from basstler.github.graphql import GraphQLMutation, GraphQLMutationAnswer
+from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ReviewTriageLocation
 from basstler.render_common import TemplatePage
@@ -91,7 +91,7 @@ class ViewedFile(ValidatedJSONModel):
 class ViewedMarking(TriageOutput):
     """
     Marks every mechanical file viewed for the account whose credential the writer
-    sends, raising :class:`GraphQLMutationRefused` when GitHub refuses one.
+    sends, raising :class:`GraphQLErrorsReturned` when GitHub refuses one.
     """
 
     github: GitHubWriter
@@ -105,6 +105,6 @@ class ViewedMarking(TriageOutput):
             variables = ViewedFile(
                 outcome.pull_request.node_identifier, file.change.path
             )
-            GraphQLMutationAnswer.from_json(
-                self.github.send(GraphQLMutation(document, variables.to_json()))
-            ).raise_if_refused()
+            GraphQLResponse.from_json(
+                self.github.send(GraphQLRequest(document, variables.to_json()))
+            ).result()

@@ -179,9 +179,9 @@ class GitHubUnreachableError(GitHubCallFailed, ConnectionError):
 
 
 @dataclass
-class GraphQLMutationRefused(DataclassException):
+class GraphQLErrorsReturned(DataclassException):
     """
-    Raised when GitHub answers a GraphQL mutation with errors.
+    Raised when GitHub answers a GraphQL request with errors.
     """
 
     messages: tuple[str, ...]
@@ -190,10 +190,10 @@ class GraphQLMutationRefused(DataclassException):
     """
 
     def error_message(self) -> str:
-        return "GitHub refused the mutation: " + "; ".join(self.messages)
+        return "GitHub answered with errors: " + "; ".join(self.messages)
 
     def suggest_correction(self) -> str:
         return (
-            "Run it where GitHub's GraphQL API is reachable, with a credential of the "
-            "account the mutation acts for: gh auth status"
+            "Check that what the request names exists and that the account gh is "
+            "logged in as may read or change it: gh auth status"
         )

@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 from basstler.class_property import classproperty
-from basstler.git.commit_range import FileChange
+from basstler.git.commit_range import FileVersions
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.commit_tree import MODULE_SUFFIX, CommitModules
 from basstler.review_triage.python_source import PythonSource
@@ -47,7 +47,7 @@ class ClassVersions:
 
     @classmethod
     def from_module(
-        cls, change: FileChange, module: str, name: str
+        cls, change: FileVersions, module: str, name: str
     ) -> ClassVersions | None:
         """
         :param change: A module both commits hold.
@@ -171,7 +171,7 @@ class SubclassSubstitutionDetection(RenameSource):
 
     @staticmethod
     def candidates_in(
-        change: FileChange, changes: PullRequestChanges
+        change: FileVersions, changes: PullRequestChanges
     ) -> Iterator[SubclassCandidate]:
         """
         :param change: A module the head commit holds.

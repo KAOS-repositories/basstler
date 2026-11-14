@@ -18,7 +18,7 @@ from basstler.review_triage.commit_tree import (
 from basstler.review_triage.comparison import (
     ChangeKind,
     ChangeKinds,
-    FileChange,
+    FileVersions,
     FileJudgment,
     JudgmentContext,
     MechanicalChange,
@@ -113,7 +113,7 @@ class DefinitionMoveDetection(RenameSource):
         return MovedDefinitions(tuple(moved))
 
     @staticmethod
-    def added_names(change: FileChange) -> frozenset[str]:
+    def added_names(change: FileVersions) -> frozenset[str]:
         """
         :param change: A changed module.
         :return: The names its head version defines and its base version did not.
@@ -127,7 +127,7 @@ class DefinitionMoveDetection(RenameSource):
 
     @staticmethod
     def removed_names(
-        change: FileChange, base: CommitModules
+        change: FileVersions, base: CommitModules
     ) -> Iterator[tuple[str, str]]:
         """
         :param change: A changed module.
@@ -161,7 +161,7 @@ class DefinitionMoveComparison(FileJudgment):
     How what is left of a module, and every other Python file, is compared.
     """
 
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         return self.comparison.applies_to(change) or (
             change.base_text is None
             and change.head_text is not None
@@ -170,7 +170,7 @@ class DefinitionMoveComparison(FileJudgment):
         )
 
     def changes(
-        self, change: FileChange, context: JudgmentContext
+        self, change: FileVersions, context: JudgmentContext
     ) -> ChangeKinds | None:
         base_path = change.previous_path or change.path
         arriving = context.moved_definitions.arriving_at(change.path)
@@ -290,7 +290,7 @@ class DefinitionMoveComparison(FileJudgment):
         self,
         base_rest: PythonSource,
         head_rest: PythonSource,
-        change: FileChange,
+        change: FileVersions,
         context: JudgmentContext,
     ) -> ChangeKinds | None:
         """

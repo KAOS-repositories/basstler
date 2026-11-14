@@ -22,6 +22,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.environment import GitHubActionsVariable
 from basstler.github.repository import Repository
 from basstler.stack.configuration import (
@@ -129,7 +130,11 @@ def main(argv: list[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
     try:
         report = _build_report(arguments)
-    except (UpstreamReadError, MissingUpstreamRepositoryError) as failure:
+    except (
+        UpstreamReadError,
+        GraphQLErrorsReturned,
+        MissingUpstreamRepositoryError,
+    ) as failure:
         logger.error(failure)
         return 1
     logger.info(report)

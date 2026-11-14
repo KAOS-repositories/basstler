@@ -53,27 +53,6 @@ class GitHubCommandFailed(UpstreamReadError):
 
 
 @dataclass
-class GraphQLErrorsReturned(UpstreamReadError):
-    """
-    Raised when GitHub answers with an ``errors`` array instead of data.
-    """
-
-    messages: list[str]
-    """
-    Every message GitHub reported.
-    """
-
-    def error_message(self) -> str:
-        return "GitHub answered with errors: " + "; ".join(self.messages)
-
-    def suggest_correction(self) -> str:
-        return (
-            "Check that the upstream repository and pull request exist and that the "
-            "logged-in account can read them"
-        )
-
-
-@dataclass
 class UpstreamPullRequestNotFound(UpstreamReadError):
     """
     Raised when a branch has no pull request open on the upstream.

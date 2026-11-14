@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.repository import Repository
 from basstler.json_model import JSONModel
 from basstler.upstream_reviews.action.exchange import (
@@ -161,7 +162,7 @@ class ActionResult(ActionAnswer):
                 recording,
                 include_resolved=False,
             )
-        except UpstreamReadError as failure:
+        except (UpstreamReadError, GraphQLErrorsReturned) as failure:
             return cls(request.identifier, error=str(failure))
         return cls(request.identifier, None, recording.responses, recording.job_logs)
 

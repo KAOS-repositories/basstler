@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from basstler.class_property import classproperty
-from basstler.git.commit_range import FileChange
+from basstler.git.commit_range import FileVersions
 from basstler.review_triage.definitions import DefinitionIndex, SourceDefinitions
 
 from ..constants.paths import DatasetLocation
@@ -49,15 +49,17 @@ class FileSample(StrEnum):
         """
         return DatasetLocation.REVIEW_TRIAGE / self
 
-    def change(self) -> FileChange:
+    def change(self) -> FileVersions:
         """
         :return: The change from the base to the head version, at a path with their
             suffix.
         """
         base = next(self.directory.glob("base.*"))
         head = next(self.directory.glob("head.*"))
-        return FileChange(
-            PurePosixPath(f"sample{base.suffix}"), base.read_text(), head.read_text()
+        return FileVersions(
+            PurePosixPath(f"sample{base.suffix}"),
+            base_text=base.read_text(),
+            head_text=head.read_text(),
         )
 
     def base_definitions(self) -> DefinitionIndex:

@@ -11,7 +11,7 @@ from enum import StrEnum
 from functools import cached_property
 
 from basstler.class_property import classproperty
-from basstler.git.commit_range import FileChange
+from basstler.git.commit_range import FileVersions
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
@@ -100,7 +100,7 @@ class FileVerdict(ABC):
     The verdict on one changed file.
     """
 
-    change: FileChange
+    change: FileVersions
     """
     The change judged.
     """
@@ -208,7 +208,7 @@ class FileJudgment(ABC):
     """
 
     @abstractmethod
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         """
         :param change: A file the pull request changes.
         :return: Whether this judgment decides it.
@@ -216,7 +216,7 @@ class FileJudgment(ABC):
 
     @abstractmethod
     def changes(
-        self, change: FileChange, context: JudgmentContext
+        self, change: FileVersions, context: JudgmentContext
     ) -> ChangeKinds | None:
         """
         :param change: A file this judgment applies to.
@@ -251,7 +251,7 @@ class ContentComparison(FileJudgment, ABC):
             mechanical.
         """
 
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         return (
             change.base_text is not None
             and change.head_text is not None
@@ -259,7 +259,7 @@ class ContentComparison(FileJudgment, ABC):
         )
 
     def changes(
-        self, change: FileChange, context: JudgmentContext
+        self, change: FileVersions, context: JudgmentContext
     ) -> ChangeKinds | None:
         return self.text_changes(change.base_text, change.head_text, context)
 
@@ -314,7 +314,7 @@ class PythonComparison(ContentComparison):
         )
 
     def changes(
-        self, change: FileChange, context: JudgmentContext
+        self, change: FileVersions, context: JudgmentContext
     ) -> ChangeKinds | None:
         """
         :meth:`ContentComparison.changes`, resolving each version's relative imports
@@ -381,7 +381,7 @@ class EmptyPackageAddition(FileJudgment):
     Judges an added package initializer holding nothing but whitespace as mechanical.
     """
 
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         return (
             change.base_text is None
             and change.head_text is not None
@@ -389,7 +389,7 @@ class EmptyPackageAddition(FileJudgment):
         )
 
     def changes(
-        self, change: FileChange, context: JudgmentContext
+        self, change: FileVersions, context: JudgmentContext
     ) -> ChangeKinds | None:
         if change.head_text.strip():
             return None
@@ -402,11 +402,11 @@ class RenamedTextComparison(FileJudgment):
     its base version into its head version, since its whitespace may carry meaning.
     """
 
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         return change.base_text is not None and change.head_text is not None
 
     def changes(
-        self, change: FileChange, context: JudgmentContext
+        self, change: FileVersions, context: JudgmentContext
     ) -> ChangeKinds | None:
         if context.renames.renamed_prose(change.base_text) == change.head_text:
             return frozenset({MechanicalChange.RENAME})
@@ -438,7 +438,7 @@ class FileTriager:
     The judgments, tried in order.
     """
 
-    def triage(self, change: FileChange) -> FileVerdict:
+    def triage(self, change: FileVersions) -> FileVerdict:
         """
         :param change: A file the pull request changes.
         :return: Whether a reviewer has to read it.
@@ -450,7 +450,7 @@ class FileTriager:
             return FileNeedingReview(change)
         return MechanicalFile(change, kinds)
 
-    def judged_changes(self, change: FileChange) -> frozenset[ChangeKind] | None:
+    def judged_changes(self, change: FileVersions) -> frozenset[ChangeKind] | None:
         """
         :param change: A file the pull request changes.
         :return: What its content change consists of, ``None`` when it is not

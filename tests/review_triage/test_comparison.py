@@ -9,7 +9,7 @@ from pathlib import PurePosixPath
 
 import pytest
 
-from basstler.git.commit_range import FileChange
+from basstler.git.commit_range import FileVersions
 from basstler.review_triage.comparison import (
     ChangeKind,
     ChangeKinds,
@@ -112,14 +112,14 @@ def test_an_unchanged_moved_file_is_mechanical():
     [
         replace(FileSample.BEHAVIOUR_CHANGED.change(), base_text=None),
         replace(FileSample.BEHAVIOUR_CHANGED.change(), head_text=None),
-        FileChange(PurePosixPath("logo.png"), None, None, is_binary=True),
+        FileVersions(PurePosixPath("logo.png"), is_binary=True),
         replace(
             FileSample.DOCUMENTATION_RENAMED.change(), path=PurePosixPath("sample.yaml")
         ),
     ],
     ids=["added", "deleted", "binary", "unjudged type"],
 )
-def test_a_file_no_judgment_proves_mechanical_needs_review(change: FileChange):
+def test_a_file_no_judgment_proves_mechanical_needs_review(change: FileVersions):
     """
     An added, deleted or binary file, or a changed file of a type nothing judges, needs
     review.
@@ -161,7 +161,7 @@ def test_a_relative_import_reaching_another_module_needs_review():
 
 @pytest.mark.parametrize("text", ["", "\n"])
 def test_an_added_empty_package_initializer_is_mechanical(text: str):
-    change = FileChange(PurePosixPath("package/__init__.py"), None, text)
+    change = FileVersions(PurePosixPath("package/__init__.py"), head_text=text)
     assert FileTriager(JudgmentContext()).triage(change) == MechanicalFile(
         change, frozenset({MechanicalChange.EMPTY_PACKAGE})
     )
@@ -170,12 +170,12 @@ def test_an_added_empty_package_initializer_is_mechanical(text: str):
 @pytest.mark.parametrize(
     "change",
     [
-        FileChange(PurePosixPath("package/__init__.py"), None, "VALUE = 1\n"),
-        FileChange(PurePosixPath("package/empty.py"), None, ""),
+        FileVersions(PurePosixPath("package/__init__.py"), head_text="VALUE = 1\n"),
+        FileVersions(PurePosixPath("package/empty.py"), head_text=""),
     ],
     ids=["with code", "another module"],
 )
-def test_another_added_file_needs_review(change: FileChange):
+def test_another_added_file_needs_review(change: FileVersions):
     assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
 
 
@@ -228,11 +228,11 @@ class GeneratedFileJudgment(FileJudgment):
     Judges every file under a generated directory mechanical.
     """
 
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         return change.path.parts[0] == "generated"
 
     def changes(
-        self, change: FileChange, context: JudgmentContext
+        self, change: FileVersions, context: JudgmentContext
     ) -> ChangeKinds | None:
         return frozenset({GeneratedChange.GENERATED})
 

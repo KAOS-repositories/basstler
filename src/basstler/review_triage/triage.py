@@ -4,7 +4,8 @@ A whole pull request triaged: its renames and the verdict on each file it change
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 from basstler.github.pull_request_changes import PullRequestChanges, RestPullRequest
 from basstler.review_triage.base_branch_merges import BaseBranchMergeDetection
@@ -109,15 +110,12 @@ class PullRequestTriager:
         :return: The verdict on each of its files, a file only merges of the base branch
             changed mechanical without being judged.
         """
-        merged = BaseBranchMergeDetection().paths_changed_only_by_merges(changes)
-        own_changes = replace(
-            changes,
-            files=tuple(file for file in changes.files if file.path not in merged),
-        )
+        separated = BaseBranchMergeDetection().separate(changes)
+        own_changes = separated.own
         renames = RenameMap.from_decisions(
             source.decisions(own_changes) for source in self.rename_sources
         )
-        base_definitions = DefinitionIndex(CommitModules(changes.commits.base_tree))
+        base_definitions = DefinitionIndex(CommitModules(own_changes.commits.base_tree))
         triager = FileTriager(
             JudgmentContext(
                 renames,
@@ -129,13 +127,14 @@ class PullRequestTriager:
             ),
             self.judgments,
         )
+        verdicts: dict[PurePosixPath, FileVerdict] = {
+            change.path: MechanicalFile(
+                change, frozenset({MechanicalChange.BASE_BRANCH_MERGE})
+            )
+            for change in separated.merged
+        } | {change.path: triager.triage(change) for change in own_changes.files}
         return TriageOutcome(
             changes.pull_request,
             renames,
-            tuple(
-                MechanicalFile(change, frozenset({MechanicalChange.BASE_BRANCH_MERGE}))
-                if change.path in merged
-                else triager.triage(change)
-                for change in changes.files
-            ),
+            tuple(verdicts[change.path] for change in changes.files),
         )

@@ -1,15 +1,41 @@
 """
-The files of a pull request that only merges of its base branch changed since the commit
-its changes are read from.
+A pull request's changes since a commit, told apart into those merges of its base branch
+made and those it made itself.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import PurePosixPath
+from dataclasses import dataclass, replace
 
-from basstler.git.commit_range import CommitRange
+from basstler.git.commit_range import CommitRange, FileVersions
 from basstler.github.pull_request_changes import PullRequestChanges
+
+REVIEWED_ON_BASE_MESSAGE = "Merge the base branch into the reviewed commit"
+"""
+The message of the commit merging the commit the changes are read from with the base
+branch.
+"""
+
+# %% the separated changes
+
+
+@dataclass(frozen=True)
+class SeparatedChanges:
+    """
+    A pull request's changes, told apart into those merges of its base branch made and
+    those it made itself.
+    """
+
+    merged: tuple[FileVersions, ...]
+    """
+    The files only merges of the base branch changed.
+    """
+
+    own: PullRequestChanges
+    """
+    The pull request's own changes to every other file.
+    """
+
 
 # %% detection
 
@@ -17,33 +43,51 @@ from basstler.github.pull_request_changes import PullRequestChanges
 @dataclass(frozen=True)
 class BaseBranchMergeDetection:
     """
-    Tells the files whose own change a pull request kept from those it changed again.
+    Tells the files merges of a pull request's base branch changed from those it changed
+    itself since the commit its changes are read from.
     """
 
-    def paths_changed_only_by_merges(
-        self, changes: PullRequestChanges
-    ) -> frozenset[PurePosixPath]:
+    def separate(self, changes: PullRequestChanges) -> SeparatedChanges:
         """
         :param changes: A pull request and the files it changes since a commit.
-        :return: The files, neither moved nor binary, whose lines the pull request
-            itself removes and adds are the same at that commit as at its head; none
-            when its changes are read from its merge base.
+        :return: Its files, its own changes read from that commit merged with its
+            current merge base; every change its own when read from its merge base.
         """
         git = changes.commits.git
-        base_branch = changes.pull_request.base.commit
         start = changes.commits.base_commit
         head = changes.commits.head_commit
-        own_change = CommitRange(git, git.merge_base(base_branch, head), head)
-        if own_change.base_commit == start:
-            return frozenset()
+        base_branch = changes.pull_request.base.commit
+        merge_base = git.merge_base(base_branch, head)
+        if start == merge_base:
+            return SeparatedChanges((), changes)
+        reviewed_on_base = git.merge_commit(start, merge_base, REVIEWED_ON_BASE_MESSAGE)
+        own_commits = CommitRange(git, reviewed_on_base.commit, head)
+        own_versions = {
+            file.path: file
+            for file in own_commits.file_versions(
+                frozenset(file.path for file in changes.files)
+            )
+        }
         own_change_at_start = CommitRange(
             git, git.merge_base(base_branch, start), start
         )
-        return frozenset(
-            file.path
-            for file in changes.files
-            if file.previous_path is None
-            and not file.is_binary
-            and own_change.edited_lines(file.path)
-            == own_change_at_start.edited_lines(file.path)
+        own_change = CommitRange(git, merge_base, head)
+        merged: list[FileVersions] = []
+        own: list[FileVersions] = []
+        for file in changes.files:
+            if file.path not in reviewed_on_base.conflicted_paths:
+                (own if file.path in own_versions else merged).append(
+                    own_versions.get(file.path, file)
+                )
+            elif (
+                file.previous_path is None
+                and not file.is_binary
+                and own_change.edited_lines(file.path)
+                == own_change_at_start.edited_lines(file.path)
+            ):
+                merged.append(file)
+            else:
+                own.append(file)
+        return SeparatedChanges(
+            tuple(merged), replace(changes, commits=own_commits, files=tuple(own))
         )

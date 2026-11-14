@@ -835,6 +835,37 @@ class CodeModificationSnippet(PathEnumeration):
     """
 
 
+class RelocationTree(PathEnumeration):
+    """
+    Source trees the module relocation tests move modules in.
+    """
+
+    DIRECTORY = CodeModificationSnippet.DIRECTORY / "relocation"
+    """
+    The directory holding them.
+    """
+
+    BEFORE = DIRECTORY / "before"
+    """
+    A package whose tests import a helper of the package and a sibling of their own.
+    """
+
+    HELPER_MOVED = DIRECTORY / "after-helper-moved"
+    """
+    :attr:`BEFORE` with the helper moved to ``support/shared``.
+    """
+
+    TESTS_MOVED = DIRECTORY / "after-tests-moved"
+    """
+    :attr:`BEFORE` with the tests moved to ``elsewhere/tests``.
+    """
+
+    DOTTED_IMPORT = DIRECTORY / "before-dotted-import"
+    """
+    A module importing a helper by its dotted name, without an alias.
+    """
+
+
 class RuleFixExample(PathEnumeration):
     """
     The examples every fix is tested on.

@@ -13,8 +13,8 @@ from cyclopts import App
 from basstler.exit_codes import ExitCode
 from basstler.github.client import GitHubRestClient
 from basstler.locations import PackageLocation
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.repository import Repository
+from basstler.git.commands import GitCommandRunner
+from basstler.github.repository import Repository
 from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
 from basstler.review_triage.pull_request import PullRequestReader
 from basstler.review_triage.triage import PullRequestTriager

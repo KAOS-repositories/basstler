@@ -16,7 +16,7 @@ from basstler.github.client import (
     GitHubWrite,
     GitHubWriter,
 )
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 from basstler.review_triage.pull_request import PullRequestChanges, PullRequestReader
 from basstler.review_triage.renames import Rename, RenameMap
 

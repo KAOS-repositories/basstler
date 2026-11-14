@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 
 from basstler.class_property import classproperty
-from basstler.maintenance.git_commands import GitCommandRunner
+from basstler.git.commands import GitCommandRunner
 from basstler.review_triage.comparison import PythonComparison
 from basstler.review_triage.pull_request import PullRequestChanges
 from basstler.review_triage.python_source import PythonSource

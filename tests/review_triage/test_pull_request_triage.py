@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from basstler.locations import ReviewTriageLocation
-from basstler.maintenance.git_commands import GitCommandRunner
+from basstler.git.commands import GitCommandRunner
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.exceptions import GraphQLMutationRefused

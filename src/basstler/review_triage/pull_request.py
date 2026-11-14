@@ -14,8 +14,8 @@ from pydantic import Field
 from basstler.github.client import GitHubReader
 from basstler.github.web_page import AbsentAsEmpty
 from basstler.json_model import ValidatedJSONModel
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.repository import Repository
+from basstler.git.commands import GitCommandRunner
+from basstler.github.repository import Repository
 from basstler.review_triage.comparison import FileChange
 
 # %% the pull request

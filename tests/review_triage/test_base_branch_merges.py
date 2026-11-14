@@ -11,6 +11,10 @@ from pathlib import PurePosixPath
 import pytest
 
 from basstler.github.pull_request_changes import (
+    CommitStart,
+    ComparisonStart,
+    LastCommitsStart,
+    MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
 )
@@ -51,10 +55,9 @@ class ReviewedHistory:
     The pull request's head commit now.
     """
 
-    def read(self, since: str | None) -> PullRequestChanges:
+    def read(self, start: ComparisonStart) -> PullRequestChanges:
         """
-        :param since: The commit the changes are read from, the merge base when
-            ``None``.
+        :param start: Where the changes are read from.
         :return: The pull request's changes.
         """
         payload = PullRequestSample.PAYLOAD.payload()
@@ -63,7 +66,7 @@ class ReviewedHistory:
         payload["body"] = DescriptionSample.WITHOUT_DECLARATION.read()
         return PullRequestChangesReader(
             self.repository.git, OnePullRequestReader(payload)
-        ).read(SAMPLE_REPOSITORY, payload["number"], since)
+        ).read(SAMPLE_REPOSITORY, payload["number"], start)
 
 
 def commit_tree(
@@ -103,7 +106,16 @@ def reviewed_history(scratch_repository: ScratchRepository) -> ReviewedHistory:
 
 
 def test_the_changes_start_at_the_commit_given(reviewed_history: ReviewedHistory):
-    changes = reviewed_history.read(reviewed_history.reviewed_commit)
+    changes = reviewed_history.read(CommitStart(reviewed_history.reviewed_commit))
+    assert changes.commits.base_commit == reviewed_history.reviewed_commit
+
+
+def test_the_last_commits_count_a_merge_as_one(reviewed_history: ReviewedHistory):
+    """
+    The head commit and the merge before it are the last two commits, so the changes
+    start at the reviewed commit, not at a commit of the base branch.
+    """
+    changes = reviewed_history.read(LastCommitsStart(2))
     assert changes.commits.base_commit == reviewed_history.reviewed_commit
 
 
@@ -114,7 +126,7 @@ def test_only_files_the_pull_request_changes_are_read_since_a_commit(
     A file only the base branch changed is not part of the pull request, so GitHub could
     not mark it viewed.
     """
-    changes = reviewed_history.read(reviewed_history.reviewed_commit)
+    changes = reviewed_history.read(CommitStart(reviewed_history.reviewed_commit))
     assert [file.path for file in changes.files] == [
         PurePosixPath("greeting.py"),
         PurePosixPath("numbers.py"),
@@ -134,7 +146,7 @@ def triage_since_review(reviewed_history: ReviewedHistory) -> TriageOutcome:
     :return: The sample pull request triaged since its reviewed commit.
     """
     return PullRequestTriager().triage(
-        reviewed_history.read(reviewed_history.reviewed_commit)
+        reviewed_history.read(CommitStart(reviewed_history.reviewed_commit))
     )
 
 
@@ -210,7 +222,7 @@ def test_the_whole_pull_request_is_triaged_from_its_merge_base(
     """
     Without a reviewed commit, no file is attributed to a merge.
     """
-    triage = PullRequestTriager().triage(reviewed_history.read(None))
+    triage = PullRequestTriager().triage(reviewed_history.read(MergeBaseStart()))
     assert not any(
         MechanicalChange.BASE_BRANCH_MERGE in kinds
         for kinds in mechanical_kinds(triage).values()

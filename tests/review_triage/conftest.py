@@ -20,6 +20,7 @@ from basstler.github.client import (
 from basstler.git.commit_range import CommitRange
 from basstler.github.repository import Repository
 from basstler.github.pull_request_changes import (
+    MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
     RestPullRequest,
@@ -165,7 +166,7 @@ def read_sample(
     payload["body"] = description.read()
     return PullRequestChangesReader(
         scratch_repository.git, OnePullRequestReader(payload)
-    ).read(SAMPLE_REPOSITORY, payload["number"])
+    ).read(SAMPLE_REPOSITORY, payload["number"], MergeBaseStart())
 
 
 @pytest.fixture

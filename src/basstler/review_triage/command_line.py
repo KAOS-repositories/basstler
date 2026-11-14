@@ -8,13 +8,20 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 
-from cyclopts import App
+from cyclopts import App, Group, Parameter, validators
 
 from basstler.exit_codes import ExitCode
 from basstler.github.client import GitHubRestClient
 from basstler.git.commands import GitCommandRunner
-from basstler.github.pull_request_changes import PullRequestChangesReader
+from basstler.github.pull_request_changes import (
+    CommitStart,
+    ComparisonStart,
+    LastCommitsStart,
+    MergeBaseStart,
+    PullRequestChangesReader,
+)
 from basstler.github.repository import Repository
 from basstler.locations import PackageLocation
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
@@ -98,10 +105,9 @@ class TriagePublication:
     Renames given and rejected beyond the description's, outranking them.
     """
 
-    since: str | None = None
+    start: ComparisonStart = MergeBaseStart()
     """
-    The commit to triage the changes from, such as the head commit a reviewer last
-    read; the merge base when ``None``.
+    Where the changes are triaged from.
     """
 
     remote: str = "origin"
@@ -109,6 +115,32 @@ class TriagePublication:
     The remote whose repository the pull request is looked up in when
     :attr:`repository` is ``None``.
     """
+
+    @classmethod
+    def from_arguments(
+        cls,
+        pull_request: int,
+        repository: str | None,
+        declaration: TriageDeclaration,
+        since: str | None,
+        last: int | None,
+    ) -> TriagePublication:
+        """
+        :param pull_request: The pull request's number.
+        :param repository: Its repository as ``owner/name``, or ``None``.
+        :param declaration: Renames given and rejected on the command line.
+        :param since: The commit to triage from, or ``None``.
+        :param last: How many of the last commits to triage, or ``None``.
+        :return: The publication triaging from *since*, else from before the *last*
+            commits, else from the merge base.
+        """
+        if since is not None:
+            start: ComparisonStart = CommitStart(since)
+        elif last is not None:
+            start = LastCommitsStart(last)
+        else:
+            start = MergeBaseStart()
+        return cls(pull_request, repository, declaration, start)
 
     def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
         """
@@ -121,7 +153,7 @@ class TriagePublication:
             else Repository.from_remote_url(git.run("remote", "get-url", self.remote))
         )
         changes = PullRequestChangesReader(git, GitHubRestClient()).read(
-            repository, self.pull_request, self.since
+            repository, self.pull_request, self.start
         )
         default = PullRequestTriager()
         triager = replace(
@@ -137,6 +169,13 @@ class TriagePublication:
 
 
 # %% the commands
+
+COMPARISON_START_GROUP = Group(
+    "Where to triage from", validator=validators.MutuallyExclusive()
+)
+"""
+The options choosing the commit a triage starts from, at most one of them given.
+"""
 
 review_triage_app = App(
     name=ReviewTriageCommand.GROUP,
@@ -154,7 +193,11 @@ def report(
     repository: str | None = None,
     rename: tuple[str, ...] = (),
     rejected_rename: tuple[str, ...] = (),
-    since: str | None = None,
+    since: Annotated[str | None, Parameter(group=COMPARISON_START_GROUP)] = None,
+    last: Annotated[
+        int | None,
+        Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
+    ] = None,
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown.
@@ -166,12 +209,15 @@ def report(
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
     :param since: The commit to triage from, such as the head commit you last
         reviewed; a file only merges of the base branch changed since is mechanical.
+    :param last: How many of the pull request's last commits to triage, a merge
+        counting as one, as GitHub's view of its last commits shows them.
     """
-    TriagePublication(
+    TriagePublication.from_arguments(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
         since,
+        last,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -183,7 +229,11 @@ def mark_viewed(
     repository: str | None = None,
     rename: tuple[str, ...] = (),
     rejected_rename: tuple[str, ...] = (),
-    since: str | None = None,
+    since: Annotated[str | None, Parameter(group=COMPARISON_START_GROUP)] = None,
+    last: Annotated[
+        int | None,
+        Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
+    ] = None,
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the account whose GitHub
@@ -196,12 +246,15 @@ def mark_viewed(
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
     :param since: The commit to triage from, such as the head commit you last
         reviewed; a file only merges of the base branch changed since is mechanical.
+    :param last: How many of the pull request's last commits to triage, a merge
+        counting as one, as GitHub's view of its last commits shows them.
     """
-    TriagePublication(
+    TriagePublication.from_arguments(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
         since,
+        last,
     ).publish((ViewedMarking(GitHubRestClient()), MarkdownReport()))
     return ReviewTriageExitCode.SUCCESS
 

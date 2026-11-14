@@ -15,6 +15,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest
 from basstler.github.pull_request_changes import (
+    MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
     RestPullRequest,
@@ -228,5 +229,5 @@ def test_a_checkout_lacking_the_commits_fetches_them(
     )
     changes = PullRequestChangesReader(
         reviewer, OnePullRequestReader(sample_payload)
-    ).read(SAMPLE_REPOSITORY, pull_request.number)
+    ).read(SAMPLE_REPOSITORY, pull_request.number, MergeBaseStart())
     assert changes.files == sample_changes.files

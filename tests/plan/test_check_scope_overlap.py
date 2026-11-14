@@ -37,9 +37,9 @@ BASE_BRANCH = "main"
 The branch the scratch repository's candidates are compared against.
 """
 
-NEW_SKILL_PATH = str(
+NEW_SKILL_PATH = (
     ProjectLocation.CLAUDE_CODE_DIRECTORY / "skills" / "new-thing" / "SKILL.md"
-)
+).as_posix()
 """
 A path no branch but ``overlapping`` introduces - the fold test's positive case.
 """

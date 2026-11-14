@@ -535,7 +535,7 @@ def test_reports_a_tracked_branch_whose_manifest_is_missing(
     assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
         SummaryMessage.PLAN_MANIFEST_MISSING,
         PLAN_IDENTIFIER,
-        str(MANIFEST_PATH),
+        MANIFEST_PATH.as_posix(),
         ScratchBranch.PERSONAL_NOTES,
     )
 
@@ -1019,14 +1019,12 @@ def require_the_uninstallable(repository: ScratchRepository) -> None:
     )
 
 
-def environment_interpreter(repository: ScratchRepository) -> Path:
+def environment_interpreter(repository: ScratchRepository) -> str:
     """
     :param repository: The fixture-built scratch repository.
-    :return: Where the package environment keeps its interpreter.
+    :return: Where the package environment keeps its interpreter, as the shell names it.
     """
-    return Path(
-        repository.configuration_value(ConfigurationVariable.ENVIRONMENT_INTERPRETER)
-    )
+    return repository.configuration_value(ConfigurationVariable.ENVIRONMENT_INTERPRETER)
 
 
 def pip_installer_call(repository: ScratchRepository) -> str:
@@ -1963,7 +1961,7 @@ def test_reports_uv_it_could_not_install_and_finishes_the_run(
             "",
         ).split(" - ")[0]
     )
-    assert not environment_interpreter(session_start_repository).exists()
+    assert not Path(environment_interpreter(session_start_repository)).exists()
     assert (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
     ).exists()
@@ -2030,7 +2028,7 @@ def test_reports_an_environment_it_could_not_create_and_finishes_the_run(
             "",
         ).split(" - ")[0]
     )
-    assert not environment_interpreter(session_start_repository).exists()
+    assert not Path(environment_interpreter(session_start_repository)).exists()
     assert (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
     ).exists()

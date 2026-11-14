@@ -219,7 +219,7 @@ def test_an_upstream_the_step_saved_passes_the_check(
     result = upstream_row(upstream_repository, REQUIRE_UPSTREAM)
 
     assert result.status == CheckStatus.OK
-    assert str(ProjectLocation.PERSONAL_STACK_CONFIGURATION) in result.detail
+    assert (ProjectLocation.PERSONAL_STACK_CONFIGURATION).as_posix() in result.detail
 
 
 def test_an_upstream_the_project_commits_passes_the_check(
@@ -233,7 +233,7 @@ def test_an_upstream_the_project_commits_passes_the_check(
     result = upstream_row(upstream_repository, REQUIRE_UPSTREAM)
 
     assert result.status == CheckStatus.OK
-    assert str(ProjectLocation.PROJECT_STACK_CONFIGURATION) in result.detail
+    assert (ProjectLocation.PROJECT_STACK_CONFIGURATION).as_posix() in result.detail
 
 
 # %% the Action

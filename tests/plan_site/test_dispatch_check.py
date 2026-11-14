@@ -497,7 +497,9 @@ def test_the_rows_are_the_verdict_then_one_per_other_repository():
 def notes_location() -> PersonalNotesLocation:
     """:return: Notes kept on the fork checkout's ``origin``."""
     return PersonalNotesLocation(
-        RemoteName.ORIGIN, NOTES_BRANCH, str(ProjectLocation.PERSONAL_NOTES_DOCUMENT)
+        RemoteName.ORIGIN,
+        NOTES_BRANCH,
+        (ProjectLocation.PERSONAL_NOTES_DOCUMENT).as_posix(),
     )
 
 

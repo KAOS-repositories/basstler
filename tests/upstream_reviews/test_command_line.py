@@ -647,7 +647,7 @@ def test_a_project_naming_no_upstream_is_a_stated_reason_not_a_crash(
     status = main(["--pull-request", "1"])
 
     assert status == 1
-    assert str(ProjectLocation.PROJECT_STACK_CONFIGURATION) in caplog.text
+    assert (ProjectLocation.PROJECT_STACK_CONFIGURATION).as_posix() in caplog.text
 
 
 # %% report rendering

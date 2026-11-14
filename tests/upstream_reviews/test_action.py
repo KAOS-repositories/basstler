@@ -391,7 +391,7 @@ def fork(tmp_path, monkeypatch) -> Fork:
     remote.parent.mkdir()
     git(tmp_path, "init", "--quiet", "--bare", "--initial-branch=main", str(remote))
     clone = tmp_path / "clone"
-    git(tmp_path, "clone", "--quiet", f"file://{remote}", str(clone))
+    git(tmp_path, "clone", "--quiet", remote.as_uri(), str(clone))
     (clone / "project.txt").write_text("project\n", encoding="utf-8")
     git(clone, "add", "project.txt")
     git(clone, "commit", "--quiet", "-m", "Project")

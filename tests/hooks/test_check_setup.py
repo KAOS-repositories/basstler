@@ -201,7 +201,7 @@ def test_does_not_check_for_the_notes_file_when_its_branch_is_missing(
 def test_reports_a_notes_branch_that_exists_but_holds_no_notes_file(
     check_setup_repository: ScratchRepository,
 ):
-    other_notes = str(ProjectLocation.PERSONAL_NOTES / "some-other-notes.md")
+    other_notes = (ProjectLocation.PERSONAL_NOTES / "some-other-notes.md").as_posix()
     check_setup_repository.run_git("config", "claude.personalNotesPath", other_notes)
 
     report = run_check_setup(check_setup_repository)
@@ -658,14 +658,14 @@ def test_reports_which_source_each_resolved_setting_came_from(
         f"{ScratchBranch.PERSONAL_NOTES} (from built-in default)"
     )
     assert report.results[SetupCheck.NOTES_PATH].detail == (
-        f"{ProjectLocation.PERSONAL_NOTES_DOCUMENT} (from built-in default)"
+        f"{ProjectLocation.PERSONAL_NOTES_DOCUMENT.as_posix()} (from built-in default)"
     )
 
 
 def test_reports_a_setting_resolved_from_the_environment(
     check_setup_repository: ScratchRepository,
 ):
-    notes_path = str(ProjectLocation.PERSONAL_NOTES / "from-the-environment.md")
+    notes_path = (ProjectLocation.PERSONAL_NOTES / "from-the-environment.md").as_posix()
     report = run_check_setup(
         check_setup_repository, CLAUDE_PERSONAL_NOTES_PATH=notes_path
     )

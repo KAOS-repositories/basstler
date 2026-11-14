@@ -160,6 +160,18 @@ class FileMode(IntEnum):
     """
 
 
+class InterpreterName(StrEnum):
+    """
+    The names the hooks run a Python interpreter by.
+    """
+
+    PYTHON3 = "python3"
+    """
+    The name the shell configuration falls back to before the package environment
+    exists, which a Windows virtual environment does not provide.
+    """
+
+
 class BashStubVariable(StrEnum):
     """
     The variables ``dataset/stubs/bash.sh`` reads.

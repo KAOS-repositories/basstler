@@ -116,7 +116,7 @@ def test_writes_the_branch_settings_when_the_project_has_none(
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == PERSONAL_SETTINGS
     assert (
-        f"local settings:  synced to {PersonalNotesPath.LOCAL_SETTINGS}"
+        f"local settings:  synced to {PersonalNotesPath.LOCAL_SETTINGS.as_posix()}"
         in result.stdout
     )
 
@@ -132,7 +132,7 @@ def test_writes_no_settings_when_the_branch_has_none(
     ).exists()
     assert (
         f"local settings:  none on '{ScratchBranch.PERSONAL_NOTES}' "
-        f"({PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH})" in result.stdout
+        f"({PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH.as_posix()})" in result.stdout
     )
 
 
@@ -170,7 +170,7 @@ def test_keeps_settings_edited_since_the_last_sync(
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == LOCALLY_EDITED_SETTINGS
     assert (
-        f"local settings:  kept local edits to {PersonalNotesPath.LOCAL_SETTINGS} - run "
+        f"local settings:  kept local edits to {PersonalNotesPath.LOCAL_SETTINGS.as_posix()} - run "
         "save-personal-settings.sh to push them" in result.stdout
     )
 
@@ -227,7 +227,7 @@ def test_saving_without_local_settings_fails_with_a_clear_message(
 
     assert result.returncode == 1
     assert result.stderr.startswith(
-        f"No {PersonalNotesPath.LOCAL_SETTINGS} at the project root "
+        f"No {PersonalNotesPath.LOCAL_SETTINGS.as_posix()} at the project root "
         f"({settings_repository.project_root / PersonalNotesPath.LOCAL_SETTINGS})"
         " - nothing to save.\n"
     )

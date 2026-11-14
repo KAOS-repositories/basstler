@@ -84,7 +84,8 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
     ``python3``, which the script under test still needs to run at all.
 
     :param mirror_parent: Where to create mirror directories.
-    :param executable_names: The executables to hide.
+    :param executable_names: The executables to hide, by the name a search finds them
+        under, which on Windows leaves out the extension.
     :return: The adjusted ``PATH`` string.
     """
     hidden = frozenset(executable_names)
@@ -94,14 +95,14 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
     ):
         directory = Path(entry)
         if not directory.is_dir() or not any(
-            (directory / name).exists() for name in hidden
+            shutil.which(name, path=entry) for name in hidden
         ):
             entries.append(entry)
             continue
         mirror = mirror_parent / f"hidden-executables-{mirror_index}"
         mirror.mkdir()
         for item in directory.iterdir():
-            if item.name in hidden:
+            if item.name in hidden or item.stem in hidden:
                 continue
             try:
                 (mirror / item.name).symlink_to(item)

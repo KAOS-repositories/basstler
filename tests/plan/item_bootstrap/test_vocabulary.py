@@ -181,8 +181,8 @@ def test_the_plans_directory_matches_the_shell_configuration_that_owns_it(
         check=True,
     )
     plans_directory, manifest_path, hub_path = resolved.stdout.strip().split("\n")
-    assert plans_directory == str(ProjectLocation.PLANS)
-    assert hub_path == str(ProjectLocation.PLAN_HUB)
+    assert plans_directory == (ProjectLocation.PLANS).as_posix()
+    assert hub_path == (ProjectLocation.PLAN_HUB).as_posix()
     assert manifest_path == PlanDocument.MANIFEST.path_within_notes_branch(
         PLAN_IDENTIFIER
     )
@@ -205,7 +205,7 @@ def test_the_branch_index_matches_the_shell_configuration_that_owns_it(
         encoding="utf-8",
         check=True,
     )
-    assert resolved.stdout == str(ProjectLocation.PLAN_BRANCH_INDEX)
+    assert resolved.stdout == (ProjectLocation.PLAN_BRANCH_INDEX).as_posix()
 
 
 SCALAR_STYLED_KEYS = tuple(

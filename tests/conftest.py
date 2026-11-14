@@ -12,6 +12,7 @@ job does not install - is never loaded for it.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -24,7 +25,11 @@ from playwright.sync_api import Browser, Page, sync_playwright
 # tests this checkout's plugin rather than whichever release that session synced.
 os.environ["BASSTLER_PLUGIN_ROOT"] = str(Path(__file__).resolve().parents[1] / "plugin")
 
-from .constants.environment import ConfigurationVariable, SearchPathVariable
+from .constants.environment import (
+    ConfigurationVariable,
+    InterpreterName,
+    SearchPathVariable,
+)
 from .executable_stubs import ExecutableStubDirectory
 from .maintenance.fork import ForkCheckout
 from .scratch_repository import ScratchRepository
@@ -41,16 +46,26 @@ def package_environment_of_the_suite(
     Give every test an empty package home and the suite's interpreter as ``python3``.
 
     A hook then runs the package this suite imports, as in CI, and never reads or
-    removes the package environments of the machine running the suite.
+    removes the package environments of the machine running the suite. Where the
+    interpreter's directory has no ``python3``, as on Windows, a stub provides it.
 
     :param tmp_path: pytest's per-test temporary directory.
     :param monkeypatch: Sets both variables for this test only.
     """
     monkeypatch.setenv(ConfigurationVariable.HOME, str(tmp_path / "basstler-home"))
+    interpreter_directory = Path(sys.executable).parent
+    search_path = [str(interpreter_directory)]
+    if shutil.which(InterpreterName.PYTHON3, path=str(interpreter_directory)) is None:
+        stub_parent = tmp_path / "suite-interpreter"
+        stub_parent.mkdir()
+        stubs = ExecutableStubDirectory.create(stub_parent)
+        stubs.install(InterpreterName.PYTHON3)
+        search_path.append(str(stubs.path))
     monkeypatch.setenv(
         SearchPathVariable.EXECUTABLE_SEARCH_PATH,
-        f"{Path(sys.executable).parent}{os.pathsep}"
-        f"{os.environ[SearchPathVariable.EXECUTABLE_SEARCH_PATH]}",
+        os.pathsep.join(
+            [*search_path, os.environ[SearchPathVariable.EXECUTABLE_SEARCH_PATH]]
+        ),
     )
 
 

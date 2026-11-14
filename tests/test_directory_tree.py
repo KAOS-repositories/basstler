@@ -34,6 +34,8 @@ def test_removing_a_tree_that_is_not_there_does_nothing(tmp_path: Path):
     """
     A missing tree is no error.
     """
+    before = sorted(tmp_path.iterdir())
+
     DirectoryTree(tmp_path / "never-made").remove()
 
-    assert list(tmp_path.iterdir()) == []
+    assert sorted(tmp_path.iterdir()) == before

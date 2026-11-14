@@ -15,6 +15,7 @@ import pytest
 
 from basstler.locations import PluginLocation, ProjectLocation, RepositoryStateLocation
 
+from ..bash_path import BashPath
 from ..constants.notes import ScratchBranch
 from ..constants.paths import DatasetLocation, PersonalNotesPath
 from ..scratch_repository import ScratchRepository
@@ -228,7 +229,7 @@ def test_saving_without_local_settings_fails_with_a_clear_message(
     assert result.returncode == 1
     assert result.stderr.startswith(
         f"No {PersonalNotesPath.LOCAL_SETTINGS.as_posix()} at the project root "
-        f"({settings_repository.project_root / PersonalNotesPath.LOCAL_SETTINGS})"
+        f"({BashPath(settings_repository.project_root / PersonalNotesPath.LOCAL_SETTINGS).text})"
         " - nothing to save.\n"
     )
 

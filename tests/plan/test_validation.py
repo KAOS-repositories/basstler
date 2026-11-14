@@ -19,6 +19,7 @@ from basstler.plan.exceptions import (
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
+    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
     SelfPlanReference,
@@ -157,6 +158,32 @@ def test_validation_rejects_a_recommended_model_that_is_no_alias():
 def test_validation_accepts_an_item_with_no_recommended_model():
     items = [manifest_item("a", recommended_model=None)]
     PlanValidator(minimal_plan(items=items)).validate()
+
+
+def test_a_save_requires_a_recommended_model_on_an_item_the_saved_plan_lacks():
+    items = [
+        manifest_item("old", recommended_model=None),
+        manifest_item("new", recommended_model=None),
+    ]
+    validator = PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset({"old"})
+    )
+    assert validator.problems == [MissingRecommendedModel(item_identifier="new")]
+
+
+def test_a_save_of_a_plan_not_saved_before_requires_a_model_on_every_item():
+    items = [manifest_item("a", recommended_model=None)]
+    validator = PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset()
+    )
+    assert validator.problems == [MissingRecommendedModel(item_identifier="a")]
+
+
+def test_a_save_accepts_a_new_item_that_has_a_recommended_model():
+    items = [manifest_item("new", recommended_model=ModelAlias.OPUS)]
+    PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset()
+    ).validate()
 
 
 @pytest.mark.parametrize("recommended_model", list(ModelAlias))

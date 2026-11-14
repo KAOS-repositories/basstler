@@ -332,6 +332,28 @@ class UnknownRecommendedModel(ValidationProblem):
 
 
 @dataclass
+class MissingRecommendedModel(ValidationProblem):
+    """
+    A new item carries no ``recommended_model``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    def error_message(self) -> str:
+        return f"new item {self.item_identifier!r} has no recommended_model"
+
+    def suggest_correction(self) -> str:
+        return (
+            "give the item the model its difficulty calls for (opus, sonnet or haiku): "
+            "set recommended_model in plan.yaml, or pass --recommended-model to "
+            "basstler.plan.item_bootstrap's record or update"
+        )
+
+
+@dataclass
 class InvalidDependsOn(ValidationProblem):
     """
     An item's ``depends_on`` isn't a list.

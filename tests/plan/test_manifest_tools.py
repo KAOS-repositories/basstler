@@ -473,3 +473,75 @@ def test_main_refuses_an_item_both_writers_changed(monkeypatch, tmp_path: Path):
 
     assert status == ManifestToolsExitCode.CHANGED_SINCE_READ
     assert not (tmp_path / "output").exists()
+
+
+# %% main - a save requires a recommended model on a new item
+
+
+def run_validate_as_save(
+    monkeypatch, manifest_path: Path, plans_directory: Path
+) -> int:
+    """
+    :param monkeypatch: pytest's monkeypatch fixture.
+    :param manifest_path: The manifest about to be saved.
+    :param plans_directory: The plans, holding the manifest's saved copy if it has one.
+    :return: The exit status the command line returns.
+    """
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            SCRIPT_NAME,
+            ManifestToolsCommand.VALIDATE,
+            str(manifest_path),
+            ManifestToolsOption.PLANS_DIRECTORY,
+            str(plans_directory),
+            ManifestToolsOption.SAVING,
+        ],
+    )
+    return main()
+
+
+def write_plan(path: Path, item_identifiers: list[str]) -> Path:
+    """
+    :param path: The manifest to write.
+    :param item_identifiers: The items it holds, none with a recommended model.
+    :return: *path*.
+    """
+    items = [manifest_item(item, recommended_model=None) for item in item_identifiers]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(minimal_plan(items=items)))
+    return path
+
+
+def test_a_save_refuses_a_new_item_without_a_recommended_model(monkeypatch, tmp_path):
+    plan_identifier = minimal_plan()[ManifestKey.IDENTIFIER.key]
+    plans = tmp_path / "plans"
+    write_plan(plans / plan_identifier / PlanDocument.MANIFEST, ["old"])
+    saving = write_plan(tmp_path / PlanDocument.MANIFEST, ["old", "new"])
+
+    assert run_validate_as_save(monkeypatch, saving, plans) == (
+        ManifestToolsExitCode.INVALID_MANIFEST
+    )
+
+
+def test_a_save_accepts_items_the_saved_plan_already_holds(monkeypatch, tmp_path):
+    plan_identifier = minimal_plan()[ManifestKey.IDENTIFIER.key]
+    plans = tmp_path / "plans"
+    write_plan(plans / plan_identifier / PlanDocument.MANIFEST, ["old"])
+    saving = write_plan(tmp_path / PlanDocument.MANIFEST, ["old"])
+
+    assert run_validate_as_save(monkeypatch, saving, plans) == (
+        ManifestToolsExitCode.SUCCESS
+    )
+
+
+def test_a_save_of_a_new_plan_refuses_items_without_a_recommended_model(
+    monkeypatch, tmp_path
+):
+    saving = write_plan(tmp_path / PlanDocument.MANIFEST, ["new"])
+    (tmp_path / "plans").mkdir()
+
+    assert run_validate_as_save(monkeypatch, saving, tmp_path / "plans") == (
+        ManifestToolsExitCode.INVALID_MANIFEST
+    )

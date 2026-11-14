@@ -220,7 +220,8 @@ while :; do
   if ! "${BASSTLER_PYTHON}" -m "${PLAN_MANIFEST_TOOLS_MODULE}" validate \
     "${MERGED_PLAN_DIR}/${PLAN_MANIFEST_FILENAME}" \
     --plans-dir "${SCRATCH_DIR}/${PLANS_DIR}" \
-    --origin-url "${ORIGIN_URL}"; then
+    --origin-url "${ORIGIN_URL}" \
+    --saving; then
     echo "Nothing was saved - fix the manifest and save again." >&2
     exit 1
   fi

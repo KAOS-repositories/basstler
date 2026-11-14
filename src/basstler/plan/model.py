@@ -719,6 +719,17 @@ class PlanManifest:
         ]
 
     @property
+    def items_without_recommended_model(self) -> list[PlanItem]:
+        """
+        :return: The items that carry no ``recommended_model``, in manifest order.
+        """
+        return [
+            item
+            for item in self.items
+            if ManifestKey.RECOMMENDED_MODEL.key not in item.content
+        ]
+
+    @property
     def landed_item_count(self) -> int:
         """
         :return: How many items landed and were dropped from the plan by earlier saves.

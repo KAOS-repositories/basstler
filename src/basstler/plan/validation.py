@@ -22,6 +22,7 @@ from basstler.plan.exceptions import (
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
+    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
     SelfPlanReference,
@@ -247,6 +248,12 @@ class PlanValidator:
     when no save is being checked.
     """
 
+    saved_item_identifiers: frozenset[str] | None = None
+    """
+    The items the plan's saved copy holds when a save is being checked, else ``None``.
+    An item outside it is new and must carry a ``recommended_model``.
+    """
+
     def validate(self) -> None:
         """
         Check every rule.
@@ -386,6 +393,16 @@ class PlanValidator:
                 )
         return problems
 
+    def is_new_item(self, item_identifier: str) -> bool:
+        """
+        :param item_identifier: An item's effective id.
+        :return: Whether a save is being checked and the saved plan lacks that item.
+        """
+        return (
+            self.saved_item_identifiers is not None
+            and item_identifier not in self.saved_item_identifiers
+        )
+
     def item_problems(self, item: dict[str, Any]) -> list[ValidationProblem]:
         """
         Every problem one item carries.
@@ -403,7 +420,11 @@ class PlanValidator:
                 UnknownStatus(item_identifier, item.get(ManifestKey.STATUS.key))
             )
         recommended_model = item.get(ManifestKey.RECOMMENDED_MODEL.key)
-        if recommended_model is not None and recommended_model not in list(ModelAlias):
+        if recommended_model is None and self.is_new_item(item_identifier):
+            problems.append(MissingRecommendedModel(item_identifier))
+        elif recommended_model is not None and recommended_model not in list(
+            ModelAlias
+        ):
             problems.append(UnknownRecommendedModel(item_identifier, recommended_model))
         depends_on = item.get(ManifestKey.DEPENDS_ON.key)
         if depends_on is not None and not isinstance(depends_on, list):

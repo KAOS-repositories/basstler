@@ -54,6 +54,11 @@ class SummaryLine(StrEnum):
     and dropped.
     """
 
+    RECOMMENDED_MODELS = "recommended models"
+    """
+    Which items of the branch's plan carry no recommended model.
+    """
+
     PLAN_SITE = "plan site"
     """
     The plan site, and where this session's work sits on it.
@@ -153,6 +158,21 @@ class SummaryMessage(StrEnum):
     MERGED_ITEMS_NOT_CHECKED = "merged_items_line_not_checked"
     """
     Recording every plan's merged items failed, and nothing was changed.
+    """
+
+    RECOMMENDED_MODELS_NOT_APPLICABLE = "recommended_models_line_not_applicable"
+    """
+    No plan tracks the branch, so no items were read.
+    """
+
+    RECOMMENDED_MODELS_ALL_SET = "recommended_models_line_all_set"
+    """
+    Every item of the branch's plan carries one.
+    """
+
+    RECOMMENDED_MODELS_UNSET = "recommended_models_line_unset"
+    """
+    Some items of the branch's plan carry none, named for the session to set.
     """
 
     CITED_NAMES_CURRENT = "cited_names_line_current"

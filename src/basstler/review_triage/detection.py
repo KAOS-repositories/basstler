@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import difflib
 import tokenize
+from dataclasses import dataclass
 
 from basstler.class_property import classproperty
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.comparison import PythonComparison
-from basstler.review_triage.pull_request import PullRequestChanges
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import Rename, RenameCandidates, RenameDecisions
@@ -17,6 +18,7 @@ from basstler.review_triage.renames import Rename, RenameCandidates, RenameDecis
 # %% detection
 
 
+@dataclass(frozen=True)
 class RenameDetection(RenameSource):
     """
     Detects a rename as an identifier the diff consistently replaces by another, where
@@ -41,7 +43,7 @@ class RenameDetection(RenameSource):
         head = changes.commits.head_tree
         return RenameDecisions(
             tuple(
-                Rename(old, new, self.label)
+                Rename(old, new, self)
                 for old, new in sorted(candidates.consistent().items())
                 if not head.mentions(old) and not base.mentions(new)
             )

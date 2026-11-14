@@ -13,7 +13,7 @@ from basstler.class_property import classproperty
 from basstler.review_triage.commit_tree import (
     MODULE_SUFFIX,
     PACKAGE_INITIALIZER,
-    CommitTree,
+    CommitModules,
 )
 from basstler.review_triage.comparison import (
     ChangeKind,
@@ -26,7 +26,7 @@ from basstler.review_triage.comparison import (
 )
 from basstler.review_triage.keyword_arguments import KeywordArgumentComparison
 from basstler.review_triage.moved_definitions import MovedDefinition, MovedDefinitions
-from basstler.review_triage.pull_request import PullRequestChanges
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.python_source import LineSpan, PythonSource
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import (
@@ -50,8 +50,8 @@ class DefinitionMoveDetection(RenameSource):
         return "definition move"
 
     def decisions(self, changes: PullRequestChanges) -> RenameDecisions:
-        base = changes.commits.base_tree
-        head = changes.commits.head_tree
+        base = CommitModules(changes.commits.base_tree)
+        head = CommitModules(changes.commits.head_tree)
         modules = [
             change for change in changes.files if change.path.suffix == MODULE_SUFFIX
         ]
@@ -60,7 +60,7 @@ class DefinitionMoveDetection(RenameSource):
             for name in self.added_names(change):
                 gained.setdefault(name, []).append(head.module_path(change.path))
         renames = [
-            Rename(f"{old_module}.{name}", f"{new_modules[0]}.{name}", self.label)
+            Rename(f"{old_module}.{name}", f"{new_modules[0]}.{name}", self)
             for change in modules
             for old_module, name in self.removed_names(change, base)
             if len(new_modules := gained.get(name, [])) == 1
@@ -76,8 +76,8 @@ class DefinitionMoveDetection(RenameSource):
         :param renames: The renames applied in judging its files.
         :return: The definitions those renames move between modules it changes.
         """
-        base = changes.commits.base_tree
-        head = changes.commits.head_tree
+        base = CommitModules(changes.commits.base_tree)
+        head = CommitModules(changes.commits.head_tree)
         modules = [
             change
             for change in changes.files
@@ -94,7 +94,11 @@ class DefinitionMoveDetection(RenameSource):
             old_module, _, name = rename.old.rpartition(DOTTED_NAME_SEPARATOR)
             source = sources.get(old_module)
             target = targets.get(rename.new.rpartition(DOTTED_NAME_SEPARATOR)[0])
-            if rename.found_by != self.label or source is None or target is None:
+            if (
+                not isinstance(rename.found_by, DefinitionMoveDetection)
+                or source is None
+                or target is None
+            ):
                 continue
             moved.append(
                 MovedDefinition(
@@ -123,7 +127,7 @@ class DefinitionMoveDetection(RenameSource):
 
     @staticmethod
     def removed_names(
-        change: FileChange, base: CommitTree
+        change: FileChange, base: CommitModules
     ) -> Iterator[tuple[str, str]]:
         """
         :param change: A changed module.
@@ -205,7 +209,7 @@ class DefinitionMoveComparison(FileJudgment):
         :param definitions: Definitions it holds that the other version does not.
         :param other_version: The module's other version.
         :return: The definitions' lines, with the section header right above each
-            when they alone fill its section or the other version lacks the header.
+            when the other version lacks it.
         """
         spans = tuple(
             source.definition_span(definition.name) for definition in definitions
@@ -214,10 +218,7 @@ class DefinitionMoveComparison(FileJudgment):
             header
             for span in spans
             if (header := source.header_above(span)) is not None
-            and (
-                source.section_holds_only(header, spans)
-                or source.lines[header.first - 1] not in other_version.lines
-            )
+            and source.lines[header.first - 1] not in other_version.lines
         }
         return spans + tuple(sorted(headers, key=lambda header: header.first))
 

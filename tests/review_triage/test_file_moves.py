@@ -9,7 +9,7 @@ from pathlib import PurePosixPath
 import pytest
 
 from basstler.review_triage.file_moves import FileMoveDetection
-from basstler.review_triage.pull_request import PullRequestChanges
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.renames import Rename, RenameDecisions
 
 from ..scratch_repository import ScratchRepository
@@ -38,7 +38,7 @@ def test_a_moved_file_is_a_rename_of_its_path_below_the_shared_directories(
             Rename(
                 "repository.py",
                 "storage/repository.py",
-                FileMoveDetection.label,
+                FileMoveDetection(),
                 is_file_path=True,
             ),
         )

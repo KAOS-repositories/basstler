@@ -8,7 +8,7 @@ from collections import Counter
 from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
-from basstler.review_triage.pull_request import PullRequestChanges
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import Rename, RenameDecisions
 
@@ -44,7 +44,7 @@ class FileMoveDetection(RenameSource):
                 continue
             found.setdefault(str(old), set()).add(str(new))
         renames = [
-            Rename(old, next(iter(news)), self.label, is_file_path=True)
+            Rename(old, next(iter(news)), self, is_file_path=True)
             for old, news in sorted(found.items())
             if len(news) == 1
         ]

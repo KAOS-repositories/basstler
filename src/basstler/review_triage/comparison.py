@@ -9,9 +9,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from functools import cached_property
-from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
+from basstler.git.commit_range import FileChange
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
@@ -26,6 +26,19 @@ class ChangeKind(StrEnum):
     The base of every enumeration of mechanical change kinds; an extension declares
     its own kinds by subclassing it.
     """
+
+    @classproperty
+    def no_change(cls) -> frozenset[ChangeKind]:
+        """
+        The kinds of change of two versions that are equal: none.
+        """
+        return frozenset()
+
+
+ChangeKinds = frozenset[ChangeKind]
+"""
+The kinds of change one judgment found.
+"""
 
 
 class MechanicalChange(ChangeKind):
@@ -78,54 +91,11 @@ class MechanicalChange(ChangeKind):
     """
 
 
-ChangeKinds = frozenset[ChangeKind]
-"""
-The kinds of change one judgment found.
-"""
-
-NO_CHANGE: ChangeKinds = frozenset()
-"""
-The kinds of change of two versions that are equal.
-"""
-
-
-# %% one file's change
+# %% the verdict on one file
 
 
 @dataclass(frozen=True)
-class FileChange:
-    """
-    One file a pull request changes, in both its versions.
-    """
-
-    path: PurePosixPath
-    """
-    Where the file is in the head commit, or was in the base commit when it is deleted.
-    """
-
-    base_text: str | None
-    """
-    The file's content in the base commit, ``None`` when it is added or binary.
-    """
-
-    head_text: str | None
-    """
-    The file's content in the head commit, ``None`` when it is deleted or binary.
-    """
-
-    previous_path: PurePosixPath | None = None
-    """
-    Where the file was in the base commit, when the pull request moves it.
-    """
-
-    is_binary: bool = False
-    """
-    Whether git compares the file as binary, which leaves both texts unread.
-    """
-
-
-@dataclass(frozen=True)
-class FileTriage(ABC):
+class FileVerdict(ABC):
     """
     The verdict on one changed file.
     """
@@ -137,25 +107,56 @@ class FileTriage(ABC):
 
 
 @dataclass(frozen=True)
-class MechanicalFile(FileTriage):
+class MechanicalFile(FileVerdict):
     """
     A file whose change is provably mechanical, so a reviewer need not read it.
     """
 
-    kinds: ChangeKinds = NO_CHANGE
+    kinds: frozenset[ChangeKind] = ChangeKind.no_change
     """
     What the change consists of.
     """
 
 
 @dataclass(frozen=True)
-class FileNeedingReview(FileTriage):
+class FileNeedingReview(FileVerdict):
     """
     A file whose change could not be shown to be mechanical.
     """
 
 
 # %% judgments
+
+
+class FileSuffix(StrEnum):
+    """
+    The file name suffixes the built-in comparisons read.
+    """
+
+    MARKDOWN = ".md"
+    """
+    Markdown documentation.
+    """
+
+    RESTRUCTURED_TEXT = ".rst"
+    """
+    reStructuredText documentation.
+    """
+
+    TEXT = ".txt"
+    """
+    Plain text.
+    """
+
+    PYTHON = ".py"
+    """
+    Python source.
+    """
+
+    PYTHON_STUB = ".pyi"
+    """
+    A Python stub, holding type hints only.
+    """
 
 
 @dataclass(frozen=True)
@@ -191,7 +192,7 @@ class JudgmentContext:
         """
         return replace(
             self,
-            renames=RenameMap.of(
+            renames=RenameMap.from_decisions(
                 [
                     RenameDecisions(self.renames.renames),
                     RenameDecisions(self.substitutions.renames),
@@ -234,7 +235,8 @@ class ContentComparison(FileJudgment, ABC):
     @abstractmethod
     def suffixes(cls) -> frozenset[str]:
         """
-        The file name suffixes of the files this comparison reads.
+        The file name suffixes of the files this comparison reads, a :class:`FileSuffix`
+        member each for a built-in comparison.
         """
 
     @abstractmethod
@@ -269,13 +271,15 @@ class ProseComparison(ContentComparison):
 
     @classproperty
     def suffixes(cls) -> frozenset[str]:
-        return frozenset({".md", ".rst", ".txt"})
+        return frozenset(
+            {FileSuffix.MARKDOWN, FileSuffix.RESTRUCTURED_TEXT, FileSuffix.TEXT}
+        )
 
     def text_changes(
         self, base_text: str, head_text: str, context: JudgmentContext
     ) -> ChangeKinds | None:
         if base_text == head_text:
-            return NO_CHANGE
+            return ChangeKind.no_change
         renamed = context.renames.renamed_prose(base_text)
         if renamed == head_text:
             return frozenset({MechanicalChange.RENAME})
@@ -300,7 +304,7 @@ class PythonComparison(ContentComparison):
 
     @classproperty
     def suffixes(cls) -> frozenset[str]:
-        return frozenset({".py", ".pyi"})
+        return frozenset({FileSuffix.PYTHON, FileSuffix.PYTHON_STUB})
 
     def text_changes(
         self, base_text: str, head_text: str, context: JudgmentContext
@@ -366,7 +370,7 @@ class PythonComparison(ContentComparison):
         """
         head_code = head.code(RenameMap())
         if base.code(RenameMap()) == head_code:
-            return NO_CHANGE
+            return ChangeKind.no_change
         if base.code(context.renames) == head_code:
             return frozenset({MechanicalChange.RENAME})
         return None
@@ -434,7 +438,7 @@ class FileTriager:
     The judgments, tried in order.
     """
 
-    def triage(self, change: FileChange) -> FileTriage:
+    def triage(self, change: FileChange) -> FileVerdict:
         """
         :param change: A file the pull request changes.
         :return: Whether a reviewer has to read it.
@@ -446,14 +450,14 @@ class FileTriager:
             return FileNeedingReview(change)
         return MechanicalFile(change, kinds)
 
-    def judged_changes(self, change: FileChange) -> ChangeKinds | None:
+    def judged_changes(self, change: FileChange) -> frozenset[ChangeKind] | None:
         """
         :param change: A file the pull request changes.
         :return: What its content change consists of, ``None`` when it is not
             provably mechanical.
         """
         if change.head_text is not None and change.base_text == change.head_text:
-            return NO_CHANGE
+            return ChangeKind.no_change
         judgment = next(
             (judgment for judgment in self.judgments if judgment.applies_to(change)),
             None,

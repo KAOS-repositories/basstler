@@ -12,19 +12,65 @@ import keyword
 import tokenize
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from enum import StrEnum
 from functools import cached_property
 
 from basstler.review_triage.renames import RenameMap
 
 # %% names in the syntax tree
 
-IDENTIFIER_FIELDS = frozenset(
-    {"id", "attr", "name", "arg", "asname", "module", "names", "rest", "kwd_attrs"}
-)
-"""
-The fields of a syntax tree node that hold an identifier, or a list of them, wherever
-the node type has such a field.
-"""
+
+class IdentifierField(StrEnum):
+    """
+    The fields of a syntax tree node that hold an identifier, or a list of them,
+    wherever the node type has such a field.
+    """
+
+    IDENTIFIER = "id"
+    """
+    The name a :class:`ast.Name` refers to.
+    """
+
+    ATTRIBUTE = "attr"
+    """
+    The attribute an :class:`ast.Attribute` reads.
+    """
+
+    NAME = "name"
+    """
+    The name a definition or a pattern binds, or the name an import alias imports.
+    """
+
+    ARGUMENT = "arg"
+    """
+    The name of a parameter or of a keyword argument.
+    """
+
+    ALIAS = "asname"
+    """
+    The name an import binds its module or member to.
+    """
+
+    MODULE = "module"
+    """
+    The module an ``import ... from`` reads.
+    """
+
+    NAMES = "names"
+    """
+    The names a ``global`` or ``nonlocal`` statement declares.
+    """
+
+    REST = "rest"
+    """
+    The name a mapping pattern binds the remaining keys to.
+    """
+
+    KEYWORD_ATTRIBUTES = "kwd_attrs"
+    """
+    The attributes a class pattern matches by keyword.
+    """
+
 
 OPTIONAL = "Optional"
 """
@@ -42,16 +88,16 @@ What a comment opening a section of a file starts with.
 """
 
 
+@dataclass(frozen=True)
 class IdentifierRenamer(ast.NodeVisitor):
     """
     Replaces, in place, every identifier of a syntax tree that a rename map renames.
     """
 
-    def __init__(self, renames: RenameMap) -> None:
-        """
-        :param renames: The renames to apply.
-        """
-        self.renames = renames
+    renames: RenameMap
+    """
+    The renames to apply.
+    """
 
     def generic_visit(self, node: ast.AST) -> None:
         """
@@ -60,11 +106,13 @@ class IdentifierRenamer(ast.NodeVisitor):
         :param node: The node visited.
         """
         for field_name, value in ast.iter_fields(node):
-            if field_name not in IDENTIFIER_FIELDS:
+            if field_name not in IdentifierField:
                 continue
             if isinstance(value, str):
                 setattr(node, field_name, self.renames.renamed_identifier(value))
-            elif isinstance(value, list) and all(isinstance(v, str) for v in value):
+            elif isinstance(value, list) and all(
+                isinstance(item, str) for item in value
+            ):
                 setattr(
                     node,
                     field_name,
@@ -525,22 +573,6 @@ class PythonSource:
         if header == 0 or not self.lines[header - 1].startswith(SECTION_HEADER):
             return None
         return LineSpan(header, header)
-
-    def section_holds_only(self, header: LineSpan, spans: tuple[LineSpan, ...]) -> bool:
-        """
-        :param header: A section header of the file.
-        :param spans: Lines of the file.
-        :return: Whether the section it opens holds nothing but blank lines and the
-            spans' lines.
-        """
-        covered = {line for span in spans for line in range(span.first, span.last + 1)}
-        for number in range(header.last + 1, len(self.lines) + 1):
-            line = self.lines[number - 1]
-            if line.startswith(SECTION_HEADER):
-                return True
-            if number not in covered and line.strip():
-                return False
-        return True
 
     def lines_of(self, span: LineSpan) -> str:
         """

@@ -7,18 +7,19 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Annotated, Any
+from pathlib import PurePosixPath
+from typing import Annotated
 
 from pydantic import Field
 
 from basstler.class_property import classproperty
-from basstler.github.client import GitHubWrite, GitHubWriter, HttpMethod
+from basstler.github.client import GitHubWriter
+from basstler.github.graphql import GraphQLMutation, GraphQLMutationAnswer
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ReviewTriageLocation
 from basstler.render_common import TemplatePage
-from basstler.review_triage.declaration import DECLARATION_MARKER
-from basstler.review_triage.exceptions import GraphQLMutationRefused
-from basstler.review_triage.triage import PullRequestTriage
+from basstler.review_triage.declaration import TriageDeclaration
+from basstler.review_triage.triage import TriageOutcome
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -31,13 +32,13 @@ This module's logger, which the Markdown report prints through.
 
 class TriageOutput(ABC):
     """
-    Delivers a triage somewhere.
+    Delivers a triage outcome somewhere.
     """
 
     @abstractmethod
-    def publish(self, triage: PullRequestTriage) -> None:
+    def publish(self, outcome: TriageOutcome) -> None:
         """
-        :param triage: The triaged pull request.
+        :param outcome: The triaged pull request.
         """
 
 
@@ -53,23 +54,20 @@ class MarkdownReport(TriageOutput, TemplatePage):
     def template(cls) -> str:
         return ReviewTriageLocation.REPORT_TEMPLATE.name
 
-    def render(self, triage: PullRequestTriage) -> str:
+    def render(self, outcome: TriageOutcome) -> str:
         """
-        :param triage: The triaged pull request.
+        :param outcome: The triaged pull request.
         :return: The report.
         """
-        return self.render_template(triage=triage, marker=DECLARATION_MARKER)
+        return self.render_template(
+            outcome=outcome, declaration_marker=TriageDeclaration.marker
+        )
 
-    def publish(self, triage: PullRequestTriage) -> None:
-        logger.info(self.render(triage))
+    def publish(self, outcome: TriageOutcome) -> None:
+        logger.info(self.render(outcome))
 
 
 # %% marking files viewed
-
-GRAPHQL_PATH = "graphql"
-"""
-The path, below the API root, of GitHub's GraphQL endpoint.
-"""
 
 
 class ViewedFile(ValidatedJSONModel):
@@ -82,55 +80,10 @@ class ViewedFile(ValidatedJSONModel):
     What GitHub's GraphQL API identifies the pull request by.
     """
 
-    path: str
+    path: PurePosixPath
     """
-    The file's path in the pull request's head commit.
-    """
-
-
-class GraphQLMutation(GitHubWrite):
-    """
-    One GraphQL mutation, sent to GitHub's GraphQL endpoint.
-    """
-
-    query: str
-    """
-    The mutation's document.
-    """
-
-    variables: dict[str, Any]
-    """
-    The document's variables.
-    """
-
-    @classproperty
-    def method(cls) -> HttpMethod:
-        return HttpMethod.POST
-
-    @property
-    def path(self) -> str:
-        return GRAPHQL_PATH
-
-
-class GraphQLError(ValidatedJSONModel):
-    """
-    One error GitHub reports for a GraphQL request.
-    """
-
-    message: str
-    """
-    What went wrong.
-    """
-
-
-class GraphQLAnswer(ValidatedJSONModel):
-    """
-    GitHub's answer to a GraphQL request, read only for its errors.
-    """
-
-    errors: tuple[GraphQLError, ...] = ()
-    """
-    The errors reported, none when the request succeeded.
+    The file's path in the pull request's head commit, which GitHub separates with
+    forward slashes on every platform.
     """
 
 
@@ -146,16 +99,12 @@ class ViewedMarking(TriageOutput):
     The writer the mutations are sent through.
     """
 
-    def publish(self, triage: PullRequestTriage) -> None:
+    def publish(self, outcome: TriageOutcome) -> None:
         document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
-        for file in triage.mechanical_files:
+        for file in outcome.mechanical_files:
             variables = ViewedFile(
-                triage.pull_request.node_identifier, str(file.change.path)
+                outcome.pull_request.node_identifier, file.change.path
             )
-            answer = GraphQLAnswer.from_json(
+            GraphQLMutationAnswer.from_json(
                 self.github.send(GraphQLMutation(document, variables.to_json()))
-            )
-            if answer.errors:
-                raise GraphQLMutationRefused(
-                    tuple(error.message for error in answer.errors)
-                )
+            ).raise_if_refused()

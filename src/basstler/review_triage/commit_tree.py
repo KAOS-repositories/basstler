@@ -1,36 +1,19 @@
 """
-The files of one commit, searched for identifiers, files and definitions.
+The Python modules of one commit, searched for their dotted paths and definitions.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
-from enum import IntEnum
 from pathlib import PurePosixPath
 
-from basstler.maintenance.git_commands import GitCommandResult, GitCommandRunner
+from basstler.git.commands import GitCommandResult
+from basstler.git.commit_tree import CommitTree, GitGrepExitCode
 from basstler.review_triage.definitions import DefinitionSearch
 from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR
 
-# %% git's answers
-
-
-class GitGrepExitCode(IntEnum):
-    """
-    What ``git grep`` exits with.
-    """
-
-    MATCH = 0
-    """
-    At least one line matched.
-    """
-
-    NO_MATCH = 1
-    """
-    Nothing matched.
-    """
-
+# %% the search
 
 PYTHON_FILE_PATTERNS = ("*.py", "*.pyi")
 """
@@ -44,7 +27,6 @@ DEFINITION_PATTERN = (
 Matches the start of a line defining a function, method or class, up to its name.
 """
 
-
 PACKAGE_INITIALIZER = "__init__.py"
 """
 The file that makes a directory a package, its own module the package's.
@@ -55,62 +37,19 @@ MODULE_SUFFIX = ".py"
 The suffix of a Python module's file.
 """
 
-
 # %% the commit
 
 
 @dataclass(frozen=True)
-class CommitTree(DefinitionSearch):
+class CommitModules(DefinitionSearch):
     """
-    The files of one commit.
-    """
-
-    git: GitCommandRunner
-    """
-    The checkout holding the commit.
+    The Python modules of one commit.
     """
 
-    commit: str
+    tree: CommitTree
     """
-    The commit searched.
+    The commit's files.
     """
-
-    held_paths: dict[PurePosixPath, bool] = field(
-        default_factory=dict, compare=False, repr=False
-    )
-    """
-    :meth:`holds` for each path asked about so far.
-    """
-
-    def mentions(self, identifier: str) -> bool:
-        """
-        :param identifier: A name, or a dotted path of names.
-        :return: Whether any file of the commit holds it as a whole word.
-        :raises GitCommandFailed: If the search itself fails.
-        """
-        search = self.git.attempt(
-            "grep",
-            "--quiet",
-            "--word-regexp",
-            "--fixed-strings",
-            "-e",
-            identifier,
-            self.commit,
-        )
-        if search.exit_status == GitGrepExitCode.NO_MATCH:
-            return False
-        return search.raise_if_failed().succeeded
-
-    def holds(self, path: PurePosixPath) -> bool:
-        """
-        :param path: A path from the commit's root.
-        :return: Whether the commit has a file there.
-        """
-        if path not in self.held_paths:
-            self.held_paths[path] = self.git.attempt(
-                "cat-file", "-e", f"{self.commit}:{path}"
-            ).succeeded
-        return self.held_paths[path]
 
     def module_path(self, path: PurePosixPath) -> str:
         """
@@ -120,7 +59,7 @@ class CommitTree(DefinitionSearch):
         """
         components = [] if path.name == PACKAGE_INITIALIZER else [path.stem]
         package = path.parent
-        while package != PurePosixPath(".") and self.holds(
+        while package != PurePosixPath(".") and self.tree.holds(
             package / PACKAGE_INITIALIZER
         ):
             components.insert(0, package.name)
@@ -135,13 +74,13 @@ class CommitTree(DefinitionSearch):
 
         :raises GitCommandFailed: If the search itself fails.
         """
-        search = self.git.attempt(
+        search = self.tree.git.attempt(
             "grep",
             "--only-matching",
             "--extended-regexp",
             "-e",
             DEFINITION_PATTERN,
-            self.commit,
+            self.tree.commit,
             "--",
             *PYTHON_FILE_PATTERNS,
         )
@@ -160,21 +99,21 @@ class CommitTree(DefinitionSearch):
 
     def files_mentioning(self, name: str) -> tuple[str, ...]:
         return self.listed_lines(
-            self.git.attempt(
+            self.tree.git.attempt(
                 "grep",
                 "--name-only",
                 "--word-regexp",
                 "--fixed-strings",
                 "-e",
                 name,
-                self.commit,
+                self.tree.commit,
                 "--",
                 *PYTHON_FILE_PATTERNS,
             )
         )
 
     def text_of(self, file: str) -> str:
-        return self.git.run("show", file)
+        return self.tree.git.run("show", file)
 
     @staticmethod
     def listed_lines(search: GitCommandResult) -> tuple[str, ...]:

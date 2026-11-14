@@ -10,15 +10,15 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 from basstler.class_property import classproperty
-from basstler.review_triage.commit_tree import MODULE_SUFFIX
-from basstler.review_triage.comparison import FileChange
-from basstler.review_triage.pull_request import PullRequestChanges
+from basstler.git.commit_range import FileChange
+from basstler.github.pull_request_changes import PullRequestChanges
+from basstler.review_triage.commit_tree import MODULE_SUFFIX, CommitModules
 from basstler.review_triage.python_source import PythonSource
+from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import (
     DOTTED_NAME_SEPARATOR,
     Rename,
     RenameDecisions,
-    RenameMap,
 )
 
 # %% one class and its subclass
@@ -46,7 +46,9 @@ class ClassVersions:
     """
 
     @classmethod
-    def of(cls, change: FileChange, module: str, name: str) -> ClassVersions | None:
+    def from_module(
+        cls, change: FileChange, module: str, name: str
+    ) -> ClassVersions | None:
         """
         :param change: A module both commits hold.
         :param module: Its dotted path in the base commit.
@@ -124,7 +126,7 @@ class SubclassCandidate:
 
 
 @dataclass(frozen=True)
-class SubclassSubstitutionDetection:
+class SubclassSubstitutionDetection(RenameSource):
     """
     Detects a class the head commit keeps and derives a new subclass from, holding only
     members moved down into it: a file may use the subclass in the class's place.
@@ -132,16 +134,12 @@ class SubclassSubstitutionDetection:
 
     @classproperty
     def label(cls) -> str:
-        """
-        What the substitutions it finds are labelled with.
-        """
         return "subclass substitution"
 
-    def substitutions(self, changes: PullRequestChanges) -> RenameMap:
+    def decisions(self, changes: PullRequestChanges) -> RenameDecisions:
         """
-        :param changes: A pull request and the files it changes.
-        :return: The class each such subclass may replace, as its name and its dotted
-            path.
+        :meth:`RenameSource.decisions`, accepting the class each such subclass may
+        replace, as its name and its dotted path.
         """
         candidates = [
             candidate
@@ -150,9 +148,9 @@ class SubclassSubstitutionDetection:
             for candidate in self.candidates_in(change, changes)
         ]
         if not candidates:
-            return RenameMap()
+            return RenameDecisions()
         kept_modules = {
-            changes.commits.base_tree.module_path(
+            CommitModules(changes.commits.base_tree).module_path(
                 change.previous_path or change.path
             ): (change)
             for change in changes.files
@@ -164,14 +162,12 @@ class SubclassSubstitutionDetection:
         for candidate in candidates:
             module, _, name = candidate.class_path.rpartition(DOTTED_NAME_SEPARATOR)
             change = kept_modules.get(module)
-            versions = change and ClassVersions.of(change, module, name)
+            versions = change and ClassVersions.from_module(change, module, name)
             if versions is None or not versions.is_substituted_by(candidate.subclass):
                 continue
-            renames.append(Rename(name, candidate.subclass.name, self.label))
-            renames.append(
-                Rename(candidate.class_path, candidate.subclass_path, self.label)
-            )
-        return RenameMap.of([RenameDecisions(tuple(renames))])
+            renames.append(Rename(name, candidate.subclass.name, self))
+            renames.append(Rename(candidate.class_path, candidate.subclass_path, self))
+        return RenameDecisions(tuple(renames))
 
     @staticmethod
     def candidates_in(
@@ -203,6 +199,6 @@ class SubclassSubstitutionDetection:
             yield SubclassCandidate(
                 subclass,
                 next(iter(sources)),
-                f"{changes.commits.head_tree.module_path(change.path)}"
+                f"{CommitModules(changes.commits.head_tree).module_path(change.path)}"
                 f"{DOTTED_NAME_SEPARATOR}{subclass.name}",
             )

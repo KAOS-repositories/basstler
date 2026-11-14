@@ -6,11 +6,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from basstler.github.pull_request_changes import PullRequestChanges, RestPullRequest
+from basstler.review_triage.commit_tree import CommitModules
 from basstler.review_triage.comparison import (
     FileJudgment,
     FileNeedingReview,
-    FileTriage,
     FileTriager,
+    FileVerdict,
     JudgmentContext,
     MechanicalFile,
     EmptyPackageAddition,
@@ -25,22 +27,21 @@ from basstler.review_triage.definition_moves import (
 )
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.module_moves import ModuleMoveDetection
-from basstler.review_triage.pull_request import PullRequestChanges, TriagedPullRequest
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.definitions import DefinitionIndex
 
-# %% the triage
+# %% the outcome
 
 
 @dataclass(frozen=True)
-class PullRequestTriage:
+class TriageOutcome:
     """
     Which of a pull request's files a reviewer has to read.
     """
 
-    pull_request: TriagedPullRequest
+    pull_request: RestPullRequest
     """
     The pull request triaged.
     """
@@ -50,7 +51,7 @@ class PullRequestTriage:
     The renames applied in judging its files.
     """
 
-    files: tuple[FileTriage, ...]
+    files: tuple[FileVerdict, ...]
     """
     The verdict on each file it changes.
     """
@@ -100,25 +101,27 @@ class PullRequestTriager:
     The judgments of each file, the first one applying to a file deciding it.
     """
 
-    def triage(self, changes: PullRequestChanges) -> PullRequestTriage:
+    def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
         :return: The verdict on each of its files.
         """
-        renames = RenameMap.of(
+        renames = RenameMap.from_decisions(
             source.decisions(changes) for source in self.rename_sources
         )
-        base_definitions = DefinitionIndex(changes.commits.base_tree)
+        base_definitions = DefinitionIndex(CommitModules(changes.commits.base_tree))
         triager = FileTriager(
             JudgmentContext(
                 renames,
                 base_definitions,
                 DefinitionMoveDetection().moved_definitions(changes, renames),
-                SubclassSubstitutionDetection().substitutions(changes),
+                RenameMap.from_decisions(
+                    [SubclassSubstitutionDetection().decisions(changes)]
+                ),
             ),
             self.judgments,
         )
-        return PullRequestTriage(
+        return TriageOutcome(
             changes.pull_request,
             renames,
             tuple(triager.triage(change) for change in changes.files),

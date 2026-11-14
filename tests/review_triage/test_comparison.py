@@ -9,10 +9,10 @@ from pathlib import PurePosixPath
 
 import pytest
 
+from basstler.git.commit_range import FileChange
 from basstler.review_triage.comparison import (
     ChangeKind,
     ChangeKinds,
-    FileChange,
     FileJudgment,
     FileNeedingReview,
     FileTriager,

@@ -17,13 +17,14 @@ from basstler.github.client import (
     GitHubWrite,
     GitHubWriter,
 )
-from basstler.repository import Repository
-from basstler.review_triage.pull_request import (
-    CommitRange,
+from basstler.git.commit_range import CommitRange
+from basstler.github.repository import Repository
+from basstler.github.pull_request_changes import (
     PullRequestChanges,
-    PullRequestReader,
-    TriagedPullRequest,
+    PullRequestChangesReader,
+    RestPullRequest,
 )
+from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameMap
 
 from ..scratch_repository import ScratchRepository
@@ -84,7 +85,7 @@ def old_name_renamed() -> RenameMap:
     """
     :return: The renames of the samples: ``old_name`` to ``new_name``.
     """
-    return RenameMap((Rename("old_name", "new_name", "test"),))
+    return RenameMap((Rename("old_name", "new_name", RenameDetection()),))
 
 
 def commit_trees(
@@ -127,7 +128,7 @@ def committed_pull_request(
     payload["base"]["sha"] = commits.base_commit
     payload["head"]["sha"] = commits.head_commit
     return PullRequestChanges(
-        TriagedPullRequest.from_json(payload), commits, commits.changes()
+        RestPullRequest.from_json(payload), commits, commits.changes()
     )
 
 
@@ -162,7 +163,7 @@ def read_sample(
     :return: The sample pull request read with that description.
     """
     payload["body"] = description.read()
-    return PullRequestReader(
+    return PullRequestChangesReader(
         scratch_repository.git, OnePullRequestReader(payload)
     ).read(SAMPLE_REPOSITORY, payload["number"])
 

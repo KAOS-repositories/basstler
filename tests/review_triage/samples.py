@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from basstler.class_property import classproperty
-from basstler.review_triage.comparison import FileChange
+from basstler.git.commit_range import FileChange
 from basstler.review_triage.definitions import DefinitionIndex, SourceDefinitions
 
 from ..constants.paths import DatasetLocation

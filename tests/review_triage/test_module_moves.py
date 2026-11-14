@@ -11,7 +11,7 @@ import pytest
 
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.module_moves import ModuleMoveDetection
-from basstler.review_triage.pull_request import PullRequestChanges
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.renames import Rename, RenameDecisions
 from basstler.review_triage.triage import PullRequestTriager
 
@@ -46,7 +46,7 @@ def test_a_moved_module_is_a_rename_of_its_dotted_path(
             Rename(
                 "package.repository",
                 "package.storage.repository",
-                ModuleMoveDetection.label,
+                ModuleMoveDetection(),
             ),
         )
     )

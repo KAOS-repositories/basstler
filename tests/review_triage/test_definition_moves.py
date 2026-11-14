@@ -12,7 +12,7 @@ import pytest
 
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.definition_moves import DefinitionMoveDetection
-from basstler.review_triage.pull_request import PullRequestChanges
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.renames import Rename, RenameDecisions
 from basstler.review_triage.triage import PullRequestTriager
 
@@ -119,12 +119,12 @@ def test_a_moved_definition_is_a_rename_of_its_dotted_path(
             Rename(
                 "package.board.Field",
                 "package.record.Field",
-                DefinitionMoveDetection.label,
+                DefinitionMoveDetection(),
             ),
             Rename(
                 "package.board.Priority",
                 "package.priority.Priority",
-                DefinitionMoveDetection.label,
+                DefinitionMoveDetection(),
             ),
         )
     )
@@ -164,7 +164,7 @@ def test_a_definition_leaving_a_moved_module_is_a_rename_of_its_dotted_path(
             Rename(
                 "package.old_home.Route",
                 "package.route.Route",
-                DefinitionMoveDetection.label,
+                DefinitionMoveDetection(),
             ),
         )
     )
@@ -200,9 +200,13 @@ def test_a_new_module_of_definitions_moved_out_of_a_moved_module_is_mechanical(
             ("board_emptied_section_base.py", "board_emptied_section_head.py"),
             id="section-emptied",
         ),
+        pytest.param(
+            ("board_emptied_section_base.py", "board_emptied_header_left_head.py"),
+            id="emptied-header-left",
+        ),
     ],
 )
-def test_a_module_losing_definitions_keeps_the_headers_of_sections_left(
+def test_a_section_header_above_definitions_moving_out_may_stay_or_go(
     definition_move: PullRequestChanges, versions: tuple[str, str]
 ):
     """

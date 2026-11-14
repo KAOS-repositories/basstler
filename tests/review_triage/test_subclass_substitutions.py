@@ -11,7 +11,7 @@ from pathlib import PurePosixPath
 import pytest
 
 from basstler.review_triage.comparison import MechanicalChange
-from basstler.review_triage.pull_request import PullRequestChanges
+from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.renames import Rename
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.triage import PullRequestTriager
@@ -74,11 +74,9 @@ def test_a_subclass_of_members_moved_down_substitutes_its_class(
     The class is substituted by the subclass, both as a name and as a dotted path.
     """
     detection = SubclassSubstitutionDetection()
-    assert detection.substitutions(subclass_substitution).renames == (
-        Rename("Branch", "NamedBranch", detection.label),
-        Rename(
-            "package.branch.Branch", "package.named_branch.NamedBranch", detection.label
-        ),
+    assert detection.decisions(subclass_substitution).accepted == (
+        Rename("Branch", "NamedBranch", detection),
+        Rename("package.branch.Branch", "package.named_branch.NamedBranch", detection),
     )
 
 

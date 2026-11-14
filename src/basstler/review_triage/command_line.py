@@ -1,10 +1,11 @@
 """
 The ``basstler review-triage`` commands: reporting which files of a pull request need
-review, and marking the others viewed.
+review, marking the others viewed, and writing a rename declaration.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
@@ -12,11 +13,12 @@ from cyclopts import App
 
 from basstler.exit_codes import ExitCode
 from basstler.github.client import GitHubRestClient
+from basstler.git.commands import GitCommandRunner
+from basstler.github.pull_request_changes import PullRequestChangesReader
+from basstler.github.repository import Repository
 from basstler.locations import PackageLocation
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.repository import Repository
+from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
-from basstler.review_triage.pull_request import PullRequestReader
 from basstler.review_triage.triage import PullRequestTriager
 from basstler.standard_streams import StandardStreamHandler
 
@@ -48,6 +50,11 @@ class ReviewTriageCommand(StrEnum):
     Mark a pull request's mechanical files viewed for the logged-in account.
     """
 
+    DECLARE = "declare"
+    """
+    Print the description comment declaring renames.
+    """
+
     @property
     def invocation(self) -> str:
         """
@@ -63,40 +70,64 @@ class ReviewTriageExitCode(ExitCode):
 
     SUCCESS = 0
     """
-    The pull request was triaged.
+    The command did what it was asked.
     """
 
 
-ORIGIN_REMOTE = "origin"
-"""
-The remote whose repository a pull request is looked up in when none is named.
-"""
+# %% publishing the triage
 
 
-# %% reading the triage
-
-
-def publish_triage(
-    pull_request: int, repository: str | None, outputs: tuple[TriageOutput, ...]
-) -> None:
+@dataclass(frozen=True)
+class TriagePublication:
     """
-    Triage a pull request in the current checkout and hand it to each output.
-
-    :param pull_request: The pull request's number.
-    :param repository: Its repository as ``owner/name``, the checkout's ``origin`` when
-        ``None``.
-    :param outputs: Where the triage goes, in order.
+    Triages one pull request in the current checkout and hands the outcome to outputs.
     """
-    git = GitCommandRunner(Path.cwd())
-    resolved = (
-        Repository.parse(repository)
-        if repository
-        else Repository.from_remote_url(git.run("remote", "get-url", ORIGIN_REMOTE))
-    )
-    changes = PullRequestReader(git, GitHubRestClient()).read(resolved, pull_request)
-    triage = PullRequestTriager().triage(changes)
-    for output in outputs:
-        output.publish(triage)
+
+    pull_request: int
+    """
+    The pull request's number.
+    """
+
+    repository: str | None = None
+    """
+    Its repository as ``owner/name``, the repository of :attr:`remote` when ``None``.
+    """
+
+    declaration: TriageDeclaration = field(default_factory=TriageDeclaration)
+    """
+    Renames given and rejected beyond the description's, outranking them.
+    """
+
+    remote: str = "origin"
+    """
+    The remote whose repository the pull request is looked up in when
+    :attr:`repository` is ``None``.
+    """
+
+    def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
+        """
+        :param outputs: Where the outcome goes, in order.
+        """
+        git = GitCommandRunner(Path.cwd())
+        repository = (
+            Repository.parse(self.repository)
+            if self.repository
+            else Repository.from_remote_url(git.run("remote", "get-url", self.remote))
+        )
+        changes = PullRequestChangesReader(git, GitHubRestClient()).read(
+            repository, self.pull_request
+        )
+        default = PullRequestTriager()
+        triager = replace(
+            default,
+            rename_sources=(
+                *default.rename_sources,
+                ArgumentDeclaration(self.declaration),
+            ),
+        )
+        outcome = triager.triage(changes)
+        for output in outputs:
+            output.publish(outcome)
 
 
 # %% the commands
@@ -111,21 +142,37 @@ The ``review-triage`` command group.
 
 
 @review_triage_app.command(name=ReviewTriageCommand.REPORT)
-def report(pull_request: int, *, repository: str | None = None) -> ReviewTriageExitCode:
+def report(
+    pull_request: int,
+    *,
+    repository: str | None = None,
+    rename: tuple[str, ...] = (),
+    rejected_rename: tuple[str, ...] = (),
+) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown.
 
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
         default.
+    :param rename: A rename as ``old=new``, outranking the description's; repeatable.
+    :param rejected_rename: An old identifier whose rename is rejected; repeatable.
     """
-    publish_triage(pull_request, repository, (MarkdownReport(),))
+    TriagePublication(
+        pull_request,
+        repository,
+        TriageDeclaration.from_arguments(rename, rejected_rename),
+    ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
 
 @review_triage_app.command(name=ReviewTriageCommand.MARK_VIEWED)
 def mark_viewed(
-    pull_request: int, *, repository: str | None = None
+    pull_request: int,
+    *,
+    repository: str | None = None,
+    rename: tuple[str, ...] = (),
+    rejected_rename: tuple[str, ...] = (),
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the account whose GitHub
@@ -134,8 +181,27 @@ def mark_viewed(
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
         default.
+    :param rename: A rename as ``old=new``, outranking the description's; repeatable.
+    :param rejected_rename: An old identifier whose rename is rejected; repeatable.
     """
-    publish_triage(
-        pull_request, repository, (ViewedMarking(GitHubRestClient()), MarkdownReport())
-    )
+    TriagePublication(
+        pull_request,
+        repository,
+        TriageDeclaration.from_arguments(rename, rejected_rename),
+    ).publish((ViewedMarking(GitHubRestClient()), MarkdownReport()))
+    return ReviewTriageExitCode.SUCCESS
+
+
+@review_triage_app.command(name=ReviewTriageCommand.DECLARE)
+def declare(
+    *, rename: tuple[str, ...] = (), rejected_rename: tuple[str, ...] = ()
+) -> ReviewTriageExitCode:
+    """
+    Print the comment declaring renames, to paste into a pull request's description.
+
+    :param rename: A rename as ``old=new``; repeatable.
+    :param rejected_rename: An old identifier whose detected rename is rejected;
+        repeatable.
+    """
+    logger.info(TriageDeclaration.from_arguments(rename, rejected_rename).comment())
     return ReviewTriageExitCode.SUCCESS

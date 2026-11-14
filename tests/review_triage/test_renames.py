@@ -4,21 +4,23 @@ Combining the renames of several sources and applying them to identifiers and pr
 
 from __future__ import annotations
 
+from basstler.review_triage.declaration import DescriptionDeclaration
+from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
 
 # %% combining sources
 
-DETECTED = Rename("old_name", "new_name", "diff")
+DETECTED = Rename("old_name", "new_name", RenameDetection())
 """
 A rename an earlier source finds.
 """
 
-DECLARED = Rename("old_name", "newer_name", "description")
+DECLARED = Rename("old_name", "newer_name", DescriptionDeclaration())
 """
 A later source's rename of the same identifier.
 """
 
-OTHER = Rename("other", "renamed_other", "diff")
+OTHER = Rename("other", "renamed_other", RenameDetection())
 """
 A rename of another identifier.
 """
@@ -29,7 +31,7 @@ def test_a_later_source_outranks_an_earlier_one():
     A rename of a later source replaces an earlier source's rename of the same
     identifier.
     """
-    renames = RenameMap.of(
+    renames = RenameMap.from_decisions(
         [RenameDecisions((DETECTED, OTHER)), RenameDecisions((DECLARED,))]
     )
     assert renames.renames == (DECLARED, OTHER)
@@ -39,7 +41,7 @@ def test_a_rejection_drops_an_earlier_source_rename():
     """
     A rejection removes the rename an earlier source found.
     """
-    renames = RenameMap.of(
+    renames = RenameMap.from_decisions(
         [
             RenameDecisions((DETECTED, OTHER)),
             RenameDecisions(rejected=frozenset({"old_name"})),
@@ -74,7 +76,10 @@ def test_renames_swapping_two_identifiers_apply_together():
     Renames apply simultaneously, so two identifiers can swap.
     """
     renames = RenameMap(
-        (Rename("first", "second", "diff"), Rename("second", "first", "diff"))
+        (
+            Rename("first", "second", RenameDetection()),
+            Rename("second", "first", RenameDetection()),
+        )
     )
     assert renames.renamed_prose("first then second") == "second then first"
 

@@ -11,7 +11,7 @@ import pytest
 
 from basstler.review_triage.comparison import (
     FileNeedingReview,
-    FileTriage,
+    FileVerdict,
     FileTriager,
     JudgmentContext,
     MechanicalChange,
@@ -32,7 +32,7 @@ from .samples import FileSample
 # %% verdicts
 
 
-def triaged(sample: FileSample, renames: RenameMap) -> FileTriage:
+def triaged(sample: FileSample, renames: RenameMap) -> FileVerdict:
     """
     :param sample: A file in two versions.
     :param renames: The renames of the pull request.

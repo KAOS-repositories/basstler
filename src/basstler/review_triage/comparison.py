@@ -12,6 +12,7 @@ from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
+from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.definitions import DefinitionIndex
@@ -56,6 +57,17 @@ class MechanicalChange(ChangeKind):
     EMPTY_PACKAGE = "empty package"
     """
     An empty package initializer was added, making its directory a package.
+    """
+
+    DEFINITIONS_MOVED_IN = "definitions moved in"
+    """
+    Definitions moved unchanged out of another module were added, with the imports
+    they need and their section headers.
+    """
+
+    DEFINITIONS_MOVED_OUT = "definitions moved out"
+    """
+    Definitions another module now holds were removed, with their section headers.
     """
 
 
@@ -153,6 +165,11 @@ class JudgmentContext:
     base_definitions: DefinitionIndex = field(default_factory=DefinitionIndex)
     """
     The functions, methods and classes the base commit defines.
+    """
+
+    moved_definitions: MovedDefinitions = MovedDefinitions()
+    """
+    The definitions the pull request moves between modules.
     """
 
 

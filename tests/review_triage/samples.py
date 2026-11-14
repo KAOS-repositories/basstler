@@ -181,6 +181,19 @@ class DefinitionMoveSample(SampleTrees):
         return "definition-move"
 
 
+class DefinitionMoveFromMovedModuleSample(SampleTrees):
+    """
+    A pull request moving a module and, out of it, one class into a module it adds.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-from-moved-module"
+
+
 TEMPLATE_REINDENTED = (
     DatasetLocation.REVIEW_TRIAGE / "template-renamed" / "reindented.py.jinja"
 )

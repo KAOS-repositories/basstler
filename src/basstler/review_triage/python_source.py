@@ -36,6 +36,11 @@ FUTURE_MODULE = "__future__"
 The module whose imports change how the rest of the file is compiled.
 """
 
+SECTION_HEADER = "# %%"
+"""
+What a comment opening a section of a file starts with.
+"""
+
 
 class IdentifierRenamer(ast.NodeVisitor):
     """
@@ -137,6 +142,26 @@ class ImportBindings:
             for binding in other.bindings
             if binding.bound_name in bound_names
         )
+
+
+# %% a run of lines
+
+
+@dataclass(frozen=True)
+class LineSpan:
+    """
+    Consecutive lines of a file, counted from one, both ends included.
+    """
+
+    first: int
+    """
+    The first line.
+    """
+
+    last: int
+    """
+    The last line.
+    """
 
 
 # %% the file's parts
@@ -287,25 +312,31 @@ class PythonSource:
         """
         The names the file's top-level functions, classes and assignments define.
         """
-        names: set[str] = set()
-        for statement in self.tree.body:
-            if isinstance(
-                statement, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
-            ):
-                names.add(statement.name)
-            elif isinstance(statement, ast.Assign | ast.AnnAssign | ast.AugAssign):
-                targets = (
-                    statement.targets
-                    if isinstance(statement, ast.Assign)
-                    else [statement.target]
-                )
-                names |= {
-                    node.id
-                    for target in targets
-                    for node in ast.walk(target)
-                    if isinstance(node, ast.Name)
-                }
-        return frozenset(names)
+        return frozenset().union(
+            *(self.names_defined_by(statement) for statement in self.tree.body)
+        )
+
+    @staticmethod
+    def names_defined_by(statement: ast.stmt) -> frozenset[str]:
+        """
+        :param statement: A statement.
+        :return: The names it defines as a function, a class or an assignment.
+        """
+        if isinstance(statement, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            return frozenset({statement.name})
+        if not isinstance(statement, ast.Assign | ast.AnnAssign | ast.AugAssign):
+            return frozenset()
+        targets = (
+            statement.targets
+            if isinstance(statement, ast.Assign)
+            else [statement.target]
+        )
+        return frozenset(
+            node.id
+            for target in targets
+            for node in ast.walk(target)
+            if isinstance(node, ast.Name)
+        )
 
     @cached_property
     def import_bindings(self) -> ImportBindings:
@@ -454,3 +485,64 @@ class PythonSource:
         :return: Whether it is a name that is not a keyword.
         """
         return token.type == tokenize.NAME and not keyword.iskeyword(token.string)
+
+    def definition_span(self, name: str) -> LineSpan:
+        """
+        :param name: A name a top-level statement of the file defines.
+        :return: The lines of that statement, its decorators included.
+        """
+        statement = next(
+            statement
+            for statement in self.tree.body
+            if name in self.names_defined_by(statement)
+        )
+        decorators = (
+            statement.decorator_list
+            if isinstance(
+                statement, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+            )
+            else []
+        )
+        first = min([statement.lineno, *(node.lineno for node in decorators)])
+        return LineSpan(first, statement.end_lineno or statement.lineno)
+
+    def section_header_before(self, span: LineSpan) -> LineSpan | None:
+        """
+        :param span: Lines of the file.
+        :return: The section header opening right above them, past blank lines,
+            ``None`` when there is none.
+        """
+        lines = self.text.splitlines()
+        line = span.first - 1
+        while line > 0 and not lines[line - 1].strip():
+            line -= 1
+        if line == 0 or not lines[line - 1].startswith(SECTION_HEADER):
+            return None
+        return LineSpan(line, line)
+
+    def lines_of(self, span: LineSpan) -> str:
+        """
+        :param span: Lines of the file.
+        :return: Their text.
+        """
+        return "\n".join(self.text.splitlines()[span.first - 1 : span.last]) + "\n"
+
+    @cached_property
+    def non_blank_lines(self) -> tuple[str, ...]:
+        """
+        The file's lines that hold more than whitespace.
+        """
+        return tuple(line for line in self.text.splitlines() if line.strip())
+
+    def without(self, spans: tuple[LineSpan, ...]) -> PythonSource:
+        """
+        :param spans: Lines of the file.
+        :return: The file with those lines left out.
+        """
+        removed = {line for span in spans for line in range(span.first, span.last + 1)}
+        kept = [
+            text
+            for number, text in enumerate(self.text.splitlines(), start=1)
+            if number not in removed
+        ]
+        return PythonSource("\n".join(kept) + "\n", self.package)

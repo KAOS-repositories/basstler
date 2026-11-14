@@ -20,8 +20,10 @@ from basstler.review_triage.comparison import (
 )
 from basstler.review_triage.declaration import DescriptionDeclaration
 from basstler.review_triage.detection import RenameDetection
-from basstler.review_triage.keyword_arguments import KeywordArgumentComparison
-from basstler.review_triage.definition_moves import DefinitionMoveDetection
+from basstler.review_triage.definition_moves import (
+    DefinitionMoveComparison,
+    DefinitionMoveDetection,
+)
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.pull_request import PullRequestChanges, TriagedPullRequest
@@ -89,7 +91,7 @@ class PullRequestTriager:
     """
 
     judgments: tuple[FileJudgment, ...] = (
-        KeywordArgumentComparison(),
+        DefinitionMoveComparison(),
         ProseComparison(),
         EmptyPackageAddition(),
         RenamedTextComparison(),
@@ -110,7 +112,12 @@ class PullRequestTriager:
             CommitTree(changes.commits.git, changes.commits.base_commit)
         )
         triager = FileTriager(
-            JudgmentContext(renames, base_definitions), self.judgments
+            JudgmentContext(
+                renames,
+                base_definitions,
+                DefinitionMoveDetection().moved_definitions(changes, renames),
+            ),
+            self.judgments,
         )
         return PullRequestTriage(
             changes.pull_request,

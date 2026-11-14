@@ -362,6 +362,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "basstler" },
     { name = "basstler-core" },
     { name = "basstler-git" },
     { name = "basstler-github" },
@@ -387,6 +388,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "basstler", editable = "packages/basstler" },
     { name = "basstler-core", editable = "packages/core" },
     { name = "basstler-git", editable = "packages/git" },
     { name = "basstler-github", editable = "packages/github" },

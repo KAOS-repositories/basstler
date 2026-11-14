@@ -40,6 +40,7 @@ packages = ["src/basstler"]
 dev = [
     "pytest",
     "pytest-xdist",
+    "basstler",
     "basstler-core",
     "basstler-git",
     "basstler-github",

@@ -5,7 +5,7 @@ Finding the modules a pull request moves, as renames of their dotted paths.
 from __future__ import annotations
 
 from basstler.class_property import classproperty
-from basstler.review_triage.commit_tree import MODULE_SUFFIX, CommitTree
+from basstler.review_triage.commit_tree import MODULE_SUFFIX
 from basstler.review_triage.pull_request import PullRequestChanges
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import (
@@ -28,8 +28,8 @@ class ModuleMoveDetection(RenameSource):
         return "file move"
 
     def decisions(self, changes: PullRequestChanges) -> RenameDecisions:
-        base = CommitTree(changes.commits.git, changes.commits.base_commit)
-        head = CommitTree(changes.commits.git, changes.commits.head_commit)
+        base = changes.commits.base_tree
+        head = changes.commits.head_tree
         renames: list[Rename] = []
         for change in changes.files:
             if change.previous_path is None or {

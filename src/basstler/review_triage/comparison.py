@@ -6,15 +6,16 @@ file does or says, otherwise in need of review.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from functools import cached_property
 from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
-from basstler.review_triage.renames import RenameMap
+from basstler.review_triage.renames import RenameDecisions, RenameMap
 from basstler.review_triage.definitions import DefinitionIndex
 
 # %% what a mechanical change consists of
@@ -68,6 +69,12 @@ class MechanicalChange(ChangeKind):
     DEFINITIONS_MOVED_OUT = "definitions moved out"
     """
     Definitions another module now holds were removed, with their section headers.
+    """
+
+    SUBCLASS_SUBSTITUTED = "class replaced by subclass"
+    """
+    A class was replaced by a subclass the pull request adds, holding only members
+    moved down from the class unchanged.
     """
 
 
@@ -171,6 +178,27 @@ class JudgmentContext:
     """
     The definitions the pull request moves between modules.
     """
+
+    substitutions: RenameMap = RenameMap()
+    """
+    Classes a file may replace by a subclass the pull request adds, as renames.
+    """
+
+    @cached_property
+    def substituted(self) -> JudgmentContext:
+        """
+        This context with :attr:`substitutions` applied as renames.
+        """
+        return replace(
+            self,
+            renames=RenameMap.of(
+                [
+                    RenameDecisions(self.renames.renames),
+                    RenameDecisions(self.substitutions.renames),
+                ]
+            ),
+            substitutions=RenameMap(),
+        )
 
 
 class FileJudgment(ABC):
@@ -426,7 +454,23 @@ class FileTriager:
         """
         if change.head_text is not None and change.base_text == change.head_text:
             return NO_CHANGE
-        for judgment in self.judgments:
-            if judgment.applies_to(change):
-                return judgment.changes(change, self.context)
-        return None
+        judgment = next(
+            (judgment for judgment in self.judgments if judgment.applies_to(change)),
+            None,
+        )
+        if judgment is None:
+            return None
+        kinds = judgment.changes(change, self.context)
+        substituted_class = self.context.substitutions.word_pattern
+        if (
+            kinds is not None
+            or substituted_class is None
+            or not substituted_class.search(change.base_text or "")
+        ):
+            return kinds
+        substituted = judgment.changes(change, self.context.substituted)
+        if substituted is None:
+            return None
+        return substituted - {MechanicalChange.RENAME} | {
+            MechanicalChange.SUBCLASS_SUBSTITUTED
+        }

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from basstler.review_triage.commit_tree import CommitTree
 from basstler.review_triage.comparison import (
     FileJudgment,
     FileNeedingReview,
@@ -28,6 +27,7 @@ from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.pull_request import PullRequestChanges, TriagedPullRequest
 from basstler.review_triage.rename_sources import RenameSource
+from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.definitions import DefinitionIndex
 
@@ -108,14 +108,13 @@ class PullRequestTriager:
         renames = RenameMap.of(
             source.decisions(changes) for source in self.rename_sources
         )
-        base_definitions = DefinitionIndex(
-            CommitTree(changes.commits.git, changes.commits.base_commit)
-        )
+        base_definitions = DefinitionIndex(changes.commits.base_tree)
         triager = FileTriager(
             JudgmentContext(
                 renames,
                 base_definitions,
                 DefinitionMoveDetection().moved_definitions(changes, renames),
+                SubclassSubstitutionDetection().substitutions(changes),
             ),
             self.judgments,
         )

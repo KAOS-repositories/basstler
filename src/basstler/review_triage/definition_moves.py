@@ -50,8 +50,8 @@ class DefinitionMoveDetection(RenameSource):
         return "definition move"
 
     def decisions(self, changes: PullRequestChanges) -> RenameDecisions:
-        base = CommitTree(changes.commits.git, changes.commits.base_commit)
-        head = CommitTree(changes.commits.git, changes.commits.head_commit)
+        base = changes.commits.base_tree
+        head = changes.commits.head_tree
         modules = [
             change for change in changes.files if change.path.suffix == MODULE_SUFFIX
         ]
@@ -76,8 +76,8 @@ class DefinitionMoveDetection(RenameSource):
         :param renames: The renames applied in judging its files.
         :return: The definitions those renames move between modules it changes.
         """
-        base = CommitTree(changes.commits.git, changes.commits.base_commit)
-        head = CommitTree(changes.commits.git, changes.commits.head_commit)
+        base = changes.commits.base_tree
+        head = changes.commits.head_tree
         modules = [
             change
             for change in changes.files

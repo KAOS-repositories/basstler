@@ -194,6 +194,20 @@ class DefinitionMoveFromMovedModuleSample(SampleTrees):
         return "definition-move-from-moved-module"
 
 
+class SubclassSubstitutionSample(SampleTrees):
+    """
+    A pull request moving a property of a class down into a new subclass, one caller
+    switching to the subclass and another keeping the class.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "subclass-substitution"
+
+
 TEMPLATE_REINDENTED = (
     DatasetLocation.REVIEW_TRIAGE / "template-renamed" / "reindented.py.jinja"
 )

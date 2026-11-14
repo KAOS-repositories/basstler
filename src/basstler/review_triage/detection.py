@@ -8,7 +8,6 @@ import difflib
 import tokenize
 
 from basstler.class_property import classproperty
-from basstler.review_triage.commit_tree import CommitTree
 from basstler.review_triage.comparison import PythonComparison
 from basstler.review_triage.pull_request import PullRequestChanges
 from basstler.review_triage.python_source import PythonSource
@@ -38,8 +37,8 @@ class RenameDetection(RenameSource):
                     PythonSource(change.head_text),
                     candidates,
                 )
-        base = CommitTree(changes.commits.git, changes.commits.base_commit)
-        head = CommitTree(changes.commits.git, changes.commits.head_commit)
+        base = changes.commits.base_tree
+        head = changes.commits.head_tree
         return RenameDecisions(
             tuple(
                 Rename(old, new, self.label)

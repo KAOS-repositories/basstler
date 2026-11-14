@@ -6,6 +6,7 @@ as git reads them.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import PurePosixPath
 from typing import Annotated
 
@@ -16,6 +17,7 @@ from basstler.github.web_page import AbsentAsEmpty
 from basstler.json_model import ValidatedJSONModel
 from basstler.maintenance.git_commands import GitCommandRunner
 from basstler.repository import Repository
+from basstler.review_triage.commit_tree import CommitTree
 from basstler.review_triage.comparison import FileChange
 
 # %% the pull request
@@ -99,6 +101,20 @@ class CommitRange:
     """
     The pull request's head commit.
     """
+
+    @cached_property
+    def base_tree(self) -> CommitTree:
+        """
+        The files of :attr:`base_commit`.
+        """
+        return CommitTree(self.git, self.base_commit)
+
+    @cached_property
+    def head_tree(self) -> CommitTree:
+        """
+        The files of :attr:`head_commit`.
+        """
+        return CommitTree(self.git, self.head_commit)
 
     def changes(self) -> tuple[FileChange, ...]:
         """

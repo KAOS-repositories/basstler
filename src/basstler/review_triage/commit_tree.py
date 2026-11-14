@@ -4,7 +4,7 @@ The files of one commit, searched for identifiers, files and definitions.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from enum import IntEnum
 from pathlib import PurePosixPath
@@ -75,6 +75,13 @@ class CommitTree(DefinitionSearch):
     The commit searched.
     """
 
+    held_paths: dict[PurePosixPath, bool] = field(
+        default_factory=dict, compare=False, repr=False
+    )
+    """
+    :meth:`holds` for each path asked about so far.
+    """
+
     def mentions(self, identifier: str) -> bool:
         """
         :param identifier: A name, or a dotted path of names.
@@ -99,7 +106,11 @@ class CommitTree(DefinitionSearch):
         :param path: A path from the commit's root.
         :return: Whether the commit has a file there.
         """
-        return self.git.attempt("cat-file", "-e", f"{self.commit}:{path}").succeeded
+        if path not in self.held_paths:
+            self.held_paths[path] = self.git.attempt(
+                "cat-file", "-e", f"{self.commit}:{path}"
+            ).succeeded
+        return self.held_paths[path]
 
     def module_path(self, path: PurePosixPath) -> str:
         """

@@ -9,7 +9,7 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -169,7 +169,7 @@ def test_candidate_changing_a_file_in_a_requested_directory_reports_it_as_shared
     report = build_scope_report(
         candidate_repository.project_root,
         BASE_BRANCH,
-        [str(Path(NEW_SKILL_PATH).parent)],
+        [PurePosixPath(NEW_SKILL_PATH).parent.as_posix()],
         [Candidate("the parent", "overlapping")],
     )
 

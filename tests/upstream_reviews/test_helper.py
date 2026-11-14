@@ -359,6 +359,16 @@ def test_the_shipped_source_is_code_alone_and_runs_without_basstler():
     compile(source, "<helper>", "exec")
 
 
+def test_the_command_s_argument_holds_no_backslash():
+    """
+    Git Bash on Windows halves the backslashes of an argument it hands a native
+    program, so an argument holding one reaches the interpreter as other JSON.
+    """
+    argument_line = HelperScript(request()).render().splitlines()[0]
+
+    assert "\\" not in argument_line
+
+
 def test_the_prompt_carries_the_command_and_how_to_answer():
     prompt = HelperPrompt(request()).render()
 

@@ -12,8 +12,8 @@ from typing import Any
 import pytest
 
 from basstler.git.commands import GitCommandRunner
-from basstler.github.exceptions import GraphQLMutationRefused
-from basstler.github.graphql import GraphQLMutation
+from basstler.github.exceptions import GraphQLErrorsReturned
+from basstler.github.graphql import GraphQLRequest
 from basstler.github.pull_request_changes import (
     PullRequestChanges,
     PullRequestChangesReader,
@@ -154,7 +154,7 @@ def test_each_mechanical_file_is_marked_viewed(sample_changes: PullRequestChange
     ViewedMarking(writer).publish(triage)
     document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
     assert writer.sent == [
-        GraphQLMutation(
+        GraphQLRequest(
             document,
             ViewedFile(triage.pull_request.node_identifier, path).to_json(),
         )
@@ -176,7 +176,7 @@ def test_a_refused_marking_is_raised(sample_changes: PullRequestChanges):
     """
     triage = PullRequestTriager().triage(sample_changes)
     writer = RecordingWriter({"errors": [{"message": "Resource not accessible"}]})
-    with pytest.raises(GraphQLMutationRefused):
+    with pytest.raises(GraphQLErrorsReturned):
         ViewedMarking(writer).publish(triage)
 
 

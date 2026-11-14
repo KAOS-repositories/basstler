@@ -1,5 +1,5 @@
 """
-The shapes of GitHub's GraphQL API: the lists it returns, the mutations sent to it and
+The shapes of GitHub's GraphQL API: the lists it returns, the requests sent to it and
 its answers to them.
 """
 
@@ -9,7 +9,7 @@ from typing import Annotated, Any, TypeVar
 
 from basstler.class_property import classproperty
 from basstler.github.client import GitHubWrite, HttpMethod
-from basstler.github.exceptions import GraphQLMutationRefused
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.json_model import RawValueReader, ValidatedJSONModel
 
 # %% connections
@@ -38,17 +38,17 @@ A list-valued GraphQL field, which GitHub returns as a connection.
 """
 
 
-# %% mutations
+# %% requests and their answers
 
 
-class GraphQLMutation(GitHubWrite):
+class GraphQLRequest(GitHubWrite):
     """
-    One GraphQL mutation, sent to GitHub's GraphQL endpoint.
+    One GraphQL document, a query or a mutation, sent to GitHub's GraphQL endpoint.
     """
 
     query: str
     """
-    The mutation's document.
+    The GraphQL document.
     """
 
     variables: dict[str, Any]
@@ -76,19 +76,26 @@ class GraphQLError(ValidatedJSONModel):
     """
 
 
-class GraphQLMutationAnswer(ValidatedJSONModel):
+class GraphQLResponse(ValidatedJSONModel):
     """
-    GitHub's answer to a GraphQL mutation, read only for its errors.
+    GitHub's answer to a GraphQL request.
+    """
+
+    data: dict[str, Any] | None = None
+    """
+    The request's result, absent when it failed outright.
     """
 
     errors: tuple[GraphQLError, ...] = ()
     """
-    The errors reported, none when the mutation succeeded.
+    The errors reported, none when the request succeeded.
     """
 
-    def raise_if_refused(self) -> None:
+    def result(self) -> dict[str, Any]:
         """
-        :raises GraphQLMutationRefused: If GitHub reported errors.
+        :return: The request's result.
+        :raises GraphQLErrorsReturned: If GitHub reported errors instead.
         """
         if self.errors:
-            raise GraphQLMutationRefused(tuple(error.message for error in self.errors))
+            raise GraphQLErrorsReturned(tuple(error.message for error in self.errors))
+        return self.data or {}

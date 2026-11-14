@@ -36,6 +36,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.exit_codes import CommandFailure, ExitCode, StackExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.locations import RepositoryStateLocation
@@ -117,7 +118,7 @@ def _dispatch() -> ExitCode:
     except CommandFailure as error:
         logger.error(f"{error}")
         return error.exit_code
-    except UpstreamReadError as error:
+    except (UpstreamReadError, GraphQLErrorsReturned) as error:
         logger.error(f"{error}")
         return StackExitCode.UPSTREAM_UNREADABLE
 

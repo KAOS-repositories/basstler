@@ -9,7 +9,7 @@ from pathlib import PurePosixPath
 
 import pytest
 
-from basstler.git.commit_range import FileChange
+from basstler.git.commit_range import FileVersions
 from basstler.review_triage.comparison import (
     ChangeKind,
     FileJudgment,
@@ -108,14 +108,14 @@ def test_an_unchanged_moved_file_is_mechanical():
     [
         replace(FileSample.BEHAVIOUR_CHANGED.change(), base_text=None),
         replace(FileSample.BEHAVIOUR_CHANGED.change(), head_text=None),
-        FileChange(PurePosixPath("logo.png"), None, None, is_binary=True),
+        FileVersions(PurePosixPath("logo.png"), is_binary=True),
         replace(
             FileSample.DOCUMENTATION_RENAMED.change(), path=PurePosixPath("sample.yaml")
         ),
     ],
     ids=["added", "deleted", "binary", "unjudged type"],
 )
-def test_a_file_no_judgment_proves_mechanical_needs_review(change: FileChange):
+def test_a_file_no_judgment_proves_mechanical_needs_review(change: FileVersions):
     """
     An added, deleted or binary file, or a changed file of a type nothing judges, needs
     review.
@@ -139,11 +139,11 @@ class GeneratedFileJudgment(FileJudgment):
     Judges every file under a generated directory mechanical.
     """
 
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         return change.path.parts[0] == "generated"
 
     def changes(
-        self, change: FileChange, renames: RenameMap
+        self, change: FileVersions, renames: RenameMap
     ) -> frozenset[ChangeKind] | None:
         return frozenset({GeneratedChange.GENERATED})
 

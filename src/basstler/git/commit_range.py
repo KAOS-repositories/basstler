@@ -1,10 +1,10 @@
 """
-The files changed between two commits, each in both its versions.
+The files changed between two commits, by how many lines and in both their versions.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import PurePosixPath
 
 from basstler.git.commands import GitCommandRunner
@@ -15,7 +15,7 @@ from basstler.git.commands import GitCommandRunner
 @dataclass(frozen=True)
 class FileChange:
     """
-    One file changed between two commits, in both its versions.
+    One file changed between two commits, and by how many lines.
     """
 
     path: PurePosixPath
@@ -23,14 +23,14 @@ class FileChange:
     Where the file is in the head commit, or was in the base commit when it is deleted.
     """
 
-    base_text: str | None
+    insertions: int = 0
     """
-    The file's content in the base commit, ``None`` when it is added or binary.
+    Lines added, zero for a binary file.
     """
 
-    head_text: str | None
+    deletions: int = 0
     """
-    The file's content in the head commit, ``None`` when it is deleted or binary.
+    Lines removed, zero for a binary file.
     """
 
     previous_path: PurePosixPath | None = None
@@ -40,7 +40,31 @@ class FileChange:
 
     is_binary: bool = False
     """
-    Whether git compares the file as binary, which leaves both texts unread.
+    Whether git compares the file as binary, which leaves its lines uncounted.
+    """
+
+    @property
+    def changed_lines(self) -> int:
+        """
+        Lines added and removed together.
+        """
+        return self.insertions + self.deletions
+
+
+@dataclass(frozen=True)
+class FileVersions(FileChange):
+    """
+    A file's change, with the file's text in both commits.
+    """
+
+    base_text: str | None = None
+    """
+    The file's content in the base commit, ``None`` when it is added or binary.
+    """
+
+    head_text: str | None = None
+    """
+    The file's content in the head commit, ``None`` when it is deleted or binary.
     """
 
 
@@ -68,7 +92,7 @@ class CommitRange:
     The commit the change ends at.
     """
 
-    def changes(self) -> tuple[FileChange, ...]:
+    def file_changes(self) -> tuple[FileChange, ...]:
         """
         :return: Every file the range changes, in the order git lists them.
         """
@@ -86,30 +110,36 @@ class CommitRange:
         for entry in listing:
             if not entry:
                 continue
-            added, _, path = entry.split("\t", 2)
+            insertions, deletions, path = entry.split("\t", 2)
             previous_path = None
             if not path:
                 previous_path = PurePosixPath(next(listing))
                 path = next(listing)
+            is_binary = insertions == "-"
             changes.append(
-                self.change(PurePosixPath(path), previous_path, added == "-")
+                FileChange(
+                    PurePosixPath(path),
+                    0 if is_binary else int(insertions),
+                    0 if is_binary else int(deletions),
+                    previous_path,
+                    is_binary,
+                )
             )
         return tuple(changes)
 
-    def change(
-        self, path: PurePosixPath, previous_path: PurePosixPath | None, is_binary: bool
-    ) -> FileChange:
+    def file_versions(self) -> tuple[FileVersions, ...]:
         """
-        :param path: Where the file is in the head commit.
-        :param previous_path: Where it was in the base commit, when it moved.
-        :param is_binary: Whether git compares it as binary.
-        :return: The file's change, its texts read unless it is binary.
+        :return: Every file the range changes, with its texts read unless it is binary.
         """
-        if is_binary:
-            return FileChange(path, None, None, previous_path, is_binary)
-        return FileChange(
-            path,
-            self.git.file_at(self.base_commit, previous_path or path),
-            self.git.file_at(self.head_commit, path),
-            previous_path,
+        return tuple(
+            FileVersions(**asdict(change))
+            if change.is_binary
+            else FileVersions(
+                **asdict(change),
+                base_text=self.git.file_at(
+                    self.base_commit, change.previous_path or change.path
+                ),
+                head_text=self.git.file_at(self.head_commit, change.path),
+            )
+            for change in self.file_changes()
         )

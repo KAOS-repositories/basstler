@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from basstler.class_property import classproperty
-from basstler.git.commit_range import FileChange
+from basstler.git.commit_range import FileVersions
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameMap
 
@@ -68,7 +68,7 @@ class FileVerdict(ABC):
     The verdict on one changed file.
     """
 
-    change: FileChange
+    change: FileVersions
     """
     The change judged.
     """
@@ -133,7 +133,7 @@ class FileJudgment(ABC):
     """
 
     @abstractmethod
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         """
         :param change: A file the pull request changes.
         :return: Whether this judgment decides it.
@@ -141,7 +141,7 @@ class FileJudgment(ABC):
 
     @abstractmethod
     def changes(
-        self, change: FileChange, renames: RenameMap
+        self, change: FileVersions, renames: RenameMap
     ) -> frozenset[ChangeKind] | None:
         """
         :param change: A file this judgment applies to.
@@ -176,7 +176,7 @@ class ContentComparison(FileJudgment, ABC):
             mechanical.
         """
 
-    def applies_to(self, change: FileChange) -> bool:
+    def applies_to(self, change: FileVersions) -> bool:
         return (
             change.base_text is not None
             and change.head_text is not None
@@ -184,7 +184,7 @@ class ContentComparison(FileJudgment, ABC):
         )
 
     def changes(
-        self, change: FileChange, renames: RenameMap
+        self, change: FileVersions, renames: RenameMap
     ) -> frozenset[ChangeKind] | None:
         return self.text_changes(change.base_text, change.head_text, renames)
 
@@ -280,7 +280,7 @@ class FileTriager:
     The judgments, tried in order.
     """
 
-    def triage(self, change: FileChange) -> FileVerdict:
+    def triage(self, change: FileVersions) -> FileVerdict:
         """
         :param change: A file the pull request changes.
         :return: Whether a reviewer has to read it.
@@ -292,7 +292,7 @@ class FileTriager:
             return FileNeedingReview(change)
         return MechanicalFile(change, kinds)
 
-    def judged_changes(self, change: FileChange) -> frozenset[ChangeKind] | None:
+    def judged_changes(self, change: FileVersions) -> frozenset[ChangeKind] | None:
         """
         :param change: A file the pull request changes.
         :return: What its content change consists of, ``None`` when it is not

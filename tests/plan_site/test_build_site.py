@@ -22,7 +22,8 @@ from basstler.github.pull_request_source import GitHubPullRequestSource
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
 from basstler.github.states import CombinedCheckState
 from basstler.plan.dependencies import DependencyReference, DependencyResolver
-from basstler.plan.model import ItemStatus, PlanDocument
+from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.validation import PlanValidator
 from basstler.plan_site.__main__ import (
@@ -101,6 +102,33 @@ def test_from_directory_reads_the_roadmap():
     assert source.roadmap_text == (
         (SitePlan.FIRST.directory / PlanDocument.ROADMAP).read_text()
     )
+
+
+def test_from_directory_gives_an_item_without_a_recommended_model_the_fallback(
+    tmp_path: Path,
+):
+    manifest = PlanManifest.from_file(SitePlan.SECOND.directory / PlanDocument.MANIFEST)
+    stripped = PlanManifest(
+        {
+            **manifest.content,
+            ManifestKey.ITEMS.key: [
+                {
+                    key: value
+                    for key, value in item.content.items()
+                    if key != ManifestKey.RECOMMENDED_MODEL.key
+                }
+                for item in manifest.items
+            ],
+        }
+    )
+    stripped.write(tmp_path / PlanDocument.MANIFEST)
+
+    source = PlanSource.from_directory(tmp_path)
+
+    assert [
+        item.content[ManifestKey.RECOMMENDED_MODEL.key]
+        for item in PlanManifest(source.manifest).items
+    ] == [ModelAlias.SONNET.value] * len(manifest.items)
 
 
 def test_from_directory_without_a_roadmap_reads_it_as_empty(tmp_path: Path):

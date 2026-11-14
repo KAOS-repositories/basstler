@@ -19,6 +19,7 @@ from basstler.exceptions import (
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
+    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
     SelfPlanReference,
@@ -154,8 +155,19 @@ def test_validation_rejects_a_recommended_model_that_is_no_alias():
     )
 
 
-@pytest.mark.parametrize("recommended_model", [None, *ModelAlias])
-def test_validation_accepts_every_alias_and_an_item_without_one(recommended_model):
+def test_validation_requires_every_item_to_carry_a_recommended_model():
+    items = [manifest_item("a", recommended_model=None)]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(minimal_plan(items=items)).validate()
+    assert [
+        problem
+        for problem in error.value.problems
+        if isinstance(problem, MissingRecommendedModel)
+    ] == [MissingRecommendedModel(item_identifier="a")]
+
+
+@pytest.mark.parametrize("recommended_model", list(ModelAlias))
+def test_validation_accepts_every_alias(recommended_model):
     items = [manifest_item("a", recommended_model=recommended_model)]
     PlanValidator(minimal_plan(items=items)).validate()
 
@@ -167,7 +179,14 @@ def test_validation_accepts_a_status_in_either_spelling(status):
     spaces, and stays readable beside the current one.
     """
     items = [
-        {"id": "a", "title": "A", "branch": "a", "track": "track-1", "status": status}
+        {
+            "id": "a",
+            "title": "A",
+            "branch": "a",
+            "track": "track-1",
+            "status": status,
+            "recommended_model": ModelAlias.SONNET.value,
+        }
     ]
     PlanValidator(minimal_plan(items=items)).validate()
 

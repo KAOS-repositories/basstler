@@ -80,7 +80,7 @@ items:                         # the actual trackable units of work - flat,
                                    # an item of this plan, <plan-id>/<item-id> for
                                    # one in another plan (see below)
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
-    recommended_model: opus | sonnet | haiku  # optional: the Claude Code alias suited to the item's
+    recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
                                                # difficulty; see "Choosing the recommended model"
     session: <url or omitted>
     notes: "short, freeform"
@@ -104,7 +104,11 @@ Code aliases, which always resolve to the newest model of the family:
 - `opus` - design-heavy, cross-cutting or ambiguous work, where the item must decide how
   something should be built.
 
-An item without the field has no preselected model.
+Every item carries one: validation refuses a plan with an item that has none. A plan
+saved before the field was required is filled in for you: every session start gives each
+item without one `sonnet` (`"${BASSTLER_PYTHON}" -m basstler.plan_site.recommended_models every-plan`), and
+every plan site build does the same in memory, so no plan drops off the site. Replace the
+default with the model the item's difficulty calls for when you next touch the item.
 
 ### Why `status` is deliberately thin
 

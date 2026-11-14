@@ -43,7 +43,8 @@ from basstler.github.pull_request_source import (
 from basstler.github.repository import GitHubAddress, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
-from basstler.plan.model import PlanDocument
+from basstler.plan.model import ManifestKey, PlanDocument, PlanManifest
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.validation import PlanValidator
 from basstler.plan_site.cards import PlanTimeAttribute
@@ -182,9 +183,30 @@ class PlanSource:
         roadmap = directory / PlanDocument.ROADMAP
         return cls(
             directory_name=directory.name,
-            manifest=yaml.safe_load((directory / PlanDocument.MANIFEST).read_text()),
+            manifest=cls.with_recommended_models(
+                yaml.safe_load((directory / PlanDocument.MANIFEST).read_text())
+            ),
             roadmap_text=roadmap.read_text() if roadmap.exists() else "",
         )
+
+    @staticmethod
+    def with_recommended_models(manifest: Any) -> Any:
+        """
+        Give each item that has no recommended model :attr:`ModelAlias.SONNET`, so a plan
+        saved before the field was required is still published.
+
+        :param manifest: The parsed ``plan.yaml``, whatever it holds.
+        :return: The manifest with the models filled in, or *manifest* itself when it is
+            no mapping with a list of items.
+        """
+        items = (
+            manifest.get(ManifestKey.ITEMS.key) if isinstance(manifest, dict) else None
+        )
+        if not isinstance(items, list) or not all(
+            isinstance(item, dict) for item in items
+        ):
+            return manifest
+        return PlanManifest(manifest).with_recommended_models(ModelAlias.SONNET).content
 
     @classmethod
     def every_plan_in(cls, plans_directory: Path) -> list[PlanSource]:

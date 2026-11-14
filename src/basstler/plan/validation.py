@@ -22,6 +22,7 @@ from basstler.exceptions import (
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
+    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
     SelfPlanReference,
@@ -403,7 +404,9 @@ class PlanValidator:
                 UnknownStatus(item_identifier, item.get(ManifestKey.STATUS.key))
             )
         recommended_model = item.get(ManifestKey.RECOMMENDED_MODEL.key)
-        if recommended_model is not None and recommended_model not in list(ModelAlias):
+        if recommended_model is None:
+            problems.append(MissingRecommendedModel(item_identifier))
+        elif recommended_model not in list(ModelAlias):
             problems.append(UnknownRecommendedModel(item_identifier, recommended_model))
         depends_on = item.get(ManifestKey.DEPENDS_ON.key)
         if depends_on is not None and not isinstance(depends_on, list):

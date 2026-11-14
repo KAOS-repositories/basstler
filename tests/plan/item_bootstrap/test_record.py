@@ -130,6 +130,7 @@ def test_recording_a_new_item_appends_it_to_the_manifest(
         title="A brand new item",
         track="a-track",
         status=ItemStatus.NOT_STARTED,
+        recommended_model=ModelAlias.SONNET,
     ).record(project_root=bootstrap_repository.project_root)
 
     manifest = published_plan(bootstrap_repository)[PlanDocument.MANIFEST]
@@ -141,6 +142,7 @@ def test_recording_a_new_item_appends_it_to_the_manifest(
         + manifest_line(ManifestKey.TRACK, "a-track")
         + manifest_line(ManifestKey.DEPENDS_ON, ())
         + manifest_line(ManifestKey.STATUS, ItemStatus.NOT_STARTED.value)
+        + manifest_line(ManifestKey.RECOMMENDED_MODEL, ModelAlias.SONNET.value)
     )
 
 
@@ -176,17 +178,20 @@ def test_recording_an_existing_item_sets_its_recommended_model(
     )
 
 
-def test_recording_without_a_recommended_model_writes_none(
+def test_recording_a_new_item_without_a_recommended_model_names_the_key_it_needs(
     bootstrap_repository: ScratchRepository,
 ):
-    record_request(bootstrap_repository).record(
-        project_root=bootstrap_repository.project_root
-    )
+    with pytest.raises(IncompleteNewItemError) as refusal:
+        record_request(
+            bootstrap_repository,
+            item_identifier=NEW_ITEM,
+            title="A brand new item",
+            track="a-track",
+            status=ItemStatus.NOT_STARTED,
+            recommended_model=None,
+        ).record(project_root=bootstrap_repository.project_root)
 
-    assert (
-        ManifestKey.RECOMMENDED_MODEL.key
-        not in published_plan(bootstrap_repository)[PlanDocument.MANIFEST]
-    )
+    assert refusal.value.missing_keys == (ManifestKey.RECOMMENDED_MODEL,)
 
 
 def test_recording_a_new_item_without_a_title_names_the_key_it_needs(
@@ -198,6 +203,7 @@ def test_recording_a_new_item_without_a_title_names_the_key_it_needs(
             item_identifier=NEW_ITEM,
             track="a-track",
             status=ItemStatus.NOT_STARTED,
+            recommended_model=ModelAlias.SONNET,
         ).record(project_root=bootstrap_repository.project_root)
 
     assert refusal.value.missing_keys == (ManifestKey.TITLE,)

@@ -54,8 +54,8 @@ class ItemRecordRequest:
 
     recommended_model: ModelAlias | None = None
     """
-    The model suited to the item's difficulty; ``None`` leaves an existing item's as it
-    is and gives a new item none.
+    The model suited to the item's difficulty, required only when the entry does not
+    exist yet; ``None`` leaves an existing item's as it is.
     """
 
     roadmap_entry: str | None = None
@@ -82,7 +82,11 @@ class ItemRecordRequest:
         :raises IncompleteNewItemError: If a field a new entry cannot omit is missing.
         :return: The block's text, newline-terminated.
         """
-        required = {ManifestKey.TITLE: self.title, ManifestKey.TRACK: self.track}
+        required = {
+            ManifestKey.TITLE: self.title,
+            ManifestKey.TRACK: self.track,
+            ManifestKey.RECOMMENDED_MODEL: self.recommended_model,
+        }
         missing = tuple(
             manifest_key for manifest_key, value in required.items() if not value
         )

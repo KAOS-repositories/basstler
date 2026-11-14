@@ -398,6 +398,10 @@ PLAN_SIZE_LIMITS_MODULE="basstler.plan.size_limits"
 PLAN_MERGED_ITEMS_MODULE="basstler.plan.merged_items"
 # Its subcommand recording every plan on the notes branch and pushing the result.
 PLAN_MERGED_ITEMS_EVERY_PLAN_COMMAND="every-plan"
+# basstler.plan_site.recommended_models: gives every plan item the recommended model it
+# lacks - run by session-start.sh. Its subcommand covers every plan on the notes branch.
+PLAN_RECOMMENDED_MODELS_MODULE="basstler.plan_site.recommended_models"
+PLAN_RECOMMENDED_MODELS_EVERY_PLAN_COMMAND="every-plan"
 # basstler.document_references: names every module and skill a document cites
 # that this release no longer ships, and what replaced it.
 DOCUMENT_REFERENCES_MODULE="basstler.document_references"

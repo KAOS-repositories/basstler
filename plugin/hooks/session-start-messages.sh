@@ -75,6 +75,19 @@ merged_items_line_not_checked() {
   printf 'not checked - recording the plans'"'"' merged items failed; the error is above'
 }
 
+# %% the recommended models line
+
+# recommended_models_line_no_plans: the notes branch holds no plans to fill.
+recommended_models_line_no_plans() {
+  printf 'not applicable (the notes branch holds no plans)'
+}
+
+# recommended_models_line_not_checked: filling every plan's recommended models failed,
+# and nothing was changed.
+recommended_models_line_not_checked() {
+  printf 'not checked - filling the plans'"'"' recommended models failed; the error is above'
+}
+
 # %% the hub line
 
 # hub_line_not_registered: the notes branch has no hub file.

@@ -392,6 +392,27 @@ class UnknownRecommendedModel(ValidationProblem):
 
 
 @dataclass
+class MissingRecommendedModel(ValidationProblem):
+    """
+    An item carries no ``recommended_model``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    def error_message(self) -> str:
+        return f"item {self.item_identifier!r} has no recommended_model"
+
+    def suggest_correction(self) -> str:
+        return (
+            "give the item the model its difficulty calls for: pass "
+            "--recommended-model to basstler.plan.item_bootstrap's record or update"
+        )
+
+
+@dataclass
 class InvalidDependsOn(ValidationProblem):
     """
     An item's ``depends_on`` isn't a list.

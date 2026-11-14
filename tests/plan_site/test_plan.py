@@ -40,7 +40,10 @@ def test_item_from_mapping_reads_the_recommended_model(alias: ModelAlias):
 
 
 def test_item_from_mapping_has_no_recommended_model_unless_the_manifest_names_one():
-    assert Item.from_mapping(manifest_item("a")).recommended_model is None
+    assert (
+        Item.from_mapping(manifest_item("a", recommended_model=None)).recommended_model
+        is None
+    )
 
 
 # %% Item - precomputed template values

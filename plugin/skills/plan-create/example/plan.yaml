@@ -27,6 +27,7 @@ items:
     branch: retry-backoff-strategy
     track: retry-logic
     status: done
+    recommended_model: sonnet
     pull_request_number: 101
     notes: Landed the core backoff calculation and its unit tests.
 
@@ -35,6 +36,7 @@ items:
     branch: retry-circuit-breaker
     track: retry-logic
     status: in progress
+    recommended_model: sonnet
     pull_request_number: 102
     depends_on: [retry-backoff-strategy]
     notes: Stacks directly on the backoff strategy branch.
@@ -44,6 +46,7 @@ items:
     branch: retry-load-testing
     track: retry-logic
     status: blocked
+    recommended_model: sonnet
     depends_on: [retry-backoff-strategy]
     blockers:
       - Waiting on load-test cluster capacity.
@@ -53,6 +56,7 @@ items:
     branch: retry-metrics
     track: observability
     status: not started
+    recommended_model: sonnet
     depends_on: [retry-backoff-strategy]
 
   - id: retry-fallback-queue
@@ -60,6 +64,7 @@ items:
     branch: retry-fallback-queue
     track: retry-logic
     status: done
+    recommended_model: sonnet
     pull_request_number: 103
     notes: Marked done here on purpose - see the plan page's drift flag.
 
@@ -68,5 +73,6 @@ items:
     branch: retry-config-flag
     track: observability
     status: in progress
+    recommended_model: sonnet
     pull_request_number: 104
     notes: No dependencies, so it can be reviewed independently.

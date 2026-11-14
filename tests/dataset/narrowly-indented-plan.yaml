@@ -11,3 +11,4 @@ items:
   track: a-track
   depends_on: []
   status: not_started
+  recommended_model: sonnet

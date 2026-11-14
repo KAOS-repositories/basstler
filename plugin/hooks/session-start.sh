@@ -218,6 +218,19 @@ if git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${PLANS_DIR}" 2>/dev/null; then
   fi
 fi
 
+# Every plan item carries a recommended model: those without one get the default.
+SUMMARY_RECOMMENDED_MODELS="$(recommended_models_line_no_plans)"
+if git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${PLANS_DIR}" 2>/dev/null; then
+  if FILLED_RECOMMENDED_MODELS="$("${BASSTLER_PYTHON}" -m "${PLAN_RECOMMENDED_MODELS_MODULE}" \
+      "${PLAN_RECOMMENDED_MODELS_EVERY_PLAN_COMMAND}" --project-root "${PROJECT_ROOT}")" \
+      && fetch_personal_notes_branch; then
+    record_plan_state_sync_stamp
+    SUMMARY_RECOMMENDED_MODELS="${FILLED_RECOMMENDED_MODELS}"
+  else
+    SUMMARY_RECOMMENDED_MODELS="$(recommended_models_line_not_checked)"
+  fi
+fi
+
 PLAN_ID="$(plan_id_for_branch "${CURRENT_BRANCH}" || true)"
 
 # No plan item: say which case (untrackable branch, no item here, no plans).
@@ -429,6 +442,7 @@ session-start.sh summary:
   PR progress:     ${SUMMARY_PROGRESS}
   plan:            ${SUMMARY_PLAN}
   merged items:    ${SUMMARY_MERGED_ITEMS}
+  recommended models: ${SUMMARY_RECOMMENDED_MODELS}
   plan site:       ${SUMMARY_HUB}
   default branch:  ${SUMMARY_DEFAULT_BRANCH}
   git identity:    ${SUMMARY_GIT_IDENTITY}

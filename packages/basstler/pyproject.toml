@@ -39,3 +39,18 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/basstler"]
+
+# What this distribution's tests need besides itself.
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-xdist",
+    "basstler-core",
+    "basstler-git",
+    "basstler-github",
+    "basstler-hub",
+    "basstler-notes",
+    "basstler-plan",
+    "basstler-reviews",
+    "basstler-stack",
+]

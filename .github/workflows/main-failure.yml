@@ -34,8 +34,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      # Every distribution, at the versions uv.lock names, into the interpreter
+      # setup-python put on PATH.
       - name: Install basstler
-        run: pip install --editable basstler
+        run: |
+          python -m pip install uv
+          UV_PROJECT_ENVIRONMENT="$(python -c 'import sys; print(sys.prefix)')" \
+            uv sync --frozen --package basstler --no-dev --project basstler
 
       - name: Record the run
         env:

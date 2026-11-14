@@ -25,3 +25,10 @@ raw-options = {root = "../.."}
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/basstler"]
+
+# What this distribution's tests need besides itself.
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-xdist",
+]

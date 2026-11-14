@@ -38,10 +38,12 @@ class PackageAndPluginRules(Section):
         return ProjectRules
 
     MODULES_IN_THE_PACKAGE = (
-        "Every Python module lives in the `basstler` package under `src/`; the "
-        "plugin under `plugin/` carries only its `SKILL.md` files, manifest and "
-        "bash entry points, which call the installed package with `python -m "
-        "basstler.<module>`"
+        "Every Python module lives in the `basstler` namespace package, under "
+        "`packages/<part>/src/` of the distribution that owns its subject, and its "
+        "tests under that distribution's `packages/<part>/tests/`; helpers the tests "
+        "of several distributions share live in `test_support/`. The plugin under "
+        "`plugin/` carries only its `SKILL.md` files, manifest and bash entry points, "
+        "which call the installed package with `python -m basstler.<module>`"
     )
 
     NAME_FILES_AND_VARIABLES_ONCE = (
@@ -50,7 +52,9 @@ class PackageAndPluginRules(Section):
     )
 
     ONLY_DECLARED_DEPENDENCIES = (
-        "The package depends only on the libraries `pyproject.toml` lists. Code "
+        "Each distribution depends only on the libraries its `pyproject.toml` lists, "
+        "and `uv.lock` pins what the workspace installs; change a requirement there "
+        "and run `uv lock`. Code "
         "that comes from `krrood` is copied, never imported; until krrood's light "
         "core is released, a copied module says so and cites krrood with "
         "`` :cite:`krrood` ``, whose entry is in `docs/references.bib`"
@@ -58,9 +62,9 @@ class PackageAndPluginRules(Section):
 
     IMPORT_ONLY_LISTED_PACKAGES = (
         "A package imports only the basstler packages its pyproject lists: every "
-        "module belongs to a distribution declared in "
-        f"{CodeReference(package_map).path}, and imports only from that distribution "
-        "and the ones it lists",
+        "module belongs to the distribution whose `packages/<part>` folder holds it, "
+        "and imports only from that distribution and the ones its `pyproject.toml` "
+        f"lists, which {CodeReference(package_map).path} reads into layers",
         (),
         PackageBoundaryChecker(),
     )
@@ -127,7 +131,8 @@ class AgentInstructionsRules(Section):
         "Where every violation of a rule has one correct fix, its checker is a "
         f"{CodeReference(FixableChecker).path}: its {CodeReference(CodeFix).path} builds "
         "the replacement and declares whether behaviour changes. Give the fix examples "
-        "as `before.py` and `after.py` in `tests/dataset/rule-fixes/<checker class>/"
+        "as `before.py` and `after.py` in "
+        "`test_support/basstler_testing/dataset/rule-fixes/<checker class>/"
         "<example>/`, which the suite tests, and apply it with "
         f"`{CodeRulesCommand.FIX.invocation}`, never by hand"
     )

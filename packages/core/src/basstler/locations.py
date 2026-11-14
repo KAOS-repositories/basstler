@@ -125,53 +125,6 @@ The parts of the ``basstler`` package this interpreter imports.
 """
 
 
-class PackageLocation(PathEnumeration):
-    """
-    The core distribution's own directory, the files the distributions ship, and the
-    checkout they are imported from, as absolute paths.
-    """
-
-    DIRECTORY = Path(__file__).parent
-    """
-    The core distribution's part of the ``basstler`` package.
-    """
-
-    SOURCE_TREE = DIRECTORY.parents[3]
-    """
-    The checkout's root, holding the workspace's ``pyproject.toml`` and ``packages``,
-    when the package is imported from a checkout through an editable install.
-    Meaningless for a package installed as a copy.
-    """
-
-    STACK_CONFIGURATION = INSTALLED_PACKAGE.shipped(ShippedPath.STACK_CONFIGURATION)
-    """
-    :attr:`ShippedPath.STACK_CONFIGURATION`, where the stack distribution ships it.
-    """
-
-    META_PACKAGE_METADATA = SOURCE_TREE / "packages" / "basstler" / "pyproject.toml"
-    """
-    The ``basstler`` distribution's metadata in a checkout: its name, the interpreters
-    it supports and where its version is read from.
-    """
-
-    LICENSE = SOURCE_TREE / "LICENSE"
-    """
-    The licence text of a checkout.
-    """
-
-    QUERIES = INSTALLED_PACKAGE.shipped(ShippedPath.QUERIES)
-    """
-    :attr:`ShippedPath.QUERIES`, where the github distribution ships them.
-    """
-
-    PLAN_ITEM_MODE_DEFAULTS = INSTALLED_PACKAGE.shipped(
-        ShippedPath.PLAN_ITEM_MODE_DEFAULTS
-    )
-    """
-    :attr:`ShippedPath.PLAN_ITEM_MODE_DEFAULTS`, where the plan distribution ships them.
-    """
-
-
 class WorkspaceLocation(PathEnumeration):
     """
     The parts of the uv workspace of basstler's distributions.
@@ -197,6 +150,58 @@ class WorkspaceLocation(PathEnumeration):
     """
     The versions every distribution and requirement of the workspace installs at,
     relative to the root.
+    """
+
+
+class PackageLocation(PathEnumeration):
+    """
+    The core distribution's own directory, the files the distributions ship, and the
+    checkout they are imported from, as absolute paths.
+    """
+
+    DIRECTORY = Path(__file__).parent
+    """
+    The core distribution's part of the ``basstler`` package.
+    """
+
+    SOURCE_TREE = DIRECTORY.parents[3]
+    """
+    The checkout's root, holding the workspace's ``pyproject.toml`` and ``packages``,
+    when the package is imported from a checkout through an editable install.
+    Meaningless for a package installed as a copy.
+    """
+
+    STACK_CONFIGURATION = INSTALLED_PACKAGE.shipped(ShippedPath.STACK_CONFIGURATION)
+    """
+    :attr:`ShippedPath.STACK_CONFIGURATION`, where the stack distribution ships it.
+    """
+
+    META_PACKAGE_METADATA = (
+        SOURCE_TREE
+        / WorkspaceLocation.PACKAGES
+        / DIRECTORY.name
+        / WorkspaceLocation.METADATA
+    )
+    """
+    The ``basstler`` distribution's metadata in a checkout: its name, the interpreters
+    it supports and where its version is read from.
+    """
+
+    LICENSE = SOURCE_TREE / "LICENSE"
+    """
+    The licence text of a checkout.
+    """
+
+    QUERIES = INSTALLED_PACKAGE.shipped(ShippedPath.QUERIES)
+    """
+    :attr:`ShippedPath.QUERIES`, where the github distribution ships them.
+    """
+
+    PLAN_ITEM_MODE_DEFAULTS = INSTALLED_PACKAGE.shipped(
+        ShippedPath.PLAN_ITEM_MODE_DEFAULTS
+    )
+    """
+    :attr:`ShippedPath.PLAN_ITEM_MODE_DEFAULTS`, where the plan distribution ships them.
     """
 
 

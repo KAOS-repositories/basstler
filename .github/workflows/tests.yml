@@ -34,7 +34,10 @@ jobs:
           python-version: "3.13"
 
       - name: Install basstler
-        run: pip install --editable basstler
+        run: |
+          python -m pip install uv
+          UV_PROJECT_ENVIRONMENT="$(python -c 'import sys; print(sys.prefix)')" \
+            uv sync --frozen --package basstler --no-dev --project basstler
 
       # A measurement that fails never blocks the tests: no output reads as within budget.
       - name: Measure the last 24 hours of runs against the budget
@@ -62,20 +65,22 @@ jobs:
         with:
           python-version: "3.13"
 
-      # Dependency groups need pip 25.1 or later.
-      - name: Install the development tools
+      # Every distribution and the development tools, at the versions uv.lock names,
+      # into the interpreter setup-python put on PATH.
+      - name: Install the workspace and the development tools
         run: |
-          python -m pip install --upgrade pip
-          pip install --group dev
+          python -m pip install uv
+          UV_PROJECT_ENVIRONMENT="$(python -c 'import sys; print(sys.prefix)')" \
+            uv sync --frozen --all-packages
+
+      - name: Check the lock is up to date
+        run: uv lock --check
 
       - name: Check the code rules
         run: ruff check .
 
       - name: Check the formatting
         run: ruff format --check .
-
-      - name: Install basstler
-        run: pip install --editable .
 
       - name: Fail on a crossing the base does not have
         run: python -m basstler code-rules new-crossings "$BASE_COMMIT"
@@ -91,7 +96,7 @@ jobs:
       needs.usage.outputs.over_budget != 'true' ||
       contains(github.event.pull_request.labels.*.name, 'budget-override'))
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -107,17 +112,31 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # The hook tests run python3 from the path, so the package is installed into the
-      # interpreter setup-python put there.
-      - name: Install basstler and the test runner
+      - name: Install uv
+        run: python -m pip install uv
+
+      # Each distribution's tests run in an environment of their own, holding only the
+      # distribution and what its pyproject.toml lists for it and its tests, and all of
+      # them run on any change. The hook tests run python3 from the path, so the
+      # environment's interpreter is put first on it.
+      - name: Run each distribution's tests on its own
         run: |
-          python -m pip install --upgrade pip
-          pip install --editable . --group dev
-
-      # The plan page's script is tested in a headless Chromium.
-      - name: Install the browser the page tests run in
-        run: python -m playwright install --with-deps chromium
-
-      - name: Run the tests
-        run: pytest tests -n auto
-
+          failed=""
+          for directory in packages/*/; do
+            part="$(basename "${directory}")"
+            name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "${directory}pyproject.toml" | head -1)"
+            environment="${RUNNER_TEMP}/environments/${part}"
+            echo "::group::${name}"
+            UV_PROJECT_ENVIRONMENT="${environment}" uv sync --frozen --package "${name}" \
+              --python "${{ matrix.python-version }}"
+            if [ -x "${environment}/bin/playwright" ]; then
+              "${environment}/bin/python" -m playwright install --with-deps chromium
+            fi
+            PATH="${environment}/bin:${PATH}" "${environment}/bin/python" -m pytest \
+              "${directory}tests" -n auto || failed="${failed} ${name}"
+            echo "::endgroup::"
+          done
+          if [ -n "${failed}" ]; then
+            echo "Tests failed for:${failed}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi

@@ -162,10 +162,10 @@
 
 ## Package and plugin
 <!-- from PackageAndPluginRules in basstler/code_rules/rules/project.py -->
-- Every Python module lives in the `basstler` package under `src/`; the plugin under `plugin/` carries only its `SKILL.md` files, manifest and bash entry points, which call the installed package with `python -m basstler.<module>`
+- Every Python module lives in the `basstler` namespace package, under `packages/<part>/src/` of the distribution that owns its subject, and its tests under that distribution's `packages/<part>/tests/`; helpers the tests of several distributions share live in `test_support/`. The plugin under `plugin/` carries only its `SKILL.md` files, manifest and bash entry points, which call the installed package with `python -m basstler.<module>`
 - Name every file and directory once, in `basstler.locations`; every environment variable once, in `basstler.environment`
-- The package depends only on the libraries `pyproject.toml` lists. Code that comes from `krrood` is copied, never imported; until krrood's light core is released, a copied module says so and cites krrood with `` :cite:`krrood` ``, whose entry is in `docs/references.bib`
-- A package imports only the basstler packages its pyproject lists: every module belongs to a distribution declared in `basstler.package_map`, and imports only from that distribution and the ones it lists (checked by `basstler code-rules check`)
+- Each distribution depends only on the libraries its `pyproject.toml` lists, and `uv.lock` pins what the workspace installs; change a requirement there and run `uv lock`. Code that comes from `krrood` is copied, never imported; until krrood's light core is released, a copied module says so and cites krrood with `` :cite:`krrood` ``, whose entry is in `docs/references.bib`
+- A package imports only the basstler packages its pyproject lists: every module belongs to the distribution whose `packages/<part>` folder holds it, and imports only from that distribution and the ones its `pyproject.toml` lists, which `basstler.package_map` reads into layers (checked by `basstler code-rules check`)
 
 ## Portability
 <!-- from PortabilityRules in basstler/code_rules/rules/project.py -->
@@ -177,7 +177,7 @@
 <!-- from AgentInstructionsRules in basstler/code_rules/rules/project.py -->
 - `AGENTS.md` is generated from the sections in `basstler.code_rules.rules`; change a rule there and run `basstler code-rules agents-md`, never edit the file
 - A script that finds code breaking a rule is a `basstler.code_rules.checker.CodeRuleChecker`, set as that rule's `checker`, so the rule and its check are declared together
-- Where every violation of a rule has one correct fix, its checker is a `basstler.code_rules.fixes.FixableChecker`: its `basstler.code_rules.fixes.CodeFix` builds the replacement and declares whether behaviour changes. Give the fix examples as `before.py` and `after.py` in `tests/dataset/rule-fixes/<checker class>/<example>/`, which the suite tests, and apply it with `basstler code-rules fix`, never by hand
+- Where every violation of a rule has one correct fix, its checker is a `basstler.code_rules.fixes.FixableChecker`: its `basstler.code_rules.fixes.CodeFix` builds the replacement and declares whether behaviour changes. Give the fix examples as `before.py` and `after.py` in `test_support/basstler_testing/dataset/rule-fixes/<checker class>/<example>/`, which the suite tests, and apply it with `basstler code-rules fix`, never by hand
 
 ## Releases
 <!-- from ReleasesRules in basstler/code_rules/rules/project.py -->

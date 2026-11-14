@@ -187,7 +187,7 @@ builds the plan's page.
 
 Every session that loads a plan pays for every line of it, so the plan holds
 only what a future session needs to act. `save-plan.sh` enforces this with
-the limits `src/basstler/plan/size_limits.py` names (`Measure`):
+the limits `packages/plan/src/basstler/plan/size_limits.py` names (`Measure`):
 
 - **Landed items are dropped on save**, along with every `depends_on` edge to
   them: the work is in the code and its history in git. A plan left with no

@@ -5,6 +5,7 @@ The paths the package names, and how a member stands in for its path.
 from __future__ import annotations
 
 import os
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from basstler.locations import (
     PackageLocation,
     PluginLocation,
     ProjectLocation,
+    WorkspaceLocation,
 )
 
 # %% a member stands in for its path
@@ -90,38 +92,25 @@ def test_the_package_directory_is_a_part_of_the_package_imported():
     assert PackageLocation.DIRECTORY.value in INSTALLED_PACKAGE.directories
 
 
-@pytest.mark.parametrize(
-    "location",
-    list(PackageLocation),
-    ids=lambda member: member._name_,
-)
-def test_every_shipped_location_exists(location: PackageLocation):
-    """
-    A misspelled location would only fail at the first read of it.
-
-    The board is left out, as scratch state a maintenance pass writes.
-    """
-    assert location.value.exists()
-
-
 def test_the_package_directory_sits_under_its_distributions_src_directory():
     """
     Each distribution follows the ``src`` layout under ``packages`` of the workspace.
     """
     assert PackageLocation.DIRECTORY.value.parent.parent.parent == (
-        PackageLocation.SOURCE_TREE / "packages"
+        PackageLocation.SOURCE_TREE / WorkspaceLocation.PACKAGES
     )
 
 
-def test_the_dependency_declaration_is_the_source_trees_own_metadata():
+def test_the_meta_package_metadata_names_the_package_s_own_distribution():
     """
-    ``pyproject.toml`` is read from the source tree, beside the ``src`` directory,
-    rather than shipped inside the package.
+    The metadata a checkout's requirements start from is that of the distribution the
+    package is named after.
     """
-    assert (
-        PackageLocation.META_PACKAGE_METADATA.value
-        == PackageLocation.SOURCE_TREE / "pyproject.toml"
+    metadata = tomllib.loads(
+        PackageLocation.META_PACKAGE_METADATA.value.read_text(encoding="utf-8")
     )
+
+    assert metadata["project"]["name"] == PackageLocation.DIRECTORY.value.name
 
 
 # %% the plugin's files

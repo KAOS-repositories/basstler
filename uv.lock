@@ -64,6 +64,20 @@ dependencies = [
     { name = "cyclopts" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-github" },
+    { name = "basstler-hub" },
+    { name = "basstler-notes" },
+    { name = "basstler-plan" },
+    { name = "basstler-reviews" },
+    { name = "basstler-stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
@@ -78,6 +92,20 @@ requires-dist = [
     { name = "cyclopts", specifier = ">=5.3" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-hub", editable = "packages/hub" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-plan", editable = "packages/plan" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [[package]]
 name = "basstler-build"
 source = { editable = "packages/build" }
@@ -86,10 +114,22 @@ dependencies = [
     { name = "packaging" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "hatchling", specifier = ">=1.24" },
     { name = "packaging", specifier = ">=24" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [[package]]
@@ -103,6 +143,12 @@ dependencies = [
     { name = "rustworkx" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "jinja2", specifier = ">=3" },
@@ -112,6 +158,12 @@ requires-dist = [
     { name = "rustworkx", specifier = ">=0.15" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [[package]]
 name = "basstler-git"
 source = { editable = "packages/git" }
@@ -119,8 +171,30 @@ dependencies = [
     { name = "basstler-core" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-github" },
+    { name = "basstler-notes" },
+    { name = "basstler-reviews" },
+    { name = "basstler-stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "basstler-core", editable = "packages/core" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
 
 [[package]]
 name = "basstler-github"
@@ -133,6 +207,19 @@ dependencies = [
     { name = "pyyaml" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-hub" },
+    { name = "basstler-notes" },
+    { name = "basstler-plan" },
+    { name = "basstler-reviews" },
+    { name = "basstler-stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
@@ -140,6 +227,19 @@ requires-dist = [
     { name = "cyclopts", specifier = ">=5.3" },
     { name = "pydantic", specifier = ">=2.11" },
     { name = "pyyaml", specifier = ">=6" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-hub", editable = "packages/hub" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-plan", editable = "packages/plan" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [[package]]
@@ -157,6 +257,20 @@ dependencies = [
     { name = "pyyaml" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-github" },
+    { name = "basstler-notes" },
+    { name = "basstler-plan" },
+    { name = "basstler-reviews" },
+    { name = "basstler-stack" },
+    { name = "playwright" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
@@ -168,6 +282,20 @@ requires-dist = [
     { name = "basstler-stack", editable = "packages/stack" },
     { name = "cyclopts", specifier = ">=5.3" },
     { name = "pyyaml", specifier = ">=6" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-plan", editable = "packages/plan" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "playwright" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [[package]]
@@ -182,6 +310,18 @@ dependencies = [
     { name = "cyclopts" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-github" },
+    { name = "basstler-plan" },
+    { name = "basstler-reviews" },
+    { name = "basstler-stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
@@ -190,6 +330,18 @@ requires-dist = [
     { name = "basstler-reviews", editable = "packages/reviews" },
     { name = "basstler-stack", editable = "packages/stack" },
     { name = "cyclopts", specifier = ">=5.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-plan", editable = "packages/plan" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [[package]]
@@ -206,6 +358,19 @@ dependencies = [
     { name = "rustworkx" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-github" },
+    { name = "basstler-hub" },
+    { name = "basstler-notes" },
+    { name = "basstler-reviews" },
+    { name = "basstler-stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
@@ -218,6 +383,19 @@ requires-dist = [
     { name = "rustworkx", specifier = ">=0.15" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-hub", editable = "packages/hub" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [[package]]
 name = "basstler-reviews"
 source = { editable = "packages/reviews" }
@@ -227,11 +405,33 @@ dependencies = [
     { name = "basstler-github" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-github" },
+    { name = "basstler-notes" },
+    { name = "basstler-stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
     { name = "basstler-git", editable = "packages/git" },
     { name = "basstler-github", editable = "packages/github" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [[package]]
@@ -244,12 +444,36 @@ dependencies = [
     { name = "libcst" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-github" },
+    { name = "basstler-notes" },
+    { name = "basstler-reviews" },
+    { name = "basstler-stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
     { name = "basstler-git", editable = "packages/git" },
     { name = "cyclopts", specifier = ">=5.3" },
     { name = "libcst", specifier = ">=1.8" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [[package]]
@@ -263,6 +487,17 @@ dependencies = [
     { name = "cyclopts" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-git" },
+    { name = "basstler-github" },
+    { name = "basstler-notes" },
+    { name = "basstler-reviews" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "basstler-core", editable = "packages/core" },
@@ -270,6 +505,17 @@ requires-dist = [
     { name = "basstler-github", editable = "packages/github" },
     { name = "basstler-reviews", editable = "packages/reviews" },
     { name = "cyclopts", specifier = ">=5.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-git", editable = "packages/git" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-reviews", editable = "packages/reviews" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [[package]]

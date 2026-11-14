@@ -101,7 +101,7 @@ def test_a_restack_keeps_what_the_branches_it_switches_to_do_not_have(
         a_stack(fork_checkout, the_board()), fork_checkout.git, RecordingPullRequests()
     )
 
-    assert tooling.read_text() == TOOLING_CONTENT
+    assert tooling.read_text(encoding="utf-8") == TOOLING_CONTENT
 
 
 def test_a_restack_publishes_a_branch_the_caller_is_sitting_on(
@@ -181,7 +181,7 @@ def test_a_restack_leaves_no_worktree_of_its_own_behind(fork_checkout: ForkCheck
         line.removeprefix("worktree ")
         for line in listed.splitlines()
         if line.startswith("worktree ")
-    ] == [str(fork_checkout.project_root.resolve())]
+    ] == [fork_checkout.project_root.resolve().as_posix()]
 
 
 def test_a_restack_that_raises_still_takes_its_worktree_with_it(
@@ -211,4 +211,4 @@ def test_a_restack_that_raises_still_takes_its_worktree_with_it(
         line.removeprefix("worktree ")
         for line in listed.splitlines()
         if line.startswith("worktree ")
-    ] == [str(fork_checkout.project_root.resolve())]
+    ] == [fork_checkout.project_root.resolve().as_posix()]

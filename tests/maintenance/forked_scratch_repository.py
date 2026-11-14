@@ -110,7 +110,7 @@ class GitHubRepositoryStandIn:
         """
         :return: The URL a remote in the scratch clone points at.
         """
-        return f"file://{self.path}"
+        return self.path.as_uri()
 
     @property
     def url_rewriting_key(self) -> str:

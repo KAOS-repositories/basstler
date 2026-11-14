@@ -9,7 +9,7 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -37,9 +37,9 @@ BASE_BRANCH = "main"
 The branch the scratch repository's candidates are compared against.
 """
 
-NEW_SKILL_PATH = str(
+NEW_SKILL_PATH = (
     ProjectLocation.CLAUDE_CODE_DIRECTORY / "skills" / "new-thing" / "SKILL.md"
-)
+).as_posix()
 """
 A path no branch but ``overlapping`` introduces - the fold test's positive case.
 """
@@ -169,7 +169,7 @@ def test_candidate_changing_a_file_in_a_requested_directory_reports_it_as_shared
     report = build_scope_report(
         candidate_repository.project_root,
         BASE_BRANCH,
-        [str(Path(NEW_SKILL_PATH).parent)],
+        [PurePosixPath(NEW_SKILL_PATH).parent.as_posix()],
         [Candidate("the parent", "overlapping")],
     )
 
@@ -275,7 +275,7 @@ def test_command_line_prints_the_report_as_json(
             "the parent=overlapping",
         ],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         cwd=RepositoryLocation.ROOT,
     )
     assert result.returncode == 0, result.stderr
@@ -309,7 +309,7 @@ def test_command_line_reports_an_unresolvable_branch_as_a_failure(
             NEW_SKILL_PATH,
         ],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         cwd=RepositoryLocation.ROOT,
     )
 

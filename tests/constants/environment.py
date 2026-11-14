@@ -154,6 +154,23 @@ class FileMode(IntEnum):
     Readable and runnable by everyone, writable by its owner.
     """
 
+    READ_ONLY_DIRECTORY = 0o555
+    """
+    A directory everyone can list and enter but no one can add to or delete from.
+    """
+
+
+class InterpreterName(StrEnum):
+    """
+    The names the hooks run a Python interpreter by.
+    """
+
+    PYTHON3 = "python3"
+    """
+    The name the shell configuration falls back to before the package environment
+    exists, which a Windows virtual environment does not provide.
+    """
+
 
 class BashStubVariable(StrEnum):
     """

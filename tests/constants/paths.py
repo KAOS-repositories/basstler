@@ -25,6 +25,16 @@ class RepositoryLocation(PathEnumeration):
     The repository root.
     """
 
+    TESTS = ROOT / "tests"
+    """
+    This test suite.
+    """
+
+    SCRIPTS = ROOT / "scripts"
+    """
+    The development scripts, such as the docstring formatter the pre-commit hook runs.
+    """
+
     MARKETPLACE = ROOT / ".claude-plugin" / "marketplace.json"
     """
     The marketplace that lists the plugin and says where it is served from.
@@ -69,6 +79,12 @@ class RepositoryLocation(PathEnumeration):
     """
     The workflow that runs the personal-notes setup on Windows for a pull request
     changing what the setup runs.
+    """
+
+    WINDOWS_TESTS_WORKFLOW = WORKFLOWS / "windows-tests.yml"
+    """
+    The workflow that runs the whole suite on Windows for every pull request ready for
+    review.
     """
 
     MAIN_FAILURE_WORKFLOW = WORKFLOWS / "main-failure.yml"
@@ -340,6 +356,11 @@ class DatasetLocation(PathEnumeration):
     per fixture plan.
     """
 
+    BASH_PATH_SCRIPT = DIRECTORY / "bash-path.sh"
+    """
+    Prints a path as the bash running it writes it.
+    """
+
     STUBS = DIRECTORY / "stubs"
     """
     Executables copied onto a scratch ``PATH`` to stand in for a real ``gh``, ``curl`` or
@@ -369,6 +390,14 @@ class DatasetLocation(PathEnumeration):
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, saying this session
     cannot start the build yet.
+    """
+
+    BUILD_START_NEEDS_ACCESS_WINDOWS_LINES_STUB = (
+        STUBS / "build_start_needs_access_windows_lines.py"
+    )
+    """
+    :attr:`BUILD_START_NEEDS_ACCESS_STUB` with its lines ending in a carriage return and
+    a line feed, as Python writes them on Windows.
     """
 
     BUILD_START_HAS_ACCESS_STUB = STUBS / "build_start_has_access.py"
@@ -763,6 +792,72 @@ class RuleSectionsFile(PathEnumeration):
     """
     The text of the sections in ``rule_sections.py``, with placeholders for the module's
     path and the commands' invocations.
+    """
+
+
+class BashByNameSnippet(PathEnumeration):
+    """
+    Source files the check for bash started by its name reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "bash-by-name"
+    """
+    The directory holding them.
+    """
+
+    SUBPROCESS_CALL = DIRECTORY / "subprocess-call.py"
+    """
+    A :mod:`subprocess` call running bash by its name, on line 9.
+    """
+
+    RETURNED_COMMAND = DIRECTORY / "returned-command.py"
+    """
+    A function returning a command line that runs bash by its name, on line 12.
+    """
+
+    LOCATED_BASH = DIRECTORY / "located-bash.py"
+    """
+    A run of the located bash, and a tuple of names starting with bash that is no
+    command.
+    """
+
+
+class LocaleEncodingSnippet(PathEnumeration):
+    """
+    Source files the check for text read or written in the locale encoding reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "locale-encoding"
+    """
+    The directory holding them.
+    """
+
+    LOCALE_TEXT = DIRECTORY / "locale-text.py"
+    """
+    Every kind of text read or written in the locale encoding, one per line from line
+    12 to line 16.
+    """
+
+    UTF_8_TEXT = DIRECTORY / "utf-8-text.py"
+    """
+    Text read and written as UTF-8, bytes read and written without an encoding, and a
+    request opened, which is no file.
+    """
+
+
+class TreeRemovalSnippet(PathEnumeration):
+    """
+    Source files the check for directories removed with :func:`shutil.rmtree` reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "tree-removal"
+    """
+    The directory holding them.
+    """
+
+    SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
+    """
+    Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
     """
 
 

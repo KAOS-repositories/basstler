@@ -13,9 +13,13 @@ expected to carry from the same definitions the hook prints it from.
 
 from __future__ import annotations
 
+import os
+
 import subprocess
 from enum import StrEnum
+from pathlib import PurePath
 
+from basstler.bash import Bash
 from basstler.locations import PluginLocation
 
 from ..constants.paths import RepositoryLocation
@@ -371,27 +375,30 @@ def summary_value(output: str, label: SummaryLine) -> str:
     raise AssertionError(f"no '{label}' line in this summary report:\n{output}")
 
 
-def summary_message(message: SummaryMessage, *arguments: str) -> str:
+def summary_message(message: SummaryMessage, *arguments: str | PurePath) -> str:
     """
     Render one summary line from the same definitions session-start.sh prints it from,
     so an assertion is never a second copy of the wording.
 
     :param message: The summary line to render.
-    :param arguments: That message's arguments, in order.
+    :param arguments: That message's arguments, in order; a path is passed with forward
+        slashes, as the shell writes it.
     :return: The rendered line.
     """
     result = subprocess.run(
-        [
-            "bash",
+        Bash.locate(os.environ).command(
             "-c",
             'source "$1"; shift; "$@"',
             "_",
             str(MESSAGES_SCRIPT),
             message,
-            *arguments,
-        ],
+            *(
+                argument.as_posix() if isinstance(argument, PurePath) else argument
+                for argument in arguments
+            ),
+        ),
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
     assert result.returncode == 0, result.stderr
     return result.stdout

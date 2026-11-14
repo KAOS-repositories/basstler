@@ -123,7 +123,7 @@ def stored(secret: DatasetLocation) -> GitHubResponse:
     :param secret: The recorded secret.
     :return: GitHub's answer with it.
     """
-    return GitHubResponse(json.loads(secret.read_text()))
+    return GitHubResponse(json.loads(secret.read_text(encoding="utf-8")))
 
 
 def runs_replaying(
@@ -135,7 +135,11 @@ def runs_replaying(
     :return: A client answering with that listing.
     """
     return ReplayingRestClient(
-        {RunListing.path(repository, NOTES_BRANCH): json.loads(listing.read_text())}
+        {
+            RunListing.path(repository, NOTES_BRANCH): json.loads(
+                listing.read_text(encoding="utf-8")
+            )
+        }
     )
 
 
@@ -493,7 +497,9 @@ def test_the_rows_are_the_verdict_then_one_per_other_repository():
 def notes_location() -> PersonalNotesLocation:
     """:return: Notes kept on the fork checkout's ``origin``."""
     return PersonalNotesLocation(
-        RemoteName.ORIGIN, NOTES_BRANCH, str(ProjectLocation.PERSONAL_NOTES_DOCUMENT)
+        RemoteName.ORIGIN,
+        NOTES_BRANCH,
+        (ProjectLocation.PERSONAL_NOTES_DOCUMENT).as_posix(),
     )
 
 

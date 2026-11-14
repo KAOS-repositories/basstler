@@ -32,6 +32,7 @@ from basstler.plan_site.dispatch_check import UNVERIFIED_PREFIX
 from basstler.plan_site.hub import HubFileKey
 from basstler.setup.report import CheckResult, CheckStatus, SetupCheck, SetupReport
 
+from ..bash_path import BashPath
 from ..constants.environment import ConfigurationVariable, ScrubbedEnvironmentPrefix
 from ..constants.notes import ScratchBranch
 from ..constants.paths import DatasetLocation, PersonalNotesPath
@@ -201,7 +202,7 @@ def test_does_not_check_for_the_notes_file_when_its_branch_is_missing(
 def test_reports_a_notes_branch_that_exists_but_holds_no_notes_file(
     check_setup_repository: ScratchRepository,
 ):
-    other_notes = str(ProjectLocation.PERSONAL_NOTES / "some-other-notes.md")
+    other_notes = (ProjectLocation.PERSONAL_NOTES / "some-other-notes.md").as_posix()
     check_setup_repository.run_git("config", "claude.personalNotesPath", other_notes)
 
     report = run_check_setup(check_setup_repository)
@@ -323,6 +324,25 @@ def with_build_start_stub(
         / Path(build_start.__file__).relative_to(package_root),
     )
     return repository
+
+
+def test_a_build_start_answer_in_windows_lines_is_one_row(
+    check_setup_repository: ScratchRepository,
+):
+    """
+    Python on Windows ends each line it prints with a carriage return, which must not
+    split the answer into rows the report cannot read.
+    """
+    with_build_start_stub(
+        check_setup_repository,
+        DatasetLocation.BUILD_START_NEEDS_ACCESS_WINDOWS_LINES_STUB,
+    )
+
+    report = run_check_setup(
+        check_setup_repository, **{ClaudeCodeVariable.REMOTE: EnvironmentFlag.TRUE}
+    )
+
+    assert report.results[SetupCheck.PLAN_SITE_ACCESS].status == CheckStatus.NEEDS_SETUP
 
 
 def test_a_cloud_session_that_cannot_start_the_build_needs_setup(
@@ -482,9 +502,10 @@ def test_a_repository_row_is_not_printed_when_the_plan_site_is_not_requested(
 def test_the_dispatch_workflow_path_matches_the_shell_configuration(
     check_setup_repository: ScratchRepository,
 ):
-    assert check_setup_repository.configuration_value(
-        "PLAN_SITE_DISPATCH_WORKFLOW_PATH"
-    ) == str(WorkflowLocation.PLAN_SITE_DISPATCH)
+    assert (
+        check_setup_repository.configuration_value("PLAN_SITE_DISPATCH_WORKFLOW_PATH")
+        == Path(WorkflowLocation.PLAN_SITE_DISPATCH).as_posix()
+    )
 
 
 # %% the package's version
@@ -658,14 +679,14 @@ def test_reports_which_source_each_resolved_setting_came_from(
         f"{ScratchBranch.PERSONAL_NOTES} (from built-in default)"
     )
     assert report.results[SetupCheck.NOTES_PATH].detail == (
-        f"{ProjectLocation.PERSONAL_NOTES_DOCUMENT} (from built-in default)"
+        f"{ProjectLocation.PERSONAL_NOTES_DOCUMENT.as_posix()} (from built-in default)"
     )
 
 
 def test_reports_a_setting_resolved_from_the_environment(
     check_setup_repository: ScratchRepository,
 ):
-    notes_path = str(ProjectLocation.PERSONAL_NOTES / "from-the-environment.md")
+    notes_path = (ProjectLocation.PERSONAL_NOTES / "from-the-environment.md").as_posix()
     report = run_check_setup(
         check_setup_repository, CLAUDE_PERSONAL_NOTES_PATH=notes_path
     )
@@ -686,7 +707,9 @@ def test_reports_which_tooling_files_the_plugin_is_missing(
     assert report.exit_code is SetupCheckExitCode.SETUP_INCOMPLETE
     assert report.results[SetupCheck.TOOLING_FILES].status == CheckStatus.NEEDS_SETUP
     assert (
-        SetupPrerequisiteFile.PLAN_SCHEMA
+        BashPath(
+            check_setup_repository.plugin_root / SetupPrerequisiteFile.PLAN_SCHEMA
+        ).text
         in report.results[SetupCheck.TOOLING_FILES].detail
     )
     assert (
@@ -702,7 +725,7 @@ def test_reports_a_session_start_hook_that_is_not_registered(
         check_setup_repository.plugin_root
         / PluginLocation.HOOKS.value.name
         / "hooks.json"
-    ).write_text("{}\n")
+    ).write_text("{}\n", encoding="utf-8")
 
     report = run_check_setup(check_setup_repository)
     assert report.exit_code is SetupCheckExitCode.SETUP_INCOMPLETE
@@ -731,7 +754,8 @@ def test_reports_declared_dependencies_that_are_not_installed(
     check_setup_repository: ScratchRepository,
 ):
     (check_setup_repository.checkout_root / PackageSourceFile.METADATA).write_text(
-        DatasetLocation.PARTLY_INSTALLED_PROJECT.read_text(),
+        DatasetLocation.PARTLY_INSTALLED_PROJECT.read_text(encoding="utf-8"),
+        encoding="utf-8",
     )
     installed, uninstalled = ProjectDeclaration.read(
         DatasetLocation.PARTLY_INSTALLED_PROJECT
@@ -756,7 +780,7 @@ def test_reports_a_declaration_it_cannot_read_rather_than_nothing_missing(
     not reported as an environment with nothing missing.
     """
     (check_setup_repository.checkout_root / PackageSourceFile.METADATA).write_text(
-        "this is not toml\n"
+        "this is not toml\n", encoding="utf-8"
     )
 
     report = run_check_setup(check_setup_repository)
@@ -777,7 +801,7 @@ def mark_an_install_in_progress(repository: ScratchRepository, process_id: int) 
     """
     marker = Path(repository.configuration_value(ConfigurationVariable.INSTALL_MARKER))
     marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(f"{process_id}\n")
+    marker.write_text(f"{process_id}\n", encoding="utf-8")
 
 
 def test_reports_dependencies_a_session_start_is_installing_as_in_progress(
@@ -898,7 +922,7 @@ def test_run_outside_a_repository_names_the_directory_on_stderr(
     """
     result = run_check_setup_outside(check_setup_repository, outside_any_repository)
 
-    assert str(outside_any_repository.resolve()) in result.stderr
+    assert BashPath(outside_any_repository.resolve()).text in result.stderr
 
 
 # %% reporting only the requested checks
@@ -920,7 +944,7 @@ def test_a_failing_unrequested_check_does_not_fail_the_requested_one(
 ):
     dispatch_needing_setup.write(
         ProjectLocation.PROJECT_STACK_CONFIGURATION,
-        DatasetLocation.SCRATCH_FORK_STACK_CONFIGURATION.read_text(),
+        DatasetLocation.SCRATCH_FORK_STACK_CONFIGURATION.read_text(encoding="utf-8"),
     )
 
     report = run_check_setup(

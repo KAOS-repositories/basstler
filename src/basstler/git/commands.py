@@ -177,7 +177,7 @@ class GitCommandRunner:
             ["git", *arguments],
             cwd=self.working_directory,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             env={**os.environ, **(environment or {})},
         )
         return GitCommandResult(
@@ -295,7 +295,7 @@ class GitCommandRunner:
             self.run("read-tree", parent or "--empty", environment=index)
             blob_file = Path(scratch) / CommitScratchFile.BLOB
             for path, text in files.items():
-                blob_file.write_text(text + "\n")
+                blob_file.write_text(text + "\n", encoding="utf-8")
                 blob = self.run("hash-object", "-w", str(blob_file))
                 self.run(
                     "update-index",

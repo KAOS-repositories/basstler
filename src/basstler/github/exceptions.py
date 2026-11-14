@@ -176,3 +176,24 @@ class GitHubUnreachableError(GitHubCallFailed, ConnectionError):
 
     def suggest_correction(self) -> str:
         return "Check the network connection to GitHub, then run the command again."
+
+
+@dataclass
+class GraphQLErrorsReturned(DataclassException):
+    """
+    Raised when GitHub answers a GraphQL request with errors.
+    """
+
+    messages: tuple[str, ...]
+    """
+    Every message GitHub reported.
+    """
+
+    def error_message(self) -> str:
+        return "GitHub answered with errors: " + "; ".join(self.messages)
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that what the request names exists and that the account gh is "
+            "logged in as may read or change it: gh auth status"
+        )

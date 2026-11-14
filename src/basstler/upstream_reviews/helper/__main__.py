@@ -33,6 +33,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.class_property import classproperty
 from basstler.github.repository import Repository
 from basstler.github.states import CheckOutcome
@@ -274,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             request.identifier, SessionTranscript.current().chunks(request.identifier)
         )
         logger.info(recording.report(request, arguments.include_resolved))
-    except UpstreamReadError as failure:
+    except (UpstreamReadError, GraphQLErrorsReturned) as failure:
         logger.error(failure)
         return 1
     return 0

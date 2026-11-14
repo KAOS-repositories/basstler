@@ -30,6 +30,7 @@ import sys
 from enum import StrEnum
 from pathlib import Path
 
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandFailed, GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
@@ -190,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     except ActionUnavailable as failure:
         logger.error(failure)
         return ActionExitCode.UNAVAILABLE
-    except (UpstreamReadError, GitCommandFailed) as failure:
+    except (UpstreamReadError, GraphQLErrorsReturned, GitCommandFailed) as failure:
         logger.error(failure)
         return ActionExitCode.READ_FAILED
     return ActionExitCode.SUCCESS

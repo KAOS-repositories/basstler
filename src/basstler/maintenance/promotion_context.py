@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandRunner
+from basstler.git.commit_range import CommitRange, FileChange
 from basstler.github.pull_request_record import (
     PullRequestField,
 )
@@ -21,49 +22,6 @@ from basstler.github.repository_access import PullRequestReader
 from basstler.stack.model import Stack, StackBranch
 
 # %% how much a branch changes
-
-
-@dataclass(frozen=True)
-class FileChange:
-    """
-    One file a branch changes, and by how many lines.
-    """
-
-    path: str
-    """
-    The file, relative to the repository root.
-    """
-
-    insertions: int
-    """
-    Lines added, zero for a binary file.
-    """
-
-    deletions: int
-    """
-    Lines removed, zero for a binary file.
-    """
-
-    @classmethod
-    def from_numstat_line(cls, line: str) -> FileChange:
-        """
-        :param line: One line of ``git diff --numstat``: added, removed, path, tab
-            separated, with ``-`` for the counts of a binary file.
-        :return: The change it describes.
-        """
-        insertions, deletions, path = line.split("\t", 2)
-        return cls(
-            path,
-            int(insertions) if insertions.isdigit() else 0,
-            int(deletions) if deletions.isdigit() else 0,
-        )
-
-    @property
-    def changed_lines(self) -> int:
-        """
-        Lines added and removed together.
-        """
-        return self.insertions + self.deletions
 
 
 @dataclass(frozen=True)
@@ -233,7 +191,7 @@ class PromotionContextReader:
         subjects = self.git.run(
             "log", "--no-merges", "--reverse", "--format=%s", f"{compared_with}..{tip}"
         ).splitlines()
-        changes_per_file = self.git.run("diff", "--numstat", f"{compared_with}...{tip}")
+        commits = CommitRange(self.git, self.git.merge_base(compared_with, tip), tip)
         return PromotionContext(
             pull_request_number=number,
             branch=branch.name,
@@ -244,13 +202,7 @@ class PromotionContextReader:
             ),
             commit_subjects=tuple(subjects[: self.commit_limit]),
             commits_not_listed=max(len(subjects) - self.commit_limit, 0),
-            change_size=ChangeSize.of(
-                [
-                    FileChange.from_numstat_line(line)
-                    for line in changes_per_file.splitlines()
-                ],
-                self.file_limit,
-            ),
+            change_size=ChangeSize.of(commits.file_changes(), self.file_limit),
         )
 
     def shortened(self, description: str) -> str:

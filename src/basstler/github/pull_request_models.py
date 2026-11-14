@@ -5,9 +5,8 @@ GraphQL API returns them, and the snapshot a report is rendered from.
 
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, dataclass, field
-from typing import Annotated, Any, Literal
+from dataclasses import dataclass
+from typing import Annotated, Literal
 
 from pydantic import AliasPath, Field
 
@@ -21,9 +20,6 @@ from basstler.github.review_models import (
 from basstler.github.states import CheckOutcome, CombinedCheckState, ConclusionOutcome
 from basstler.github.web_page import AbsentAsEmpty
 from basstler.json_model import ValidatedJSONModel
-from basstler.upstream_reviews.exceptions import (
-    GraphQLErrorsReturned,
-)
 
 # %% models mirroring the pull request
 
@@ -330,69 +326,3 @@ class ReviewThreadsPageResult(ValidatedJSONModel):
     """
     The pull request, carrying one page of its review threads.
     """
-
-
-# %% the GraphQL envelope
-
-
-@dataclass(frozen=True)
-class GraphQLRequest:
-    """
-    One GraphQL query, whose fields are named as the request body names them.
-    """
-
-    query: str
-    """
-    The GraphQL document.
-    """
-
-    variables: dict[str, Any]
-    """
-    The document's variables.
-    """
-
-    def to_json(self) -> dict[str, Any]:
-        """
-        :return: The request body GitHub's GraphQL endpoint reads.
-        """
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class GraphQLResponse:
-    """
-    A parsed GraphQL response envelope.
-    """
-
-    data: dict[str, Any] | None
-    """
-    The ``data`` data, absent when the query failed outright.
-    """
-
-    errors: list[str] = field(default_factory=list)
-    """
-    Every message from an ``errors`` array, empty on success.
-    """
-
-    @classmethod
-    def from_json(cls, text: str) -> GraphQLResponse:
-        """
-        Parse a response body.
-
-        :param text: The raw JSON GitHub returned.
-        :return: The parsed envelope.
-        """
-        body = json.loads(text)
-        return cls(
-            data=body.get("data"),
-            errors=[error["message"] for error in body.get("errors", [])],
-        )
-
-    def result(self) -> dict[str, Any]:
-        """:return: The query's result.
-
-        :raises GraphQLErrorsReturned: If GitHub reported errors instead.
-        """
-        if self.errors:
-            raise GraphQLErrorsReturned(self.errors)
-        return self.data or {}

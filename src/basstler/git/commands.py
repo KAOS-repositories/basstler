@@ -441,6 +441,14 @@ class GitCommandRunner:
         """
         return self.attempt("merge-base", first, second).succeeded
 
+    def merge_base(self, first: str, second: str) -> str:
+        """
+        :param first: Any reference git can resolve to a commit.
+        :param second: Another one.
+        :return: The best common ancestor of the two commits.
+        """
+        return self.run("merge-base", first, second)
+
 
 @dataclass(frozen=True)
 class TransientGitSetting:

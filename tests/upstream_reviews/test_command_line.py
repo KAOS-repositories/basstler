@@ -17,12 +17,13 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from basstler.github.exceptions import GraphQLErrorsReturned
+from basstler.github.graphql import GraphQLRequest
 from basstler.exceptions import DataclassException
 from basstler.github.pull_request_models import (
     CheckResult,
     CheckStatus,
     GraphQLCheckStatus,
-    GraphQLRequest,
     UpstreamPullRequestSnapshot,
 )
 from basstler.github.query_documents import QueryVariable
@@ -45,7 +46,6 @@ from basstler.upstream_reviews.clients import (
 )
 from basstler.upstream_reviews.exceptions import (
     GitHubCommandFailed,
-    GraphQLErrorsReturned,
     UpstreamPullRequestNotFound,
     UpstreamReadError,
 )
@@ -849,7 +849,7 @@ def test_graphql_errors_are_raised_rather_than_returned(stubbed_gh, monkeypatch)
     with pytest.raises(GraphQLErrorsReturned) as raised:
         GitHubCommandLineClient().execute("query {}", {})
 
-    assert raised.value.messages == [GRAPHQL_ERROR_MESSAGE]
+    assert raised.value.messages == (GRAPHQL_ERROR_MESSAGE,)
 
 
 def test_a_job_log_is_asked_for_by_the_job_s_own_endpoint(

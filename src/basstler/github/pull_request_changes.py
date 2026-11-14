@@ -90,7 +90,8 @@ class PullRequestChanges:
 
     commits: CommitRange
     """
-    The commits its change runs between, from its merge base to its head commit.
+    The commits its change runs between, from its merge base, or from the commit the
+    changes were read since, to its head commit.
     """
 
     files: tuple[FileVersions, ...]
@@ -115,10 +116,14 @@ class PullRequestChangesReader:
     Where the pull request is read from.
     """
 
-    def read(self, repository: Repository, number: int) -> PullRequestChanges:
+    def read(
+        self, repository: Repository, number: int, since: str | None = None
+    ) -> PullRequestChanges:
         """
         :param repository: The repository the pull request is opened on.
         :param number: The pull request's number.
+        :param since: The commit to read the changes from, such as the head commit a
+            reviewer last read; the merge base when ``None``.
         :return: The pull request and its changes, its commits fetched first when the
             checkout lacks either end.
         """
@@ -134,8 +139,10 @@ class PullRequestChangesReader:
                 pull_request.head_reference,
                 pull_request.base.branch,
             )
-        merge_base = self.git.merge_base(
-            pull_request.base.commit, pull_request.head.commit
+        start = (
+            self.git.merge_base(pull_request.base.commit, pull_request.head.commit)
+            if since is None
+            else self.git.commit_at(since)
         )
-        commits = CommitRange(self.git, merge_base, pull_request.head.commit)
+        commits = CommitRange(self.git, start, pull_request.head.commit)
         return PullRequestChanges(pull_request, commits, commits.file_versions())

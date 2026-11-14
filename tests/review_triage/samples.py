@@ -210,6 +210,40 @@ class SubclassSubstitutionSample(SampleTrees):
         return "subclass-substitution"
 
 
+# %% the base branch merged after a review
+
+
+class BaseBranchMergeSample(SampleTrees):
+    """
+    A pull request reviewed once, then merging an update of its base branch and changing
+    one file again.
+    """
+
+    BASE_TREE = "base"
+    """
+    The files of the base branch the pull request started from.
+    """
+
+    REVIEWED_TREE = "reviewed"
+    """
+    The files the pull request had changed when it was reviewed.
+    """
+
+    BASE_BRANCH_UPDATE = "base-branch-update"
+    """
+    The files the base branch changed after the review.
+    """
+
+    HEAD_TREE = "head"
+    """
+    The files the pull request changed after merging the update.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "base-branch-merge"
+
+
 SECTIONED_BOARD = DatasetLocation.REVIEW_TRIAGE / "definition-move-sectioned"
 """
 Versions of the definition-move sample's board module that hold section headers.

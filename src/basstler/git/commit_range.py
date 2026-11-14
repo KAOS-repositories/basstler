@@ -11,6 +11,11 @@ from pathlib import PurePosixPath
 from basstler.git.commands import GitCommandRunner
 from basstler.git.commit_tree import CommitTree
 
+HUNK_HEADER = "@@"
+"""
+What the line opening each hunk of a unified diff starts with.
+"""
+
 # %% one file's change
 
 
@@ -142,6 +147,35 @@ class CommitRange:
                 )
             )
         return tuple(changes)
+
+    def edited_lines(self, path: PurePosixPath) -> tuple[str, ...]:
+        """
+        :param path: A file's path in both commits.
+        :return: The lines the range removes from and adds to the file, each behind its
+            ``-`` or ``+``, in diff order and without line numbers or context.
+        """
+        diff = self.git.run(
+            "diff",
+            "--unified=0",
+            "--no-color",
+            "--no-ext-diff",
+            self.base_commit,
+            self.head_commit,
+            "--",
+            str(path),
+        )
+        lines = diff.splitlines()
+        first_hunk = next(
+            (
+                number
+                for number, line in enumerate(lines)
+                if line.startswith(HUNK_HEADER)
+            ),
+            len(lines),
+        )
+        return tuple(
+            line for line in lines[first_hunk:] if not line.startswith(HUNK_HEADER)
+        )
 
     def file_versions(self) -> tuple[FileVersions, ...]:
         """

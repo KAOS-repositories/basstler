@@ -4,9 +4,10 @@ A whole pull request triaged: its renames and the verdict on each file it change
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from basstler.github.pull_request_changes import PullRequestChanges, RestPullRequest
+from basstler.review_triage.base_branch_merges import BaseBranchMergeDetection
 from basstler.review_triage.commit_tree import CommitModules
 from basstler.review_triage.comparison import (
     FileJudgment,
@@ -14,6 +15,7 @@ from basstler.review_triage.comparison import (
     FileTriager,
     FileVerdict,
     JudgmentContext,
+    MechanicalChange,
     MechanicalFile,
     EmptyPackageAddition,
     ProseComparison,
@@ -104,19 +106,25 @@ class PullRequestTriager:
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
-        :return: The verdict on each of its files.
+        :return: The verdict on each of its files, a file only merges of the base branch
+            changed mechanical without being judged.
         """
+        merged = BaseBranchMergeDetection().paths_changed_only_by_merges(changes)
+        own_changes = replace(
+            changes,
+            files=tuple(file for file in changes.files if file.path not in merged),
+        )
         renames = RenameMap.from_decisions(
-            source.decisions(changes) for source in self.rename_sources
+            source.decisions(own_changes) for source in self.rename_sources
         )
         base_definitions = DefinitionIndex(CommitModules(changes.commits.base_tree))
         triager = FileTriager(
             JudgmentContext(
                 renames,
                 base_definitions,
-                DefinitionMoveDetection().moved_definitions(changes, renames),
+                DefinitionMoveDetection().moved_definitions(own_changes, renames),
                 RenameMap.from_decisions(
-                    [SubclassSubstitutionDetection().decisions(changes)]
+                    [SubclassSubstitutionDetection().decisions(own_changes)]
                 ),
             ),
             self.judgments,
@@ -124,5 +132,10 @@ class PullRequestTriager:
         return TriageOutcome(
             changes.pull_request,
             renames,
-            tuple(triager.triage(change) for change in changes.files),
+            tuple(
+                MechanicalFile(change, frozenset({MechanicalChange.BASE_BRANCH_MERGE}))
+                if change.path in merged
+                else triager.triage(change)
+                for change in changes.files
+            ),
         )

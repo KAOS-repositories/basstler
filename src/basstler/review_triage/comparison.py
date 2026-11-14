@@ -90,6 +90,12 @@ class MechanicalChange(ChangeKind):
     moved down from the class unchanged.
     """
 
+    BASE_BRANCH_MERGE = "base branch merge"
+    """
+    Only merges of the base branch changed the file since the commit the triage starts
+    from.
+    """
+
 
 # %% the verdict on one file
 

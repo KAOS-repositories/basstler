@@ -98,6 +98,12 @@ class TriagePublication:
     Renames given and rejected beyond the description's, outranking them.
     """
 
+    since: str | None = None
+    """
+    The commit to triage the changes from, such as the head commit a reviewer last
+    read; the merge base when ``None``.
+    """
+
     remote: str = "origin"
     """
     The remote whose repository the pull request is looked up in when
@@ -115,7 +121,7 @@ class TriagePublication:
             else Repository.from_remote_url(git.run("remote", "get-url", self.remote))
         )
         changes = PullRequestChangesReader(git, GitHubRestClient()).read(
-            repository, self.pull_request
+            repository, self.pull_request, self.since
         )
         default = PullRequestTriager()
         triager = replace(
@@ -148,6 +154,7 @@ def report(
     repository: str | None = None,
     rename: tuple[str, ...] = (),
     rejected_rename: tuple[str, ...] = (),
+    since: str | None = None,
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown.
@@ -157,11 +164,14 @@ def report(
         default.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
+    :param since: The commit to triage from, such as the head commit you last
+        reviewed; a file only merges of the base branch changed since is mechanical.
     """
     TriagePublication(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
+        since,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -173,6 +183,7 @@ def mark_viewed(
     repository: str | None = None,
     rename: tuple[str, ...] = (),
     rejected_rename: tuple[str, ...] = (),
+    since: str | None = None,
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the account whose GitHub
@@ -183,11 +194,14 @@ def mark_viewed(
         default.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
+    :param since: The commit to triage from, such as the head commit you last
+        reviewed; a file only merges of the base branch changed since is mechanical.
     """
     TriagePublication(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
+        since,
     ).publish((ViewedMarking(GitHubRestClient()), MarkdownReport()))
     return ReviewTriageExitCode.SUCCESS
 

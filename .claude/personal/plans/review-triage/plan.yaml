@@ -68,11 +68,12 @@ items:
   status: in progress
   branch: claude/pattern-checkers-mechanical-marking-arg9pe
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
-  notes: 'Stacked on #220 (its checkers). Takes krracker''s design (specifications,
-    actions, plans, reversal) into basstler.code_modification on libcst, without the
-    role transformations. A checker reports specifications, a rule declares its fix and
-    the behaviour it preserves or changes, with examples tested automatically. First
-    fix: text read and written as UTF-8.'
+  pull_request_number: 222
+  notes: >
+    Draft #222, stacked on #220. basstler.code_modification (specifications, NodeReplacement with
+    exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
+    SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107 of #220's 129 .py files;
+    examples under tests/dataset/rule-fixes tested automatically.
 
 - id: directory-and-bash-fixes
   title: Fixes for directory removal and bash started by name

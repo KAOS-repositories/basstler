@@ -12,6 +12,9 @@ tracks:
 - id: triage
   name: Classify, report and mark viewed
   wave: triage
+- id: pattern-fixes
+  name: Rule fixes applied and proven mechanical
+  wave: triage
 items:
 - id: mechanical-file-triage
   title: Classify mechanical files, summarise them in CI and mark them viewed
@@ -58,3 +61,42 @@ items:
     every pull request with --on-every-pull-request), turns Actions on for forks and
     lists the token steps left; mark-viewed falls back to Actions and names both routes
     and the README when neither works. Waits on the user storing the token.' 
+
+- id: rule-fixes
+  title: Declare reversible fixes on code rules and apply them with code-rules fix
+  track: pattern-fixes
+  status: in progress
+  branch: claude/pattern-checkers-mechanical-marking-arg9pe
+  session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
+  notes: 'Stacked on #220 (its checkers). Takes krracker''s design (specifications,
+    actions, plans, reversal) into basstler.code_modification on libcst, without the
+    role transformations. A checker reports specifications, a rule declares its fix and
+    the behaviour it preserves or changes, with examples tested automatically. First
+    fix: text read and written as UTF-8.'
+
+- id: directory-and-bash-fixes
+  title: Fixes for directory removal and bash started by name
+  track: pattern-fixes
+  depends_on: [rule-fixes]
+  status: not started
+  notes: 'rmtree(x) becomes DirectoryTree(x).remove(); with ignore_errors=True the fix
+    keeps ignoring errors through a declared DirectoryTree option, unless the rule wants
+    it to raise, and declares that. Bash.locate fix only where an environment is in scope.'
+
+- id: rule-fix-triage
+  title: Prove a file mechanical when its change is a rule's fix
+  track: pattern-fixes
+  depends_on: [keyword-argument-triage, rule-fixes]
+  status: not started
+  notes: 'basstler-review-triage depends on basstler-rules. The triage recomputes each
+    fix from the base and allows the difference where it reproduces the head, alongside
+    renames and imports; a new change kind names the rule. Rule-fix files are marked
+    viewed like other mechanical kinds. Expect most of #220 mechanical.'
+
+- id: reduced-review-diff
+  title: Show a reviewer only what is left once rule fixes are reversed
+  track: pattern-fixes
+  depends_on: [rule-fix-triage]
+  status: not started
+  notes: 'For a file mixing a rule fix and a real change, reverse the fix''s actions on
+    the head and show the remaining diff against the base in the report.'

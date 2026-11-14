@@ -41,12 +41,11 @@ items:
   status: in progress
   recommended_model: sonnet
   notes: >
-    Draft #223, stacked on #222. The moves are one ActionPlan of reversible move and
-    import-rewrite actions added to basstler.code_modification. Tests move to
-    packages/<part>/tests. hatch-vcs per package, root ../..; basstler-build's hatch hook pins
-    siblings ==version. Committed uv.lock, uv sync --frozen at session start; a release clones
-    its tag and syncs from it. Map read from each package's folder and pyproject. Windows
-    without uv: py -3.14/-3.13/-3.12, then python, as full paths. release:major.
+    Draft #223, stacked on #222, implemented at 4ddeda0b; CI not read yet. One code_modification
+    ActionPlan moved sources and tests into packages/<part>; uv workspace with basstler-build's
+    sibling pins and uv.lock; session start syncs the lock (a release from a tag clone); each
+    distribution's tests run in their own CI environment. Open: shared test helpers still pull
+    the stack into lower distributions' dev groups.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split

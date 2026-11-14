@@ -135,21 +135,6 @@ items:
     It runs the latest release through uvx, so it needs no update; removing it is one command.
     No phone access (owner, 2026-11-09): phones cannot run it, and private hosting waits until
     phone access matters.'
-- id: model-recommendation
-  title: Each action button preselects the recommended Claude model for its task
-  track: display
-  status: in progress
-  recommended_model: sonnet
-  branch: claude/plan-site-ui-model-recommendation-ra1w52
-  pull_request_number: 209
-  session: https://claude.ai/code/session_018wfiv8Ms8MFF2MJcxPWn2w
-  depends_on: []
-  notes: >
-    Per-item design: each item carries a required recommended_model (opus, sonnet or haiku) that
-    plan-create and add-plan-item set from the task's difficulty; the plan site preselects it and
-    the copied command starts with /model <alias>. Session start fills any missing one with sonnet
-    on the notes branch (basstler.plan_site.recommended_models every-plan) and the site build fills
-    it in memory, so no plan drops off the site. Draft PR #209.
 - id: rules-and-notes-comments
   title: Highlight and comment on any rule or note on the site, then ask Claude or commit
     the change
@@ -163,4 +148,4 @@ items:
     one command carrying every quote, comment and source path, which a skill applies; Commit
     opens the file's GitHub editor on the notes branch until basstler-service/site-actions
     makes it one click.
-landed_item_count: 1
+landed_item_count: 2

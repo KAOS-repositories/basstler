@@ -137,7 +137,9 @@ The first line is the status:
 
 ## Finish
 
-Relay the summary as printed, then add only what this session did: every reparent step 2 could not
+Relay the summary as printed, name `/plan-item-resolve {pull-request-number}` as the way to resolve
+each conflicting pull request it reports (it also takes one no plan tracks), then add only what this
+session did: every reparent step 2 could not
 complete (number, stuck base, target base, the native-stack step that stopped you) and anything
 you stopped on.
 

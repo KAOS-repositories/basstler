@@ -139,9 +139,12 @@ items:
 - id: portability-fixes
   title: Fixes for file URLs and paths written into git and shell text
   track: pattern-fixes
+  branch: claude/loving-maxwell-s1y58z
+  pull_request_number: 228
+  session: https://claude.ai/code/session_018wfiv7tGSxnxF2wRvV9Fa4
   depends_on:
   - rule-fixes
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'Two patterns #220 applied by hand: a file:// URL built from a path becomes Path.as_uri();
     str(path) in git or shell command text becomes as_posix(), only if a checker can tell

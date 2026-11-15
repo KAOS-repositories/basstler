@@ -13,7 +13,7 @@ import pytest
 from basstler.github.states import CombinedCheckState
 from basstler.maintenance.promotion import PromotionSummary
 from basstler.plan.model import ItemStatus
-from basstler.plan_site.plan import Item, Plan, Track, Wave
+from basstler.plan.structure import Item, Plan, Track, Wave
 from basstler.plan_site.plan_page import PlanPage
 from basstler.github.pull_request_state import (
     ForkLineage,
@@ -104,8 +104,8 @@ def promotion_of_first_item(page: PlanPage):
     :param page: A page not yet rendered.
     :return: The first item's promotion button, once the page is rendered.
     """
-    page.render()
-    return page.plan.items[0].promotion
+    rendered = page.render()
+    return rendered.cards_by_identifier[page.plan.items[0].identifier].promotion
 
 
 # %% a promotable item
@@ -137,9 +137,17 @@ def test_the_link_opens_in_a_new_tab():
     assert f'href="{escape(url)}" target="_blank" rel="noopener"' in html
 
 
-def test_the_button_is_labelled_with_the_upstream_repository():
+def test_the_button_is_labelled_contribute():
     promotion = promotion_of_first_item(a_page(a_ready_record()))
-    assert str(LINEAGE.upstream_repository) in promotion.label
+    assert promotion.label == "Contribute"
+
+
+def test_the_link_names_the_upstream_repository_on_hover():
+    page = a_page(a_ready_record())
+    assert (
+        f'title="Open a pull request on {LINEAGE.upstream_repository}"'
+        in page.render().html
+    )
 
 
 def test_a_pull_request_stacked_on_a_merged_item_is_promotable():

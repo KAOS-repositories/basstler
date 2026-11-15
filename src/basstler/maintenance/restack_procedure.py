@@ -13,14 +13,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from basstler.git.commands import BranchAncestry, GitCommandRunner
-from basstler.git.commit_move import CommitMoveChecks
+from basstler.git.commands import GitCommandRunner
+from basstler.stack.commit_move import BranchAncestry, CommitMoveChecks
 from basstler.github.repository_access import ForkPullRequests
 from basstler.maintenance.restack_steps import (
     BranchOutcome,
     BranchUnderRestack,
     ConflictResponse,
     IntegrateParent,
+    LeaveUnpublishedLocalCommits,
     PublishBranch,
     RefuseAnUnsafeMove,
     ReportAParentThatIsGone,
@@ -54,6 +55,7 @@ def restack_steps() -> tuple[RestackStep, ...]:
         WithholdBranchStillConflicting(),
         ReportAParentThatIsGone(),
         SkipBranchAlreadyCurrent(),
+        LeaveUnpublishedLocalCommits(),
         IntegrateParent(),
         RefuseAnUnsafeMove(),
         PublishBranch(),
@@ -266,8 +268,12 @@ def _restack_branch(
             explanation=f"not attempted: `{blocking_ancestor}` below it was left "
             "unpublished this pass",
         )
+    local_before = restacking.git.local_commit(restacking.branch.name)
     for step in restack_steps():
         outcome = step.attempt(restacking)
-        if outcome is not None:
-            return outcome
+        if outcome is None:
+            continue
+        if outcome.outcome is not RestackOutcome.PUSHED:
+            restacking.git.restore_branch(restacking.branch.name, local_before)
+        return outcome
     raise RestackConcludedNothingError(restacking.branch.name)

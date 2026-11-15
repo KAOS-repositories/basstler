@@ -48,7 +48,7 @@ class Layer(IntEnum):
 
     COLLABORATION = 4
     """
-    Work on pull requests: upstream reviews, stacked pull requests and plans.
+    Work on pull requests: upstream reviews and stacked pull requests.
     """
 
     NOTES = 5
@@ -56,17 +56,22 @@ class Layer(IntEnum):
     The personal notes and their setup.
     """
 
-    USER_FACING = 6
+    PLANS = 6
+    """
+    Plans and their items, kept on the personal-notes branch.
+    """
+
+    USER_FACING = 7
     """
     What a user reads or invokes directly: the plan site hub and the skills.
     """
 
-    MCP = 7
+    MCP = 8
     """
     The Model Context Protocol server.
     """
 
-    META_PACKAGE = 8
+    META_PACKAGE = 9
     """
     The ``basstler`` distribution, which installs every default distribution.
     """
@@ -100,6 +105,11 @@ class Distribution(StrEnum):
     REVIEWS = "basstler-reviews"
     """
     Reading an upstream pull request's checks and review threads.
+    """
+
+    REVIEW_TRIAGE = "basstler-review-triage"
+    """
+    Telling a pull request's mechanical files from those a reviewer has to read.
     """
 
     STACK = "basstler-stack"
@@ -325,6 +335,12 @@ PACKAGE_MAP = PackageMap(
             (Distribution.CORE, Distribution.GIT, Distribution.GITHUB),
         ),
         DistributionDeclaration(
+            Distribution.REVIEW_TRIAGE,
+            Layer.COLLABORATION,
+            ("review_triage",),
+            (Distribution.CORE, Distribution.GIT, Distribution.GITHUB),
+        ),
+        DistributionDeclaration(
             Distribution.STACK,
             Layer.COLLABORATION,
             ("maintenance", "stack"),
@@ -336,12 +352,6 @@ PACKAGE_MAP = PackageMap(
             ),
         ),
         DistributionDeclaration(
-            Distribution.PLAN,
-            Layer.COLLABORATION,
-            ("plan",),
-            (Distribution.CORE, Distribution.GIT, Distribution.GITHUB),
-        ),
-        DistributionDeclaration(
             Distribution.NOTES,
             Layer.NOTES,
             ("document_references", "personal_notes", "setup"),
@@ -351,6 +361,17 @@ PACKAGE_MAP = PackageMap(
                 Distribution.GITHUB,
                 Distribution.REVIEWS,
                 Distribution.STACK,
+            ),
+        ),
+        DistributionDeclaration(
+            Distribution.PLAN,
+            Layer.PLANS,
+            ("plan",),
+            (
+                Distribution.CORE,
+                Distribution.GIT,
+                Distribution.GITHUB,
+                Distribution.NOTES,
             ),
         ),
         DistributionDeclaration(
@@ -377,6 +398,7 @@ PACKAGE_MAP = PackageMap(
                 Distribution.RULES,
                 Distribution.GITHUB,
                 Distribution.REVIEWS,
+                Distribution.REVIEW_TRIAGE,
                 Distribution.STACK,
                 Distribution.PLAN,
                 Distribution.NOTES,

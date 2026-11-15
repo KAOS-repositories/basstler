@@ -48,7 +48,7 @@ from basstler.git.remote_branch import RemoteBranch
 from basstler.github.repository import GitHubAddress, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan_site.exceptions import RegistryUnreadableError
-from basstler.plan_site.plan import Item
+from basstler.plan.structure import Item
 from basstler.plan_site.theme import (
     AppearanceSettings,
     SiteTheme,

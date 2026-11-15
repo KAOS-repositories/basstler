@@ -1,6 +1,6 @@
 """
-A plan.yaml as its page on the plan site reads it: its waves, tracks and items, each
-item carrying the live state the renderer fills in.
+A plan.yaml read as its waves, tracks and items, each item carrying the live state its
+pull request is classified into.
 """
 
 from __future__ import annotations
@@ -8,20 +8,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from basstler.github.pull_request_state import LiveState, PullRequestRecord
 from basstler.github.repository import GitHubAddress, PullRequestReference
 from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model_alias import ModelAlias
 from basstler.render_common import sanitize_http_url
-
-if TYPE_CHECKING:
-    from basstler.plan_site.cards import (
-        DependencyChip,
-        ItemAction,
-        PromotionButton,
-        StartNowAction,
-    )
 
 
 # %% waves and tracks
@@ -166,6 +159,12 @@ class Item:
     A link to the session that produced this item, if any.
     """
 
+    recommended_model: ModelAlias | None = None
+    """
+    The Claude model suited to this item's difficulty, or ``None`` when none was
+    recommended.
+    """
+
     notes: str | None = None
     """
     Free-text notes shown on the item's card.
@@ -212,29 +211,6 @@ class Item:
     upstream_pull_request_url: str | None = field(default=None, init=False)
     """
     The upstream pull request its pull request's description links, if any.
-    """
-
-    dependency_chips: list[DependencyChip] = field(default_factory=list, init=False)
-    """
-    One chip per entry of :attr:`depends_on`.
-    """
-
-    action: ItemAction | None = field(default=None, init=False)
-    """
-    This item's action button; ``None`` for a done item, and for a not-started item
-    until its dependencies are ready to build on.
-    """
-
-    pending_start_action: StartNowAction | None = field(default=None, init=False)
-    """
-    The start action of a not-started item that only open draft dependencies hold back;
-    ``None`` for any other item.
-    """
-
-    promotion: PromotionButton | None = field(default=None, init=False)
-    """
-    The button opening this item's pull request on the upstream; ``None`` unless the pull
-    request is open in a fork.
     """
 
     needs_review: bool = field(default=False, init=False)
@@ -328,6 +304,7 @@ class Item:
         called after :meth:`PlanValidator.validate` has already confirmed the data
         is well-formed."""
         notes = data.get(ManifestKey.NOTES.key)
+        recommended_model = data.get(ManifestKey.RECOMMENDED_MODEL.key)
         return cls(
             title=data[ManifestKey.TITLE.key],
             branch=data.get(ManifestKey.BRANCH.key),
@@ -337,6 +314,9 @@ class Item:
             pull_request_number=data.get(ManifestKey.PULL_REQUEST_NUMBER.key),
             repository=data.get(ManifestKey.REPOSITORY.key),
             session=sanitize_http_url(data.get(ManifestKey.SESSION.key)),
+            recommended_model=(
+                ModelAlias(recommended_model) if recommended_model else None
+            ),
             notes=notes.strip() if notes else None,
             depends_on=list(data.get(ManifestKey.DEPENDS_ON.key) or []),
             blockers=list(data.get(ManifestKey.BLOCKERS.key) or []),

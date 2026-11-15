@@ -11,8 +11,8 @@ from dataclasses import replace
 import pytest
 
 from basstler.exit_codes import StackExitCode
-from basstler.git.commands import GitCommandFailed, ProposedPush
-from basstler.git.commit_move import RefusalReason
+from basstler.git.commands import GitCommandFailed, IntegrationStrategy, ProposedPush
+from basstler.stack.commit_move import RefusalReason
 from basstler.maintenance.commands import RestackCommand
 from basstler.maintenance.fast_forward import (
     FastForwardOutcome,
@@ -25,10 +25,7 @@ from basstler.maintenance.restack_steps import (
     RestackOutcome,
     TellTheBranchOwner,
 )
-from basstler.stack.model import (
-    IntegrationStrategy,
-    PullRequest,
-)
+from basstler.stack.model import PullRequest
 
 from ..constants.stack import RemoteName, StackBranch, StackLabel
 from .fork import (
@@ -224,6 +221,89 @@ def test_a_conflicting_integration_pushes_nothing_and_names_the_files(
     )
 
 
+def a_local_commit_never_published(fork_checkout: ForkCheckout, branch: str) -> str:
+    """
+    Commit on a branch without publishing it, as a resolved conflict is before its push.
+
+    :param fork_checkout: The checkout to commit in.
+    :param branch: The branch to commit on.
+    :return: The commit, which only this checkout has.
+    """
+    fork_checkout.run_git("checkout", "--quiet", branch)
+    return fork_checkout.commit("a-resolution-not-yet-pushed", "only here\n")
+
+
+def test_a_branch_holding_commits_the_fork_lacks_is_left_as_it_is(
+    fork_checkout: ForkCheckout,
+):
+    """
+    Resetting the branch to the fork's copy would silently drop those commits.
+    """
+    a_parent_and_child(fork_checkout)
+    fork_checkout.commit_on(
+        StackBranch.PARENT,
+        fork_checkout.own_file(StackBranch.PARENT),
+        "the parent moved\n",
+    )
+    unpublished = a_local_commit_never_published(fork_checkout, StackBranch.CHILD)
+    before = fork_checkout.published_commit(RemoteName.ORIGIN, StackBranch.CHILD)
+
+    outcomes = restack(
+        a_stack(fork_checkout, the_board()), fork_checkout.git, RecordingPullRequests()
+    )
+
+    child = next(outcome for outcome in outcomes if outcome.branch == StackBranch.CHILD)
+    assert child.outcome == RestackOutcome.UNPUBLISHED_LOCAL_COMMITS
+    assert fork_checkout.run_git("rev-parse", StackBranch.CHILD) == unpublished
+    assert (
+        fork_checkout.published_commit(RemoteName.ORIGIN, StackBranch.CHILD) == before
+    )
+
+
+def test_a_branch_left_unpublished_is_left_where_it_was_locally(
+    fork_checkout: ForkCheckout,
+):
+    """
+    A restack that publishes nothing must leave no commit of its own behind, or the next
+    pass would take it for somebody's unpublished work.
+    """
+    a_parent_and_child(fork_checkout)
+    fork_checkout.commit_on(
+        StackBranch.PARENT, FixtureFile.CONTESTED, "the parent's version\n"
+    )
+    fork_checkout.commit_on(
+        StackBranch.CHILD, FixtureFile.CONTESTED, "the child's version\n"
+    )
+    fork_checkout.run_git("reset", "--quiet", "--hard", "HEAD~1")
+    behind = fork_checkout.run_git("rev-parse", StackBranch.CHILD)
+
+    restack(
+        a_stack(fork_checkout, the_board()), fork_checkout.git, RecordingPullRequests()
+    )
+
+    assert fork_checkout.run_git("rev-parse", StackBranch.CHILD) == behind
+
+
+def test_a_branch_with_no_local_copy_gets_none_from_an_unpublished_restack(
+    fork_checkout: ForkCheckout,
+):
+    a_parent_and_child(fork_checkout)
+    fork_checkout.commit_on(
+        StackBranch.PARENT, FixtureFile.CONTESTED, "the parent's version\n"
+    )
+    fork_checkout.commit_on(
+        StackBranch.CHILD, FixtureFile.CONTESTED, "the child's version\n"
+    )
+    fork_checkout.run_git("checkout", "--quiet", "--detach")
+    fork_checkout.run_git("branch", "--delete", "--force", StackBranch.CHILD)
+
+    restack(
+        a_stack(fork_checkout, the_board()), fork_checkout.git, RecordingPullRequests()
+    )
+
+    assert fork_checkout.git.local_commit(StackBranch.CHILD) is None
+
+
 def test_an_integration_stopped_before_it_began_is_not_reported_as_a_conflict(
     fork_checkout: ForkCheckout,
 ):
@@ -292,10 +372,10 @@ def test_only_the_rebase_strategy_authorises_rewriting_published_history():
     configuration = make_configuration()
 
     merging = ProposedPush.publishing(
-        configuration, "a-branch", IntegrationStrategy.MERGE
+        configuration.fork_remote, "a-branch", IntegrationStrategy.MERGE
     )
     rebasing = ProposedPush.publishing(
-        configuration, "a-branch", IntegrationStrategy.REBASE
+        configuration.fork_remote, "a-branch", IntegrationStrategy.REBASE
     )
 
     assert not merging.with_lease
@@ -341,8 +421,8 @@ def test_a_rebase_whose_lease_has_expired_is_rejected_rather_than_forced_through
     """
     The lease is what stops a rebase overwriting a push this pass never saw.
 
-    Staleness is arranged by winding the remote-tracking ref back, which is the state a
-    concurrent push leaves this checkout in.
+    Staleness is arranged by winding the remote-tracking ref and the checkout's own copy
+    back, which is the state a concurrent push leaves this checkout in.
     """
     a_parent_and_child(fork_checkout)
     fork_checkout.commit_on(
@@ -357,6 +437,8 @@ def test_a_rebase_whose_lease_has_expired_is_rejected_rather_than_forced_through
     fork_checkout.run_git(
         "update-ref", f"refs/remotes/origin/{StackBranch.CHILD}", stale
     )
+    fork_checkout.run_git("checkout", "--quiet", "--detach")
+    fork_checkout.run_git("branch", "--force", StackBranch.CHILD, stale)
 
     outcomes = restack(
         a_stack(fork_checkout, the_board(labels=[StackLabel.REBASE])),

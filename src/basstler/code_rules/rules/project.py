@@ -13,6 +13,7 @@ from basstler.code_rules import rules
 from basstler.code_rules.bash_by_name import BashByNameChecker
 from basstler.code_rules.checker import CodeRuleChecker
 from basstler.code_rules.commands import CodeRulesCommand
+from basstler.code_rules.file_uri import FileUriChecker
 from basstler.code_rules.fixes import CodeFix, FixableChecker
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 from basstler.code_rules.package_boundaries import PackageBoundaryChecker
@@ -90,6 +91,13 @@ class PortabilityRules(Section):
         "that cannot encode most of Unicode",
         (),
         LocaleEncodingChecker(),
+    )
+
+    BUILD_FILE_URLS_WITH_AS_URI = (
+        "Build a file URL with `Path.as_uri()`, never by putting a path after "
+        "`file://`: a Windows path gives no valid URL that way",
+        (),
+        FileUriChecker(),
     )
 
     REMOVE_TREES_THROUGH_DIRECTORY_TREE = (

@@ -108,6 +108,7 @@ def test_the_checkers_are_those_of_the_checked_rules():
         PackageAndPluginRules.IMPORT_ONLY_LISTED_PACKAGES.checker,
         PortabilityRules.START_BASH_THROUGH_ITS_LOCATOR.checker,
         PortabilityRules.READ_AND_WRITE_TEXT_AS_UTF_8.checker,
+        PortabilityRules.BUILD_FILE_URLS_WITH_AS_URI.checker,
         PortabilityRules.REMOVE_TREES_THROUGH_DIRECTORY_TREE.checker,
     )
 

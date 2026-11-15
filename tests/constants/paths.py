@@ -910,6 +910,30 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
 
 
+class FileUriSnippet(PathEnumeration):
+    """
+    Source files the check for file URLs built by putting a path after ``file://``
+    reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "file-uri"
+    """
+    The directory holding them.
+    """
+
+    PATH_AFTER_SCHEME = DIRECTORY / "path-after-scheme.py"
+    """
+    Two file URLs built by putting a path after ``file://``, on lines 10 and 11.
+    """
+
+    OTHER_URLS = DIRECTORY / "other-urls.py"
+    """
+    A URL from :meth:`pathlib.PurePath.as_uri`, a web URL, a file URL with more text
+    after the path, a converted path after ``file://``, the bare scheme, and a file URL
+    concatenated with another string literal.
+    """
+
+
 class TreeRemovalSnippet(PathEnumeration):
     """
     Source files the check for directories removed with :func:`shutil.rmtree` reads.

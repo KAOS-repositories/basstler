@@ -20,6 +20,7 @@ from basstler.code_modification.actions import (
     AppliedAction,
     NodeReplacement,
 )
+from basstler.code_modification.imports import ImportedName
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.specification import Specification
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
@@ -76,6 +77,13 @@ class CodeFix[SpecificationType: Specification](ABC):
         """
         How the fixed code behaves compared with the code it replaces.
         """
+
+    @classproperty
+    def imports(cls) -> tuple[ImportedName, ...]:
+        """
+        The names every replacement of the fix uses, which the fixed module has to import.
+        """
+        return ()
 
     @abstractmethod
     def replacement(self, specification: SpecificationType) -> libcst.CSTNode:
@@ -176,11 +184,16 @@ class SourceFixer:
             places breaking a rule as there were before it.
         """
         inverses: list[Action] = []
+        imports: list[ImportedName] = []
         places = self.places(module)
         while places:
-            applied = self.round_of_fixes(places).apply(module)
+            chosen = self.chosen_places(places)
+            applied = ActionPlan(
+                tuple(place.action for place in reversed(chosen))
+            ).apply(module)
             module = applied.module
             inverses.append(applied.inverse)
+            imports.extend(name for place in chosen for name in place.fix.imports)
             remaining = self.places(module)
             if len(remaining) >= len(places):
                 raise FixDoesNotConvergeError(
@@ -189,6 +202,10 @@ class SourceFixer:
                     )
                 )
             places = remaining
+        for name in dict.fromkeys(imports):
+            applied = name.addition_to(module).apply(module)
+            module = applied.module
+            inverses.append(applied.inverse)
         return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))
 
     def places(self, module: libcst.Module) -> list[FixablePlace]:
@@ -203,12 +220,10 @@ class SourceFixer:
         ]
 
     @staticmethod
-    def round_of_fixes(places: list[FixablePlace]) -> ActionPlan:
+    def chosen_places(places: list[FixablePlace]) -> list[FixablePlace]:
         """
         :param places: Places breaking a rule, some perhaps inside others.
-        :return: The fixes of every place that overlaps no place before it, outermost
-            first, applied from the end of the module towards its start so that each
-            leaves the location of the next unchanged.
+        :return: Every place that overlaps no place before it, outermost first.
         """
         chosen: list[FixablePlace] = []
         for place in sorted(
@@ -224,4 +239,4 @@ class SourceFixer:
                 place.specification.overlaps(other.specification) for other in chosen
             ):
                 chosen.append(place)
-        return ActionPlan(tuple(place.action for place in reversed(chosen)))
+        return chosen

@@ -15,6 +15,9 @@ tracks:
 - id: pattern-fixes
   name: Rule fixes applied and proven mechanical
   wave: triage
+- id: windows
+  name: The Windows fixes the triage is proven on
+  wave: triage
 items:
 - id: keyword-argument-triage
   title: Prove keyword-argument conversions mechanical
@@ -91,6 +94,9 @@ items:
     is allowed; a new change kind names the plan or rule.
 
 
+    Mark #220 only once windows-suite stops pushing.
+
+
     Next: decide how a commit records the plan it applied; nothing stores #223''s relocation
     plan replayably yet. uv-workspace supplies the file actions it replays.'
 - id: reduced-review-diff
@@ -141,4 +147,19 @@ items:
     reliably that it sits in command text, otherwise that half is dropped and the item says
     so. Done when code-rules fix reproduces #220''s hand edits and rule-fix-triage marks those
     files mechanical.'
+
+- id: windows-suite
+  title: Make the suite pass on Windows
+  track: windows
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet
+  branch: fix-windows-test-failures
+  pull_request_number: 220
+  notes: 'Draft #220, main merged at b2bb4d75; last Windows run 39 failed, 2712 passed. Runs on
+    a Windows machine (.venv/Scripts/python.exe). Next, in order: install-lock liveness (kill -0
+    sees MSYS PIDs); session start on Scripts/python.exe environments and their removal;
+    GH_CONFIG_DIR at a temporary folder for the no-credential tests; the no-upstream remote test;
+    skip the ~20 gh/bash stub tests on win32, naming the limit. Each push restacks #222 upward
+    and clears Viewed on the files it touches.'
 landed_item_count: 1

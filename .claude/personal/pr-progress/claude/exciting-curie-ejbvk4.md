@@ -1,12 +1,13 @@
 ## Plan
-- Experiment sandbox for goal-paths (#232, never merged): build seven parts, one commit series each, ask for the next move after each.
-- Order now: goal-path, goal-page, owner-steps, merged-dependencies, done-checks, plan-goal-skill, session-close-check.
+- Experiment sandbox for goal-paths (#232, never merged): seven parts, one commit series each, built straight through; ask only on real design decisions.
+- After every push that changes what the plan site shows, start the site build (basstler.plan_site.build_start).
 - stack-board's plan-site.yml builds from this branch during the experiment; set basstler_branch_or_tag back to main at accept or drop.
 
 ## Done
-- goal-path at 29bd414a: basstler goal set/path/next; goal mechanical-files-viewed under plans/_goals/.
-- goal-page at 52f9bc90: goals on the repository index, a page per goal at <repo>/_goals/<id>/.
+- goal-path, goal-page, owner-steps (c02831ef), merged-dependencies (d46c3565), done-checks (10cca2c2), plan-goal-skill (f356a0c0).
+- session-close-check: basstler session-close, Stop and PostToolUse hooks, plan saves settle the record.
 
 ## Next
-- owner-steps: owner moves derived from live pull request state (review and mark ready, merge) and what each releases; then stored owner steps.
-- Gaps: invalid goal YAML or a cross-plan cycle stops the site build; goal page has no in-browser refresh.
+- User decides: the block-styled-keys vocabulary test; whether real owner steps go into review-triage/plan.yaml now.
+- Then use it on the real goals, accept or drop, feedback comment on #192, split into pull requests.
+- Unverified: whether plugin Stop/PostToolUse hooks fire in cloud sessions (needs the plugin installed from this branch).

@@ -267,6 +267,9 @@ def test_only_the_keys_whose_values_run_over_lines_are_block_styled():
         ManifestKey.NOTES,
         ManifestKey.BLOCKERS,
         ManifestKey.DEPENDS_ON,
+        ManifestKey.COMMANDS,
+        ManifestKey.DEPENDS_ON_MERGED,
+        ManifestKey.DONE_WHEN,
     }
 
 

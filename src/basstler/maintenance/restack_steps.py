@@ -15,32 +15,25 @@ from enum import StrEnum
 from typing import Any
 
 from basstler.git.commands import (
+    CommitTrailer,
     GitCommandResult,
     GitCommandRunner,
+    IntegrationStrategy,
     ProposedPush,
 )
-from basstler.git.commit_move import (
+from basstler.stack.commit_move import (
     CommitMoveAction,
     CommitMoveChecks,
     ProposedCommitMove,
     RefusalReason,
 )
-from basstler.github.constants import (
-    CommitTrailer,
-    MaintenanceText,
-    MergeableState,
-)
+from basstler.github.constants import MaintenanceText, MergeableState
 from basstler.github.pull_request_record import (
     PullRequestField,
 )
 from basstler.github.repository_access import ForkPullRequests
 from basstler.stack.label_write import LabelWrite
-from basstler.stack.model import (
-    IntegrationStrategy,
-    ParentSituation,
-    Stack,
-    StackBranch,
-)
+from basstler.stack.model import ParentSituation, Stack, StackBranch
 from basstler.stack.settings import Configuration
 
 # %% what became of one branch
@@ -101,6 +94,12 @@ class RestackOutcome(StrEnum):
     build on; nothing was published.
     """
 
+    UNPUBLISHED_LOCAL_COMMITS = "unpublished-local-commits"
+    """
+    The checkout holds commits on it that the fork lacks, which restacking from the
+    fork's copy would drop; it was left as it is and nothing was published.
+    """
+
     @property
     def blocks_branches_above(self) -> bool:
         """
@@ -116,6 +115,7 @@ class RestackOutcome(StrEnum):
             RestackOutcome.WITHHELD,
             RestackOutcome.BLOCKED_BY_ANCESTOR,
             RestackOutcome.PARENT_GONE,
+            RestackOutcome.UNPUBLISHED_LOCAL_COMMITS,
         }
 
 
@@ -385,6 +385,17 @@ class BranchUnderRestack:
             f"open branch"
         )
 
+    @property
+    def conflict_resolution(self) -> str:
+        """:return: How this branch's owner resolves and publishes a conflict, which
+        depends on whether the pass merges or rebases it."""
+        advice = (
+            MaintenanceText.REBASE_RESOLUTION
+            if self.strategy is IntegrationStrategy.REBASE
+            else MaintenanceText.MERGE_RESOLUTION
+        )
+        return advice.format(parent=self.parent)
+
     def write_conflict_report(self, conflicting_paths: Sequence[str]) -> str:
         """
         Write the comment telling this branch's owner that integrating the parent conflicts.
@@ -398,8 +409,8 @@ class BranchUnderRestack:
             f"`{self.branch.name}` conflicts, so this branch was left untouched and "
             f"skipped.\n\n"
             f"Conflicting files:\n{files}\n\n"
-            f"Please resolve and push. This branch is labelled "
-            f"`needs-resolution` so later passes skip it rather than re-reporting the same "
+            f"{self.conflict_resolution} This branch is labelled "
+            f"`{self.configuration.needs_resolution_label}` so later passes skip it rather than re-reporting the same "
             f"conflict; the label is cleared automatically once it merges cleanly again, "
             f"and the branch rejoins the pass.{self.branch.owner_address}"
         )
@@ -416,8 +427,8 @@ class BranchUnderRestack:
             f"other open branch of the stack, so there is nothing to retarget it at.\n\n"
             f"Rebase it onto whatever superseded that base, or close this pull request "
             f"if the work went with it.\n\n"
-            f"Nothing was changed here. This branch is labelled `needs-resolution` so "
-            f"later passes skip it, and it rejoins the pass once its base leads "
+            f"Nothing was changed here. This branch is labelled "
+            f"`{self.configuration.needs_resolution_label}` so later passes skip it, and it rejoins the pass once its base leads "
             f"somewhere again.{self.branch.owner_address}"
         )
 
@@ -599,6 +610,31 @@ class SkipBranchAlreadyCurrent(RestackStep):
 
 
 @dataclass(frozen=True)
+class LeaveUnpublishedLocalCommits(RestackStep):
+    """
+    Leaves a branch alone while the checkout holds commits on it that the fork lacks.
+
+    A restack starts from the fork's copy and moves the checkout's own copy of the
+    branch there, so anything only the checkout has - a resolved conflict not yet pushed
+    - would be dropped without a word.
+    """
+
+    def attempt(self, restacking: BranchUnderRestack) -> BranchOutcome | None:
+        """:param restacking: The branch being restacked.
+        :return: An unpublished-local-commits outcome when the checkout's copy is not
+            contained in the fork's, otherwise ``None``."""
+        git = restacking.git
+        local = git.local_commit(restacking.branch.name)
+        if local is None or git.contains(local, restacking.branch_reference):
+            return None
+        return restacking.concluded(
+            RestackOutcome.UNPUBLISHED_LOCAL_COMMITS,
+            explanation=f"this checkout holds commits on it the fork lacks (at {local})"
+            "; publish or discard them, then run the pass again",
+        )
+
+
+@dataclass(frozen=True)
 class IntegrateParent(RestackStep):
     """
     Integrates the parent's tip, answering a conflict through the branch's
@@ -715,7 +751,7 @@ class PublishBranch(RestackStep):
         git = restacking.git
         push = git.push(
             ProposedPush.publishing(
-                restacking.configuration,
+                restacking.configuration.fork_remote,
                 restacking.branch.name,
                 restacking.strategy,
                 replaces_superseded_merges=not git.contains(

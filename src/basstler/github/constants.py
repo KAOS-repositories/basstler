@@ -76,6 +76,24 @@ class MaintenanceText(StrEnum):
     of them at a glance.
     """
 
+    MERGE_RESOLUTION = (
+        "Merge `{parent}` into this branch, resolve the conflicts in the merge commit "
+        "and push. A plain push publishes it; the pass never force-pushes a merged branch."
+    )
+    """
+    How the owner of a conflicting branch resolves it when the pass merges its parent,
+    with the parent's name to fill in.
+    """
+
+    REBASE_RESOLUTION = (
+        "Rebase this branch onto `{parent}`, resolve the conflicts and push with "
+        "`--force-with-lease`. Its `rebase` label is what allows the rewrite."
+    )
+    """
+    How the owner of a conflicting branch resolves it when the pass rebases it onto its
+    parent, with the parent's name to fill in.
+    """
+
     PROMOTION_HEADING = "## Promote"
     """
     Heading the compare-and-create link is written under, in the fork pull request's own
@@ -107,31 +125,6 @@ class MaintenanceNotice(StrEnum):
     )
     """
     The project is not a fork, so the pass leaves out every step that needs an upstream.
-    """
-
-
-class CommitTrailer(StrEnum):
-    """
-    The trailer keys basstler writes into the commits it makes, and later recognises
-    those commits by.
-    """
-
-    RESTACKED_PARENT = "Restacked-parent"
-    """
-    Names the parent a restack merged in, marking the merge as the restack's own rather
-    than one a person made.
-    """
-
-    RESTACKED_PARENT_COMMIT = "Restacked-parent-commit"
-    """
-    The commit of the parent a restack merged in, which a restack's own merge records as
-    its second parent.
-    """
-
-    ACTION_REQUEST = "Basstler-request"
-    """
-    The identifier of the upstream-reviews request whose branch the commit is on,
-    marking the branch as basstler's own rather than one a person made.
     """
 
 

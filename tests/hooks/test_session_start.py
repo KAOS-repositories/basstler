@@ -47,6 +47,7 @@ from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
 from basstler.upstream_reviews.action.branch import InstallationState
 
+from ..bash_path import BashPath
 from ..constants.environment import (
     ConfigurationVariable,
     FileMode,
@@ -537,6 +538,78 @@ def test_reports_a_tracked_branch_whose_manifest_is_missing(
         PLAN_IDENTIFIER,
         MANIFEST_PATH.as_posix(),
         ScratchBranch.PERSONAL_NOTES,
+    )
+
+
+# %% the recommended models line
+
+
+def test_reports_recommended_models_as_not_applicable_when_no_plan_tracks_the_branch(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(SummaryMessage.RECOMMENDED_MODELS_NOT_APPLICABLE)
+
+
+def without_recommended_model(
+    manifest: PlanManifest, item_identifier: str
+) -> PlanManifest:
+    """
+    :return: *manifest* with the named item's ``recommended_model`` removed.
+    """
+    items = [
+        (
+            {
+                key: value
+                for key, value in item.content.items()
+                if key != ManifestKey.RECOMMENDED_MODEL.key
+            }
+            if item.identifier == item_identifier
+            else item.content
+        )
+        for item in manifest.items
+    ]
+    return PlanManifest({**manifest.content, ManifestKey.ITEMS.key: items})
+
+
+def test_reports_every_item_of_the_tracked_plan_as_having_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    result = publish_tracked_plan_and_run(
+        session_start_repository, tracked_plan.manifest, tmp_path
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_ALL_SET, tracked_plan.manifest.identifier
+    )
+
+
+def test_names_the_items_of_the_tracked_plan_without_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    queued_item = tracked_plan.item_with_status(ItemStatus.NOT_STARTED)
+    manifest = without_recommended_model(tracked_plan.manifest, queued_item.identifier)
+
+    result = publish_tracked_plan_and_run(session_start_repository, manifest, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_UNSET,
+        manifest.identifier,
+        queued_item.identifier,
     )
 
 
@@ -1485,7 +1558,7 @@ def test_a_session_start_installs_nothing_for_a_plugin_naming_no_release(
     assert result.returncode == 0, result.stderr
     assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
         SummaryMessage.DEPENDENCIES_RELEASE_NOT_NAMED,
-        str(session_start_repository.plugin_root),
+        BashPath(session_start_repository.plugin_root).text,
     )
     assert not call_log.exists()
 
@@ -1697,7 +1770,7 @@ def test_tells_the_session_where_the_plugin_is(
         encoding="utf-8",
         check=True,
     ).stdout
-    assert Path(exported) == session_start_repository.plugin_root
+    assert exported == BashPath(session_start_repository.plugin_root).text
 
 
 def test_tells_the_session_which_interpreter_runs_the_package(
@@ -1821,6 +1894,38 @@ def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
     assert version.stdout.strip() == str(True)
 
 
+def test_skips_an_interpreter_on_the_path_that_cannot_run_when_creating_the_environment(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A first candidate that cannot run does not stop the next one from being tried.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.PIP)
+    newest_candidate = configuration_value(
+        ConfigurationVariable.INTERPRETER_CANDIDATES
+    ).split()[0]
+    stub_bin.install(newest_candidate, "unusable_interpreter")
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_hiding_executables(tmp_path, PackageManager.UV)
+            ),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
+        environment_directory(session_start_repository),
+        package_source(session_start_repository),
+    )
+
+
 def path_without_a_supported_interpreter(mirror_parent: Path) -> str:
     """
     :param mirror_parent: Where to build the mirror directories.
@@ -1878,7 +1983,8 @@ def test_installs_uv_when_no_supported_interpreter_is_on_the_path(
         package_source(session_start_repository),
     )
     assert install_log.read_text(encoding="utf-8").splitlines() == [
-        f"install --target {installed_uv_directory(session_start_repository)} "
+        "install --target "
+        f"{session_start_repository.configuration_value(ConfigurationVariable.UV_DIRECTORY)} "
         f"{PackageManager.UV}"
     ]
     assert environment_log.read_text(encoding="utf-8").splitlines() == [
@@ -1992,8 +2098,8 @@ def test_installs_into_the_interpreter_a_windows_environment_was_created_with(
 
     assert result.returncode == 0, result.stderr
     windows_interpreter = (
-        Path(environment_directory(session_start_repository))
-        / EnvironmentInterpreterLayout.WINDOWS
+        f"{environment_directory(session_start_repository)}"
+        f"/{EnvironmentInterpreterLayout.WINDOWS}"
     )
     assert environment_log.read_text(encoding="utf-8").splitlines()[-1] == (
         f"{PackageManager.PIP} install --python {windows_interpreter} --editable "
@@ -2045,14 +2151,17 @@ def test_runs_the_package_with_the_interpreter_of_a_windows_environment(
     ``python3``.
     """
     without_an_environment(session_start_repository)
-    windows_interpreter = write_interpreter_wrapper(
+    write_interpreter_wrapper(
         Path(environment_directory(session_start_repository))
         / EnvironmentInterpreterLayout.WINDOWS
     )
 
     assert session_start_repository.configuration_value(
         ConfigurationVariable.PYTHON
-    ) == str(windows_interpreter)
+    ) == (
+        f"{environment_directory(session_start_repository)}"
+        f"/{EnvironmentInterpreterLayout.WINDOWS}"
+    )
 
 
 # %% the plan site line
@@ -2372,6 +2481,9 @@ def test_removes_the_environment_of_a_project_that_is_gone(
 ):
     project = other_project(session_start_repository)
     abandoned = environment_of(session_start_repository, project)
+    abandoned_as_the_shell_names_it = configuration_value_in(
+        session_start_repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    )
     DirectoryTree(project).remove()
 
     result = publish_and_run(session_start_repository)
@@ -2379,7 +2491,7 @@ def test_removes_the_environment_of_a_project_that_is_gone(
     assert result.returncode == 0, result.stderr
     assert not abandoned.exists()
     assert summary_value(result.stdout, SummaryLine.ENVIRONMENTS) == summary_message(
-        SummaryMessage.ENVIRONMENTS_REMOVED, str(abandoned)
+        SummaryMessage.ENVIRONMENTS_REMOVED, abandoned_as_the_shell_names_it
     )
 
 
@@ -2401,7 +2513,7 @@ def test_keeps_the_environment_of_a_project_that_still_exists(
 
 
 def test_keeps_the_environment_a_live_install_holds(
-    session_start_repository: ScratchRepository,
+    session_start_repository: ScratchRepository, running_shell_process_id: int
 ):
     project = other_project(session_start_repository)
     installing = environment_of(session_start_repository, project)
@@ -2411,7 +2523,7 @@ def test_keeps_the_environment_a_live_install_holds(
         )
     )
     marker.parent.mkdir(parents=True)
-    marker.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    marker.write_text(f"{running_shell_process_id}\n", encoding="utf-8")
     DirectoryTree(project).remove()
 
     result = publish_and_run(session_start_repository)
@@ -2428,11 +2540,14 @@ def test_never_removes_the_environment_the_session_runs(
     """
     project = other_project(session_start_repository)
     running = environment_of(session_start_repository, project)
+    exported = configuration_value_in(
+        session_start_repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    )
     DirectoryTree(project).remove()
 
     result = publish_and_run(
         session_start_repository,
-        environment={BasstlerVariable.ENVIRONMENT_DIRECTORY: str(running)},
+        environment={BasstlerVariable.ENVIRONMENT_DIRECTORY: exported},
     )
 
     assert result.returncode == 0, result.stderr

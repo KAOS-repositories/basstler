@@ -18,3 +18,4 @@ items:
     track: track-1
     depends_on: []
     status: done
+    recommended_model: sonnet

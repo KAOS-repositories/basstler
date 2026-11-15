@@ -7,7 +7,6 @@ personal-notes remote - no network access or real personal-notes branch involved
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 from enum import StrEnum
@@ -32,6 +31,7 @@ from basstler.plan_site.dispatch_check import UNVERIFIED_PREFIX
 from basstler.plan_site.hub import HubFileKey
 from basstler.setup.report import CheckResult, CheckStatus, SetupCheck, SetupReport
 
+from ..bash_path import BashPath
 from ..constants.environment import ConfigurationVariable, ScrubbedEnvironmentPrefix
 from ..constants.notes import ScratchBranch
 from ..constants.paths import DatasetLocation, PersonalNotesPath
@@ -325,6 +325,25 @@ def with_build_start_stub(
     return repository
 
 
+def test_a_build_start_answer_in_windows_lines_is_one_row(
+    check_setup_repository: ScratchRepository,
+):
+    """
+    Python on Windows ends each line it prints with a carriage return, which must not
+    split the answer into rows the report cannot read.
+    """
+    with_build_start_stub(
+        check_setup_repository,
+        DatasetLocation.BUILD_START_NEEDS_ACCESS_WINDOWS_LINES_STUB,
+    )
+
+    report = run_check_setup(
+        check_setup_repository, **{ClaudeCodeVariable.REMOTE: EnvironmentFlag.TRUE}
+    )
+
+    assert report.results[SetupCheck.PLAN_SITE_ACCESS].status == CheckStatus.NEEDS_SETUP
+
+
 def test_a_cloud_session_that_cannot_start_the_build_needs_setup(
     check_setup_repository: ScratchRepository,
 ):
@@ -482,9 +501,10 @@ def test_a_repository_row_is_not_printed_when_the_plan_site_is_not_requested(
 def test_the_dispatch_workflow_path_matches_the_shell_configuration(
     check_setup_repository: ScratchRepository,
 ):
-    assert check_setup_repository.configuration_value(
-        "PLAN_SITE_DISPATCH_WORKFLOW_PATH"
-    ) == str(WorkflowLocation.PLAN_SITE_DISPATCH)
+    assert (
+        check_setup_repository.configuration_value("PLAN_SITE_DISPATCH_WORKFLOW_PATH")
+        == Path(WorkflowLocation.PLAN_SITE_DISPATCH).as_posix()
+    )
 
 
 # %% the package's version
@@ -686,7 +706,9 @@ def test_reports_which_tooling_files_the_plugin_is_missing(
     assert report.exit_code is SetupCheckExitCode.SETUP_INCOMPLETE
     assert report.results[SetupCheck.TOOLING_FILES].status == CheckStatus.NEEDS_SETUP
     assert (
-        SetupPrerequisiteFile.PLAN_SCHEMA
+        BashPath(
+            check_setup_repository.plugin_root / SetupPrerequisiteFile.PLAN_SCHEMA
+        ).text
         in report.results[SetupCheck.TOOLING_FILES].detail
     )
     assert (
@@ -782,9 +804,9 @@ def mark_an_install_in_progress(repository: ScratchRepository, process_id: int) 
 
 
 def test_reports_dependencies_a_session_start_is_installing_as_in_progress(
-    check_setup_repository: ScratchRepository,
+    check_setup_repository: ScratchRepository, running_shell_process_id: int
 ):
-    mark_an_install_in_progress(check_setup_repository, os.getpid())
+    mark_an_install_in_progress(check_setup_repository, running_shell_process_id)
 
     report = run_check_setup(check_setup_repository)
 
@@ -808,9 +830,9 @@ def test_a_marker_left_by_an_install_that_ended_is_not_in_progress(
 
 
 def test_waiting_for_an_install_still_running_gives_up_after_its_timeout(
-    check_setup_repository: ScratchRepository,
+    check_setup_repository: ScratchRepository, running_shell_process_id: int
 ):
-    mark_an_install_in_progress(check_setup_repository, os.getpid())
+    mark_an_install_in_progress(check_setup_repository, running_shell_process_id)
 
     status = check_setup_repository.configuration_output(
         "wait_for_basstler_install 0; printf '%s' \"$?\""
@@ -899,7 +921,7 @@ def test_run_outside_a_repository_names_the_directory_on_stderr(
     """
     result = run_check_setup_outside(check_setup_repository, outside_any_repository)
 
-    assert str(outside_any_repository.resolve()) in result.stderr
+    assert BashPath(outside_any_repository.resolve()).text in result.stderr
 
 
 # %% reporting only the requested checks

@@ -54,7 +54,7 @@ from ..constants.environment import (
 )
 from ..constants.notes import ScratchBranch
 from ..constants.paths import DatasetLocation, PersonalNotesPath, RepositoryLocation
-from ..executable_stubs import ExecutableStubDirectory
+from ..executable_stubs import ExecutableStubDirectory, NEEDS_SCRIPT_AS_EXECUTABLE
 from ..scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
 
 SCRIPTS_UNDER_TEST = (
@@ -293,6 +293,7 @@ def test_completes_a_full_setup(setup_repository: ScratchRepository):
     assert check_setup_report(setup_repository).exit_code == exit_code
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     setup_repository: ScratchRepository, tmp_path: Path
 ):

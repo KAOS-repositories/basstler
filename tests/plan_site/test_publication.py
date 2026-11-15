@@ -28,7 +28,7 @@ from basstler.git.commands import (
     GitCommandResult,
     GitCommandRunner,
 )
-from basstler.git.remote_branch import RemoteBranch
+from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.actions_budget import ActionsBudget
 from basstler.github.client import (
     GitHubReader,
@@ -95,6 +95,7 @@ from basstler.plan_site.workflows import (
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
+from ..executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from ..constants.paths import DatasetLocation
 from ..constants.stack import RemoteName
 from ..maintenance.fork import UPSTREAM_BASE, ForkCheckout
@@ -763,12 +764,12 @@ def test_a_written_dispatch_workflow_reads_back_its_site_repository():
 # %% the site the notes branch records
 
 
-def notes_branch_of(fork_checkout: ForkCheckout) -> RemoteBranch:
+def notes_branch_of(fork_checkout: ForkCheckout) -> GitHubRemoteBranch:
     """
     :param fork_checkout: The fork checkout.
     :return: Its notes branch on ``origin``.
     """
-    return RemoteBranch(
+    return GitHubRemoteBranch(
         NOTES_BRANCH, GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN
     )
 
@@ -995,7 +996,7 @@ def test_a_merge_workflow_branch_without_the_default_branch_s_history_is_rebuilt
     """
     publishing.create(publishing.site.repository)
     publication = publishing.publication(publishing.runs_none())
-    RemoteBranch(
+    GitHubRemoteBranch(
         publication.merge_workflow_branch, publication.git, RemoteName.ORIGIN
     ).write(
         {
@@ -1879,6 +1880,7 @@ def test_a_cloud_session_s_store_command_runs_without_this_session_s_python(publ
     assert sys.executable not in pending_step(report, UserStep.STORE_TOKEN).line
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_cloud_session_s_store_command_proves_the_token_by_starting_the_build(
     published, tmp_path, monkeypatch
 ):
@@ -1893,6 +1895,7 @@ def test_a_cloud_session_s_store_command_proves_the_token_by_starting_the_build(
     )
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_cloud_session_s_store_command_stores_the_token_in_every_registered_repository(
     published, tmp_path, monkeypatch
 ):
@@ -1910,6 +1913,7 @@ def test_a_cloud_session_s_store_command_stores_the_token_in_every_registered_re
     ]
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_cloud_session_s_store_command_stores_nothing_when_the_build_is_refused(
     published, tmp_path, monkeypatch
 ):

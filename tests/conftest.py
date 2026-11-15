@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -24,6 +25,8 @@ from playwright.sync_api import Browser, Page, sync_playwright
 # basstler.locations reads on import; pinned before anything imports it, so the suite
 # tests this checkout's plugin rather than whichever release that session synced.
 os.environ["BASSTLER_PLUGIN_ROOT"] = str(Path(__file__).resolve().parents[1] / "plugin")
+
+from basstler.bash import Bash
 
 from .constants.environment import (
     ConfigurationVariable,
@@ -38,35 +41,71 @@ from .upstream_reviews.replay import RecordedResponse, ReplayingClient
 # %% the package's environment, as CI has it
 
 
+@pytest.fixture(scope="session")
+def python3_directory(tmp_path_factory: pytest.TempPathFactory) -> Path | None:
+    """
+    :param tmp_path_factory: Makes the directory outside every test's own ``tmp_path``.
+    :return: A directory holding a ``python3`` running the suite's interpreter, or
+        ``None`` where the interpreter's directory has one, as everywhere but Windows.
+    """
+    interpreter_directory = Path(sys.executable).parent
+    if shutil.which(InterpreterName.PYTHON3, path=str(interpreter_directory)):
+        return None
+    stubs = ExecutableStubDirectory.create(tmp_path_factory.mktemp("suite-interpreter"))
+    stubs.install(InterpreterName.PYTHON3)
+    return stubs.path
+
+
 @pytest.fixture(autouse=True)
 def package_environment_of_the_suite(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, python3_directory: Path | None
 ) -> None:
     """
     Give every test an empty package home and the suite's interpreter as ``python3``.
 
     A hook then runs the package this suite imports, as in CI, and never reads or
-    removes the package environments of the machine running the suite. Where the
-    interpreter's directory has no ``python3``, as on Windows, a stub provides it.
+    removes the package environments of the machine running the suite.
 
     :param tmp_path: pytest's per-test temporary directory.
     :param monkeypatch: Sets both variables for this test only.
+    :param python3_directory: Where ``python3`` is, when the interpreter's own
+        directory has none.
     """
     monkeypatch.setenv(ConfigurationVariable.HOME, str(tmp_path / "basstler-home"))
-    interpreter_directory = Path(sys.executable).parent
-    search_path = [str(interpreter_directory)]
-    if shutil.which(InterpreterName.PYTHON3, path=str(interpreter_directory)) is None:
-        stub_parent = tmp_path / "suite-interpreter"
-        stub_parent.mkdir()
-        stubs = ExecutableStubDirectory.create(stub_parent)
-        stubs.install(InterpreterName.PYTHON3)
-        search_path.append(str(stubs.path))
+    search_path = [str(Path(sys.executable).parent)]
+    if python3_directory is not None:
+        search_path.append(str(python3_directory))
     monkeypatch.setenv(
         SearchPathVariable.EXECUTABLE_SEARCH_PATH,
         os.pathsep.join(
             [*search_path, os.environ[SearchPathVariable.EXECUTABLE_SEARCH_PATH]]
         ),
     )
+
+
+# %% a live process the hooks can see
+
+
+@pytest.fixture
+def running_shell_process_id() -> Iterator[int]:
+    """
+    The id of a running process as the hooks' ``kill -0`` knows it.
+
+    On Windows that is the id bash gives its own process, which is not the one Python
+    gets for a process it starts, and a Python process has none.
+
+    :return: The id of a bash process that stays alive until the test ends.
+    """
+    process = subprocess.Popen(
+        Bash.locate(os.environ).command("-c", 'printf "%s\n" "$$"; exec sleep 600'),
+        stdout=subprocess.PIPE,
+        encoding="utf-8",
+    )
+    assert process.stdout is not None
+    yield int(process.stdout.readline())
+    process.kill()
+    process.wait()
+    process.stdout.close()
 
 
 # %% scratch repositories and stubs

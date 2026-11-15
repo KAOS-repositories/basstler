@@ -201,7 +201,7 @@ report_plan_site_access() {
     report plan_site_access info "no plan site lists this repository, so no build is started"
     return 0
   fi
-  access="$("${BASSTLER_PYTHON}" -m "${PLAN_SITE_BUILD_START_MODULE}" check-access 2>/dev/null | tr '\n' ' ')" \
+  access="$("${BASSTLER_PYTHON}" -m "${PLAN_SITE_BUILD_START_MODULE}" check-access 2>/dev/null | tr -d '\r' | tr '\n' ' ')" \
     || access=""
   access="${access% }"
   if [ -z "${access}" ]; then

@@ -868,9 +868,10 @@ class CodeModificationSnippet(PathEnumeration):
     An import of :class:`basstler.bash.Bash` among other names.
     """
 
-    NO_IMPORTS = DIRECTORY / "no-imports.py"
+    NO_IMPORTS = DIRECTORY / "no-imports.txt"
     """
-    A docstring and one statement, with no import.
+    A docstring and one statement, with no import; plain text, because the repository
+    requires the future import in every Python file.
     """
 
 

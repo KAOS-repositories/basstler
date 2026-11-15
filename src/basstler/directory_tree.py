@@ -17,8 +17,8 @@ from pathlib import Path
 @dataclass(frozen=True)
 class DirectoryTree:
     """
-    A directory and everything in it, such as a clone whose object files git left
-    read-only, which Windows refuses to delete.
+    A directory and everything in it, such as a clone whose object files git left read-
+    only, which Windows refuses to delete.
     """
 
     root: Path

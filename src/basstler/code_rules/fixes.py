@@ -178,8 +178,8 @@ class SourceFixer:
     def fixed(self, module: libcst.Module) -> AppliedAction:
         """
         :param module: The module to fix, which is left as it is.
-        :return: The module with every place the checkers report fixed, and the action
-            restoring *module* exactly.
+        :return: The module with every place the checkers report fixed and the imports
+            the fixes need added, and the action restoring *module* exactly.
         :raises FixDoesNotConvergeError: If a round of fixes leaves at least as many
             places breaking a rule as there were before it.
         """

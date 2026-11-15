@@ -12,4 +12,4 @@ def run(script: str, environment: Mapping[str, str]) -> None:
     """
     Run *script* in *environment*.
     """
-    subprocess.run(["bash", "-c", script], check=True, env=environment)
+    subprocess.run(["bash", "-c", script], check=True)

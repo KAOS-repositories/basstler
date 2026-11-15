@@ -8,7 +8,11 @@ from __future__ import annotations
 import libcst
 import pytest
 
-from basstler.code_modification.actions import ActionPlan, NodeReplacement
+from basstler.code_modification.actions import (
+    ActionPlan,
+    NodeReplacement,
+    StatementRemoval,
+)
 from basstler.code_modification.exceptions import ActionTargetMissingError
 from basstler.code_modification.positions import PositionedModule
 
@@ -93,3 +97,24 @@ def test_a_plan_is_undone_in_the_reverse_order_it_was_applied(two_calls):
     applied = plan.apply(two_calls.module)
 
     assert applied.inverse.apply(applied.module).module.code == two_calls.module.code
+
+
+# %% statements
+
+
+def test_removing_a_statement_the_module_lacks_raises():
+    """
+    A removal made for another module is refused instead of removing what is there.
+    """
+    module = libcst.parse_module(
+        CodeModificationSnippet.IMPORTS_BEFORE_CODE.read_text(encoding="utf-8")
+    )
+    other = libcst.parse_module(
+        CodeModificationSnippet.IMPORTS_WITH_BASH.read_text(encoding="utf-8")
+    )
+    statement = other.body[2]
+
+    with pytest.raises(ActionTargetMissingError):
+        StatementRemoval(PositionedModule(other).positions[statement], statement).apply(
+            module
+        )

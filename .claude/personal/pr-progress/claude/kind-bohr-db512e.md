@@ -1,12 +1,12 @@
 ## Plan
-- Tests first: example `before.py`/`after.py` pairs for `TreeRemovalChecker` and `BashByNameChecker`; `DirectoryTree(ignore_errors=True)` tests.
-- `DirectoryTree.ignore_errors` field; `TreeRemovalChecker` becomes a `FixableChecker`.
-- Import action in `code_modification` (inverse removes the import).
-- `BashByNameChecker` fixable only where an `environment` is in scope.
-- Regenerate `AGENTS.md`; ruff, docformatter, `code-rules check`.
+- `DirectoryTree.ignore_errors`; `TreeRemovalChecker` and `BashByNameChecker` become fixable, with examples under `tests/dataset/rule-fixes/`.
+- Statement insertion/removal actions and `ImportedName`, so a fix adds the import it needs.
+- Full suite, ruff, `code-rules check`, then the PR description.
 
 ## Done
-- Branch and draft PR open, stacked on #222.
+- `DirectoryTree.ignore_errors` and its tests.
+- Import actions (`StatementInsertion`, `StatementRemoval`, `ImportedName`); `SourceFixer` adds each fix's imports.
+- Tree-removal fix and bash fix with examples; calls the fix cannot take over (handler, no `environment`) stay reported with a message saying so.
 
 ## Next
-- Write the failing tests.
+- Full suite result; update the description with decisions; keep draft.

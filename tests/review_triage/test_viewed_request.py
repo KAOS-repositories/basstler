@@ -10,16 +10,16 @@ import pytest
 
 from basstler.github.repository_details import RepositoryDetails
 from basstler.locations import WorkflowLocation
-from basstler.repository import PullRequestReference, Repository
+from basstler.github.exceptions import GraphQLErrorsReturned
+from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.client import GitHubWriter
 from basstler.review_triage.exceptions import (
     FilesNotMarkedViewed,
-    GraphQLMutationRefused,
     MarkViewedWorkflowRefused,
 )
 from basstler.review_triage.outputs import ViewedMarking
-from basstler.review_triage.pull_request import PullRequestChanges
-from basstler.review_triage.triage import PullRequestTriage, PullRequestTriager
+from basstler.github.pull_request_changes import PullRequestChanges
+from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 from basstler.review_triage.viewed_request import (
     MarkViewedDispatch,
     MarkViewedInputs,
@@ -122,7 +122,7 @@ def test_a_refused_dispatch_is_raised():
 
 
 @pytest.fixture
-def sample_triage(sample_changes: PullRequestChanges) -> PullRequestTriage:
+def sample_triage(sample_changes: PullRequestChanges) -> TriageOutcome:
     """
     :return: The sample pull request, triaged.
     """
@@ -147,20 +147,20 @@ def routes(
     )
 
 
-def test_files_marked_directly_ask_no_workflow(sample_triage: PullRequestTriage):
+def test_files_marked_directly_ask_no_workflow(sample_triage: TriageOutcome):
     client = WorkflowRepositoryClient()
     routes(RecordingWriter({"data": {}}), client).mark(sample_triage)
     assert client.sent == []
 
 
-def test_a_refused_direct_marking_asks_the_workflow(sample_triage: PullRequestTriage):
+def test_a_refused_direct_marking_asks_the_workflow(sample_triage: TriageOutcome):
     client = WorkflowRepositoryClient()
     routes(RefusingWriter(HTTPStatus.FORBIDDEN), client).mark(sample_triage)
     assert [type(write) for write in client.sent] == [MarkViewedDispatch]
 
 
 def test_a_cloud_session_asks_the_workflow_without_marking_directly(
-    sample_triage: PullRequestTriage,
+    sample_triage: TriageOutcome,
 ):
     writer = RecordingWriter({"data": {}})
     client = WorkflowRepositoryClient()
@@ -171,17 +171,17 @@ def test_a_cloud_session_asks_the_workflow_without_marking_directly(
     )
 
 
-def test_both_routes_failing_is_raised(sample_triage: PullRequestTriage):
+def test_both_routes_failing_is_raised(sample_triage: TriageOutcome):
     client = WorkflowRepositoryClient(write_refusal=HTTPStatus.NOT_FOUND)
     with pytest.raises(FilesNotMarkedViewed):
         routes(RefusingWriter(HTTPStatus.FORBIDDEN), client).mark(sample_triage)
 
 
 def test_marking_only_directly_never_asks_the_workflow(
-    sample_triage: PullRequestTriage,
+    sample_triage: TriageOutcome,
 ):
     client = WorkflowRepositoryClient()
-    with pytest.raises(GraphQLMutationRefused):
+    with pytest.raises(GraphQLErrorsReturned):
         routes(RefusingWriter(HTTPStatus.FORBIDDEN), client, directly=True).mark(
             sample_triage
         )

@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from basstler.class_property import classproperty
 from basstler.locations import GitHubTemplate
 from basstler.render_common import TemplatePage
-from basstler.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, Repository
 
 # %% the form's parameters
 

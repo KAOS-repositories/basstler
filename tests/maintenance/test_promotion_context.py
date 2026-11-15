@@ -9,30 +9,30 @@ import argparse
 import json
 from dataclasses import asdict
 from enum import StrEnum
+from pathlib import PurePosixPath
 
 import pytest
 
-from basstler.github_labels import GitHubLabel
+from basstler.git.commit_range import FileChange
+from basstler.github.tooling_labels import GitHubLabel
 from basstler.maintenance.commands import (
-    PrepareCommand,
     PreparationKey,
+    PrepareCommand,
     RunReportCommand,
 )
 from basstler.maintenance.promotion import PromotionSummaries, PromotionSummary
 from basstler.maintenance.promotion_context import (
     ChangeSize,
-    FileChange,
     PromotionContextReader,
 )
 from basstler.stack.promotion_link import PromotionLink
 
 from ..constants.stack import RemoteName, StackBranch
-
 from .fork import (
     UPSTREAM_BASE,
+    ForkCheckout,
     PromotionSampleText,
     StackPullRequestNumber,
-    ForkCheckout,
     a_board_entry,
     a_parent_and_child,
     a_stack,
@@ -101,10 +101,10 @@ def test_a_branch_awaiting_its_link_is_described_from_its_pull_request_and_commi
     assert context.description == PromotionSampleText.SUMMARY
     assert context.commit_subjects == tuple(subjects)
     assert context.compared_with == reader.stack.configuration.upstream_base_reference
-    assert context.change_size == ChangeSize.of(
+    assert context.change_size == ChangeSize.from_file_changes(
         [
-            FileChange(ForkCheckout.own_file(StackBranch.PARENT), 1, 0),
-            FileChange("a-second-file", 1, 0),
+            FileChange(PurePosixPath(ForkCheckout.own_file(StackBranch.PARENT)), 1, 0),
+            FileChange(PurePosixPath("a-second-file"), 1, 0),
         ],
         reader.file_limit,
     )
@@ -150,7 +150,10 @@ def test_a_large_change_is_described_within_its_budget(fork_checkout: ForkChecko
 
     (context,) = reader.read()
 
-    assert len(json.dumps(asdict(context)).encode()) <= OutputBudget.PROMOTION_CONTEXT
+    assert (
+        len(json.dumps(asdict(context), default=str).encode())
+        <= OutputBudget.PROMOTION_CONTEXT
+    )
     assert len(context.change_size.largest_files) == reader.file_limit
     assert context.commits_not_listed == commits + 1 - reader.commit_limit
     assert context.description.endswith(reader.truncation_marker)

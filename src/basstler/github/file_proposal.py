@@ -23,7 +23,7 @@ from basstler.github.pull_request import NewPullRequest
 from basstler.github.pull_request_form import PullRequestForm
 from basstler.github.web_page import WebPage
 from basstler.json_model import ValidatedJSONModel
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 
 # %% the contents API
 

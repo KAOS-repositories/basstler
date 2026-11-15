@@ -12,7 +12,7 @@ from basstler.github.token_form import (
 )
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.user_steps import UserStep, UserSteps
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 
 # %% the repositories
 

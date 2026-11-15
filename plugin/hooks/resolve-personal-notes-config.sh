@@ -32,6 +32,9 @@ if [ "$(git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree 2>/dev/null)" !
   exit 78
 fi
 CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
+# Whether Claude Code runs this in a cloud session (basstler.locations.ClaudeCodeVariable.REMOTE),
+# which setup-review-triage's skill reads; unset elsewhere, so it is "false" there.
+CLAUDE_CODE_REMOTE="${CLAUDE_CODE_REMOTE:-false}"
 
 # Every caller also does `git` operations (config, fetch, worktree, branch)
 # that assume they're running inside the project. Move there explicitly instead
@@ -390,6 +393,8 @@ PLAN_ITEM_MODE_MODULE="basstler.plan.item_mode"
 # basstler.plan.manifest_tools: reads a plan id out of a manifest and regenerates
 # the branch index - the manifest plumbing save-plan.sh calls.
 PLAN_MANIFEST_TOOLS_MODULE="basstler.plan.manifest_tools"
+# Its subcommand listing the items that carry no recommended model.
+PLAN_UNMODELLED_ITEMS_COMMAND="unmodelled-items"
 # basstler.plan.size_limits: prunes landed items and refuses a plan or progress
 # notes over their limits - the gate save-plan.sh and save-pr-progress.sh run.
 PLAN_SIZE_LIMITS_MODULE="basstler.plan.size_limits"
@@ -431,12 +436,12 @@ UPSTREAM_REVIEWS_HELPER_MODULE="basstler.upstream_reviews.helper"
 # workflow and nothing of the project's.
 UPSTREAM_REVIEWS_ACTION_MODULE="basstler.upstream_reviews.action"
 UPSTREAM_REVIEWS_ACTION_BRANCH="basstler/upstream-reviews"
-# basstler.actions_usage: the last 24 hours of Actions runs and jobs per workflow against
+# basstler.github.actions_usage: the last 24 hours of Actions runs and jobs per workflow against
 # the budget's daily ceilings - run by session-start.sh and by the test workflow.
-ACTIONS_USAGE_MODULE="basstler.actions_usage"
-# basstler.main_failure: the one issue open while the default branch's tests fail -
+ACTIONS_USAGE_MODULE="basstler.github.actions_usage"
+# basstler.github.main_failure: the one issue open while the default branch's tests fail -
 # recorded by the test workflow, shown by session-start.sh.
-MAIN_FAILURE_MODULE="basstler.main_failure"
+MAIN_FAILURE_MODULE="basstler.github.main_failure"
 # dependencies: prints the package's requirements an environment does not
 # have - what missing_dependencies below calls.
 BASSTLER_DEPENDENCIES_MODULE="basstler.setup.dependencies"

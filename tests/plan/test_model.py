@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
 from basstler.plan import model
 from basstler.plan.model import (
@@ -19,12 +20,11 @@ from basstler.plan.model import (
     PlanItem,
     PlanManifest,
 )
-from basstler.repository import Repository
 
 from ..constants.paths import DatasetLocation
-from .concurrent_edits import PLAN_IDENTIFIER
-from ..fixture_plans import ForeignItemId, FixturePlanId, fixture_item, fixture_manifest
+from ..fixture_plans import FixturePlanId, ForeignItemId, fixture_item, fixture_manifest
 from ..manifest_builders import manifest_item, minimal_plan
+from .concurrent_edits import PLAN_IDENTIFIER
 
 # %% stored spelling
 
@@ -191,3 +191,21 @@ def test_a_plan_document_path_is_slash_separated_on_windows(document, monkeypatc
     assert document.path_within_notes_branch(PLAN_IDENTIFIER) == (
         f"{ProjectLocation.PLANS.as_posix()}/{PLAN_IDENTIFIER}/{document}"
     )
+
+
+# %% items without a recommended model
+
+
+def test_a_manifest_lists_the_items_that_carry_no_recommended_model():
+    manifest = PlanManifest(
+        minimal_plan(
+            items=[
+                manifest_item("a", recommended_model=None),
+                manifest_item("b", recommended_model="opus"),
+            ]
+        )
+    )
+
+    assert [item.identifier for item in manifest.items_without_recommended_model] == [
+        "a"
+    ]

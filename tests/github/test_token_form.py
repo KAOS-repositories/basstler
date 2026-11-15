@@ -17,7 +17,7 @@ from basstler.github.token_form import (
     TokenFormParameter,
     TokenUse,
 )
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 
 # %% the filled-in form
 

@@ -11,15 +11,17 @@ from typing import Any
 import yaml
 
 import basstler.plan.item_bootstrap
+from basstler.github.pull_request import NewPullRequest
+from basstler.github.repository import PullRequestReference
 from basstler.plan.item_bootstrap.exceptions import PullRequestRefusedError
 from basstler.plan.item_bootstrap.manifest_text import ManifestText
-from basstler.github.pull_request import NewPullRequest
 from basstler.plan.item_bootstrap.opening import (
     PullRequestOpener,
     WorkOpenRequest,
 )
 from basstler.plan.item_bootstrap.record import ItemRecordRequest
 from basstler.plan.item_bootstrap.update import ItemUpdateRequest
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemLayout,
     ItemStatus,
@@ -33,7 +35,6 @@ from basstler.plan.size_limits import (
     RoadmapEntryLocation,
     SizeViolation,
 )
-from basstler.repository import PullRequestReference
 
 from ...constants.notes import ScratchBranch
 from ...constants.paths import DatasetLocation
@@ -247,6 +248,7 @@ def record_request(repository: ScratchRepository, **overrides: object):
         plan_identifier=PLAN_IDENTIFIER,
         item_identifier=EXISTING_ITEM,
         status=ItemStatus.IN_PROGRESS,
+        recommended_model=ModelAlias.SONNET,
     )
     defaults.update(overrides)
     return ItemRecordRequest(**defaults)

@@ -20,7 +20,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from basstler.plan_site.plan import Plan
+from basstler.github.pull_request_source import (
+    GitHubPullRequestSource,
+    PullRequestSource,
+)
 from basstler.plan.check_dependency_readiness import DependencyReadiness
 from basstler.plan.dependencies import DependencyResolver
 from basstler.plan.item_bootstrap.documents import PlanDocuments, ProjectCheckout
@@ -29,7 +32,7 @@ from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.repository_rules_store import RepositoryRulesStore
 from basstler.plan.size_limits import Roadmap
 from basstler.plan.validation import PlanValidator
-from basstler.pull_request_source import GitHubPullRequestSource, PullRequestSource
+from basstler.plan.structure import Plan
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -173,7 +176,7 @@ class ItemBrief:
                 plan,
                 item.identifier,
                 pull_request_source.live_pull_requests_of(
-                    DependencyResolver(plan, plan_directory)
+                    DependencyResolver(plan, plan_directory).pull_request_references
                 ),
                 plan_directory,
             )

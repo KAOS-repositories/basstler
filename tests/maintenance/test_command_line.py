@@ -6,20 +6,19 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
-from dataclasses import field as dataclasses_field
+from dataclasses import dataclass, field as dataclasses_field
 
 import pytest
 
 import basstler.maintenance.__main__
 from basstler.environment import GitHubCredentialVariable
-from basstler.maintenance.upstream_action import UpstreamReadRoute
-
 from basstler.exit_codes import StackExitCode
-
+from basstler.github.constants import MaintenanceNotice
+from basstler.github.pull_request_state import PullRequestState
+from basstler.github.repository_access import ForkPullRequests, PullRequestListState
 from basstler.locations import RepositoryStateLocation
-from basstler.maintenance.board import BoardExport, UpstreamPullRequests
-from basstler.maintenance.constants import MaintenanceNotice
+from basstler.maintenance.board import BoardExport
+from basstler.upstream_reviews.action.open_pull_requests import UpstreamPullRequests
 from basstler.maintenance.commands import (
     BoardCommand,
     MaintenanceCommand,
@@ -28,13 +27,11 @@ from basstler.maintenance.commands import (
     RestackCommand,
     RunReportCommand,
 )
-from basstler.pull_request_state import PullRequestState
-from basstler.stack.model import PullRequest
-from basstler.maintenance.github import ForkPullRequests, PullRequestListState
 from basstler.maintenance.restack_steps import RestackStep
+from basstler.maintenance.upstream_read_route import UpstreamReadRoute
+from basstler.stack.model import PullRequest
 
 from ..constants.stack import RemoteName, StackBranch
-
 from .fork import (
     ForkCheckout,
     a_parent_and_child,

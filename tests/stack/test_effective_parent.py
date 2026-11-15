@@ -12,13 +12,12 @@ from basstler.stack.model import (
     PullRequest,
     Reparent,
     RestackPlanEntry,
-    IntegrationStrategy,
     Stack,
     StackBranch as BranchOfStack,
 )
+from basstler.git.commands import IntegrationStrategy
 
 from ..constants.stack import StackBranch
-
 from .dataset import StackRepository, build
 
 # %% the board

@@ -10,7 +10,7 @@ from enum import StrEnum
 from urllib.parse import quote
 
 from basstler.class_property import classproperty
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 
 # %% the form's parameters
 

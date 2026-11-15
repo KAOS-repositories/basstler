@@ -18,17 +18,20 @@ items:
   pull_request_number: 11
   track: track-1
   status: in_progress
+  recommended_model: sonnet
 - id: draft-dependency
   title: A dependency whose pull request is still a draft
   branch: draft-dependency
   pull_request_number: 12
   track: track-1
   status: in_progress
+  recommended_model: sonnet
 - id: briefed-item
   title: The item being briefed
   branch: briefed-branch
   track: track-1
   status: not_started
+  recommended_model: sonnet
   depends_on:
   - merged-dependency
   - draft-dependency

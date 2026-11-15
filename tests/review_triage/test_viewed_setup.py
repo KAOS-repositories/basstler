@@ -23,7 +23,7 @@ from basstler.github.pull_request_form import PullRequestForm
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.token_form import PermissionLevel, RepositoryPermission, TokenUse
 from basstler.locations import WorkflowLocation
-from basstler.repository import BASSTLER_REPOSITORY, Repository
+from basstler.github.repository import BASSTLER_REPOSITORY, Repository
 from basstler.review_triage.exceptions import MarkViewedWorkflowRefused
 from basstler.review_triage.viewed_request import ReviewTriageSecret
 from basstler.review_triage.viewed_setup import (

@@ -22,8 +22,12 @@ from basstler.github.client import (
 )
 from basstler.github.credential import CredentialProvider
 from basstler.github.exceptions import GitHubRequestFailed
-from basstler.repository import Repository
-from basstler.review_triage.pull_request import PullRequestChanges, PullRequestReader
+from basstler.github.pull_request_changes import (
+    PullRequestChanges,
+    PullRequestChangesReader,
+)
+from basstler.github.repository import Repository
+from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameMap
 
 from ..constants.paths import DatasetLocation
@@ -160,7 +164,7 @@ def old_name_renamed() -> RenameMap:
     """
     :return: The renames of the samples: ``old_name`` to ``new_name``.
     """
-    return RenameMap((Rename("old_name", "new_name", "test"),))
+    return RenameMap((Rename("old_name", "new_name", RenameDetection()),))
 
 
 @pytest.fixture
@@ -197,7 +201,7 @@ def read_sample(
     :return: The sample pull request read with that description.
     """
     payload["body"] = description.read()
-    return PullRequestReader(
+    return PullRequestChangesReader(
         scratch_repository.git, OnePullRequestReader(payload)
     ).read(SAMPLE_REPOSITORY, payload["number"])
 

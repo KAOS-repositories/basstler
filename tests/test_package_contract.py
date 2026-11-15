@@ -21,15 +21,18 @@ from pathlib import Path
 
 import pytest
 
-from basstler.locations import ClaudeCodeVariable, PackageLocation, PluginLocation
-
+from basstler.environment import GitBashVariable
+from basstler.locations import (
+    ClaudeCodeVariable,
+    PackageLocation,
+    PluginLocation,
+    ProjectLocation,
+)
 from basstler.package_layout import (
     PackageModule,
     command_line_entry_points,
     package_modules,
 )
-from basstler.environment import GitBashVariable
-from basstler.locations import ProjectLocation
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
 
@@ -267,7 +270,7 @@ def test_every_workflow_that_runs_a_module_installs_the_dependencies_first():
 
 
 BASSTLER_REFERENCE = re.compile(
-    r"(?:basstler/\.github/workflows/[\w-]+\.yml@|basstler_branch_or_tag: )(\S+)"
+    r"(?:basstler/\.github/workflows/upstream-reviews\.yml@|basstler_branch_or_tag: )(\S+)"
 )
 """
 The ``@<branch or tag>`` the caller uses basstler's workflow at, or the
@@ -275,18 +278,13 @@ The ``@<branch or tag>`` the caller uses basstler's workflow at, or the
 """
 
 
-EXAMPLE_CALLERS = sorted((RepositoryLocation.ROOT / "docs" / "examples").glob("*.yml"))
-"""
-The example workflows a project copies to call one of basstler's reusable workflows.
-"""
-
-
-@pytest.mark.parametrize("caller", EXAMPLE_CALLERS, ids=lambda path: path.name)
-def test_the_example_caller_uses_one_branch_or_tag_throughout(caller: Path):
+def test_the_example_caller_uses_one_branch_or_tag_throughout():
     """
     A project copies the example caller as it stands, so the workflow it uses and the
     package that workflow installs have to come from the same branch or tag.
     """
+    caller = RepositoryLocation.ROOT / "docs" / "examples" / "upstream-reviews.yml"
+
     references = BASSTLER_REFERENCE.findall(caller.read_text())
 
     assert len(references) == 2

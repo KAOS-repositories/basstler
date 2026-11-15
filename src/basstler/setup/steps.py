@@ -42,20 +42,19 @@ from pathlib import Path
 
 from basstler.bash import Bash
 from basstler.class_property import classproperty
-from basstler.github_labels import GitHubLabel
+from basstler.git.commands import GitCommandFailed, GitCommandRunner
+from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.repository import Repository
+from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
-from basstler.maintenance.git_commands import GitCommandFailed, GitCommandRunner
 from basstler.plugin_root import PluginRoot
-from basstler.repository import Repository
 from basstler.shell_configuration import (
     FetchedBranchReference,
     ShellConfigurationFunction,
 )
-from basstler.stack.configuration import StackSetting
+from basstler.github.stack_configuration import StackSetting
 from basstler.standard_streams import StandardStreamHandler
-from basstler.maintenance.remote_branch import RemoteBranch
-from basstler.upstream_reviews.action.branch import ActionInstallation
-from basstler.upstream_reviews.action.branch import ActionBranch
+from basstler.upstream_reviews.action.branch import ActionBranch, ActionInstallation
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -788,7 +787,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if arguments.command == SetupCommand.INSTALL_UPSTREAM_REVIEWS_ACTION:
         remote = PersonalNotesSetting.REMOTE.resolve(project_root, os.environ)
-        branch = RemoteBranch(ActionBranch.NAME, GitCommandRunner(project_root), remote)
+        branch = GitHubRemoteBranch(
+            ActionBranch.NAME, GitCommandRunner(project_root), remote
+        )
         try:
             changed = ActionInstallation(arguments.branch_or_tag).install(branch)
         except GitCommandFailed as failure:

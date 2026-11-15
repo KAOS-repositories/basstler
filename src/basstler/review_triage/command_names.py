@@ -31,6 +31,11 @@ class ReviewTriageCommand(StrEnum):
     Mark a pull request's mechanical files viewed for the logged-in account.
     """
 
+    DECLARE = "declare"
+    """
+    Print the description comment declaring renames.
+    """
+
     REQUEST_MARK_VIEWED = "request-mark-viewed"
     """
     Ask a repository's Actions to mark a pull request's mechanical files viewed.

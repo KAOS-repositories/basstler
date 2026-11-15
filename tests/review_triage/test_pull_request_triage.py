@@ -5,30 +5,28 @@ triage.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
 
-from basstler.locations import ReviewTriageLocation
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.review_triage.comparison import MechanicalChange
-from basstler.review_triage.detection import RenameDetection
-from basstler.review_triage.exceptions import GraphQLMutationRefused
-from basstler.review_triage.outputs import (
-    GraphQLMutation,
-    MarkdownReport,
-    ViewedFile,
-    ViewedMarking,
-)
-from basstler.review_triage.pull_request import (
+from basstler.git.commands import GitCommandRunner
+from basstler.github.exceptions import GraphQLErrorsReturned
+from basstler.github.graphql import GraphQLRequest
+from basstler.github.pull_request_changes import (
     PullRequestChanges,
-    PullRequestReader,
-    TriagedPullRequest,
+    PullRequestChangesReader,
+    RestPullRequest,
 )
+from basstler.locations import ReviewTriageLocation
+from basstler.review_triage.comparison import MechanicalChange
+from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
+from basstler.review_triage.detection import RenameDetection
+from basstler.review_triage.outputs import MarkdownReport, ViewedFile, ViewedMarking
 from basstler.review_triage.renames import Rename, RenameDecisions
-from basstler.review_triage.triage import PullRequestTriage, PullRequestTriager
+from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from ..scratch_repository import ScratchRepository
 from .conftest import (
@@ -55,7 +53,7 @@ What each mechanical file of the sample pull request changes.
 """
 
 
-def mechanical_kinds(triage: PullRequestTriage) -> dict[PurePosixPath, frozenset]:
+def mechanical_kinds(triage: TriageOutcome) -> dict[PurePosixPath, frozenset]:
     """
     :param triage: A triaged pull request.
     :return: The kinds of change of each of its mechanical files, by path.
@@ -71,7 +69,7 @@ def test_a_consistent_rename_gone_from_the_head_is_detected(
     rename.
     """
     assert RenameDetection().decisions(sample_changes) == RenameDecisions(
-        (Rename("old_name", "new_name", RenameDetection.label),)
+        (Rename("old_name", "new_name", RenameDetection()),)
     )
 
 
@@ -114,6 +112,26 @@ def test_a_rename_the_description_rejects_is_not_applied(
     }
 
 
+def test_a_rename_rejected_by_argument_is_not_applied(
+    sample_changes: PullRequestChanges,
+):
+    """
+    A rejection given as an argument outranks the detected rename, as the description's
+    does.
+    """
+    default = PullRequestTriager()
+    triager = replace(
+        default,
+        rename_sources=(
+            *default.rename_sources,
+            ArgumentDeclaration(TriageDeclaration(rejected_renames=("old_name",))),
+        ),
+    )
+    assert mechanical_kinds(triager.triage(sample_changes)) == {
+        PurePosixPath("package/constants.py"): frozenset({MechanicalChange.MOVE})
+    }
+
+
 # %% outputs
 
 
@@ -138,12 +156,20 @@ def test_each_mechanical_file_is_marked_viewed(sample_changes: PullRequestChange
     ViewedMarking(writer).publish(triage)
     document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
     assert writer.sent == [
-        GraphQLMutation(
+        GraphQLRequest(
             document,
-            ViewedFile(triage.pull_request.node_identifier, str(path)).to_json(),
+            ViewedFile(triage.pull_request.node_identifier, path).to_json(),
         )
         for path in MECHANICAL_KINDS
     ]
+
+
+def test_a_viewed_path_is_sent_with_forward_slashes():
+    """
+    A file's path goes to GitHub as its POSIX form, on every platform.
+    """
+    path = PurePosixPath("package/constants.py")
+    assert ViewedFile("node", path).to_json()["path"] == path.as_posix()
 
 
 def test_a_refused_marking_is_raised(sample_changes: PullRequestChanges):
@@ -152,7 +178,7 @@ def test_a_refused_marking_is_raised(sample_changes: PullRequestChanges):
     """
     triage = PullRequestTriager().triage(sample_changes)
     writer = RecordingWriter({"errors": [{"message": "Resource not accessible"}]})
-    with pytest.raises(GraphQLMutationRefused):
+    with pytest.raises(GraphQLErrorsReturned):
         ViewedMarking(writer).publish(triage)
 
 
@@ -164,7 +190,7 @@ def test_a_refused_call_is_raised_as_a_refused_marking(
     as a refused marking, which names the other ways to mark the files.
     """
     triage = PullRequestTriager().triage(sample_changes)
-    with pytest.raises(GraphQLMutationRefused):
+    with pytest.raises(GraphQLErrorsReturned):
         ViewedMarking(RefusingWriter(HTTPStatus.FORBIDDEN)).publish(triage)
 
 
@@ -182,7 +208,7 @@ def test_a_checkout_lacking_the_commits_fetches_them(
     repository, then reads the same changes.
     """
     scratch_repository.serve_origin_as(SAMPLE_REPOSITORY)
-    pull_request = TriagedPullRequest.from_json(sample_payload)
+    pull_request = RestPullRequest.from_json(sample_payload)
     scratch_repository.run_git(
         "push",
         "--quiet",
@@ -190,6 +216,8 @@ def test_a_checkout_lacking_the_commits_fetches_them(
         f"{pull_request.base.commit}:refs/heads/{pull_request.base.branch}",
         f"{pull_request.head.commit}:{pull_request.head_reference}",
     )
+    # An empty checkout, whose fetches from the repository's GitHub URL git sends to
+    # the scratch repository's remote instead, which holds both commits.
     reviewer = GitCommandRunner(tmp_path / "reviewer")
     reviewer.working_directory.mkdir()
     reviewer.run("init", "--quiet")
@@ -198,7 +226,7 @@ def test_a_checkout_lacking_the_commits_fetches_them(
         f"url.{scratch_repository.work_remote_path}.insteadOf",
         SAMPLE_REPOSITORY.clone_url,
     )
-    changes = PullRequestReader(reviewer, OnePullRequestReader(sample_payload)).read(
-        SAMPLE_REPOSITORY, pull_request.number
-    )
+    changes = PullRequestChangesReader(
+        reviewer, OnePullRequestReader(sample_payload)
+    ).read(SAMPLE_REPOSITORY, pull_request.number)
     assert changes.files == sample_changes.files

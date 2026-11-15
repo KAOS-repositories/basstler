@@ -304,6 +304,12 @@ class NamingRules(Section):
         "passes this test"
     )
 
+    NO_BARE_PREPOSITION_NAMES = (
+        "A method name is never a bare preposition such as `of`, `for` or `with`: it "
+        "says nothing without its class and its arguments beside it. Name what it "
+        "builds from or does, as in `RenameMap.from_decisions`"
+    )
+
     USE_PLAIN_WORDS = (
         "Use the plain word every reader already knows. Use a specialist, "
         "metaphorical or in-house term only where it is genuinely the precise word,"

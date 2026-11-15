@@ -17,10 +17,25 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from basstler.github.graphql import GraphQLRequest
 from basstler.exceptions import DataclassException
+from basstler.github.pull_request_models import (
+    CheckResult,
+    CheckStatus,
+    GraphQLCheckStatus,
+    UpstreamPullRequestSnapshot,
+)
+from basstler.github.query_documents import QueryVariable
+from basstler.github.repository import Repository
+from basstler.github.review_models import (
+    PageInfo,
+    ReviewThread,
+    ThreadMarker,
+)
+from basstler.github.states import CheckOutcome, CombinedCheckState, ReviewState
+from basstler.json_model import JSONModel
 from basstler.locations import ProjectLocation
-from basstler.repository import Repository
-from basstler.stack.configuration import CommittedStackConfiguration
+from basstler.github.stack_configuration import CommittedStackConfiguration
 from basstler.upstream_reviews.__main__ import (
     main,
     resolve_upstream_repository,
@@ -29,24 +44,16 @@ from basstler.upstream_reviews.clients import (
     GitHubCommandLineClient,
 )
 from basstler.upstream_reviews.exceptions import (
-    UpstreamReadError,
     GitHubCommandFailed,
-    GraphQLErrorsReturned,
     UpstreamPullRequestNotFound,
 )
+from basstler.github.exceptions import GraphQLErrorsReturned, UpstreamReadError
 from basstler.upstream_reviews.failure_logs import (
     FailedJob,
     FailureLog,
     FailureLogReader,
     LogFormatting,
     LogMarker,
-)
-from basstler.upstream_reviews.pull_request_models import (
-    CheckResult,
-    GraphQLCheckStatus,
-    CheckStatus,
-    GraphQLRequest,
-    UpstreamPullRequestSnapshot,
 )
 from basstler.upstream_reviews.readers import (
     ReadSource,
@@ -56,14 +63,6 @@ from basstler.upstream_reviews.report import (
     ReportText,
     UpstreamPullRequestReport,
 )
-from basstler.upstream_reviews.review_models import (
-    PageInfo,
-    ReviewThread,
-)
-from basstler.github.states import CheckOutcome, ReviewState, CombinedCheckState
-from basstler.json_model import JSONModel
-from basstler.upstream_reviews.query_documents import QueryVariable
-from basstler.upstream_reviews.review_models import ThreadMarker
 
 from ..constants.paths import DatasetLocation
 from .replay import (
@@ -849,7 +848,7 @@ def test_graphql_errors_are_raised_rather_than_returned(stubbed_gh, monkeypatch)
     with pytest.raises(GraphQLErrorsReturned) as raised:
         GitHubCommandLineClient().execute("query {}", {})
 
-    assert raised.value.messages == [GRAPHQL_ERROR_MESSAGE]
+    assert raised.value.messages == (GRAPHQL_ERROR_MESSAGE,)
 
 
 def test_a_job_log_is_asked_for_by_the_job_s_own_endpoint(

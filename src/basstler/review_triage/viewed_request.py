@@ -12,14 +12,14 @@ from basstler.github.repository_details import RepositoryDetails
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import WorkflowLocation
-from basstler.repository import PullRequestReference, Repository
+from basstler.github.exceptions import GraphQLErrorsReturned
+from basstler.github.repository import PullRequestReference, Repository
 from basstler.review_triage.exceptions import (
     FilesNotMarkedViewed,
-    GraphQLMutationRefused,
     MarkViewedWorkflowRefused,
 )
 from basstler.review_triage.outputs import ViewedMarking
-from basstler.review_triage.triage import PullRequestTriage
+from basstler.review_triage.triage import TriageOutcome
 
 # %% names the workflow reads
 
@@ -173,25 +173,25 @@ class ViewedMarkingRoutes:
     Whether to mark them only directly, never through Actions.
     """
 
-    def mark(self, triage: PullRequestTriage) -> str:
+    def mark(self, outcome: TriageOutcome) -> str:
         """
-        :param triage: The triaged pull request.
+        :param outcome: The triaged pull request.
         :return: What was done, as one line.
-        :raises GraphQLMutationRefused: If marking only directly fails.
+        :raises GraphQLErrorsReturned: If marking only directly fails.
         :raises FilesNotMarkedViewed: If neither route marks them.
         """
         if self.in_cloud_session:
             direct_refusal = CLOUD_SESSION_REFUSAL
         else:
-            direct_refusal = "; ".join(self.marking.refusals(triage))
+            direct_refusal = "; ".join(self.marking.refusals(outcome))
         pull_request = self.request.pull_request
         if not direct_refusal:
             return (
-                f"Marked {len(triage.mechanical_files)} mechanical files of "
+                f"Marked {len(outcome.mechanical_files)} mechanical files of "
                 f"{pull_request.url} viewed"
             )
         if self.directly:
-            raise GraphQLMutationRefused((direct_refusal,))
+            raise GraphQLErrorsReturned((direct_refusal,))
         workflow_refusal = self.request.refusal(self.client)
         if workflow_refusal is not None:
             raise FilesNotMarkedViewed(

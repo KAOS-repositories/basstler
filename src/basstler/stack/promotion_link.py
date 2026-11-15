@@ -11,8 +11,9 @@ from basstler.github.pull_request_form import (
     PrefilledPullRequestLink,
     PullRequestForm,
 )
+from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
-from basstler.stack.configuration import (
+from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     MissingUpstreamRepositoryError,
 )
@@ -26,6 +27,39 @@ This module's logger, which is also what its command prints through.
 """
 
 # %% promotion links
+
+
+@dataclass(frozen=True)
+class PromotionTarget:
+    """Where a fork branch is promoted to: the upstream repository and branch, and the fork's owner."""
+
+    upstream_repository: Repository
+    """The repository the pull request is opened in."""
+
+    upstream_base: str
+    """The upstream branch it is opened against."""
+
+    fork_owner: str
+    """The account owning the fork the branch lives in."""
+
+    @classmethod
+    def from_configuration(cls, configuration: Configuration) -> PromotionTarget:
+        """
+        :param configuration: The resolved configuration naming both repositories.
+        :return: The target it describes.
+        :raises MissingUpstreamRepositoryError: If the project names no upstream.
+        """
+        upstream_repository = configuration.upstream_repository
+        if upstream_repository is None:
+            raise MissingUpstreamRepositoryError(
+                CommittedStackConfiguration().project_file,
+                ProjectLocation.PERSONAL_STACK_CONFIGURATION.value,
+            )
+        return cls(
+            upstream_repository=upstream_repository,
+            upstream_base=configuration.upstream_base,
+            fork_owner=configuration.fork_repository.owner,
+        )
 
 
 @dataclass(frozen=True)
@@ -52,28 +86,36 @@ class PromotionLink(PrefilledPullRequestLink):
     def build(
         cls, configuration: Configuration, branch: str, title: str, body: str
     ) -> PromotionLink:
-        """
-        Build the link promoting a fork branch to the upstream base.
+        """Build the link promoting a fork branch to the upstream base.
 
         :param configuration: The resolved configuration naming both repositories.
         :param branch: The fork branch to promote.
         :param title: Title to prefill.
-        :param body: Description to prefill, shortened if the URL would not otherwise
-            fit.
+        :param body: Description to prefill, shortened if the URL would not otherwise fit.
         :return: The link, flagged if the body was shortened.
         :raises MissingUpstreamRepositoryError: If the project names no upstream.
-        :raises PromotionLinkTooLongError: If even the title does not fit.
         """
-        upstream_repository = configuration.upstream_repository
-        if upstream_repository is None:
-            raise MissingUpstreamRepositoryError(
-                CommittedStackConfiguration().project_file,
-                ProjectLocation.PERSONAL_STACK_CONFIGURATION.value,
-            )
+        return cls.for_target(
+            PromotionTarget.from_configuration(configuration), branch, title, body
+        )
+
+    @classmethod
+    def for_target(
+        cls, target: PromotionTarget, branch: str, title: str, body: str
+    ) -> PromotionLink:
+        """Build the link promoting a fork branch to a target.
+
+        :param target: Where the branch is promoted to.
+        :param branch: The fork branch to promote.
+        :param title: Title to prefill.
+        :param body: Description to prefill, shortened if the URL would not otherwise fit.
+        :return: The link, flagged if the body was shortened.
+        """
+
         form = PullRequestForm(
-            upstream_repository,
-            configuration.upstream_base,
-            f"{configuration.fork_repository.owner}:{branch}",
+            target.upstream_repository,
+            target.upstream_base,
+            f"{target.fork_owner}:{branch}",
             title,
             body,
         )
@@ -85,9 +127,7 @@ class PromotionLink(PrefilledPullRequestLink):
         return cls(link.url, link.body_was_truncated)
 
     def print_url(self) -> None:
-        """
-        Print the compare-and-create URL, reporting on stderr if the body was shortened.
-        """
+        """Print the compare-and-create URL, reporting on stderr if the body was shortened."""
         logger.info(self.url)
         if self.body_was_truncated:
             logger.error("the description was shortened to fit the URL length limit")

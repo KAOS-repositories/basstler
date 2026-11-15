@@ -11,9 +11,10 @@ from enum import StrEnum
 from urllib.parse import urlencode, urlsplit
 
 from basstler.class_property import classproperty
+from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
+from basstler.github.repository import GitHubAddress, Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
-from basstler.maintenance.remote_branch import RemoteBranch
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.workflows import (
     GitHubCommandLineOption,
@@ -21,7 +22,6 @@ from basstler.plan_site.workflows import (
     PlanSiteSecret,
     WorkflowFile,
 )
-from basstler.repository import GitHubAddress, Repository
 
 PAGES_HOST_SUFFIX = ".github.io"
 """

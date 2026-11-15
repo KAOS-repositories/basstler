@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.locations import BasstlerRepositoryLocation
-from basstler.repository import BASSTLER_REPOSITORY, PullRequestReference, Repository
+from basstler.github.repository import (
+    BASSTLER_REPOSITORY,
+    PullRequestReference,
+    Repository,
+)
 from basstler.review_triage.command_names import ReviewTriageCommand
 
 # %% the routes a correction offers
@@ -51,24 +55,6 @@ class MarkingRoutes:
 
 
 # %% errors
-
-
-@dataclass
-class GraphQLMutationRefused(DataclassException):
-    """
-    Raised when GitHub answers a GraphQL mutation with errors.
-    """
-
-    messages: tuple[str, ...]
-    """
-    Every message GitHub reported.
-    """
-
-    def error_message(self) -> str:
-        return "GitHub refused the mutation: " + "; ".join(self.messages)
-
-    def suggest_correction(self) -> str:
-        return MarkingRoutes.instructions
 
 
 @dataclass

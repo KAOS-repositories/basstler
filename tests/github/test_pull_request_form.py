@@ -7,7 +7,7 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlsplit
 
 from basstler.github.pull_request_form import PullRequestForm, PullRequestFormParameter
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 
 # %% the filled-in form
 

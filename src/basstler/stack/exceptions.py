@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING
 from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, StackExitCode
-from basstler.repository import Repository
-from basstler.stack.configuration import StackSetting
+from basstler.github.repository import Repository
+from basstler.github.stack_configuration import StackSetting
 
 if TYPE_CHECKING:
     from basstler.stack.settings import Remote

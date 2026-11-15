@@ -35,10 +35,10 @@ from basstler.github.token_form import (
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ReviewTriageLocation, WorkflowLocation
 from basstler.render_common import TemplatePage
-from basstler.repository import BASSTLER_REPOSITORY, Repository
+from basstler.github.repository import BASSTLER_REPOSITORY, Repository
 from basstler.review_triage.exceptions import MarkViewedWorkflowRefused
 from basstler.review_triage.viewed_request import ReviewTriageSecret
-from basstler.workflows import Workflow
+from basstler.github.workflows import Workflow
 
 # %% the REST resources the setup reads and writes
 

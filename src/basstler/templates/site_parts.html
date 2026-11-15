@@ -67,15 +67,26 @@ siteRecheckWhenShown(siteRecountProgress);
 {% macro action_button(action, hidden=False) %}
 {% if action %}
 <span class="action-group"{% if hidden %} hidden {{ vocabulary.draft_recheck_attribute.START_ACTION }}{% endif %}>
-  <span class="model-picker" data-model="" aria-label="Model for {{ action.label }}">
-    <button type="button" class="model-picker-toggle" onclick="planPageToggleModelPicker(event, this)">{{ available_models[0].label }} ▾</button>
+  <span class="model-picker" data-model="{{ action.recommended_model.value if action.recommended_model else '' }}" aria-label="Model for {{ action.label }}">
+    <button type="button" class="model-picker-toggle" onclick="planPageToggleModelPicker(event, this)">{{ action.recommended_model.label if action.recommended_model else 'Model' }} ▾</button>
     <ul class="model-picker-list" role="listbox">
       {% for model in available_models %}
-      <li role="option" data-value="{{ model.value }}" onclick="planPageSelectModel(event, this)"{% if loop.first %} class="model-picker-option-selected"{% endif %}>{{ model.label }}</li>
+      <li role="option" data-value="{{ model.value }}" onclick="planPageSelectModel(event, this)"{% if model == action.recommended_model %} class="model-picker-option-selected"{% endif %}>{{ model.label }}</li>
       {% endfor %}
     </ul>
   </span>
   <button type="button" class="action-button" data-action-command="{{ action.command }}" onclick="planPageCopyActionCommand(this)">▸ {{ action.label }}</button>
 </span>
+{% endif %}
+{% endmacro %}
+
+{# A link to the upstream's prefilled pull request form, or the reason it cannot open yet. #}
+{% macro promotion_button(promotion) %}
+{% if promotion %}
+{% if promotion.url %}
+<a class="promote-button" href="{{ promotion.url }}" target="_blank" rel="noopener" title="Open a pull request on {{ promotion.upstream_repository }}">{{ promotion.label }} ↗</a>
+{% else %}
+<span class="promote-button promote-button-disabled" aria-disabled="true" title="{{ promotion.reason }}">{{ promotion.label }} ↗</span>
+{% endif %}
 {% endif %}
 {% endmacro %}

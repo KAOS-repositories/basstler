@@ -7,7 +7,7 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlsplit
 
 from basstler.github.file_proposal import FileProposal
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 
 from ..constants.paths import DatasetLocation
 

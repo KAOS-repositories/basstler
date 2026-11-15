@@ -25,6 +25,10 @@ items:
   commands:
   - gh secret set PLAN_SITE_TOKEN --repo example/site
   - gh workflow run plan-site.yml --repo example/site
+  done_when:
+  - plan-site
+  - published
+  - example/site
   depends_on:
   - build-workflow
   status: not started

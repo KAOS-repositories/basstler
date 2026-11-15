@@ -426,11 +426,12 @@ class PlanValidator:
         performed_by = item.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)
         if performed_by not in list(Performer):
             problems.append(UnknownPerformer(item_identifier, performed_by))
-        commands = item.get(ManifestKey.COMMANDS.key) or []
-        if not isinstance(commands, list) or not all(
-            isinstance(command, str) for command in commands
-        ):
-            problems.append(InvalidCommands(item_identifier))
+        for command_key in (ManifestKey.COMMANDS.key, ManifestKey.DONE_WHEN.key):
+            commands = item.get(command_key) or []
+            if not isinstance(commands, list) or not all(
+                isinstance(command, str) for command in commands
+            ):
+                problems.append(InvalidCommands(item_identifier, command_key))
         recommended_model = item.get(ManifestKey.RECOMMENDED_MODEL.key)
         if (
             recommended_model is None

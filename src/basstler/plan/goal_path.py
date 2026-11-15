@@ -27,6 +27,52 @@ from basstler.plan.model import ItemStatus
 from basstler.plan.model_alias import ModelAlias
 from basstler.plan.structure import Item
 
+# %% the commands
+
+
+class GoalCommandName(StrEnum):
+    """
+    The ``basstler goal`` commands, each by the word that invokes it.
+    """
+
+    GROUP = "goal"
+    """
+    The command group every other member belongs to.
+    """
+
+    SET = "set"
+    """
+    Saves a goal.
+    """
+
+    PATH = "path"
+    """
+    Prints a goal's whole path.
+    """
+
+    NEXT = "next"
+    """
+    Prints the command of the first step that can be acted on.
+    """
+
+    CHECK = "check"
+    """
+    Runs the done checks of a goal's steps and records the steps that pass as done.
+    """
+
+    MARK_DONE = "mark-done"
+    """
+    Records one step as done on its owner's word.
+    """
+
+    def invocation(self, *arguments: str) -> str:
+        """
+        :param arguments: What follows the command's name.
+        :return: The whole command as a person types it.
+        """
+        return " ".join(("basstler", GoalCommandName.GROUP, self, *arguments))
+
+
 # %% the report
 
 
@@ -88,6 +134,12 @@ class PathStepReport(ValidatedJSONModel):
     owner_commands: list[str]
     """
     The commands the owner runs to make that move, in order.
+    """
+
+    closing_command: str | None
+    """
+    The command that records the step as done once it is carried out, or ``None`` for a
+    step its pull request's merge finishes.
     """
 
     releases: list[str]
@@ -300,6 +352,12 @@ class PathStep:
     The entries of :attr:`awaited` the step needs merged, not only out of draft.
     """
 
+    closing_command: str | None = None
+    """
+    The command that records the step as done once it is carried out, or ``None`` for a
+    step its pull request's merge finishes.
+    """
+
     @property
     def reference(self) -> DependencyReference:
         """
@@ -332,6 +390,14 @@ class PathStep:
         """
         return self.item.is_effectively_done()
 
+    @property
+    def has_pending_done_check(self) -> bool:
+        """
+        Whether a done check can decide now that the step is done: it has one, is not
+        finished and waits for nothing.
+        """
+        return bool(self.item.done_when) and not self.is_finished and not self.awaited
+
     def report(self, releases: tuple[DependencyReference, ...]) -> PathStepReport:
         """
         :param releases: The steps that wait for this one.
@@ -349,6 +415,7 @@ class PathStep:
             awaited_merges=[reference.text for reference in self.awaited_merges],
             owner_move=self.owner_move.description if self.owner_move else None,
             owner_commands=list(self.owner_move.commands) if self.owner_move else [],
+            closing_command=self.closing_command,
             releases=[reference.text for reference in releases],
         )
 
@@ -569,6 +636,8 @@ class GoalPath:
             )
             lines.append(f"      you: {step.owner_move}{released}")
         lines += [f"        {command}" for command in step.owner_commands]
+        if step.closing_command is not None:
+            lines.append(f"      then: {step.closing_command}")
         if step.awaited_merges:
             lines.append(f"      needs merged: {', '.join(step.awaited_merges)}")
         lines += [f"      blocked: {blocker}" for blocker in step.blockers]
@@ -724,7 +793,23 @@ class NeededItems:
                 for dependency in awaited
                 if dependency in merged_dependencies
             ),
+            closing_command=self.closing_command_of(reference),
         )
+
+    def closing_command_of(self, reference: DependencyReference) -> str | None:
+        """
+        :param reference: A needed item, its live state classified.
+        :return: The command that records the item as done once it is carried out, or
+            ``None`` for an item its pull request's merge finishes.
+        """
+        item = self.resolved_by_reference[reference].item
+        if item.is_effectively_done():
+            return None
+        if item.done_when:
+            return GoalCommandName.CHECK.invocation(self.goal.identifier)
+        if item.is_performed_by_owner:
+            return GoalCommandName.MARK_DONE.invocation(reference.text)
+        return None
 
     def owner_move_of(
         self, reference: DependencyReference, awaited: tuple[DependencyReference, ...]

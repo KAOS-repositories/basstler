@@ -17,7 +17,10 @@ from basstler.github.pull_request_source import (
     PullRequestSource,
 )
 from basstler.plan.goal import Goal, GoalStore
-from basstler.plan.goal_path import GoalPath, NeededItems
+from basstler.plan.dependencies import DependencyReference
+from basstler.plan.done_check import BasstlerCommandRunner, DoneChecker, FinishedStep
+from basstler.plan.exceptions import StepReferenceWithoutPlanError
+from basstler.plan.goal_path import GoalCommandName, GoalPath, NeededItems
 from basstler.plan.item_bootstrap.documents import ProjectCheckout
 from basstler.standard_streams import StandardStreamHandler
 
@@ -42,9 +45,14 @@ class GoalExitCode(ExitCode):
     No step of the goal's path can be acted on now.
     """
 
+    STEP_NOT_DONE = 2
+    """
+    A step's done check ran and did not pass.
+    """
+
 
 goal_app = App(
-    name="goal",
+    name=GoalCommandName.GROUP,
     help="Save a goal and print the ordered path of plan items that reaches it.",
 )
 """
@@ -71,7 +79,7 @@ def read_path(
         return GoalPath.compute(goal, plan_directory, pull_request_source)
 
 
-@goal_app.command(name="path")
+@goal_app.command(name=GoalCommandName.PATH)
 def print_path(
     identifier: str,
     as_json: Annotated[bool, Parameter(name="--json")] = False,
@@ -89,7 +97,7 @@ def print_path(
     return GoalExitCode.SUCCESS
 
 
-@goal_app.command(name="next")
+@goal_app.command(name=GoalCommandName.NEXT)
 def print_next_step(identifier: str) -> GoalExitCode:
     """
     Print the command of the first step of the goal's path that can be acted on now.
@@ -106,7 +114,7 @@ def print_next_step(identifier: str) -> GoalExitCode:
     return GoalExitCode.SUCCESS
 
 
-@goal_app.command(name="set")
+@goal_app.command(name=GoalCommandName.SET)
 def set_goal(
     identifier: str,
     title: str,
@@ -127,4 +135,50 @@ def set_goal(
         plan_directory = ProjectCheckout(Path.cwd()).check_out_manifests(Path(scratch))
         NeededItems.of_goal(goal, plan_directory).refuse_unresolved_references()
     store.write(goal)
+    return GoalExitCode.SUCCESS
+
+
+def check_steps(path: GoalPath, checker: DoneChecker) -> GoalExitCode:
+    """
+    Run every pending done check of the path and record the steps that pass as done.
+
+    :param path: The goal's path.
+    :param checker: What runs the checks.
+    :return: Whether every check that ran passed.
+    """
+    outcomes = checker.outcomes_of(path)
+    for outcome in outcomes:
+        logger.info(outcome.description)
+        if outcome.passed:
+            FinishedStep(outcome.reference).record(checker.runner.project_root)
+    if not outcomes:
+        logger.info(f"No step of goal {path.goal.identifier} has a check to run now.")
+    if all(outcome.passed for outcome in outcomes):
+        return GoalExitCode.SUCCESS
+    return GoalExitCode.STEP_NOT_DONE
+
+
+@goal_app.command(name=GoalCommandName.CHECK)
+def check_goal(identifier: str) -> GoalExitCode:
+    """
+    Run the done check of each step that has one and waits for nothing, and record the
+    steps whose check passes as done.
+
+    :param identifier: The goal's id.
+    """
+    path = read_path(identifier, Path.cwd(), GitHubPullRequestSource.from_environment())
+    return check_steps(path, DoneChecker(BasstlerCommandRunner(Path.cwd())))
+
+
+@goal_app.command(name=GoalCommandName.MARK_DONE)
+def mark_done(step: str) -> GoalExitCode:
+    """
+    Record a step as done on its owner's word.
+
+    :param step: The step's item, as ``<plan-id>/<item-id>``.
+    """
+    reference = DependencyReference.from_text(step)
+    if not reference.is_well_formed or not reference.names_another_plan:
+        raise StepReferenceWithoutPlanError(step)
+    FinishedStep(reference).record(Path.cwd())
     return GoalExitCode.SUCCESS

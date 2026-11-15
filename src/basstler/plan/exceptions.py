@@ -171,6 +171,24 @@ class UnknownGoalError(DataclassException, LookupError):
 
 
 @dataclass
+class StepReferenceWithoutPlanError(DataclassException, ValueError):
+    """
+    Raised when a step is named without the plan holding it.
+    """
+
+    step: str
+    """
+    The step as it was given.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.step!r} does not name a step with its plan"
+
+    def suggest_correction(self) -> str:
+        return "Name the step as <plan-id>/<item-id>."
+
+
+@dataclass
 class UnresolvedGoalReferenceError(DataclassException, LookupError):
     """
     Raised when a goal's path reaches a reference that names no item of any plan.
@@ -515,7 +533,7 @@ class UnknownPerformer(ValidationProblem):
 @dataclass
 class InvalidCommands(ValidationProblem):
     """
-    An item's ``commands`` isn't a list of strings.
+    An item's ``commands`` or ``done_when`` isn't a list of strings.
     """
 
     item_identifier: str
@@ -523,8 +541,16 @@ class InvalidCommands(ValidationProblem):
     The offending item's effective id.
     """
 
+    manifest_key: str
+    """
+    The key whose value is not a list of strings.
+    """
+
     def error_message(self) -> str:
-        return f"item {self.item_identifier!r} commands must be a list of strings"
+        return (
+            f"item {self.item_identifier!r} {self.manifest_key} must be a list of "
+            "strings"
+        )
 
 
 @dataclass

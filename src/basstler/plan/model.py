@@ -402,6 +402,11 @@ class ManifestKey(KeySpecification, Enum):
     The commands that carry out an item its owner performs, in order.
     """
 
+    DONE_WHEN = ("done_when", ValueStyle.SEQUENCE)
+    """
+    The arguments of the basstler command whose success means the item is done.
+    """
+
     ITEMS = ("items",)
     """
     The manifest's top-level list of items.

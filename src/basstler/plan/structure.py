@@ -196,6 +196,12 @@ class Item:
     The commands that carry out an item its owner performs, in order.
     """
 
+    done_when: list[str] = field(default_factory=list)
+    """
+    The arguments of the basstler command whose success means this item is done; empty
+    when nothing checks it.
+    """
+
     live_state: LiveState = field(default=LiveState.NO_PULL_REQUEST, init=False)
     """
     This item's live GitHub state.
@@ -348,6 +354,7 @@ class Item:
                 data.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)
             ),
             commands=list(data.get(ManifestKey.COMMANDS.key) or []),
+            done_when=list(data.get(ManifestKey.DONE_WHEN.key) or []),
         )
 
     def is_effectively_done(self) -> bool:

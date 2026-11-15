@@ -15,7 +15,7 @@ from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyReference, PlanDirectory
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal
-from basstler.plan.goal_path import GoalPath, NeededItems
+from basstler.plan.goal_path import GoalCommandName, GoalPath, NeededItems
 from basstler.plan.model import PlanDocument
 from basstler.plan_site.__main__ import RepositorySite, SiteFile
 from basstler.plan_site.goal_page import GoalPage, GoalSummary
@@ -318,6 +318,16 @@ class TestAnOwnersStepOnTheSite:
         )
         for command in commands:
             assert f"<code>{html.escape(command)}</code>" in page
+
+    def test_the_goal_page_names_the_closing_command(self, built_site: Path):
+        """
+        The goal's page shows the command that records the owner's step as done.
+        """
+        page = page_at(
+            built_site, ADDRESS.goal_url(NOTES_REPOSITORY, OWNER_STEP_GOAL.identifier)
+        )
+        closing = GoalCommandName.CHECK.invocation(OWNER_STEP_GOAL.identifier)
+        assert f"<code>{closing}</code>" in page
 
     def test_the_plan_page_lists_the_commands(
         self, built_site: Path, commands: list[str]

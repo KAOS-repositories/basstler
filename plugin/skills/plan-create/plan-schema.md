@@ -89,6 +89,8 @@ items:                         # the actual trackable units of work - flat,
     blockers: ["freeform reasons", ...]   # optional, defaults to []
     performed_by: session | owner  # optional, defaults to session; see "Steps the owner performs"
     commands: ["<command>", ...]   # optional: what the owner runs for an owner's step, in order
+    done_when: ["<argument>", ...] # optional: the arguments of the basstler command whose
+                                   # success proves the item done; see "Done checks"
 ```
 
 Validation is not documentation-only: `plan/validation.py` enforces this
@@ -146,6 +148,15 @@ owner's own computer. Such a step is an item with `performed_by: owner`. It has 
 pull request or `recommended_model`, and its `commands` list what the owner runs, in order.
 No "Start now" is offered for it: the plan page and a goal's path show it as the owner's,
 with its commands. Items that depend on it wait until its `status` is `done`.
+
+### Done checks
+
+An item whose completion a command can prove carries that command's arguments as `done_when`:
+what follows `basstler` on the command line, one list entry per argument. `basstler goal check
+<goal-id>` runs the check of every step of the goal's path that has one and waits for nothing,
+and sets each step whose check exits 0 to `done`. Only basstler's own commands run, never a
+shell line, and the plan site's build never runs one. An owner's step without a check is
+recorded with `basstler goal mark-done <plan-id>/<item-id>`.
 
 ### Depending on an item in another plan
 

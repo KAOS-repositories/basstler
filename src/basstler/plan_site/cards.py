@@ -5,14 +5,13 @@ action button and model dropdown, and the track and wave sections it sits in.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from basstler.class_property import classproperty
-from basstler.plan.model_alias import ModelAlias
+from basstler.plan.item_action import ItemAction, StartNowAction
 from basstler.github.repository import Repository
 from basstler.stack.promotability import PromotionBlocker
 
@@ -210,72 +209,6 @@ class DependencyChip:
             card_url=card_url,
             draft_pull_request=dependency.draft_pull_request,
         )
-
-
-# %% action buttons
-
-
-@dataclass(frozen=True)
-class ItemAction(ABC):
-    """One not-done item's actionable button - see
-    :attr:`ItemCard.action`. The label matches what the status actually calls
-    for (starting fresh work reads differently from resolving a blocker),
-    but every non-``done`` status gets one: there's always something
-    actionable to do next besides waiting.
-
-    Not a plain enum: each action carries the plan/item it targets, so its
-    members can't be fixed singletons - one subclass per ``/plan-item-...``
-    skill instead. Not instantiated directly - see :class:`StartNowAction`/
-    :class:`ResolveAction`."""
-
-    label: str
-    """The button's text, e.g. ``"Start now"`` or ``"Resolve"``."""
-
-    plan_id: str
-    """The plan this action's command targets."""
-
-    item_identifier: str
-    """The item this action's command targets."""
-
-    recommended_model: ModelAlias | None = None
-    """The model the button's picker preselects, or ``None`` to preselect none."""
-
-    @classproperty
-    @abstractmethod
-    def skill_command_name(cls) -> str:
-        """The ``/plan-item-...`` skill this action invokes - fixed per
-        subclass, since which skill an action routes to never varies per
-        instance (only :attr:`label` does, e.g. ``"Resolve"`` vs. ``"Resume"``
-        for the same :class:`ResolveAction`)."""
-
-    @property
-    def command(self) -> str:
-        """The full command copied to the clipboard when the button is
-        clicked."""
-        return f"{self.skill_command_name} {self.plan_id} {self.item_identifier}"
-
-
-@dataclass(frozen=True)
-class StartNowAction(ItemAction):
-    """Routes a not-started item, once every dependency is ready, to
-    ``plan-item-kickoff``."""
-
-    @classproperty
-    def skill_command_name(cls) -> str:
-        """:return: The ``plan-item-kickoff`` skill."""
-        return "/plan-item-kickoff"
-
-
-@dataclass(frozen=True)
-class ResolveAction(ItemAction):
-    """Routes a blocked, in-progress, or deferred item to
-    ``plan-item-resolve`` - :attr:`ItemAction.label` is worded to match
-    which of those three it actually is."""
-
-    @classproperty
-    def skill_command_name(cls) -> str:
-        """:return: The ``plan-item-resolve`` skill."""
-        return "/plan-item-resolve"
 
 
 # %% promotion button

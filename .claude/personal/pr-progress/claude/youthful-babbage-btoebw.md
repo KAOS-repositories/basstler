@@ -1,10 +1,10 @@
 ## Plan
-- Move the general files from #214's branch (not cherry-pick): moves, definitions, python_source, renames, comparison, detection, triage, git/ and github/ changes, tests, datasets.
-- Leave calls, keyword_arguments, signatures, tree_matching with #214; definition_moves uses a plain PythonComparison.
-- Tests first: run moved tests against trimmed sources, fix on the source side.
+- Apply #214's own diff (merge base to head) for the general files, not whole-file copies, since its merge base is older than main.
+- Leave calls, keyword_arguments, signatures, tree_matching and their tests and datasets with #214; definition_moves uses a plain PythonComparison.
 
 ## Done
-- Bootstrap commit, draft PR #226, item recorded in progress.
+- Bootstrap, draft PR #226, item in progress.
+- 106 files applied; ruff, code-rules check and review_triage, git and github tests pass.
 
 ## Next
-- Copy the general files, trim the keyword-argument parts, run pytest and ruff.
+- Full suite result, then mark ready for review once it passes.

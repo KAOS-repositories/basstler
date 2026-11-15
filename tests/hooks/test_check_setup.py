@@ -7,7 +7,6 @@ personal-notes remote - no network access or real personal-notes branch involved
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 from enum import StrEnum
@@ -805,9 +804,9 @@ def mark_an_install_in_progress(repository: ScratchRepository, process_id: int) 
 
 
 def test_reports_dependencies_a_session_start_is_installing_as_in_progress(
-    check_setup_repository: ScratchRepository,
+    check_setup_repository: ScratchRepository, running_shell_process_id: int
 ):
-    mark_an_install_in_progress(check_setup_repository, os.getpid())
+    mark_an_install_in_progress(check_setup_repository, running_shell_process_id)
 
     report = run_check_setup(check_setup_repository)
 
@@ -831,9 +830,9 @@ def test_a_marker_left_by_an_install_that_ended_is_not_in_progress(
 
 
 def test_waiting_for_an_install_still_running_gives_up_after_its_timeout(
-    check_setup_repository: ScratchRepository,
+    check_setup_repository: ScratchRepository, running_shell_process_id: int
 ):
-    mark_an_install_in_progress(check_setup_repository, os.getpid())
+    mark_an_install_in_progress(check_setup_repository, running_shell_process_id)
 
     status = check_setup_repository.configuration_output(
         "wait_for_basstler_install 0; printf '%s' \"$?\""

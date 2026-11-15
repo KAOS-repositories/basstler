@@ -1486,7 +1486,7 @@ def test_a_session_start_installs_nothing_for_a_plugin_naming_no_release(
     assert result.returncode == 0, result.stderr
     assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
         SummaryMessage.DEPENDENCIES_RELEASE_NOT_NAMED,
-        str(session_start_repository.plugin_root),
+        BashPath(session_start_repository.plugin_root).text,
     )
     assert not call_log.exists()
 
@@ -1879,7 +1879,8 @@ def test_installs_uv_when_no_supported_interpreter_is_on_the_path(
         package_source(session_start_repository),
     )
     assert install_log.read_text(encoding="utf-8").splitlines() == [
-        f"install --target {installed_uv_directory(session_start_repository)} "
+        "install --target "
+        f"{session_start_repository.configuration_value(ConfigurationVariable.UV_DIRECTORY)} "
         f"{PackageManager.UV}"
     ]
     assert environment_log.read_text(encoding="utf-8").splitlines() == [
@@ -1993,8 +1994,8 @@ def test_installs_into_the_interpreter_a_windows_environment_was_created_with(
 
     assert result.returncode == 0, result.stderr
     windows_interpreter = (
-        Path(environment_directory(session_start_repository))
-        / EnvironmentInterpreterLayout.WINDOWS
+        f"{environment_directory(session_start_repository)}"
+        f"/{EnvironmentInterpreterLayout.WINDOWS}"
     )
     assert environment_log.read_text(encoding="utf-8").splitlines()[-1] == (
         f"{PackageManager.PIP} install --python {windows_interpreter} --editable "
@@ -2046,14 +2047,17 @@ def test_runs_the_package_with_the_interpreter_of_a_windows_environment(
     ``python3``.
     """
     without_an_environment(session_start_repository)
-    windows_interpreter = write_interpreter_wrapper(
+    write_interpreter_wrapper(
         Path(environment_directory(session_start_repository))
         / EnvironmentInterpreterLayout.WINDOWS
     )
 
     assert session_start_repository.configuration_value(
         ConfigurationVariable.PYTHON
-    ) == str(windows_interpreter)
+    ) == (
+        f"{environment_directory(session_start_repository)}"
+        f"/{EnvironmentInterpreterLayout.WINDOWS}"
+    )
 
 
 # %% the plan site line
@@ -2373,6 +2377,9 @@ def test_removes_the_environment_of_a_project_that_is_gone(
 ):
     project = other_project(session_start_repository)
     abandoned = environment_of(session_start_repository, project)
+    abandoned_as_the_shell_names_it = configuration_value_in(
+        session_start_repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    )
     DirectoryTree(project).remove()
 
     result = publish_and_run(session_start_repository)
@@ -2380,7 +2387,7 @@ def test_removes_the_environment_of_a_project_that_is_gone(
     assert result.returncode == 0, result.stderr
     assert not abandoned.exists()
     assert summary_value(result.stdout, SummaryLine.ENVIRONMENTS) == summary_message(
-        SummaryMessage.ENVIRONMENTS_REMOVED, str(abandoned)
+        SummaryMessage.ENVIRONMENTS_REMOVED, abandoned_as_the_shell_names_it
     )
 
 
@@ -2402,7 +2409,7 @@ def test_keeps_the_environment_of_a_project_that_still_exists(
 
 
 def test_keeps_the_environment_a_live_install_holds(
-    session_start_repository: ScratchRepository,
+    session_start_repository: ScratchRepository, running_shell_process_id: int
 ):
     project = other_project(session_start_repository)
     installing = environment_of(session_start_repository, project)
@@ -2412,7 +2419,7 @@ def test_keeps_the_environment_a_live_install_holds(
         )
     )
     marker.parent.mkdir(parents=True)
-    marker.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    marker.write_text(f"{running_shell_process_id}\n", encoding="utf-8")
     DirectoryTree(project).remove()
 
     result = publish_and_run(session_start_repository)
@@ -2429,11 +2436,14 @@ def test_never_removes_the_environment_the_session_runs(
     """
     project = other_project(session_start_repository)
     running = environment_of(session_start_repository, project)
+    exported = configuration_value_in(
+        session_start_repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    )
     DirectoryTree(project).remove()
 
     result = publish_and_run(
         session_start_repository,
-        environment={BasstlerVariable.ENVIRONMENT_DIRECTORY: str(running)},
+        environment={BasstlerVariable.ENVIRONMENT_DIRECTORY: exported},
     )
 
     assert result.returncode == 0, result.stderr

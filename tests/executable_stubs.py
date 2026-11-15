@@ -10,11 +10,30 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
+
 from .constants.environment import FileMode, SearchPathVariable
 from .constants.paths import DatasetLocation
+
+# %% where a script cannot stand in for an executable
+
+NEEDS_SCRIPT_AS_EXECUTABLE = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason=(
+        "Windows only launches a .exe found on PATH: a .cmd wrapper splits its "
+        "arguments at '&', and Defender blocks a compiled launcher (WinError 225), "
+        "so a script cannot stand in for gh or bash"
+    ),
+)
+"""
+Skips a test that runs a script as ``gh`` or ``bash``, where the platform cannot launch one.
+"""
+
+# %% stub directories
 
 
 @dataclass(frozen=True)

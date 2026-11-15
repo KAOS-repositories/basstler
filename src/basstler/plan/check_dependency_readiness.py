@@ -42,6 +42,18 @@ class DependencyReadiness:
     The dependency, with its live state already classified.
     """
 
+    must_be_merged: bool = False
+    """
+    Whether the dependent needs the dependency merged, not only out of draft.
+    """
+
+    @property
+    def is_ready(self) -> bool:
+        """
+        Whether the dependent can start as far as this dependency goes.
+        """
+        return self.dependency.releases_dependent(self.must_be_merged)
+
     def to_json(self) -> dict[str, Any]:
         """
         This readiness as the one entry the item brief serializes for it.
@@ -51,9 +63,7 @@ class DependencyReadiness:
             ReadinessField.IDENTIFIER.value: self.dependency.reference.text,
             ReadinessField.TITLE.value: self.dependency.title,
             ReadinessField.LIVE_STATE.value: live_state.value if live_state else None,
-            ReadinessField.IS_READY.value: (
-                self.dependency.is_ready_to_unblock_dependents()
-            ),
+            ReadinessField.IS_READY.value: self.is_ready,
         }
 
     @classmethod
@@ -83,4 +93,7 @@ class DependencyReadiness:
 
         resolver = DependencyResolver(plan=plan, plan_directory=plan_directory)
         resolver.classify_live_states(live_pull_requests)
-        return [cls(dependency) for dependency in resolver.dependencies_of(item)]
+        return [
+            cls(resolver.resolve(entry), entry in item.depends_on_merged)
+            for entry in item.depends_on
+        ]

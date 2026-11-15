@@ -79,6 +79,8 @@ items:                         # the actual trackable units of work - flat,
     depends_on: [<item-id>, ...]  # structural/stacking dependency - a bare id for
                                    # an item of this plan, <plan-id>/<item-id> for
                                    # one in another plan (see below)
+    depends_on_merged: [<entry>, ...]  # optional: the depends_on entries that must be merged,
+                                   # not only out of draft, before this item starts
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
     recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
                                                # difficulty; see "Choosing the recommended model"
@@ -129,6 +131,13 @@ it, but "GitHub confirms this PR is merged" has exactly one correct state: `done
 The page shows a merged item as `done` whatever its `status` says; the manifest
 follows at the next session start, which records every plan's merged items done
 and drops them.
+
+### Needing a dependency merged
+
+A `depends_on` entry is satisfied once its item is done, merged, or has a pull request out of
+draft: enough to stack a branch on. Where the item must not start before the dependency has
+*merged* - it reads what the merge publishes, or runs on the default branch - list that entry
+under `depends_on_merged` too, spelled as in `depends_on`.
 
 ### Steps the owner performs
 

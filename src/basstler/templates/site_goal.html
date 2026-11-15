@@ -19,6 +19,9 @@
         <div class="owner-move"><strong>You:</strong> {{ step.owner_move.description }}{% for released in path.references_released_by(step) %}{% if loop.first %} <span class="owner-releases">releases</span>{% endif %} <a class="chip" href="#{{ anchor_of(released) }}">{{ released.text }}</a>{% endfor %}</div>
         {{ command_list(step.owner_move.commands) }}
         {% endif %}
+        {% if step.awaited_merges %}
+        <div class="blocker">▸ Starts once merged:{% for awaited in step.awaited_merges %} <a class="chip" href="#{{ anchor_of(awaited) }}">{{ awaited.text }}</a>{% endfor %}</div>
+        {% endif %}
         {% for blocker in item.blockers %}
         <div class="blocker">▸ {{ blocker }}</div>
         {% endfor %}

@@ -150,6 +150,21 @@ class Dependency(ABC):
         """
 
     @abstractmethod
+    def is_finished(self) -> bool:
+        """
+        Whether the item this dependency names is done or merged.
+        """
+
+    def releases_dependent(self, must_be_merged: bool) -> bool:
+        """
+        :param must_be_merged: Whether the dependent needs this dependency merged.
+        :return: Whether the dependent can start as far as this dependency goes.
+        """
+        if must_be_merged:
+            return self.is_finished()
+        return self.is_ready_to_unblock_dependents()
+
+    @abstractmethod
     def classify_live_state(
         self,
         live_pull_requests: LivePullRequests,
@@ -225,6 +240,9 @@ class ResolvedDependency(Dependency):
         referenced item's own answer."""
         return self.item.is_ready_for_dependent_review()
 
+    def is_finished(self) -> bool:
+        return self.item.is_effectively_done()
+
     def classify_live_state(
         self,
         live_pull_requests: LivePullRequests,
@@ -264,6 +282,9 @@ class UnresolvedDependency(Dependency):
     def is_ready_for_dependent_review(self) -> bool:
         """See :meth:`Dependency.is_ready_for_dependent_review` - always
         ``False``."""
+        return False
+
+    def is_finished(self) -> bool:
         return False
 
     def classify_live_state(
@@ -455,8 +476,8 @@ class DependencyResolver:
             item with none.
         """
         return all(
-            dependency.is_ready_to_unblock_dependents()
-            for dependency in self.dependencies_of(item)
+            self.resolve(entry).releases_dependent(entry in item.depends_on_merged)
+            for entry in item.depends_on
         )
 
     def classify_live_states(

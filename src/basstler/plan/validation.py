@@ -14,6 +14,7 @@ import rustworkx
 
 from basstler.plan.exceptions import (
     DependencyCycle,
+    DependsOnMergedNotDependedOn,
     DuplicateItemId,
     InvalidBlockers,
     InvalidCommands,
@@ -450,6 +451,14 @@ class PlanValidator:
                 for entry in depends_on or []
                 if (problem := self.dependency_problem(item_identifier, entry))
                 is not None
+            )
+        depends_on_merged = item.get(ManifestKey.DEPENDS_ON_MERGED.key) or []
+        if not isinstance(depends_on_merged, list) or not all(
+            isinstance(depends_on, list) and entry in depends_on
+            for entry in depends_on_merged
+        ):
+            problems.append(
+                DependsOnMergedNotDependedOn(item_identifier, depends_on_merged)
             )
         blockers = item.get(ManifestKey.BLOCKERS.key)
         if blockers is not None and not isinstance(blockers, list):

@@ -461,6 +461,32 @@ class InvalidBlockers(ValidationProblem):
 
 
 @dataclass
+class DependsOnMergedNotDependedOn(ValidationProblem):
+    """
+    An item's ``depends_on_merged`` isn't a list of entries of its ``depends_on``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    depends_on_merged: Any
+    """
+    Whatever ``depends_on_merged`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} depends_on_merged must list entries of its "
+            f"depends_on, got {self.depends_on_merged!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "list each entry under depends_on as well, spelled the same"
+
+
+@dataclass
 class UnknownPerformer(ValidationProblem):
     """
     An item's ``performed_by`` isn't one of :class:`Performer`'s values.

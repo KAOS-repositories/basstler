@@ -8,13 +8,15 @@ import html
 from pathlib import Path
 
 import pytest
+import yaml
 
 from basstler.github.pull_request_source import PullRequestSource
 from basstler.locations import ProjectLocation
-from basstler.plan.dependencies import PlanDirectory
+from basstler.plan.dependencies import DependencyReference, PlanDirectory
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal
 from basstler.plan.goal_path import GoalPath, NeededItems
+from basstler.plan.model import PlanDocument
 from basstler.plan_site.__main__ import RepositorySite, SiteFile
 from basstler.plan_site.goal_page import GoalPage, GoalSummary
 from basstler.plan_site.hub import NotesBranch, SiteAddress
@@ -24,6 +26,7 @@ from basstler.setup.steps import PersonalNotesSetting
 from ..constants.paths import DatasetLocation
 from ..constants.site import SiteRepository, SiteSampleText
 from ..plan.test_goal_path import GOAL, recorded_pull_requests
+from ..plan import test_merged_dependencies as merged_dependency_plan
 from ..plan.test_owner_steps import GOAL as OWNER_STEP_GOAL
 from ..plan.test_owner_steps import PLAN_ID as OWNER_STEP_PLAN_ID
 from ..recorded_pull_requests import RecordedPullRequestSource
@@ -327,3 +330,38 @@ class TestAnOwnersStepOnTheSite:
         )
         for command in commands:
             assert f"<code>{html.escape(command)}</code>" in page
+
+
+# %% a step waiting for a merge
+
+
+class TestAStepWaitingForAMerge:
+    """
+    A step that needs a dependency merged says so on the goal's page.
+    """
+
+    def test_the_goal_page_names_the_awaited_merge(self, tmp_path: Path):
+        """
+        The dependent's card links the step whose merge it starts after.
+        """
+        goal = merged_dependency_plan.GOAL
+        (target,) = goal.target_references
+        records = merged_dependency_plan.base_pull_request(merged=False)
+        build_site(
+            tmp_path,
+            {
+                Path(target.plan_id) / PlanDocument.MANIFEST: yaml.safe_dump(
+                    merged_dependency_plan.manifest()
+                ),
+                Path(ProjectLocation.PLAN_GOALS.name) / f"{goal.identifier}.yaml": (
+                    goal.render()
+                ),
+            },
+            RecordedPullRequestSource(records=records),
+        )
+        page = page_at(tmp_path, ADDRESS.goal_url(NOTES_REPOSITORY, goal.identifier))
+        base = DependencyReference(
+            item_identifier=merged_dependency_plan.BASE, plan_id=target.plan_id
+        )
+        awaited_link = f'<a class="chip" {link_to("#" + GoalPage.anchor_of(base))}>'
+        assert f"Starts once merged: {awaited_link}{base.text}</a>" in page

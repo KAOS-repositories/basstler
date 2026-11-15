@@ -75,6 +75,11 @@ class PathStepReport(ValidatedJSONModel):
     What the item's plan records as blocking it.
     """
 
+    awaited_merges: list[str]
+    """
+    The items the step cannot start before the merge of, each as ``<plan-id>/<item-id>``.
+    """
+
     owner_move: str | None
     """
     What the item's pull request waits on the owner for, or ``None`` when nothing.
@@ -290,6 +295,11 @@ class PathStep:
     What the step's pull request waits on the owner for, or ``None`` when nothing.
     """
 
+    awaited_merges: tuple[DependencyReference, ...] = ()
+    """
+    The entries of :attr:`awaited` the step needs merged, not only out of draft.
+    """
+
     @property
     def reference(self) -> DependencyReference:
         """
@@ -336,6 +346,7 @@ class PathStep:
             recommended_model=self.item.recommended_model,
             command=self.action.command if self.action else None,
             blockers=self.item.blockers,
+            awaited_merges=[reference.text for reference in self.awaited_merges],
             owner_move=self.owner_move.description if self.owner_move else None,
             owner_commands=list(self.owner_move.commands) if self.owner_move else [],
             releases=[reference.text for reference in releases],
@@ -558,6 +569,8 @@ class GoalPath:
             )
             lines.append(f"      you: {step.owner_move}{released}")
         lines += [f"        {command}" for command in step.owner_commands]
+        if step.awaited_merges:
+            lines.append(f"      needs merged: {', '.join(step.awaited_merges)}")
         lines += [f"      blocked: {blocker}" for blocker in step.blockers]
         return lines
 
@@ -679,14 +692,21 @@ class NeededItems:
         """
         resolved = self.resolved_by_reference[reference]
         dependencies = self.dependencies_of(reference)
+        merged_dependencies = tuple(
+            dependency
+            for entry, dependency in zip(
+                resolved.item.depends_on, dependencies, strict=True
+            )
+            if entry in resolved.item.depends_on_merged
+        )
         awaited: tuple[DependencyReference, ...] = ()
         if resolved.item.status is ItemStatus.NOT_STARTED:
             awaited = tuple(
                 dependency
                 for dependency in dependencies
-                if not self.resolved_by_reference[
-                    dependency
-                ].is_ready_to_unblock_dependents()
+                if not self.resolved_by_reference[dependency].releases_dependent(
+                    dependency in merged_dependencies
+                )
             )
         action = None
         if not resolved.item.is_effectively_done():
@@ -699,6 +719,11 @@ class NeededItems:
             awaited=awaited,
             action=action,
             owner_move=self.owner_move_of(reference, awaited),
+            awaited_merges=tuple(
+                dependency
+                for dependency in awaited
+                if dependency in merged_dependencies
+            ),
         )
 
     def owner_move_of(

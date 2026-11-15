@@ -362,6 +362,11 @@ class ManifestKey(KeySpecification, Enum):
     The items this one stacks on, by id.
     """
 
+    DEPENDS_ON_MERGED = ("depends_on_merged", ValueStyle.SEQUENCE)
+    """
+    The entries of :attr:`DEPENDS_ON` that must be merged before the item starts.
+    """
+
     STATUS = ("status",)
     """
     The session's own planning assessment - see :class:`ItemStatus`.

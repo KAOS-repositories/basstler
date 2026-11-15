@@ -175,6 +175,12 @@ class Item:
     The identifiers of items that must complete before this one can start.
     """
 
+    depends_on_merged: list[str] = field(default_factory=list)
+    """
+    The entries of :attr:`depends_on` that must be merged, not only out of draft, before
+    this item can start.
+    """
+
     blockers: list[str] = field(default_factory=list)
     """
     Free-text descriptions of what's currently blocking this item.
@@ -336,6 +342,7 @@ class Item:
             ),
             notes=notes.strip() if notes else None,
             depends_on=list(data.get(ManifestKey.DEPENDS_ON.key) or []),
+            depends_on_merged=list(data.get(ManifestKey.DEPENDS_ON_MERGED.key) or []),
             blockers=list(data.get(ManifestKey.BLOCKERS.key) or []),
             performed_by=Performer(
                 data.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)

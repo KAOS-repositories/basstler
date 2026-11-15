@@ -1,12 +1,9 @@
 ## Plan
-- `DirectoryTree.ignore_errors`; `TreeRemovalChecker` and `BashByNameChecker` become fixable, with examples under `tests/dataset/rule-fixes/`.
-- Statement insertion/removal actions and `ImportedName`, so a fix adds the import it needs.
-- Full suite, ruff, `code-rules check`, then the PR description.
+- Both Windows rules get reversible fixes; imports added by the fixer.
 
 ## Done
-- `DirectoryTree.ignore_errors` and its tests.
-- Import actions (`StatementInsertion`, `StatementRemoval`, `ImportedName`); `SourceFixer` adds each fix's imports.
-- Tree-removal fix and bash fix with examples; calls the fix cannot take over (handler, no `environment`) stay reported with a message saying so.
+- `DirectoryTree.ignore_errors`; tree-removal and bash fixes with examples; import actions.
+- Suite: only the 5 failures that also fail on #222's head. Description and `release:minor` set.
 
 ## Next
-- Full suite result; update the description with decisions; keep draft.
+- Review; merge after #222.

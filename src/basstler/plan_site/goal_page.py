@@ -140,6 +140,8 @@ class GoalPage(TemplatePage):
             anchor_of=self.anchor_of,
             built_at=self.built_at,
             script_template=SiteTemplate.PLAN_SCRIPT.name,
+            live_state_script_template=SiteTemplate.LIVE_STATE_SCRIPT.name,
+            recheck_script_template=SiteTemplate.PLAN_PULL_REQUEST_RECHECK_SCRIPT.name,
             vocabulary=PlanPageVocabulary(),
             available_models=list(ModelAlias),
         )

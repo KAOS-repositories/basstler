@@ -78,6 +78,12 @@ class LiveStateAttribute(StrEnum):
     On the page's count of one status: the status counted.
     """
 
+    CHANGED_SINCE_BUILD = "data-changed-since-build"
+    """
+    On the notice a page shows once a pull request's state differs from the one it was
+    built with.
+    """
+
 
 class PlanTimeAttribute(StrEnum):
     """

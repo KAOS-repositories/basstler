@@ -5,19 +5,31 @@ Tests for basstler.plan_site's goal pages and the goals a repository's index lis
 from __future__ import annotations
 
 import html
+import json
 from pathlib import Path
 
 import pytest
 import yaml
+from playwright.sync_api import Page, Route, expect
+
+from basstler.github.pull_request_record import PullRequestField
+from basstler.github.pull_request_state import LiveState
 
 from basstler.github.pull_request_source import PullRequestSource
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyReference, PlanDirectory
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal
-from basstler.plan.goal_path import GoalCommandName, GoalPath, NeededItems
+from basstler.github.repository import PullRequestReference
+from basstler.plan.goal_path import GoalCommandName, GoalPath, NeededItems, PathStep
 from basstler.plan.model import PlanDocument
 from basstler.plan_site.__main__ import RepositorySite, SiteFile
+from basstler.plan_site.cards import (
+    DraftRecheckAttribute,
+    LiveStateAttribute,
+    PlanTimeAttribute,
+    RefreshSource,
+)
 from basstler.plan_site.goal_page import GoalPage, GoalSummary
 from basstler.plan_site.hub import NotesBranch, SiteAddress
 from basstler.plan_site.hub_page import RepositorySummary
@@ -25,6 +37,7 @@ from basstler.setup.steps import PersonalNotesSetting
 
 from ..constants.paths import DatasetLocation
 from ..constants.site import SiteRepository, SiteSampleText
+from ..github.pull_request_api import api_pull_request
 from ..plan.test_goal_path import GOAL, recorded_pull_requests
 from ..plan import test_merged_dependencies as merged_dependency_plan
 from ..plan.test_owner_steps import GOAL as OWNER_STEP_GOAL
@@ -375,3 +388,164 @@ class TestAStepWaitingForAMerge:
         )
         awaited_link = f'<a class="chip" {link_to("#" + GoalPage.anchor_of(base))}>'
         assert f"Starts once merged: {awaited_link}{base.text}</a>" in page
+
+
+# %% the sequence and whose turn each step is
+
+
+class TestTheSequenceOnTheGoalPage:
+    """
+    The goal's page numbers every unfinished step and says who moves it now.
+    """
+
+    def test_every_unfinished_step_carries_its_place(
+        self, tmp_path: Path, goal_path: GoalPath
+    ):
+        """
+        Each step's card leads with its place in the recommended sequence.
+        """
+        build_site(tmp_path, goal_plan_files())
+        page = page_at(tmp_path, GOAL_URL)
+        assert goal_path.sequence
+        for step in goal_path.sequence:
+            position = goal_path.position_of(step)
+            assert f'<span class="step-number">{position}.</span> <a ' in page
+        assert page.count('<span class="step-number">') == len(goal_path.sequence)
+
+    def test_the_next_step_that_is_the_owners_shows_the_move_not_a_command_button(
+        self, tmp_path: Path, goal_path: GoalPath
+    ):
+        """
+        When the next step waits on the owner, the page's next section states the move.
+        """
+        build_site(tmp_path, goal_plan_files())
+        page = page_at(tmp_path, GOAL_URL)
+        next_section = page.split('id="goal-next-step"')[1].split("</section>")[0]
+        assert goal_path.next_step.is_owners_turn
+        assert html.escape(goal_path.next_step.owner_move.description) in next_section
+        assert "action-button" not in next_section.split("Yours now")[0]
+
+    def test_a_step_is_marked_with_whose_move_it_is(
+        self, tmp_path: Path, goal_path: GoalPath
+    ):
+        """
+        The cards marked as the owner's move are as many as the owner's steps.
+        """
+        build_site(tmp_path, goal_plan_files())
+        page = page_at(tmp_path, GOAL_URL)
+        assert page.count("Your move</span>") == len(goal_path.owner_steps)
+        assert page.count("A session's move</span>") == len(
+            [step for step in goal_path.sequence if step.needs_a_session]
+        )
+
+
+# %% the page's refresh
+
+
+ANSWERED_PULL_REQUEST = PullRequestReference(NOTES_REPOSITORY, 1)
+"""
+The pull request GitHub's stand-in describes whichever address the page asks for.
+"""
+
+
+def first_draft_step(goal_path: GoalPath) -> PathStep:
+    """
+    :return: The first step of the path whose pull request is a draft.
+    """
+    return next(
+        step
+        for step in goal_path.sequence
+        if step.item.live_state is LiveState.OPEN_DRAFT
+    )
+
+
+def open_goal_page(page: Page, tmp_path: Path, overrides: dict) -> None:
+    """
+    Open the built goal page with GitHub answering every pull request as an open draft
+    changed by ``overrides``, and wait for the page's re-check.
+
+    :param page: The browser page to open it in.
+    :param tmp_path: The directory :func:`build_site` built into.
+    :param overrides: The fields GitHub answers differently from an open draft.
+    """
+    fields = {PullRequestField.DRAFT: True, **overrides}
+
+    def answer_for_github(route: Route) -> None:
+        route.fulfill(
+            headers={"Access-Control-Allow-Origin": "*"},
+            content_type="application/json",
+            body=json.dumps(api_pull_request(ANSWERED_PULL_REQUEST, fields)),
+        )
+
+    page.route(SiteSampleText.SITE_URL + "**", lambda route: route.abort())
+    page.route("https://api.github.com/**", answer_for_github)
+    relative = GOAL_URL.removeprefix(ADDRESS.hub_url)
+    page.goto((tmp_path / "site" / relative / SiteFile.PAGE).as_uri())
+    page.wait_for_selector(f"[{DraftRecheckAttribute.FINISHED}]", state="attached")
+
+
+class TestTheGoalPagesRefresh:
+    """
+    The goal's page says when its states were read and re-reads them when opened.
+    """
+
+    def test_the_page_says_when_it_was_built(self, tmp_path: Path):
+        """
+        The masthead carries the refresh time, marked as coming from the build.
+        """
+        build_site(tmp_path, goal_plan_files())
+        page = page_at(tmp_path, GOAL_URL)
+        assert f"Refreshed <time {PlanTimeAttribute.RELATIVE} " in page
+        assert (
+            f"<span {PlanTimeAttribute.REFRESH_SOURCE}>{RefreshSource.BUILD}</span>"
+            in page
+        )
+
+    def test_every_pull_request_chip_names_its_api_address(
+        self, tmp_path: Path, goal_path: GoalPath
+    ):
+        """
+        Each step's pull request chip carries the address its state is re-read from.
+        """
+        build_site(tmp_path, goal_plan_files())
+        page = page_at(tmp_path, GOAL_URL)
+        references = [
+            step.pull_request_reference
+            for step in goal_path.sequence
+            if step.pull_request_reference
+        ]
+        assert references
+        for reference in references:
+            assert f'{LiveStateAttribute.PULL_REQUEST}="{reference.api_url}"' in page
+
+    def test_unchanged_pull_requests_refresh_the_time_and_show_no_notice(
+        self, tmp_path: Path, browser_page: Page
+    ):
+        """
+        When GitHub answers what the build read, only the refresh time changes.
+        """
+        build_site(tmp_path, goal_plan_files())
+        open_goal_page(browser_page, tmp_path, {})
+        expect(
+            browser_page.locator(f"[{PlanTimeAttribute.REFRESH_SOURCE}]")
+        ).to_have_text(RefreshSource.LIVE)
+        expect(
+            browser_page.locator(f"[{LiveStateAttribute.CHANGED_SINCE_BUILD}]")
+        ).to_be_hidden()
+
+    def test_a_pull_request_changed_since_the_build_is_shown_and_announced(
+        self, tmp_path: Path, browser_page: Page, goal_path: GoalPath
+    ):
+        """
+        A draft now out of draft shows as ready, and the page says its order is stale.
+        """
+        build_site(tmp_path, goal_plan_files())
+        open_goal_page(browser_page, tmp_path, {PullRequestField.DRAFT: False})
+        step = first_draft_step(goal_path)
+        chip = browser_page.locator(
+            f"#{GoalPage.anchor_of(step.reference)} [{LiveStateAttribute.PULL_REQUEST}]"
+        )
+        expect(chip).to_contain_text(LiveState.OPEN_READY.display_label)
+        expect(
+            browser_page.locator(f"[{LiveStateAttribute.CHANGED_SINCE_BUILD}]")
+        ).to_be_visible()

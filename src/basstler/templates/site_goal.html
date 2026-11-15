@@ -6,12 +6,20 @@
 
 {% macro step_card(step) %}
 {% set item = step.item %}
-      <article id="{{ anchor_of(step.reference) }}" class="item {{ item.status_and_drift_css_class }}">
-        <h3><a href="{{ locate_item_card(step.reference) }}">{{ item.title }}</a></h3>
+      <article id="{{ anchor_of(step.reference) }}" class="item {{ item.status_and_drift_css_class }}" {{ vocabulary.live_state_attribute.ITEM_STATUS }}="{{ item.status.value }}">
+        <h3><span class="step-number">{{ path.position_of(step) }}.</span> <a href="{{ locate_item_card(step.reference) }}">{{ item.title }}</a></h3>
         <div class="chips">
-          <span class="chip {{ vocabulary.chip_tone.of_status(item.status) }}">{{ item.status.value | capitalize }}</span>
+          <span class="chip {{ vocabulary.chip_tone.of_status(item.status) }}" {{ vocabulary.live_state_attribute.STATUS_CHIP }}>{{ item.status.value | capitalize }}</span>
           {% if step.pull_request_reference %}
-          <a class="chip {{ vocabulary.chip_tone.of_live_state(item.live_state) }}" href="{{ step.pull_request_reference.url }}">#{{ item.pull_request_number }} · {{ item.live_state.display_label }}</a>
+          <a class="chip {{ vocabulary.chip_tone.of_live_state(item.live_state) }}" href="{{ step.pull_request_reference.url }}" {{ vocabulary.live_state_attribute.PULL_REQUEST }}="{{ step.pull_request_reference.api_url }}">#{{ item.pull_request_number }} · {{ item.live_state.display_label }}</a>
+          {% endif %}
+          {% if step.check_state %}
+          <span class="chip {{ vocabulary.chip_tone.of_check_state(step.check_state) }}">CI {{ step.check_state.value }}</span>
+          {% endif %}
+          {% if step.is_owners_turn %}
+          <span class="chip chip-turn">Your move</span>
+          {% elif step.needs_a_session %}
+          <span class="chip chip-idle">A session's move</span>
           {% endif %}
         </div>
         <span class="item-identifier">{{ step.reference.text }}</span>
@@ -45,15 +53,21 @@
     <h1>{{ goal.title }}</h1>
     <p class="meta-line mono">
       <span>{{ path.finished_steps | length }} / {{ path.steps | length }} steps finished</span>
-      <span>Built <time datetime="{{ built_at.isoformat() }}">{{ built_at.strftime("%Y-%m-%d %H:%M %Z") }}</time></span>
+      <span>Refreshed <time {{ vocabulary.plan_time_attribute.RELATIVE }} {{ vocabulary.plan_time_attribute.REFRESHED }} datetime="{{ built_at.isoformat() }}">{{ built_at.strftime("%Y-%m-%d %H:%M %Z") }}</time> <span {{ vocabulary.plan_time_attribute.REFRESH_SOURCE }}>{{ vocabulary.refresh_source.BUILD }}</span></span>
     </p>
+    <p class="blocker" hidden {{ vocabulary.live_state_attribute.CHANGED_SINCE_BUILD }}>▸ A pull request changed since this page was built. The chips show its state now; the order and the moves are computed again by the next build, which that change started.</p>
   </header>
 
   <section class="next-steps" id="goal-next-step">
     <h2>Next</h2>
     {% if next_step %}
-    <p class="goal-next"><a href="#{{ anchor_of(next_step.reference) }}">{{ next_step.item.title }}</a></p>
+    <p class="goal-next">{{ path.position_of(next_step) }}. <a href="#{{ anchor_of(next_step.reference) }}">{{ next_step.item.title }}</a></p>
+    {% if next_step.is_owners_turn %}
+    <div class="owner-move"><strong>You:</strong> {{ next_step.owner_move.description }}</div>
+    {{ command_list(next_step.owner_move.commands) }}
+    {% else %}
     {{ action_button(next_step.action) }}
+    {% endif %}
     {% elif path.groups %}
     <p class="goal-next">Nothing can be acted on now: every unfinished step waits for the steps named above it.</p>
     {% else %}
@@ -63,7 +77,7 @@
     <h2 class="owner-heading">Yours now</h2>
     <ul>
     {% for step in path.owner_steps %}
-      <li><a href="#{{ anchor_of(step.reference) }}">{{ step.owner_move.description }}</a>{% for released in path.references_released_by(step) %}{% if loop.first %} <span class="next-reason">releases</span>{% endif %} <span class="next-reason">{{ released.text }}</span>{% endfor %}</li>
+      <li>{{ path.position_of(step) }}. <a href="#{{ anchor_of(step.reference) }}">{{ step.owner_move.description }}</a>{% for released in path.references_released_by(step) %}{% if loop.first %} <span class="next-reason">releases</span>{% endif %} <span class="next-reason">{{ released.text }}</span>{% endfor %}</li>
     {% endfor %}
     </ul>
     {% endif %}
@@ -93,5 +107,8 @@
 {% block scripts %}
 <script>
 {% include script_template %}
+{% include live_state_script_template %}
+{% include recheck_script_template %}
+planPageStartRechecks();
 </script>
 {% endblock %}

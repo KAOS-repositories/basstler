@@ -263,6 +263,8 @@ a.chip:hover { border-color: currentColor; }
   padding: var(--space-2) var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); align-items: baseline;
 }
 .goal-list .goal-progress, .goal-list code { font-size: 0.78rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.chip-turn { background: var(--accent-tint); color: var(--accent-strong); font-weight: 600; }
+.step-number { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .goal-next { margin: 0 0 var(--space-2); font-size: 0.92rem; }
 .goal-group { display: flex; flex-direction: column; gap: var(--space-3); margin: 0 0 var(--space-5); }
 .goal-group h2 { font-size: 0.95rem; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }

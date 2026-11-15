@@ -1,0 +1,4 @@
+id: goal-paths-decided
+title: The goal-paths experiment is accepted and split, or dropped
+targets:
+- goal-paths/verdict

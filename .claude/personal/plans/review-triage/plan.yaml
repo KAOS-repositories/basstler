@@ -43,10 +43,9 @@ items:
   track: triage
   blockers:
     - >-
-      Mergeable with main at 1c54d6ff; CI there not yet read. Waits on the user storing
-      REVIEW_TRIAGE_VIEWER_TOKEN. #219 (stacked on this) now conflicts with it in token_form.py,
-      site_repository.py, user_steps.py, test_site_repository.py. Upstream review not checked (none
-      named).
+      Mergeable with main at 1c54d6ff; CI there not yet read. REVIEW_TRIAGE_VIEWER_TOKEN is stored
+      per the user (not checked: unreadable from a cloud session). #219 (stacked) conflicts in
+      token_form.py, site_repository.py, user_steps.py, test_site_repository.py.
   depends_on: []
   status: in progress
   recommended_model: sonnet
@@ -54,16 +53,13 @@ items:
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 215
   notes: >
-    Draft #215, stacked on #213: set-up-mark-viewed installs the workflow (on every pull request
-    with --on-every-pull-request), turns Actions on for forks and lists the token steps left;
-    mark-viewed falls back to Actions and names both routes and the README when neither works. Waits
-    on the user storing the token.
+    Draft #215, now on main (#213 merged): set-up-mark-viewed installs the workflow (on every pull
+    request with --on-every-pull-request), turns Actions on for forks and lists the token steps
+    left; mark-viewed falls back to Actions and names both routes and the README when neither works.
+    The user says the token is stored (not checked from a cloud session).
 
     #221 merges only after #215: #221's mark-viewed.yml calls #215's reusable
     review-triage-mark-viewed.yml.
-
-    #213 has merged, so #215 now targets main; main was merged in at 1c54d6ff
-    (ViewedMarking.refusals feeds the routes; marking only directly raises GraphQLErrorsReturned).
 - id: rule-fixes
   title: Declare reversible fixes on code rules and apply them with code-rules fix
   track: pattern-fixes

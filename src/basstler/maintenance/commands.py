@@ -275,7 +275,7 @@ class PrepareCommand(StackScopeArgument, MaintenanceCommand):
             PreparationKey.REPARENTS: [asdict(entry) for entry in stack.reparents()],
             PreparationKey.TO_SUMMARIZE: [asdict(context) for context in contexts],
         }
-        logger.info(json.dumps(document, ensure_ascii=False))
+        logger.info(json.dumps(document, ensure_ascii=False, default=str))
         return StackExitCode.SUCCESS
 
 

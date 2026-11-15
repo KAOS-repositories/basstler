@@ -461,6 +461,11 @@ class ProjectLocation(PathEnumeration):
     The rules every plan of the repository follows, one entry per rule.
     """
 
+    PLAN_GOALS = PLANS / "_goals"
+    """
+    Where goals live on the personal-notes branch, one file per goal.
+    """
+
     PERSONAL_STACK_CONFIGURATION = PERSONAL_NOTES / "stack.toml"
     """
     The per-user override of :attr:`PROJECT_STACK_CONFIGURATION`.

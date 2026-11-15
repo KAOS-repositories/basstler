@@ -340,6 +340,12 @@ class DatasetLocation(PathEnumeration):
     per fixture plan.
     """
 
+    GOAL_PLANS = DIRECTORY / "goal-plans"
+    """
+    A plans directory copied from the plans a real goal spans, with that goal under its
+    goals directory.
+    """
+
     STUBS = DIRECTORY / "stubs"
     """
     Executables copied onto a scratch ``PATH`` to stand in for a real ``gh``, ``curl`` or

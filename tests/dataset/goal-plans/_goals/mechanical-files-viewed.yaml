@@ -1,0 +1,7 @@
+id: mechanical-files-viewed
+title: The mechanical files of #220 and #223 are marked viewed
+targets:
+- review-triage/action-plan-triage
+- review-triage/reduced-review-diff
+- review-triage/windows-suite
+- review-triage/actions-marking

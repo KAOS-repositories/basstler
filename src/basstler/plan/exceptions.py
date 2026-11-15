@@ -143,6 +143,63 @@ class UnknownRepositoryRuleError(DataclassException, LookupError):
         return f"Use one of: {', '.join(self.known_identifiers) or 'none yet'}."
 
 
+# %% goals
+
+
+@dataclass
+class UnknownGoalError(DataclassException, LookupError):
+    """
+    Raised when a goal is asked for that the notes branch does not hold.
+    """
+
+    identifier: str
+    """
+    The id that was asked for.
+    """
+
+    known_identifiers: tuple[str, ...]
+    """
+    The ids of the goals the notes branch holds, sorted.
+    """
+
+    def error_message(self) -> str:
+        return f"the notes branch holds no goal {self.identifier!r}"
+
+    def suggest_correction(self) -> str:
+        return f"Use one of: {', '.join(self.known_identifiers) or 'none yet'}."
+
+
+@dataclass
+class UnresolvedGoalReferenceError(DataclassException, LookupError):
+    """
+    Raised when a goal's path reaches a reference that names no item of any plan.
+    """
+
+    goal_identifier: str
+    """
+    The goal whose path was being computed.
+    """
+
+    reference_text: str
+    """
+    The reference that names nothing, as ``<plan-id>/<item-id>``.
+    """
+
+    named_by: str
+    """
+    What names it: the goal's targets, or the item whose ``depends_on`` holds it.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"goal {self.goal_identifier!r} needs {self.reference_text!r}, named by "
+            f"{self.named_by}, which is no item of any plan"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Name an existing item as <plan-id>/<item-id>, or remove the reference."
+
+
 # %% plan validation
 
 

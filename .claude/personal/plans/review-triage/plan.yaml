@@ -41,6 +41,11 @@ items:
 - id: viewed-marking-workflow
   title: Mark files viewed on every pull request, from Actions or your own computer
   track: triage
+  blockers:
+    - >-
+      Conflicts with main in 10 files (#213's review answers, #217, #209 landed after the cut);
+      merge main in and resolve. CI: test_skill_documents fails because setup-review-triage cites
+      ${CLAUDE_CODE_REMOTE}, which the shell configuration lacks. Upstream review not checked.
   depends_on: []
   status: in progress
   recommended_model: sonnet

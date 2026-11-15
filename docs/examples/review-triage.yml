@@ -1,0 +1,36 @@
+# Optional: copy into a project as .github/workflows/review-triage.yml to write each
+# pull request's review triage into its run's summary. The reference below follows
+# basstler's main branch; to pin a release instead, change it to its tag.
+name: Review triage
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The whole history, so both ends of the pull request are in the checkout.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install basstler
+        run: pip install "basstler @ git+https://github.com/KAOS-repositories/basstler@main"
+
+      - name: Triage the files for review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m basstler review-triage report
+          ${{ github.event.pull_request.number }}
+          --repository "${{ github.repository }}" >> "$GITHUB_STEP_SUMMARY"

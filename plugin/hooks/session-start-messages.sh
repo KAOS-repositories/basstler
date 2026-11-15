@@ -75,6 +75,33 @@ merged_items_line_not_checked() {
   printf 'not checked - recording the plans'"'"' merged items failed; the error is above'
 }
 
+# %% the recommended models line
+
+# recommended_models_line_not_applicable: no plan resolved for this branch, so no items
+# were read.
+recommended_models_line_not_applicable() {
+  printf 'not applicable (this branch tracks no plan)'
+}
+
+# recommended_models_line_not_checked: reading the plan's items failed.
+recommended_models_line_not_checked() {
+  printf 'not checked - reading the plan'"'"'s items failed; the error is above'
+}
+
+# recommended_models_line_all_set: every item of the branch's plan carries one.
+recommended_models_line_all_set() {
+  local plan_id="$1"
+  printf "every item of '%s' has one" "${plan_id}"
+}
+
+# recommended_models_line_unset: items of the branch's plan carry none; a session sets
+# them by judgement, and nothing is written for the user.
+recommended_models_line_unset() {
+  local plan_id="$1"
+  local item_identifiers="$2"
+  printf "'%s' items without one: %s - run /plan-recommend-models %s" "${plan_id}" "${item_identifiers}" "${plan_id}"
+}
+
 # %% the hub line
 
 # hub_line_not_registered: the notes branch has no hub file.

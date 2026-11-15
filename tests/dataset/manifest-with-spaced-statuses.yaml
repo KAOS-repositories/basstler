@@ -17,6 +17,7 @@ items:
     pull_request_number: 1
     track: track-1
     status: in progress
+    recommended_model: sonnet
     notes: some long note that should be left completely untouched by the patch
   - id: b
     title: Item B
@@ -24,3 +25,4 @@ items:
     pull_request_number: 2
     track: track-1
     status: not started
+    recommended_model: sonnet

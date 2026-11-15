@@ -102,8 +102,11 @@ items:
 - id: move-triage
   title: Prove module, definition and file moves mechanical
   track: triage
+  branch: claude/youthful-babbage-btoebw
+  pull_request_number: 226
+  session: https://claude.ai/code/session_018wfiv8MVHyrTDcHrfEBtkJ
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: sonnet
   notes: 'The general part of #214, split out onto a new branch from main: commit_tree, definitions,
     python_source, renames, moved_definitions, module_moves, file_moves, definition_moves,

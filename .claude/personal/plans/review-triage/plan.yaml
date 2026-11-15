@@ -17,9 +17,10 @@ tracks:
   wave: triage
 items:
 - id: keyword-argument-triage
-  title: Prove keyword-argument conversions and module moves mechanical
+  title: Prove keyword-argument conversions mechanical
   track: triage
-  depends_on: []
+  depends_on:
+  - move-triage
   status: in progress
   recommended_model: sonnet
   branch: ccr-37402cb7-cls5ht-keyword-arguments
@@ -28,7 +29,12 @@ items:
   notes: 'Draft #214, stacked on #213: signature-checked keyword-argument judgment, and rename
     sources for module moves, definitions moved between modules and moved file paths in prose;
     relative imports resolved per file, templates and empty package initializers judged. CRAM
-    #967: 123 of 154 files mechanical; #210: 233 of 246.'
+    #967: 123 of 154 files mechanical; #210: 233 of 246.
+
+
+    Split: the moves and the general triage go to move-triage; #214 is restacked onto it and
+    keeps keyword_arguments, calls, signatures and tree_matching with their tests and datasets,
+    supplying KeywordArgumentComparison.'
 - id: viewed-marking-workflow
   title: Mark files viewed on every pull request, from Actions or your own computer
   track: triage
@@ -41,7 +47,10 @@ items:
   notes: 'Draft #215, stacked on #213: set-up-mark-viewed installs the workflow (on every
     pull request with --on-every-pull-request), turns Actions on for forks and lists the token
     steps left; mark-viewed falls back to Actions and names both routes and the README when
-    neither works. Waits on the user storing the token.'
+    neither works. Waits on the user storing the token.
+
+
+    #221 merges only after #215: #221''s mark-viewed.yml calls #215''s reusable review-triage-mark-viewed.yml.'
 - id: rule-fixes
   title: Declare reversible fixes on code rules and apply them with code-rules fix
   track: pattern-fixes
@@ -67,21 +76,23 @@ items:
     ignoring errors through a declared DirectoryTree option, unless the rule wants it to raise,
     and declares that. Bash.locate fix only where an environment is in scope.
 - id: rule-fix-triage
-  title: Prove a file mechanical when its change is a rule's fix
+  title: Prove a file mechanical when replaying a recorded modification on the base reproduces
+    the head
   track: pattern-fixes
   depends_on:
-  - keyword-argument-triage
+  - move-triage
   - rule-fixes
+  - basstler-packages/uv-workspace
   status: not started
   recommended_model: opus
-  notes: 'Goal: #220 mostly marked viewed; done when its triage report marks its rule-fix
-    files mechanical (107 of 129 .py files from the UTF-8 fix alone; most of the rest once
-    directory-and-bash-fixes lands). basstler-review-triage depends on basstler-rules; the
-    triage recomputes each fix from the base and allows the difference where it reproduces
-    the head, alongside renames and imports; a new change kind names the rule; such files
-    are marked viewed like other mechanical kinds.
+  notes: 'Done when #220''s rule-fix files (107 of 129 from the UTF-8 fix) and #223''s moved
+    files are marked mechanical. basstler-review-triage depends on basstler-rules; replaying
+    any recorded code_modification ActionPlan or rule fix on the base that reproduces the head
+    is allowed; a new change kind names the plan or rule.
 
-    '
+
+    Next: decide how a commit records the plan it applied; nothing stores #223''s relocation
+    plan replayably yet. uv-workspace supplies the file actions it replays.'
 - id: reduced-review-diff
   title: Show a reviewer only what is left once rule fixes are reversed
   track: pattern-fixes
@@ -91,4 +102,43 @@ items:
   recommended_model: sonnet
   notes: For a file mixing a rule fix and a real change, reverse the fix's actions on the
     head and show the remaining diff against the base in the report.
+
+- id: move-triage
+  title: Prove module, definition and file moves mechanical
+  track: triage
+  depends_on: []
+  status: not started
+  recommended_model: sonnet
+  notes: 'The general part of #214, split out onto a new branch from main: commit_tree, definitions,
+    python_source, renames, moved_definitions, module_moves, file_moves, definition_moves,
+    subclass_substitutions, base_branch_merges and the reviewed-commit / --last triage, the
+    changes to comparison, detection and triage, the git/ and github/ changes (dc0f2460''s
+    UTF-8 git text may overlap #220), with their tests and datasets. definition_moves defaults
+    to a plain PythonComparison. Split by moving files, not cherry-picking: #214''s commits mix
+    both parts (e.g. c931b79c).'
+
+- id: generated-file-triage
+  title: Prove a generated file mechanical by regenerating it
+  track: triage
+  depends_on:
+  - move-triage
+  status: not started
+  recommended_model: sonnet
+  notes: A file the repository generates, starting with AGENTS.md from basstler code-rules
+    agents-md (code_rules/command_line.py generate_agents_instructions), is mechanical when
+    regenerating it from the head's sources reproduces the head's file. Each generated file
+    and its generator are declared once, not hardcoded in the triage.
+
+- id: portability-fixes
+  title: Fixes for file URLs and paths written into git and shell text
+  track: pattern-fixes
+  depends_on:
+  - rule-fixes
+  status: not started
+  recommended_model: opus
+  notes: 'Two patterns #220 applied by hand: a file:// URL built from a path becomes Path.as_uri();
+    str(path) in git or shell command text becomes as_posix(), only if a checker can tell
+    reliably that it sits in command text, otherwise that half is dropped and the item says
+    so. Done when code-rules fix reproduces #220''s hand edits and rule-fix-triage marks those
+    files mechanical.'
 landed_item_count: 1

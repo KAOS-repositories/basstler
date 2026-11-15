@@ -101,7 +101,7 @@ def test_a_branch_awaiting_its_link_is_described_from_its_pull_request_and_commi
     assert context.description == PromotionSampleText.SUMMARY
     assert context.commit_subjects == tuple(subjects)
     assert context.compared_with == reader.stack.configuration.upstream_base_reference
-    assert context.change_size == ChangeSize.of(
+    assert context.change_size == ChangeSize.from_file_changes(
         [
             FileChange(PurePosixPath(ForkCheckout.own_file(StackBranch.PARENT)), 1, 0),
             FileChange(PurePosixPath("a-second-file"), 1, 0),

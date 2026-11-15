@@ -157,6 +157,7 @@ def report(
         default.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication(
         pull_request,
@@ -183,6 +184,7 @@ def mark_viewed(
         default.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication(
         pull_request,
@@ -202,6 +204,7 @@ def declare(
     :param rename: A rename as ``old=new``; repeatable.
     :param rejected_rename: An old identifier whose detected rename is rejected;
         repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     logger.info(TriageDeclaration.from_arguments(rename, rejected_rename).comment())
     return ReviewTriageExitCode.SUCCESS

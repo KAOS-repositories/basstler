@@ -110,8 +110,8 @@ items:
     subclass_substitutions, base_branch_merges and the reviewed-commit / --last triage, the
     changes to comparison, detection and triage, the git/ and github/ changes (dc0f2460''s
     UTF-8 git text may overlap #220), with their tests and datasets. definition_moves defaults
-    to a plain PythonComparison. Split by moving files, not cherry-picking: #214''s commits mix
-    both parts (e.g. c931b79c).'
+    to a plain PythonComparison. Exempt from the basstler-packages freeze on github. Split by moving files, not cherry-picking: #214''s commits mix
+    both parts.'
 
 - id: generated-file-triage
   title: Prove a generated file mechanical by regenerating it

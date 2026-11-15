@@ -55,6 +55,11 @@ class GoalCommandName(StrEnum):
     Prints the command of the first step that can be acted on.
     """
 
+    SUMMARY = "summary"
+    """
+    Prints one line per goal: how far it is and what comes next.
+    """
+
     CHECK = "check"
     """
     Runs the done checks of a goal's steps and records the steps that pass as done.
@@ -584,6 +589,20 @@ class GoalPath:
                 if step.action is not None
             ),
             None,
+        )
+
+    @property
+    def summary_line(self) -> str:
+        """
+        The goal's progress and its next command, as one line.
+        """
+        next_step = self.next_step
+        upcoming = next_step.action.command if next_step else "nothing to act on now"
+        owned = len(self.owner_steps)
+        waiting = f"; {owned} step(s) wait on you" if owned else ""
+        return (
+            f"{self.goal.identifier}: {len(self.finished_steps)}/{len(self.steps)} "
+            f"steps finished; next: {upcoming}{waiting}"
         )
 
     def report(self) -> GoalPathReport:

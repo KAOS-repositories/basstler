@@ -17,7 +17,7 @@ from basstler.github.pull_request_source import (
     PullRequestSource,
 )
 from basstler.plan.goal import Goal, GoalStore
-from basstler.plan.dependencies import DependencyReference
+from basstler.plan.dependencies import DependencyReference, PlanDirectory
 from basstler.plan.done_check import BasstlerCommandRunner, DoneChecker, FinishedStep
 from basstler.plan.exceptions import StepReferenceWithoutPlanError
 from basstler.plan.goal_path import GoalCommandName, GoalPath, NeededItems
@@ -94,6 +94,49 @@ def print_path(
     logger.info(
         json.dumps(path.report().to_json(), indent=2) if as_json else path.render()
     )
+    return GoalExitCode.SUCCESS
+
+
+def summary_lines(
+    goals: list[Goal],
+    plan_directory: PlanDirectory,
+    pull_request_source: PullRequestSource,
+) -> list[str]:
+    """
+    :param goals: The goals to summarize.
+    :param plan_directory: The plans their targets and dependencies live in.
+    :param pull_request_source: Where the items' live state is read from.
+    :return: One line per goal: its progress and next command, or the reference that
+        keeps its path from being computed.
+    """
+    lines = []
+    for goal in goals:
+        needed = NeededItems.of_goal(goal, plan_directory)
+        if needed.unresolved:
+            lines.append(
+                f"{goal.identifier}: no path - {needed.unresolved[0].error_message()}"
+            )
+            continue
+        lines.append(
+            GoalPath.from_needed_items(needed, pull_request_source).summary_line
+        )
+    return lines
+
+
+@goal_app.command(name=GoalCommandName.SUMMARY)
+def print_summary() -> GoalExitCode:
+    """
+    Print one line per goal on the notes branch: how far it is and what comes next.
+    """
+    store = GoalStore.from_project_root(Path.cwd())
+    store.branch.fetch()
+    goals = [store.fetched_goal(known) for known in store.fetched_identifiers()]
+    with tempfile.TemporaryDirectory() as scratch:
+        plan_directory = ProjectCheckout(Path.cwd()).check_out_manifests(Path(scratch))
+        lines = summary_lines(
+            goals, plan_directory, GitHubPullRequestSource.from_environment()
+        )
+    logger.info("\n".join(lines))
     return GoalExitCode.SUCCESS
 
 

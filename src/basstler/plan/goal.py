@@ -177,6 +177,13 @@ class GoalStore:
         known = self.fetched_identifiers()
         if identifier not in known:
             raise UnknownGoalError(identifier, known)
+        return self.fetched_goal(identifier)
+
+    def fetched_goal(self, identifier: str) -> Goal:
+        """
+        :param identifier: The id of a goal the notes branch held when last fetched.
+        :return: That goal.
+        """
         return Goal.from_yaml(
             self.branch.git.run(
                 "show",

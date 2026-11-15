@@ -10,7 +10,12 @@ import pytest
 from basstler.locations import PluginLocation, ProjectLocation
 from basstler.plan.exceptions import UnknownGoalError, UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal, GoalStore
-from basstler.plan.goal_command import GoalExitCode, read_path, set_goal
+from basstler.plan.goal_command import (
+    GoalExitCode,
+    read_path,
+    set_goal,
+    summary_lines,
+)
 from basstler.plan.goal_path import GoalPath
 from basstler.plan.dependencies import PlanDirectory
 
@@ -145,3 +150,54 @@ class TestSavingAGoal:
         assert (
             published_file(goal_repository, GoalStore.goal_path("unreachable")) is None
         )
+
+
+# %% summarizing
+
+
+class TestSummarizingGoals:
+    """
+    Each goal is summarized on one line, whether or not its path can be computed.
+    """
+
+    def test_a_goal_is_summarized_by_its_paths_own_line(self):
+        """
+        A goal whose references resolve reads as its path summarizes itself.
+        """
+        plan_directory = PlanDirectory(DatasetLocation.GOAL_PLANS)
+        path = GoalPath.compute(
+            STORED_GOAL,
+            PlanDirectory(DatasetLocation.GOAL_PLANS),
+            RecordedPullRequestSource(),
+        )
+        assert summary_lines(
+            [STORED_GOAL], plan_directory, RecordedPullRequestSource()
+        ) == [path.summary_line]
+
+    def test_the_line_counts_the_steps_and_names_the_next_command(self):
+        """
+        The line carries the finished and total step counts and the next command.
+        """
+        path = GoalPath.compute(
+            STORED_GOAL,
+            PlanDirectory(DatasetLocation.GOAL_PLANS),
+            RecordedPullRequestSource(),
+        )
+        progress = f"{len(path.finished_steps)}/{len(path.steps)} steps finished"
+        assert path.summary_line.startswith(f"{STORED_GOAL.identifier}: {progress}")
+        assert f"next: {path.next_step.action.command}" in path.summary_line
+
+    def test_a_goal_naming_no_item_is_reported_not_raised(self):
+        """
+        A goal whose target resolves to nothing gets a line saying so.
+        """
+        goal = Goal(identifier="lost", title="Lost", targets=["no-plan/no-item"])
+        (line,) = summary_lines(
+            [goal],
+            PlanDirectory(DatasetLocation.GOAL_PLANS),
+            RecordedPullRequestSource(),
+        )
+        unresolved = UnresolvedGoalReferenceError(
+            goal.identifier, goal.targets[0], "the goal's targets"
+        )
+        assert line == f"{goal.identifier}: no path - {unresolved.error_message()}"

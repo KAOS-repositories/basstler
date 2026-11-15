@@ -179,22 +179,13 @@ class GitHubUnreachableError(GitHubCallFailed, ConnectionError):
         return "Check the network connection to GitHub, then run the command again."
 
 
-# %% reading an upstream pull request
-
-
-class UpstreamReadError(DataclassException, ABC):
-    """
-    Base class for every failure reading an upstream pull request.
-    """
-
-
 @dataclass
-class GraphQLErrorsReturned(UpstreamReadError):
+class GraphQLErrorsReturned(DataclassException):
     """
-    Raised when GitHub answers with an ``errors`` array instead of data.
+    Raised when GitHub answers a GraphQL request with errors.
     """
 
-    messages: list[str]
+    messages: tuple[str, ...]
     """
     Every message GitHub reported.
     """
@@ -204,6 +195,15 @@ class GraphQLErrorsReturned(UpstreamReadError):
 
     def suggest_correction(self) -> str:
         return (
-            "Check that the upstream repository and pull request exist and that the "
-            "logged-in account can read them"
+            "Check that what the request names exists and that the account gh is "
+            "logged in as may read or change it: gh auth status"
         )
+
+
+# %% reading an upstream pull request
+
+
+class UpstreamReadError(DataclassException, ABC):
+    """
+    Base class for every failure reading an upstream pull request.
+    """

@@ -17,12 +17,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from basstler.github.graphql import GraphQLRequest
 from basstler.exceptions import DataclassException
 from basstler.github.pull_request_models import (
     CheckResult,
     CheckStatus,
     GraphQLCheckStatus,
-    GraphQLRequest,
     UpstreamPullRequestSnapshot,
 )
 from basstler.github.query_documents import QueryVariable
@@ -856,7 +856,7 @@ def test_graphql_errors_are_raised_rather_than_returned(stubbed_gh, monkeypatch)
     with pytest.raises(GraphQLErrorsReturned) as raised:
         GitHubCommandLineClient().execute("query {}", {})
 
-    assert raised.value.messages == [GRAPHQL_ERROR_MESSAGE]
+    assert raised.value.messages == (GRAPHQL_ERROR_MESSAGE,)
 
 
 @NEEDS_SCRIPT_AS_EXECUTABLE

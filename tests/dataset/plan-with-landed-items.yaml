@@ -19,6 +19,7 @@ items:
     track: track-1
     depends_on: []
     status: done
+    recommended_model: sonnet
     notes: >
       Merged; nothing here is needed again.
   - id: open
@@ -28,6 +29,7 @@ items:
     track: track-1
     depends_on: [landed]
     status: in_progress
+    recommended_model: sonnet
     notes: >
       Builds on the landed item.
   - id: queued
@@ -37,5 +39,6 @@ items:
     track: track-1
     depends_on: [landed, open]
     status: not_started
+    recommended_model: sonnet
     notes: >
       Waits on the open item.

@@ -21,9 +21,13 @@ items:
   track: triage
   blockers:
     - >-
-      One open review thread on #213 asks the reviewer whether the existing of/at methods are
-      renamed here or separately (discussion_r4573303623). Merged with main and CI-pending at
-      d9a49529.
+      Three review threads on #213 say "missing return" on the review-triage commands (r4576144014,
+      r4576145225, r4576149799). Answered at 06ea0772 by adding :return: to the docstrings; they
+      stay open until the reviewer confirms that was meant.
+    - >-
+      Stacked #215 and #214 conflict with this branch (#219 sits behind #215); a person decides how.
+      CI was green at e0d267bc, not yet read at 06ea0772. No upstream is named, so upstream reviews
+      were not read.
   depends_on: []
   status: in progress
   recommended_model: sonnet

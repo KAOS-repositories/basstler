@@ -166,7 +166,7 @@ class ItemClassifier:
             ),
             parent_landed=self._base_has_landed(record, lineage),
             withheld=self.needs_resolution_label in record.labels,
-            checks_failed=record.check_state is not None and record.check_state.failed,
+            checks_failed=record.has_failed_checks,
         )
 
     def _base_has_landed(self, record: PullRequestRecord, lineage: ForkLineage) -> bool:
@@ -193,14 +193,9 @@ class ItemClassifier:
         One item's live pull request, or ``None`` if it has none or GitHub returned
         none.
         """
-        if item.pull_request_number is None:
-            return None
-        repository_pull_requests = (
-            self.live_pull_requests.pull_requests_by_repository.get(
-                self._repository_of(item), {}
-            )
+        return self.live_pull_requests.record_of(
+            self._repository_of(item), item.pull_request_number
         )
-        return repository_pull_requests.get(str(item.pull_request_number))
 
     def _pending_start_action_for(self, card: ItemCard) -> StartNowAction | None:
         """

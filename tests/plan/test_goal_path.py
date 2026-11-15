@@ -9,12 +9,14 @@ from enum import StrEnum
 import pytest
 
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
+from basstler.github.states import CombinedCheckState
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyReference, PlanDirectory
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal
 from basstler.plan.goal_path import (
+    OWNER_PREFIX,
     GoalPath,
     OwnerSituation,
     PathStep,
@@ -76,6 +78,11 @@ class StepId(StrEnum):
     In progress with a pull request, depending on an item that has one too.
     """
 
+    IN_PROGRESS_WITH_BLOCKER = "viewed-marking-workflow"
+    """
+    In progress with a pull request, its plan recording a blocker.
+    """
+
     OUTSIDE_THE_PATH = "pypi-release"
     """
     In :attr:`GoalPlanId.PACKAGES`, which no target depends on.
@@ -126,11 +133,14 @@ def pull_request_reference_of(plan: Plan, item: Item) -> PullRequestReference:
 
 
 def recorded_pull_requests(
-    draft: bool, merged_items: frozenset[str] = frozenset()
+    draft: bool,
+    merged_items: frozenset[str] = frozenset(),
+    failing_items: frozenset[str] = frozenset(),
 ) -> RecordedPullRequestSource:
     """
     :param draft: Whether every open pull request is a draft.
     :param merged_items: The ids of the items whose pull requests have merged.
+    :param failing_items: The ids of the items whose pull requests' checks failed.
     :return: A pull request for every item of the spanned plans that names one.
     """
     directory = PlanDirectory(DatasetLocation.GOAL_PLANS)
@@ -144,6 +154,9 @@ def recorded_pull_requests(
                 state=PullRequestState.CLOSED if merged else PullRequestState.OPEN,
                 draft=draft and not merged,
                 merged_at="2026-11-15T00:00:00+00:00" if merged else None,
+                check_state=CombinedCheckState.FAILURE
+                if item.identifier in failing_items
+                else CombinedCheckState.SUCCESS,
             )
     return RecordedPullRequestSource(records=records)
 
@@ -359,16 +372,30 @@ class TestTheGroupsOfAPath:
             step.reference for group in path.groups for step in group.steps
         }
 
-    def test_the_next_step_is_the_first_one_with_an_action(
+    def test_the_next_step_is_the_first_one_something_moves_forward(
         self, plan_directory: PlanDirectory
     ):
         """
-        The next step is the first of the steps to act on now.
+        The next step is the first of the sequence that a session or the owner can move.
         """
         path = path_with(plan_directory, recorded_pull_requests(draft=True))
 
         assert path.next_step == path.groups[0].steps[0]
-        assert path.next_step.action is not None
+        assert path.next_step.next_move is not None
+
+    def test_the_sequence_numbers_every_unfinished_step_in_group_order(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        Every unfinished step has its place in the sequence, counted from one.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        in_group_order = [step for group in path.groups for step in group.steps]
+
+        assert list(path.sequence) == in_group_order
+        assert [path.position_of(step) for step in in_group_order] == list(
+            range(1, len(in_group_order) + 1)
+        )
 
 
 # %% the report
@@ -398,15 +425,13 @@ class TestThePathReport:
             for step in group.steps
         }
 
-    def test_the_text_names_the_next_step_s_command(
-        self, plan_directory: PlanDirectory
-    ):
+    def test_the_text_names_the_next_step_s_move(self, plan_directory: PlanDirectory):
         """
-        The printed path's second line gives the next command.
+        The printed path's second line gives the next move.
         """
         path = path_with(plan_directory, recorded_pull_requests(draft=True))
 
-        assert path.next_step.action.command in path.render().splitlines()[1]
+        assert path.next_step.next_move in path.render().splitlines()[1]
 
     def test_a_not_started_status_is_reported_as_the_plan_records_it(
         self, plan_directory: PlanDirectory
@@ -537,4 +562,108 @@ class TestTheOwnersMoves:
         assert reported.owner_move == step.owner_move.description
         assert reported.releases == [
             reference.text for reference in path.references_released_by(step)
+        ]
+
+
+# %% whose turn a step is
+
+
+class TestWhoseTurnAStepIs:
+    """
+    A step under way is its owner's to review unless something is left for a session.
+    """
+
+    def test_a_draft_with_nothing_left_for_a_session_is_the_owners_to_review(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A draft with passing checks and no recorded blocker waits on its owner's review.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        step = step_of(path, reference_of(StepId.IN_PROGRESS))
+
+        assert step.is_owners_turn
+        assert not step.needs_a_session
+        assert step.next_move == OWNER_PREFIX + step.owner_move.description
+
+    def test_a_recorded_blocker_leaves_the_step_to_a_session(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A draft whose plan records a blocker is resolved by a session first.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        step = step_of(path, reference_of(StepId.IN_PROGRESS_WITH_BLOCKER))
+
+        assert step.item.blockers
+        assert step.needs_a_session
+        assert not step.is_owners_turn
+        assert step.next_move == step.action.command
+
+    def test_failed_checks_leave_the_step_to_a_session(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A draft whose checks failed is resolved by a session first.
+        """
+        path = path_with(
+            plan_directory,
+            recorded_pull_requests(
+                draft=True, failing_items=frozenset({StepId.IN_PROGRESS})
+            ),
+        )
+        step = step_of(path, reference_of(StepId.IN_PROGRESS))
+
+        assert step.needs_a_session
+        assert step.next_move == step.action.command
+
+    def test_a_step_ready_to_start_is_a_sessions(self, plan_directory: PlanDirectory):
+        """
+        A not-started step whose dependencies are ready is started by a session.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=False))
+        step = step_of(path, reference_of(StepId.NOT_STARTED_BEHIND_DRAFTS))
+
+        assert step.needs_a_session
+        assert step.next_move == step.action.command
+
+    def test_a_merge_waiting_for_another_merge_moves_nothing_now(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A ready pull request held back by an unmerged dependency has no move now.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=False))
+        step = step_of(path, reference_of(StepId.STACKED_WITH_PULL_REQUEST))
+
+        assert step.owner_move.after
+        assert step.next_move is None
+
+    def test_only_the_steps_that_are_the_owners_turn_wait_on_the_owner(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        The steps listed as the owner's are exactly those whose turn is the owner's.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+
+        assert path.owner_steps == tuple(
+            step for step in path.steps if step.is_owners_turn
+        )
+        assert (
+            step_of(path, reference_of(StepId.IN_PROGRESS_WITH_BLOCKER))
+            not in path.owner_steps
+        )
+
+    def test_the_report_numbers_each_step_and_names_its_move(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A reported step carries its place in the sequence and what moves it now.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        reported = [step for group in path.report().groups for step in group.steps]
+
+        assert [(step.position, step.next_move) for step in reported] == [
+            (path.position_of(step), step.next_move) for step in path.sequence
         ]

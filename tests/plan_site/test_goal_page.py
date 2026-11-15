@@ -221,7 +221,7 @@ class TestTheGoalsOnTheIndex:
     A repository's index lists its goals, and names the ones the build left out.
     """
 
-    def test_the_index_links_the_goal_and_shows_its_next_command(
+    def test_the_index_links_the_goal_and_shows_its_next_move(
         self, tmp_path: Path, goal_path: GoalPath
     ):
         """
@@ -230,7 +230,7 @@ class TestTheGoalsOnTheIndex:
         build_site(tmp_path, goal_plan_files())
         index = page_at(tmp_path, ADDRESS.repository_url(NOTES_REPOSITORY))
         assert link_to(GOAL_URL) in index
-        assert f"<code>{goal_path.next_step.action.command}</code>" in index
+        assert f"<code>{goal_path.next_step.next_move}</code>" in index
 
     def test_a_summary_counts_the_finished_steps(self):
         """

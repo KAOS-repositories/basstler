@@ -143,7 +143,7 @@ def print_summary() -> GoalExitCode:
 @goal_app.command(name=GoalCommandName.NEXT)
 def print_next_step(identifier: str) -> GoalExitCode:
     """
-    Print the command of the first step of the goal's path that can be acted on now.
+    Print what moves the first step of the goal's path that can be acted on now.
 
     :param identifier: The goal's id.
     """
@@ -153,7 +153,7 @@ def print_next_step(identifier: str) -> GoalExitCode:
     if next_step is None:
         logger.info(f"No step of goal {identifier} can be acted on now.")
         return GoalExitCode.NOTHING_TO_ACT_ON
-    logger.info(next_step.action.command)
+    logger.info(next_step.next_move)
     return GoalExitCode.SUCCESS
 
 

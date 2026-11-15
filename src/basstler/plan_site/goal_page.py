@@ -45,9 +45,9 @@ class GoalSummary:
     How many steps the path has.
     """
 
-    next_command: str | None
+    next_move: str | None
     """
-    The command of the first step that can be acted on, or ``None`` when none can.
+    What moves the first step that can be acted on, or ``None`` when none can.
     """
 
     @classmethod
@@ -63,7 +63,7 @@ class GoalSummary:
             page_url=page_url,
             finished_step_count=len(path.finished_steps),
             step_count=len(path.steps),
-            next_command=next_step.action.command if next_step else None,
+            next_move=next_step.next_move if next_step else None,
         )
 
 

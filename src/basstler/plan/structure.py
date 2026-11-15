@@ -249,6 +249,14 @@ class Item:
         return self.performed_by is Performer.OWNER
 
     @property
+    def has_failed_checks(self) -> bool:
+        """
+        Whether the checks of this item's live pull request failed.
+        """
+        record = self.pull_request_record
+        return record is not None and record.has_failed_checks
+
+    @property
     def has_open_pull_request(self) -> bool:
         """
         Whether this item currently has an open (draft or ready) pull request.

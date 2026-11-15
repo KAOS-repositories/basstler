@@ -174,7 +174,7 @@ class TestSummarizingGoals:
             [STORED_GOAL], plan_directory, RecordedPullRequestSource()
         ) == [path.summary_line]
 
-    def test_the_line_counts_the_steps_and_names_the_next_command(self):
+    def test_the_line_counts_the_steps_and_names_the_next_move(self):
         """
         The line carries the finished and total step counts and the next command.
         """
@@ -185,7 +185,7 @@ class TestSummarizingGoals:
         )
         progress = f"{len(path.finished_steps)}/{len(path.steps)} steps finished"
         assert path.summary_line.startswith(f"{STORED_GOAL.identifier}: {progress}")
-        assert f"next: {path.next_step.action.command}" in path.summary_line
+        assert f"next: {path.next_step.next_move}" in path.summary_line
 
     def test_a_goal_naming_no_item_is_reported_not_raised(self):
         """

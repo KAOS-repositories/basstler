@@ -248,7 +248,9 @@ class TestAnOwnersStepOnAPath:
         """
         path = path_with(plan_directory, draft=False)
         step = step_of(path, reference_of(StepId.OWNER))
-        reported = step.report(path.references_released_by(step))
+        reported = step.report(
+            path.position_of(step), path.references_released_by(step)
+        )
         assert reported.owner_move == step.owner_move.description
         assert reported.owner_commands == owner_item(plan_directory).commands
 

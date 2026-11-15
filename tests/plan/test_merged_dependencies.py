@@ -209,7 +209,7 @@ class TestWhatAMergedDependencyHoldsBack:
         assert step.awaited == (base,)
         assert step.awaited_merges == (base,)
         assert step.action is None
-        assert step.report(()).awaited_merges == [base.text]
+        assert step.report(path.position_of(step), ()).awaited_merges == [base.text]
 
     def test_a_path_starts_the_dependent_after_the_merge(self, tmp_path: Path):
         """

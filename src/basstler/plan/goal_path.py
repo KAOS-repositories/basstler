@@ -14,6 +14,7 @@ from graphlib import TopologicalSorter
 from basstler.github.pull_request_source import PullRequestSource
 from basstler.github.pull_request_state import LiveState
 from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.states import CombinedCheckState
 from basstler.json_model import ValidatedJSONModel
 from basstler.plan.dependencies import (
     DependencyReference,
@@ -26,6 +27,11 @@ from basstler.plan.item_action import ItemAction
 from basstler.plan.model import ItemStatus
 from basstler.plan.model_alias import ModelAlias
 from basstler.plan.structure import Item
+
+OWNER_PREFIX = "you: "
+"""
+What precedes a move in a printed path when the owner, not a session, makes it.
+"""
 
 # %% the commands
 
@@ -86,9 +92,20 @@ class PathStepReport(ValidatedJSONModel):
     One unfinished step of a path, as a command prints it.
     """
 
+    position: int
+    """
+    The step's place in the recommended sequence, counted from one.
+    """
+
     reference: str
     """
     The step's item, as ``<plan-id>/<item-id>``.
+    """
+
+    next_move: str | None
+    """
+    What moves the step forward now: a session's command, or the owner's move after
+    :data:`OWNER_PREFIX`; ``None`` while it waits.
     """
 
     title: str
@@ -111,6 +128,11 @@ class PathStepReport(ValidatedJSONModel):
     The item's pull request, if it has one.
     """
 
+    check_state: CombinedCheckState | None
+    """
+    The verdict over the pull request's checks, or ``None`` when none was read.
+    """
+
     recommended_model: ModelAlias | None
     """
     The model suited to the item, if one was recommended.
@@ -118,7 +140,7 @@ class PathStepReport(ValidatedJSONModel):
 
     command: str | None
     """
-    The command that carries the step out now, or ``None`` while it waits.
+    The command a session works on the step with, or ``None`` while it waits.
     """
 
     blockers: list[str]
@@ -180,9 +202,9 @@ class GoalPathReport(ValidatedJSONModel):
     The goal the path leads to.
     """
 
-    next_command: str | None
+    next_move: str | None
     """
-    The command of the first step that can be acted on, or ``None`` when none can.
+    What moves the first step that can be acted on, or ``None`` when none can.
     """
 
     groups: list[PathGroupReport]
@@ -403,17 +425,72 @@ class PathStep:
         """
         return bool(self.item.done_when) and not self.is_finished and not self.awaited
 
-    def report(self, releases: tuple[DependencyReference, ...]) -> PathStepReport:
+    @property
+    def check_state(self) -> CombinedCheckState | None:
         """
+        The verdict over the checks of the item's pull request, or ``None`` when none
+        was read.
+        """
+        record = self.item.pull_request_record
+        return record.check_state if record else None
+
+    @property
+    def needs_a_session(self) -> bool:
+        """
+        Whether a session works on the step before its owner does: it can be started, or
+        its plan records a blocker or a status other than in progress, or its pull
+        request's checks failed.
+        """
+        if self.action is None:
+            return False
+        if self.owner_move is None:
+            return True
+        return (
+            self.item.status is not ItemStatus.IN_PROGRESS
+            or bool(self.item.blockers)
+            or self.item.has_failed_checks
+        )
+
+    @property
+    def is_owners_turn(self) -> bool:
+        """
+        Whether the owner's move is what the step waits for now.
+        """
+        return (
+            self.owner_move is not None
+            and not self.owner_move.after
+            and not self.needs_a_session
+        )
+
+    @property
+    def next_move(self) -> str | None:
+        """
+        What moves the step forward now: a session's command, or the owner's move after
+        :data:`OWNER_PREFIX`; ``None`` while it waits.
+        """
+        if self.needs_a_session:
+            return self.action.command
+        if self.is_owners_turn:
+            return OWNER_PREFIX + self.owner_move.description
+        return None
+
+    def report(
+        self, position: int, releases: tuple[DependencyReference, ...]
+    ) -> PathStepReport:
+        """
+        :param position: The step's place in the recommended sequence.
         :param releases: The steps that wait for this one.
         :return: The step as a command prints it.
         """
         return PathStepReport(
+            position=position,
             reference=self.reference.text,
+            next_move=self.next_move,
             title=self.item.title,
             status=self.item.status,
             live_state=self.item.live_state.display_label,
             pull_request_number=self.item.pull_request_number,
+            check_state=self.check_state,
             recommended_model=self.item.recommended_model,
             command=self.action.command if self.action else None,
             blockers=self.item.blockers,
@@ -458,7 +535,8 @@ class PathGroup:
         return PathGroupReport(
             awaited=[reference.text for reference in self.awaited],
             steps=[
-                step.report(path.references_released_by(step)) for step in self.steps
+                step.report(path.position_of(step), path.references_released_by(step))
+                for step in self.steps
             ],
         )
 
@@ -565,30 +643,35 @@ class GoalPath:
             if step.reference in waiting.awaited
         )
 
+    @cached_property
+    def sequence(self) -> tuple[PathStep, ...]:
+        """
+        The unfinished steps in the order recommended to carry them out.
+        """
+        return tuple(step for group in self.groups for step in group.steps)
+
+    def position_of(self, step: PathStep) -> int:
+        """
+        :param step: An unfinished step of the path.
+        :return: Its place in :attr:`sequence`, counted from one.
+        """
+        return self.sequence.index(step) + 1
+
     @property
     def owner_steps(self) -> tuple[PathStep, ...]:
         """
-        The steps whose pull requests the owner can act on now, in path order.
+        The steps that wait on the owner now, in path order.
         """
-        return tuple(
-            step
-            for step in self.steps
-            if step.owner_move is not None and not step.owner_move.after
-        )
+        return tuple(step for step in self.steps if step.is_owners_turn)
 
     @property
     def next_step(self) -> PathStep | None:
         """
-        The first step that can be acted on now, or ``None`` when none can.
+        The first step of :attr:`sequence` that a session or the owner can move now, or
+        ``None`` when none can.
         """
         return next(
-            (
-                step
-                for group in self.groups
-                for step in group.steps
-                if step.action is not None
-            ),
-            None,
+            (step for step in self.sequence if step.next_move is not None), None
         )
 
     @property
@@ -597,7 +680,7 @@ class GoalPath:
         The goal's progress and its next command, as one line.
         """
         next_step = self.next_step
-        upcoming = next_step.action.command if next_step else "nothing to act on now"
+        upcoming = next_step.next_move if next_step else "nothing to act on now"
         owned = len(self.owner_steps)
         waiting = f"; {owned} step(s) wait on you" if owned else ""
         return (
@@ -612,7 +695,7 @@ class GoalPath:
         next_step = self.next_step
         return GoalPathReport(
             goal=self.goal,
-            next_command=next_step.action.command if next_step else None,
+            next_move=next_step.next_move if next_step else None,
             groups=[group.report(self) for group in self.groups],
             finished=[step.reference.text for step in self.finished_steps],
         )
@@ -624,7 +707,7 @@ class GoalPath:
         report = self.report()
         lines = [
             f"Goal {self.goal.identifier}: {self.goal.title}",
-            f"Next: {report.next_command or 'nothing can be acted on now'}",
+            f"Next: {report.next_move or 'nothing can be acted on now'}",
         ]
         for group, group_report in zip(self.groups, report.groups, strict=True):
             lines += ["", group.heading]
@@ -638,23 +721,32 @@ class GoalPath:
     def step_lines(step: PathStepReport) -> list[str]:
         """
         :param step: One reported step.
-        :return: Its lines in a printed path: the item and its state, its title, its
-            command and its blockers.
+        :return: Its lines in a printed path: its place and state, its title, what
+            moves it now, what follows that, and its blockers.
         """
         state = [step.status.value, step.live_state]
         if step.pull_request_number is not None:
             state.append(f"#{step.pull_request_number}")
+        if step.check_state is not None:
+            state.append(f"CI {step.check_state.value}")
         if step.recommended_model is not None:
             state.append(step.recommended_model.value)
-        lines = [f"  {step.reference}  [{' · '.join(state)}]", f"      {step.title}"]
-        if step.command is not None:
+        lines = [
+            f"  {step.position}. {step.reference}  [{' · '.join(state)}]",
+            f"      {step.title}",
+        ]
+        session_first = step.next_move == step.command
+        if step.command is not None and session_first:
             lines.append(f"      {step.command}")
         if step.owner_move is not None:
             released = (
                 f" (releases {', '.join(step.releases)})" if step.releases else ""
             )
-            lines.append(f"      you: {step.owner_move}{released}")
+            follows = "then " if step.command is not None and session_first else ""
+            lines.append(f"      {follows}{OWNER_PREFIX}{step.owner_move}{released}")
         lines += [f"        {command}" for command in step.owner_commands]
+        if step.command is not None and not session_first:
+            lines.append(f"      for more work on it: {step.command}")
         if step.closing_command is not None:
             lines.append(f"      then: {step.closing_command}")
         if step.awaited_merges:
@@ -756,6 +848,9 @@ class NeededItems:
         )
         for resolved in self.resolved_by_reference.values():
             resolved.classify_live_state(live_pull_requests)
+            resolved.item.pull_request_record = live_pull_requests.record_of(
+                resolved.repository, resolved.item.pull_request_number
+            )
 
     def in_dependency_order(self) -> list[DependencyReference]:
         """

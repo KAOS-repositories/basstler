@@ -100,7 +100,7 @@ class ViewedMarking(TriageOutput):
     """
 
     def publish(self, outcome: TriageOutcome) -> None:
-        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
+        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text(encoding="utf-8")
         for file in outcome.mechanical_files:
             variables = ViewedFile(
                 outcome.pull_request.node_identifier, file.change.path

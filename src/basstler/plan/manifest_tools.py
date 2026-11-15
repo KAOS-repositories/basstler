@@ -467,6 +467,13 @@ class ManifestToolsCommandLine:
                 arguments.scratch_dir, arguments.plans_dir, arguments.manifest_filename
             )
             arguments.output.write_text(index.render(), encoding="utf-8")
+        elif arguments.subcommand == ManifestToolsCommand.UNMODELLED_ITEMS:
+            manifest = model.PlanManifest.from_file(arguments.manifest_path)
+            logger.info(
+                ", ".join(
+                    item.identifier for item in manifest.items_without_recommended_model
+                )
+            )
         elif arguments.subcommand == ManifestToolsCommand.ITEM:
             manifest = model.PlanManifest.from_file(arguments.manifest_path)
             item = (

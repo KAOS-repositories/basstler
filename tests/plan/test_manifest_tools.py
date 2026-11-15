@@ -513,7 +513,7 @@ def write_plan(path: Path, item_identifiers: list[str]) -> Path:
     """
     items = [manifest_item(item, recommended_model=None) for item in item_identifiers]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(minimal_plan(items=items)))
+    path.write_text(yaml.safe_dump(minimal_plan(items=items)), encoding="utf-8")
     return path
 
 

@@ -10,11 +10,30 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
+
 from .constants.environment import FileMode, SearchPathVariable
 from .constants.paths import DatasetLocation
+
+# %% where a script cannot stand in for an executable
+
+NEEDS_SCRIPT_AS_EXECUTABLE = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason=(
+        "Windows only launches a .exe found on PATH: a .cmd wrapper splits its "
+        "arguments at '&', and Defender blocks a compiled launcher (WinError 225), "
+        "so a script cannot stand in for gh or bash"
+    ),
+)
+"""
+Skips a test that runs a script as ``gh`` or ``bash``, where the platform cannot launch one.
+"""
+
+# %% stub directories
 
 
 @dataclass(frozen=True)
@@ -47,14 +66,15 @@ class ExecutableStubDirectory:
         """
         return DatasetLocation.STUBS / f"{executable_name}.sh"
 
-    def install(self, executable_name: str) -> None:
+    def install(self, executable_name: str, stub_name: str | None = None) -> None:
         """
-        Copy the stub backing *executable_name* into this directory.
+        Copy a stub into this directory under the name of the executable it replaces.
 
         :param executable_name: The executable to stand in for.
+        :param stub_name: The stub to copy; the one named like *executable_name* if omitted.
         """
         destination = self.path / executable_name
-        shutil.copy(self.stub_for(executable_name), destination)
+        shutil.copy(self.stub_for(stub_name or executable_name), destination)
         destination.chmod(FileMode.EXECUTABLE)
 
     def ahead_of(self, search_path: str) -> str:
@@ -78,7 +98,8 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
     Build a ``PATH`` string equivalent to the current one but with every one of
     *executable_names* unfindable through it.
 
-    Mirrors (via symlinks) any directory that provides one of them into a copy missing
+    Mirrors (via symlinks, or hard links on Windows, which lets only a privileged user
+    make symlinks) any directory that provides one of them into a copy missing
     just those files, rather than dropping the whole directory from `PATH` - the
     directory providing them (typically ``/usr/bin``) also provides ``bash``, ``git`` and
     ``python3``, which the script under test still needs to run at all.
@@ -89,6 +110,7 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
     :return: The adjusted ``PATH`` string.
     """
     hidden = frozenset(executable_names)
+    link = os.link if sys.platform == "win32" else os.symlink
     entries = []
     for mirror_index, entry in enumerate(
         os.environ.get(SearchPathVariable.EXECUTABLE_SEARCH_PATH, "").split(os.pathsep)
@@ -105,7 +127,7 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
             if item.name in hidden or item.stem in hidden:
                 continue
             try:
-                (mirror / item.name).symlink_to(item)
+                link(item, mirror / item.name)
             except OSError:
                 continue
         entries.append(str(mirror))

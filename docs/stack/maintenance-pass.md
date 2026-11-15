@@ -102,6 +102,11 @@ Re-deriving the summary, re-reading the full report, or running the individual c
 does the same work twice and can disagree with what actually ran. `--json` exists for tooling; a
 session never needs it.
 
+A conflict comment says how to resolve and publish by how the pass integrates that branch: merge the
+parent in and push, which a plain push publishes (`maintenance push` does), or - only on a branch
+labelled `rebase` - rebase it and push with `--force-with-lease`. A branch never carries a rewrite its
+label does not authorise.
+
 `integration-failed` means integrating the parent failed without conflicting on anything - an
 untracked file in the way, unrelated histories, a reference that does not resolve. The branch is not
 what needs fixing, so its owner is deliberately not told and it is never labelled.
@@ -111,6 +116,12 @@ is what a base whose own pull request closed without merging leaves behind. Ther
 retarget it at and what superseded the abandoned work is the owner's to say, so the branch is labelled
 and commented on exactly as a conflict is, and nothing is published or reparented. A pass over one
 named subtree leaves it to the caller instead, as it does a conflict.
+
+`unpublished-local-commits` means the checkout holds commits on the branch that the fork lacks, such as
+a resolved conflict not yet pushed. A restack starts from the fork's copy and moves the checkout's own
+copy of the branch there, which would drop them, so the branch is left as it is and nothing is
+published. Publish or discard the commits and run the pass again. A branch the pass does not publish
+is always left at the commit it was at, so the pass never leaves such commits behind itself.
 
 A `skipped` pull request has a head the credential cannot push to (`head-on-another-fork`) or one
 whose repository is gone (`head-repository-deleted`). Its base is still on the fork, so the session still

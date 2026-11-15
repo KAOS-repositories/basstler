@@ -275,7 +275,9 @@ class ScratchRepository:
             project_root,
             initialize_bare_repository(parent_directory / "personal-notes.git"),
         )
-        repository.run_git("init", "--quiet")
+        repository.run_git(
+            "init", "--quiet", f"--initial-branch={ScratchBranch.INITIAL}"
+        )
         repository.run_git("config", "user.name", SCRATCH_IDENTITY.name)
         repository.run_git("config", "user.email", SCRATCH_IDENTITY.email)
         # A throwaway repository has no reason to sign, and an environment that signs

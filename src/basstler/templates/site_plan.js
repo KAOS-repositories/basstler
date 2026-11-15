@@ -4,7 +4,7 @@ function planPageCopyActionCommand(button) {
   var model = modelPicker && modelPicker.classList.contains("model-picker")
     ? modelPicker.getAttribute("data-model")
     : "";
-  var command = model ? "/model " + model + "\n" + baseCommand : baseCommand;
+  var command = baseCommand;
   var originalLabel = button.textContent;
   var resetTimeoutMilliseconds = 1800;
 
@@ -19,7 +19,7 @@ function planPageCopyActionCommand(button) {
   }
 
   function onCopySucceeded() {
-    showResult("action-button-copied", "Copied!");
+    showResult("action-button-copied", model ? "Copied - run /model " + model + " first" : "Copied!");
   }
 
   function onCopyFailed() {

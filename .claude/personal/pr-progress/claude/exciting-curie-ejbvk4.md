@@ -5,7 +5,7 @@
 
 ## Done
 - goal-path, goal-page, owner-steps (c02831ef), merged-dependencies (d46c3565), done-checks (10cca2c2), plan-goal-skill (f356a0c0).
-- session-close-check: basstler session-close, Stop and PostToolUse hooks, plan saves settle the record.
+- session-close-check (5648e595, pushed at 8d85a0e6): basstler session-close, Stop and PostToolUse hooks, plan saves settle the record.
 
 ## Next
 - User decides: the block-styled-keys vocabulary test; whether real owner steps go into review-triage/plan.yaml now.

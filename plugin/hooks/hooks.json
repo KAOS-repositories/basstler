@@ -9,6 +9,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__claude-code-remote__add_repo",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.attach_approval"
+          }
+        ]
+      }
     ]
   }
 }

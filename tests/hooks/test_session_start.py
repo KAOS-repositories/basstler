@@ -1894,6 +1894,38 @@ def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
     assert version.stdout.strip() == str(True)
 
 
+def test_skips_an_interpreter_on_the_path_that_cannot_run_when_creating_the_environment(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A first candidate that cannot run does not stop the next one from being tried.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.PIP)
+    newest_candidate = configuration_value(
+        ConfigurationVariable.INTERPRETER_CANDIDATES
+    ).split()[0]
+    stub_bin.install(newest_candidate, "unusable_interpreter")
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_hiding_executables(tmp_path, PackageManager.UV)
+            ),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
+        environment_directory(session_start_repository),
+        package_source(session_start_repository),
+    )
+
+
 def path_without_a_supported_interpreter(mirror_parent: Path) -> str:
     """
     :param mirror_parent: Where to build the mirror directories.

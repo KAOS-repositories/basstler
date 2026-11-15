@@ -94,6 +94,12 @@ class RestackOutcome(StrEnum):
     build on; nothing was published.
     """
 
+    UNPUBLISHED_LOCAL_COMMITS = "unpublished-local-commits"
+    """
+    The checkout holds commits on it that the fork lacks, which restacking from the
+    fork's copy would drop; it was left as it is and nothing was published.
+    """
+
     @property
     def blocks_branches_above(self) -> bool:
         """
@@ -109,6 +115,7 @@ class RestackOutcome(StrEnum):
             RestackOutcome.WITHHELD,
             RestackOutcome.BLOCKED_BY_ANCESTOR,
             RestackOutcome.PARENT_GONE,
+            RestackOutcome.UNPUBLISHED_LOCAL_COMMITS,
         }
 
 
@@ -600,6 +607,31 @@ class SkipBranchAlreadyCurrent(RestackStep):
         ):
             return restacking.concluded(RestackOutcome.UP_TO_DATE)
         return None
+
+
+@dataclass(frozen=True)
+class LeaveUnpublishedLocalCommits(RestackStep):
+    """
+    Leaves a branch alone while the checkout holds commits on it that the fork lacks.
+
+    A restack starts from the fork's copy and moves the checkout's own copy of the
+    branch there, so anything only the checkout has - a resolved conflict not yet pushed
+    - would be dropped without a word.
+    """
+
+    def attempt(self, restacking: BranchUnderRestack) -> BranchOutcome | None:
+        """:param restacking: The branch being restacked.
+        :return: An unpublished-local-commits outcome when the checkout's copy is not
+            contained in the fork's, otherwise ``None``."""
+        git = restacking.git
+        local = git.local_commit(restacking.branch.name)
+        if local is None or git.contains(local, restacking.branch_reference):
+            return None
+        return restacking.concluded(
+            RestackOutcome.UNPUBLISHED_LOCAL_COMMITS,
+            explanation=f"this checkout holds commits on it the fork lacks (at {local})"
+            "; publish or discard them, then run the pass again",
+        )
 
 
 @dataclass(frozen=True)

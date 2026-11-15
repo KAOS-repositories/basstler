@@ -28,9 +28,21 @@ items:
   recommended_model: opus
   session: https://claude.ai/code/session_018wfiv5szXTK6zAAyzgUyKD
   notes: 'Experiment entry. Sandbox: this branch off main, draft #232, never merged. Stage: running.
-    Verdict: none. All seven parts are built at 8d85a0e6, one commit series each; they become
-    the split''s items. Open with the user: the block-styled-keys vocabulary test fails (three
-    new list keys); whether real owner steps go into review-triage now. Unverified: plugin Stop
-    and PostToolUse hooks in cloud sessions. The plan site builds from this branch (stack-board
-    plan-site.yml); set it back to main at accept or drop. Feedback on experiment mode goes to
-    #192.'
+    Verdict: none (the owner''s step verdict). Seven parts built, one commit series each; they
+    become the split''s items. At f3b9f9a0 a path numbers its steps and says whose move each
+    is, and a goal page shows its refresh time. Real owner steps are in review-triage. Unverified:
+    plugin Stop and PostToolUse hooks in cloud sessions. The plan site builds from this branch
+    (stack-board plan-site.yml); set it back to main at accept or drop. Feedback on experiment
+    mode goes to #192.'
+
+- id: verdict
+  title: Decide the goal-paths experiment - accept and split, drop, or keep iterating
+  track: sandbox
+  depends_on: []
+  status: not started
+  performed_by: owner
+  notes: 'Yours whenever you have used it enough. Tell a session one of: accept (it splits
+    #232 into the seven items as stacked draft pull requests and closes #232), drop (it closes
+    #232 and deletes the branch), or keep iterating (say what to change). On accept or drop
+    the session sets stack-board''s plan-site.yml back to main and posts the experiment-mode
+    feedback on #192, then marks this step done.'

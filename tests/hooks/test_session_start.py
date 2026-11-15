@@ -47,6 +47,7 @@ from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
 from basstler.upstream_reviews.action.branch import InstallationState
 
+from ..bash_path import BashPath
 from ..constants.environment import (
     ConfigurationVariable,
     FileMode,
@@ -537,6 +538,78 @@ def test_reports_a_tracked_branch_whose_manifest_is_missing(
         PLAN_IDENTIFIER,
         MANIFEST_PATH.as_posix(),
         ScratchBranch.PERSONAL_NOTES,
+    )
+
+
+# %% the recommended models line
+
+
+def test_reports_recommended_models_as_not_applicable_when_no_plan_tracks_the_branch(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(SummaryMessage.RECOMMENDED_MODELS_NOT_APPLICABLE)
+
+
+def without_recommended_model(
+    manifest: PlanManifest, item_identifier: str
+) -> PlanManifest:
+    """
+    :return: *manifest* with the named item's ``recommended_model`` removed.
+    """
+    items = [
+        (
+            {
+                key: value
+                for key, value in item.content.items()
+                if key != ManifestKey.RECOMMENDED_MODEL.key
+            }
+            if item.identifier == item_identifier
+            else item.content
+        )
+        for item in manifest.items
+    ]
+    return PlanManifest({**manifest.content, ManifestKey.ITEMS.key: items})
+
+
+def test_reports_every_item_of_the_tracked_plan_as_having_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    result = publish_tracked_plan_and_run(
+        session_start_repository, tracked_plan.manifest, tmp_path
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_ALL_SET, tracked_plan.manifest.identifier
+    )
+
+
+def test_names_the_items_of_the_tracked_plan_without_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    queued_item = tracked_plan.item_with_status(ItemStatus.NOT_STARTED)
+    manifest = without_recommended_model(tracked_plan.manifest, queued_item.identifier)
+
+    result = publish_tracked_plan_and_run(session_start_repository, manifest, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_UNSET,
+        manifest.identifier,
+        queued_item.identifier,
     )
 
 
@@ -1697,7 +1770,7 @@ def test_tells_the_session_where_the_plugin_is(
         encoding="utf-8",
         check=True,
     ).stdout
-    assert Path(exported) == session_start_repository.plugin_root
+    assert exported == BashPath(session_start_repository.plugin_root).text
 
 
 def test_tells_the_session_which_interpreter_runs_the_package(

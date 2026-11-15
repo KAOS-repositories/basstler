@@ -378,6 +378,17 @@ class BranchUnderRestack:
             f"open branch"
         )
 
+    @property
+    def conflict_resolution(self) -> str:
+        """:return: How this branch's owner resolves and publishes a conflict, which
+        depends on whether the pass merges or rebases it."""
+        advice = (
+            MaintenanceText.REBASE_RESOLUTION
+            if self.strategy is IntegrationStrategy.REBASE
+            else MaintenanceText.MERGE_RESOLUTION
+        )
+        return advice.format(parent=self.parent)
+
     def write_conflict_report(self, conflicting_paths: Sequence[str]) -> str:
         """
         Write the comment telling this branch's owner that integrating the parent conflicts.
@@ -391,8 +402,8 @@ class BranchUnderRestack:
             f"`{self.branch.name}` conflicts, so this branch was left untouched and "
             f"skipped.\n\n"
             f"Conflicting files:\n{files}\n\n"
-            f"Please resolve and push. This branch is labelled "
-            f"`needs-resolution` so later passes skip it rather than re-reporting the same "
+            f"{self.conflict_resolution} This branch is labelled "
+            f"`{self.configuration.needs_resolution_label}` so later passes skip it rather than re-reporting the same "
             f"conflict; the label is cleared automatically once it merges cleanly again, "
             f"and the branch rejoins the pass.{self.branch.owner_address}"
         )
@@ -409,8 +420,8 @@ class BranchUnderRestack:
             f"other open branch of the stack, so there is nothing to retarget it at.\n\n"
             f"Rebase it onto whatever superseded that base, or close this pull request "
             f"if the work went with it.\n\n"
-            f"Nothing was changed here. This branch is labelled `needs-resolution` so "
-            f"later passes skip it, and it rejoins the pass once its base leads "
+            f"Nothing was changed here. This branch is labelled "
+            f"`{self.configuration.needs_resolution_label}` so later passes skip it, and it rejoins the pass once its base leads "
             f"somewhere again.{self.branch.owner_address}"
         )
 

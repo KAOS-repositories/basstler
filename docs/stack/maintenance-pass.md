@@ -102,6 +102,11 @@ Re-deriving the summary, re-reading the full report, or running the individual c
 does the same work twice and can disagree with what actually ran. `--json` exists for tooling; a
 session never needs it.
 
+A conflict comment says how to resolve and publish by how the pass integrates that branch: merge the
+parent in and push, which a plain push publishes (`maintenance push` does), or - only on a branch
+labelled `rebase` - rebase it and push with `--force-with-lease`. A branch never carries a rewrite its
+label does not authorise.
+
 `integration-failed` means integrating the parent failed without conflicting on anything - an
 untracked file in the way, unrelated histories, a reference that does not resolve. The branch is not
 what needs fixing, so its owner is deliberately not told and it is never labelled.

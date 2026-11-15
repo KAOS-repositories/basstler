@@ -193,6 +193,11 @@ class SiteTemplate(PathEnumeration):
     One plan's page: a column per wave, a card per item.
     """
 
+    GOAL = PackageLocation.TEMPLATES.value / "site_goal.html"
+    """
+    One goal's page: the ordered steps that reach it, grouped by what they wait for.
+    """
+
     PLAN_SCRIPT = PackageLocation.TEMPLATES.value / "site_plan.js"
     """
     A plan page's behaviour: copying commands, choosing a model, revealing an item.

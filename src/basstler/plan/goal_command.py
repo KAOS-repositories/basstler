@@ -125,6 +125,6 @@ def set_goal(
     store.branch.fetch()
     with tempfile.TemporaryDirectory() as scratch:
         plan_directory = ProjectCheckout(Path.cwd()).check_out_manifests(Path(scratch))
-        NeededItems.of_goal(goal, plan_directory)
+        NeededItems.of_goal(goal, plan_directory).refuse_unresolved_references()
     store.write(goal)
     return GoalExitCode.SUCCESS

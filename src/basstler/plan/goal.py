@@ -81,6 +81,20 @@ class Goal(ValidatedJSONModel):
         """
         return cls.from_json(yaml.safe_load(text) or {})
 
+    @classmethod
+    def every_goal_in(cls, plans_directory: Path) -> list[Goal]:
+        """
+        :param plans_directory: A checked-out plans directory.
+        :raises pydantic.ValidationError: If a goal file does not hold a valid goal.
+        :return: The goals under its goals directory, in file-name order.
+        """
+        return [
+            cls.from_yaml(path.read_text())
+            for path in sorted(
+                (plans_directory / ProjectLocation.PLAN_GOALS.name).glob("*.yaml")
+            )
+        ]
+
     @property
     def target_references(self) -> list[DependencyReference]:
         """

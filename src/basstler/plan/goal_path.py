@@ -5,7 +5,7 @@ what each step waits for and the action that carries it out.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from graphlib import TopologicalSorter
 
@@ -160,6 +160,17 @@ class PathStep:
         return self.resolved.item
 
     @property
+    def pull_request_reference(self) -> PullRequestReference | None:
+        """
+        The item's pull request in its plan's repository, if it has one.
+        """
+        if self.item.pull_request_number is None:
+            return None
+        return PullRequestReference(
+            Repository.parse(self.resolved.repository), self.item.pull_request_number
+        )
+
+    @property
     def is_finished(self) -> bool:
         """
         Whether the item is done or its pull request has merged.
@@ -252,11 +263,24 @@ class GoalPath:
         :return: The path, with every item's live state classified.
         """
         needed = NeededItems.of_goal(goal, plan_directory)
+        needed.refuse_unresolved_references()
+        return cls.from_needed_items(needed, pull_request_source)
+
+    @classmethod
+    def from_needed_items(
+        cls, needed: NeededItems, pull_request_source: PullRequestSource
+    ) -> GoalPath:
+        """
+        :param needed: A goal's items, every reference among them resolved.
+        :param pull_request_source: Where the items' live state is read from.
+        :raises graphlib.CycleError: If the dependencies form a cycle.
+        :return: The path, with every item's live state classified.
+        """
         needed.classify_live_states(pull_request_source)
         steps: dict[DependencyReference, PathStep] = {}
         for reference in needed.in_dependency_order():
             steps[reference] = needed.step_of(reference)
-        return cls(goal=goal, steps=tuple(steps.values()))
+        return cls(goal=needed.goal, steps=tuple(steps.values()))
 
     @cached_property
     def steps_by_reference(self) -> dict[DependencyReference, PathStep]:
@@ -377,13 +401,18 @@ class NeededItems:
     Every needed item, by the reference naming it with its plan.
     """
 
+    unresolved: list[UnresolvedGoalReferenceError] = field(default_factory=list)
+    """
+    The references among the targets and their dependencies that name no item.
+    """
+
     @classmethod
     def of_goal(cls, goal: Goal, plan_directory: PlanDirectory) -> NeededItems:
         """
         :param goal: The goal to reach.
         :param plan_directory: The plans its items live in.
-        :raises UnresolvedGoalReferenceError: If a target or a dependency names no item.
-        :return: The targets and, transitively, everything they depend on.
+        :return: The targets and, transitively, everything they depend on that
+            resolves, with the references that do not in :attr:`unresolved`.
         """
         needed = cls(goal=goal, resolved_by_reference={})
         pending = [
@@ -395,15 +424,25 @@ class NeededItems:
                 continue
             resolved = plan_directory.resolve(reference)
             if not isinstance(resolved, ResolvedDependency):
-                raise UnresolvedGoalReferenceError(
-                    goal.identifier, reference.text, named_by
+                needed.unresolved.append(
+                    UnresolvedGoalReferenceError(
+                        goal.identifier, reference.text, named_by
+                    )
                 )
+                continue
             needed.resolved_by_reference[reference] = resolved
             pending += [
                 (dependency, reference.text)
                 for dependency in needed.dependencies_of(reference)
             ]
         return needed
+
+    def refuse_unresolved_references(self) -> None:
+        """
+        :raises UnresolvedGoalReferenceError: If a target or a dependency names no item.
+        """
+        if self.unresolved:
+            raise self.unresolved[0]
 
     def dependencies_of(
         self, reference: DependencyReference

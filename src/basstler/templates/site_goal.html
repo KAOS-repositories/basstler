@@ -1,0 +1,79 @@
+{% extends "site_layout.html" %}
+{% from "site_parts.html" import action_button with context %}
+{% block title %}{{ goal.title }}{% endblock %}
+{% block page_class %}page-narrow{% endblock %}
+{% block page_id %}goal-page{% endblock %}
+
+{% macro step_card(step) %}
+{% set item = step.item %}
+      <article id="{{ anchor_of(step.reference) }}" class="item {{ item.status_and_drift_css_class }}">
+        <h3><a href="{{ locate_item_card(step.reference) }}">{{ item.title }}</a></h3>
+        <div class="chips">
+          <span class="chip {{ vocabulary.chip_tone.of_status(item.status) }}">{{ item.status.value | capitalize }}</span>
+          {% if step.pull_request_reference %}
+          <a class="chip {{ vocabulary.chip_tone.of_live_state(item.live_state) }}" href="{{ step.pull_request_reference.url }}">#{{ item.pull_request_number }} · {{ item.live_state.display_label }}</a>
+          {% endif %}
+        </div>
+        <span class="item-identifier">{{ step.reference.text }}</span>
+        {% for blocker in item.blockers %}
+        <div class="blocker">▸ {{ blocker }}</div>
+        {% endfor %}
+        {% if item.notes %}
+        <details>
+          <summary>Notes</summary>
+          <div class="notes">{{ item.notes }}</div>
+        </details>
+        {% endif %}
+        {{ action_button(step.action) }}
+      </article>
+{% endmacro %}
+
+{% block content %}
+  <header class="masthead">
+    <p class="crumbs"><a href="{{ hub_url }}">All repositories</a> › <a href="{{ index_url }}">{{ repository_name }}</a> › {{ goal.identifier }}</p>
+    <p class="eyebrow">Goal</p>
+    <h1>{{ goal.title }}</h1>
+    <p class="meta-line mono">
+      <span>{{ path.finished_steps | length }} / {{ path.steps | length }} steps finished</span>
+      <span>Built <time datetime="{{ built_at.isoformat() }}">{{ built_at.strftime("%Y-%m-%d %H:%M %Z") }}</time></span>
+    </p>
+  </header>
+
+  <section class="next-steps" id="goal-next-step">
+    <h2>Next</h2>
+    {% if next_step %}
+    <p class="goal-next"><a href="#{{ anchor_of(next_step.reference) }}">{{ next_step.item.title }}</a></p>
+    {{ action_button(next_step.action) }}
+    {% elif path.groups %}
+    <p class="goal-next">Nothing can be acted on now: every unfinished step waits for the steps named above it.</p>
+    {% else %}
+    <p class="goal-next">Every step is finished: the goal is reached.</p>
+    {% endif %}
+  </section>
+
+  {% for group in path.groups %}
+  <section class="goal-group">
+    <h2>{% if group.awaited %}After {% for awaited in group.awaited %}<a class="chip chip-unmet" href="#{{ anchor_of(awaited) }}">{{ awaited.text }}</a> {% endfor %}{% else %}Now{% endif %}</h2>
+    {% for step in group.steps %}
+    {{ step_card(step) }}
+    {% endfor %}
+  </section>
+  {% endfor %}
+
+  {% if path.finished_steps %}
+  <details class="goal-finished">
+    <summary>Finished ({{ path.finished_steps | length }})</summary>
+    <ul>
+    {% for step in path.finished_steps %}
+      <li><a href="{{ locate_item_card(step.reference) }}">{{ step.item.title }}</a> <span class="item-identifier">{{ step.reference.text }}</span></li>
+    {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% include script_template %}
+</script>
+{% endblock %}

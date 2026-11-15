@@ -858,6 +858,21 @@ class CodeModificationSnippet(PathEnumeration):
     One call of :func:`print`.
     """
 
+    IMPORTS_BEFORE_CODE = DIRECTORY / "imports-before-code.py"
+    """
+    Two imports after the future import, then code.
+    """
+
+    IMPORTS_WITH_BASH = DIRECTORY / "imports-with-bash.py"
+    """
+    An import of :class:`basstler.bash.Bash` among other names.
+    """
+
+    NO_IMPORTS = DIRECTORY / "no-imports.py"
+    """
+    A docstring and one statement, with no import.
+    """
+
 
 class RuleFixExample(PathEnumeration):
     """

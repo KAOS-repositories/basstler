@@ -90,6 +90,67 @@ class NodeReplacement(Action):
         )
 
 
+# %% statements
+
+
+@dataclass(frozen=True)
+class StatementInsertion(Action):
+    """
+    Inserts a statement into the body of a module.
+    """
+
+    index: int
+    """
+    The position in the module's body the statement gets.
+    """
+
+    statement: libcst.BaseStatement
+    """
+    The statement inserted.
+    """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        body = [*module.body[: self.index], self.statement, *module.body[self.index :]]
+        changed = module.with_changes(body=body)
+        location = PositionedModule(changed).positions[self.statement]
+        return AppliedAction(changed, StatementRemoval(location, self.statement))
+
+
+@dataclass(frozen=True)
+class StatementRemoval(Action):
+    """
+    Removes a statement from the body of a module.
+    """
+
+    location: CodeRange
+    """
+    The code range of :attr:`statement` in the module the action is applied to.
+    """
+
+    statement: libcst.BaseStatement
+    """
+    The statement removed, which the module's body must hold at :attr:`location`.
+    """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        positions = PositionedModule(module).positions
+        index = next(
+            (
+                index
+                for index, statement in enumerate(module.body)
+                if positions[statement] == self.location
+                and statement.deep_equals(self.statement)
+            ),
+            None,
+        )
+        if index is None:
+            raise ActionTargetMissingError(self.location, type(self.statement).__name__)
+        changed = module.with_changes(
+            body=[*module.body[:index], *module.body[index + 1 :]]
+        )
+        return AppliedAction(changed, StatementInsertion(index, self.statement))
+
+
 # %% plans
 
 

@@ -27,4 +27,10 @@ items:
   status: in progress
   recommended_model: opus
   session: https://claude.ai/code/session_018wfiv5szXTK6zAAyzgUyKD
-  notes: 'Experiment entry. Sandbox: this branch off main, draft #232, never merged. Stage: running. Verdict: none. Parts, one commit series each, become the split''s items. Done: goal-path, goal-page, owner moves derived from pull request state. Left: stored owner steps, merged-dependencies, done-checks, plan-goal-skill, session-close-check. The plan site builds from this branch meanwhile (stack-board plan-site.yml); set it back to main at accept or drop. Goals live under plans/_goals/. Each iteration offers: keep iterating, accept, drop, plan first. Feedback on experiment mode goes to #192.'
+  notes: 'Experiment entry. Sandbox: this branch off main, draft #232, never merged. Stage: running.
+    Verdict: none. All seven parts are built at 8d85a0e6, one commit series each; they become
+    the split''s items. Open with the user: the block-styled-keys vocabulary test fails (three
+    new list keys); whether real owner steps go into review-triage now. Unverified: plugin Stop
+    and PostToolUse hooks in cloud sessions. The plan site builds from this branch (stack-board
+    plan-site.yml); set it back to main at accept or drop. Feedback on experiment mode goes to
+    #192.'

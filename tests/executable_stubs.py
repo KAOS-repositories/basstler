@@ -97,7 +97,8 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
     Build a ``PATH`` string equivalent to the current one but with every one of
     *executable_names* unfindable through it.
 
-    Mirrors (via symlinks) any directory that provides one of them into a copy missing
+    Mirrors (via symlinks, or hard links on Windows, which lets only a privileged user
+    make symlinks) any directory that provides one of them into a copy missing
     just those files, rather than dropping the whole directory from `PATH` - the
     directory providing them (typically ``/usr/bin``) also provides ``bash``, ``git`` and
     ``python3``, which the script under test still needs to run at all.
@@ -108,6 +109,7 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
     :return: The adjusted ``PATH`` string.
     """
     hidden = frozenset(executable_names)
+    link = os.link if sys.platform == "win32" else os.symlink
     entries = []
     for mirror_index, entry in enumerate(
         os.environ.get(SearchPathVariable.EXECUTABLE_SEARCH_PATH, "").split(os.pathsep)
@@ -124,7 +126,7 @@ def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
             if item.name in hidden or item.stem in hidden:
                 continue
             try:
-                (mirror / item.name).symlink_to(item)
+                link(item, mirror / item.name)
             except OSError:
                 continue
         entries.append(str(mirror))

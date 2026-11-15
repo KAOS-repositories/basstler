@@ -48,9 +48,9 @@ def test_a_call_with_an_error_handler_is_reported_without_a_fix():
     violations = list(
         TreeRemovalChecker().violations(TreeRemovalSnippet.HANDLED_RMTREE)
     )
-    assert [violation.first_line for violation in violations] == [14]
-    assert (
-        CodeRulesCommand.FIX.invocation not in violations[0].description.split(";")[0]
+    assert [violation.first_line for violation in violations] == [17]
+    assert violations[0].description.endswith(
+        f"`{CodeRulesCommand.FIX.invocation}` leaves it"
     )
 
 

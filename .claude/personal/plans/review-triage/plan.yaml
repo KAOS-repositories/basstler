@@ -196,4 +196,36 @@ items:
   notes: 'Open #221, written by set-up-mark-viewed. Its mark-viewed.yml calls #215''s reusable
     review-triage-mark-viewed.yml, so the owner merges it only after #215 has merged. Needs
     the REVIEW_TRIAGE_VIEWER_TOKEN secret stored by the owner.'
+
+- id: mark-220-viewed
+  title: 'Mark #220''s mechanical files viewed'
+  track: windows
+  depends_on:
+  - windows-suite
+  - rule-fix-triage
+  depends_on_merged:
+  - rule-fix-triage
+  status: not started
+  performed_by: owner
+  commands:
+  - basstler review-triage report 220
+  - basstler review-triage mark-viewed 220
+  notes: 'Run on your own computer, from a checkout that has rule-fix-triage merged, once
+    windows-suite''s notes say its pushes are done: every push to #220 clears Viewed. The
+    report lists what will be marked; read it before marking.'
+
+- id: mark-223-viewed
+  title: 'Mark #223''s mechanical files viewed'
+  track: pattern-fixes
+  depends_on:
+  - action-plan-triage
+  - basstler-packages/uv-workspace
+  status: not started
+  performed_by: owner
+  commands:
+  - basstler review-triage report 223
+  - basstler review-triage mark-viewed 223
+  notes: 'Run on your own computer from action-plan-triage''s branch, which carries the proof
+    that #223''s moved files are mechanical. The report lists what will be marked; read it
+    before marking.'
 landed_item_count: 1

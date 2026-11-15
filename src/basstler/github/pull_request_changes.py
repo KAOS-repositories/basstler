@@ -5,6 +5,7 @@ them.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -74,6 +75,64 @@ class RestPullRequest(ValidatedJSONModel):
         return f"refs/pull/{self.number}/head"
 
 
+# %% where the changes are read from
+
+
+class ComparisonStart(ABC):
+    """
+    The commit a pull request's changes are read from.
+    """
+
+    @abstractmethod
+    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
+        """
+        :param git: The checkout holding the pull request's commits.
+        :param pull_request: The pull request.
+        :return: The commit its changes are read from.
+        """
+
+
+@dataclass(frozen=True)
+class MergeBaseStart(ComparisonStart):
+    """
+    The pull request's merge base, from which its whole change is read.
+    """
+
+    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
+        return git.merge_base(pull_request.base.commit, pull_request.head.commit)
+
+
+@dataclass(frozen=True)
+class CommitStart(ComparisonStart):
+    """
+    A commit given, such as the head commit a reviewer last read.
+    """
+
+    reference: str
+    """
+    Any reference git can resolve to the commit.
+    """
+
+    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
+        return git.commit_at(self.reference)
+
+
+@dataclass(frozen=True)
+class LastCommitsStart(ComparisonStart):
+    """
+    The commit before the pull request's last commits, following first parents from its
+    head, so a merge into it counts as one commit.
+    """
+
+    count: int
+    """
+    How many of its last commits the changes span.
+    """
+
+    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
+        return git.commit_at(f"{pull_request.head.commit}~{self.count}")
+
+
 # %% the pull request with its changes
 
 
@@ -90,7 +149,8 @@ class PullRequestChanges:
 
     commits: CommitRange
     """
-    The commits its change runs between, from its merge base to its head commit.
+    The commits its change runs between, from the commit the changes are read from to
+    its head commit.
     """
 
     files: tuple[FileVersions, ...]
@@ -115,12 +175,18 @@ class PullRequestChangesReader:
     Where the pull request is read from.
     """
 
-    def read(self, repository: Repository, number: int) -> PullRequestChanges:
+    def read(
+        self,
+        repository: Repository,
+        number: int,
+        start: ComparisonStart,
+    ) -> PullRequestChanges:
         """
         :param repository: The repository the pull request is opened on.
         :param number: The pull request's number.
-        :return: The pull request and its changes, its commits fetched first when the
-            checkout lacks either end.
+        :param start: Where the changes are read from.
+        :return: The pull request and the changes of the files it changes, its commits
+            fetched first when the checkout lacks either end.
         """
         pull_request = RestPullRequest.from_json(
             self.github.get(repository.pull_request_path(number))
@@ -134,8 +200,18 @@ class PullRequestChangesReader:
                 pull_request.head_reference,
                 pull_request.base.branch,
             )
-        merge_base = self.git.merge_base(
-            pull_request.base.commit, pull_request.head.commit
+        whole_change = CommitRange(
+            self.git,
+            self.git.merge_base(pull_request.base.commit, pull_request.head.commit),
+            pull_request.head.commit,
         )
-        commits = CommitRange(self.git, merge_base, pull_request.head.commit)
-        return PullRequestChanges(pull_request, commits, commits.file_versions())
+        start_commit = start.commit(self.git, pull_request)
+        if start_commit == whole_change.base_commit:
+            return PullRequestChanges(
+                pull_request, whole_change, whole_change.file_versions()
+            )
+        commits = CommitRange(self.git, start_commit, pull_request.head.commit)
+        own_paths = frozenset(change.path for change in whole_change.file_changes())
+        return PullRequestChanges(
+            pull_request, commits, commits.file_versions(own_paths)
+        )

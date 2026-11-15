@@ -15,6 +15,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest
 from basstler.github.pull_request_changes import (
+    MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
     RestPullRequest,
@@ -145,6 +146,20 @@ def test_the_report_lists_renames_and_both_groups_of_files(
     assert MarkdownReport().render(triage) == expected
 
 
+def test_the_report_leaves_out_the_paths_of_moved_files(
+    sample_changes: PullRequestChanges,
+):
+    """
+    A moved file's path rename is seen in the move itself, so the table leaves it out.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    moved = [rename for rename in triage.renames.renames if rename.is_file_path]
+    report = MarkdownReport().render(triage)
+    rows = [f"| `{rename.old}` | `{rename.new}` |" in report for rename in moved]
+    assert rows == [False] * len(moved)
+    assert moved != []
+
+
 def test_each_mechanical_file_is_marked_viewed(sample_changes: PullRequestChanges):
     """
     One mutation is sent per mechanical file, naming the pull request and the file.
@@ -214,5 +229,5 @@ def test_a_checkout_lacking_the_commits_fetches_them(
     )
     changes = PullRequestChangesReader(
         reviewer, OnePullRequestReader(sample_payload)
-    ).read(SAMPLE_REPOSITORY, pull_request.number)
+    ).read(SAMPLE_REPOSITORY, pull_request.number, MergeBaseStart())
     assert changes.files == sample_changes.files

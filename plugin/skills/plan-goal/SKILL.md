@@ -17,8 +17,7 @@ a command cannot: which items the outcome the user described actually needs.
 Every command here is run as
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/hooks/resolve-personal-notes-config.sh"
-"${BASSTLER_PYTHON}" -m basstler goal <command> ...
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" __main__ goal <command> ...
 ```
 
 from the project's checkout.
@@ -44,7 +43,7 @@ and pick the fewest items that, once done, make the outcome true.
 ## 3. Save it
 
 ```bash
-"${BASSTLER_PYTHON}" -m basstler goal set <id> "<title>" --target <plan-id>/<item-id> [--target ...]
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" __main__ goal set <id> "<title>" --target <plan-id>/<item-id> [--target ...]
 ```
 
 It refuses a target that names no item, and replaces a goal that already has the id.
@@ -52,7 +51,7 @@ It refuses a target that names no item, and replaces a goal that already has the
 ## 4. Read the path and judge it
 
 ```bash
-"${BASSTLER_PYTHON}" -m basstler goal path <id>
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" __main__ goal path <id>
 ```
 
 Read every step against the outcome, and against what the user said in this conversation:

@@ -94,9 +94,11 @@ class ItemAction(ABC):
         :param plan_id: The plan holding the item.
         :param item: The item to act on.
         :param dependencies_are_ready: Whether each of its dependencies can be built on.
-        :return: The item's next action; ``None`` for a done item, and for a not-started
-            one until its dependencies are ready.
+        :return: The item's next action; ``None`` for a done item, for one its owner
+            performs, and for a not-started one until its dependencies are ready.
         """
+        if item.is_performed_by_owner:
+            return None
         match item.status:
             case ItemStatus.DONE:
                 return None

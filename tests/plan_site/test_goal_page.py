@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from basstler.github.pull_request_source import PullRequestSource
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import PlanDirectory
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
@@ -23,6 +24,9 @@ from basstler.setup.steps import PersonalNotesSetting
 from ..constants.paths import DatasetLocation
 from ..constants.site import SiteRepository, SiteSampleText
 from ..plan.test_goal_path import GOAL, recorded_pull_requests
+from ..plan.test_owner_steps import GOAL as OWNER_STEP_GOAL
+from ..plan.test_owner_steps import PLAN_ID as OWNER_STEP_PLAN_ID
+from ..recorded_pull_requests import RecordedPullRequestSource
 from .test_build_site import link_to
 from .test_hub import publish_notes
 
@@ -50,17 +54,31 @@ def goal_plan_files() -> dict[Path, str]:
     """
     :return: Every file of the dataset's goal plans, by its path in the plans directory.
     """
+    return plan_files_under(DatasetLocation.GOAL_PLANS.value)
+
+
+def plan_files_under(directory: Path) -> dict[Path, str]:
+    """
+    :param directory: A dataset plans directory.
+    :return: Every file under it, by its path in the plans directory.
+    """
     return {
-        path.relative_to(DatasetLocation.GOAL_PLANS.value): path.read_text()
-        for path in DatasetLocation.GOAL_PLANS.value.rglob("*")
+        path.relative_to(directory): path.read_text()
+        for path in directory.rglob("*")
         if path.is_file()
     }
 
 
-def build_site(tmp_path: Path, files: dict[Path, str]) -> RepositorySummary:
+def build_site(
+    tmp_path: Path,
+    files: dict[Path, str],
+    pull_request_source: PullRequestSource | None = None,
+) -> RepositorySummary:
     """
     :param tmp_path: A directory of the test's own.
     :param files: The notes branch's plans directory.
+    :param pull_request_source: Where the build reads pull requests from; every dataset
+        pull request a draft when not given.
     :return: The card of the repository built into ``tmp_path / "site"``.
     """
     publish_notes(tmp_path / "remotes", NOTES_REPOSITORY, files)
@@ -74,7 +92,7 @@ def build_site(tmp_path: Path, files: dict[Path, str]) -> RepositorySummary:
     )
     site = RepositorySite(
         address=ADDRESS,
-        pull_request_source=recorded_pull_requests(draft=True),
+        pull_request_source=pull_request_source or recorded_pull_requests(draft=True),
         notes=notes,
     )
     return site.build(tmp_path / "site")
@@ -254,3 +272,58 @@ class TestTheGoalsOnTheIndex:
         )
         with pytest.raises(UnresolvedGoalReferenceError):
             needed.refuse_unresolved_references()
+
+
+# %% a step the owner performs
+
+
+class TestAnOwnersStepOnTheSite:
+    """
+    The commands of a step the owner performs are shown wherever the step is.
+    """
+
+    @pytest.fixture
+    def commands(self) -> list[str]:
+        """
+        :return: Every command the dataset plan records for its owner.
+        """
+        plan = PlanDirectory(DatasetLocation.OWNER_STEP_PLANS).plan(OWNER_STEP_PLAN_ID)
+        commands = [command for item in plan.items for command in item.commands]
+        assert commands
+        return commands
+
+    @pytest.fixture
+    def built_site(self, tmp_path: Path) -> Path:
+        """
+        :return: The directory a site over the owner-step plans was built under.
+        """
+        build_site(
+            tmp_path,
+            plan_files_under(DatasetLocation.OWNER_STEP_PLANS.value),
+            RecordedPullRequestSource(),
+        )
+        return tmp_path
+
+    def test_the_goal_page_lists_the_commands(
+        self, built_site: Path, commands: list[str]
+    ):
+        """
+        The goal's page shows each command of the owner's step.
+        """
+        page = page_at(
+            built_site, ADDRESS.goal_url(NOTES_REPOSITORY, OWNER_STEP_GOAL.identifier)
+        )
+        for command in commands:
+            assert f"<code>{html.escape(command)}</code>" in page
+
+    def test_the_plan_page_lists_the_commands(
+        self, built_site: Path, commands: list[str]
+    ):
+        """
+        The plan's page shows each command on the owner's step's card.
+        """
+        page = page_at(
+            built_site, ADDRESS.plan_url(NOTES_REPOSITORY, OWNER_STEP_PLAN_ID)
+        )
+        for command in commands:
+            assert f"<code>{html.escape(command)}</code>" in page

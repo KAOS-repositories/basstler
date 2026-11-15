@@ -14,7 +14,12 @@ from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyReference, PlanDirectory
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal
-from basstler.plan.goal_path import GoalPath, OwnerMove, OwnerSituation, PathStep
+from basstler.plan.goal_path import (
+    GoalPath,
+    OwnerSituation,
+    PathStep,
+    PullRequestMove,
+)
 from basstler.plan.item_action import ItemAction, ResolveAction, StartNowAction
 from basstler.plan.model import ItemStatus
 from basstler.plan.structure import Item, Plan
@@ -438,7 +443,7 @@ class TestTheOwnersMoves:
         path = path_with(plan_directory, recorded_pull_requests(draft=True))
         step = step_of(path, reference_of(StepId.IN_PROGRESS))
 
-        assert step.owner_move == OwnerMove(
+        assert step.owner_move == PullRequestMove(
             situation=OwnerSituation.DRAFT_AWAITING_REVIEW,
             pull_request_number=step.item.pull_request_number,
         )
@@ -452,7 +457,7 @@ class TestTheOwnersMoves:
         path = path_with(plan_directory, recorded_pull_requests(draft=False))
         step = step_of(path, reference_of(StepId.IN_PROGRESS))
 
-        assert step.owner_move == OwnerMove(
+        assert step.owner_move == PullRequestMove(
             situation=OwnerSituation.READY_TO_MERGE,
             pull_request_number=step.item.pull_request_number,
         )

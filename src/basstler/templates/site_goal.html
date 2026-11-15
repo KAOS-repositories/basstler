@@ -1,5 +1,5 @@
 {% extends "site_layout.html" %}
-{% from "site_parts.html" import action_button with context %}
+{% from "site_parts.html" import action_button, command_list with context %}
 {% block title %}{{ goal.title }}{% endblock %}
 {% block page_class %}page-narrow{% endblock %}
 {% block page_id %}goal-page{% endblock %}
@@ -17,6 +17,7 @@
         <span class="item-identifier">{{ step.reference.text }}</span>
         {% if step.owner_move %}
         <div class="owner-move"><strong>You:</strong> {{ step.owner_move.description }}{% for released in path.references_released_by(step) %}{% if loop.first %} <span class="owner-releases">releases</span>{% endif %} <a class="chip" href="#{{ anchor_of(released) }}">{{ released.text }}</a>{% endfor %}</div>
+        {{ command_list(step.owner_move.commands) }}
         {% endif %}
         {% for blocker in item.blockers %}
         <div class="blocker">▸ {{ blocker }}</div>

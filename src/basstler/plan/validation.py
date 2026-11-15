@@ -16,6 +16,7 @@ from basstler.plan.exceptions import (
     DependencyCycle,
     DuplicateItemId,
     InvalidBlockers,
+    InvalidCommands,
     InvalidDependsOn,
     InvalidLandedItemCount,
     InvalidManifestRoot,
@@ -29,6 +30,7 @@ from basstler.plan.exceptions import (
     SharedBranch,
     UnknownDependency,
     UnknownDependencyPlan,
+    UnknownPerformer,
     UnknownRecommendedModel,
     UnknownStatus,
     UnknownTrack,
@@ -41,7 +43,7 @@ from basstler.plan.dependencies import (
     PlanDirectory,
     ResolvedDependency,
 )
-from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model import ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
 
 # %% dependency cycles
@@ -251,6 +253,7 @@ class PlanValidator:
     saved_item_identifiers: frozenset[str] | None = None
     """
     The items the plan's saved copy holds when a save is being checked, else ``None``.
+
     An item outside it is new and must carry a ``recommended_model``.
     """
 
@@ -419,8 +422,20 @@ class PlanValidator:
             problems.append(
                 UnknownStatus(item_identifier, item.get(ManifestKey.STATUS.key))
             )
+        performed_by = item.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)
+        if performed_by not in list(Performer):
+            problems.append(UnknownPerformer(item_identifier, performed_by))
+        commands = item.get(ManifestKey.COMMANDS.key) or []
+        if not isinstance(commands, list) or not all(
+            isinstance(command, str) for command in commands
+        ):
+            problems.append(InvalidCommands(item_identifier))
         recommended_model = item.get(ManifestKey.RECOMMENDED_MODEL.key)
-        if recommended_model is None and self.is_new_item(item_identifier):
+        if (
+            recommended_model is None
+            and performed_by != Performer.OWNER
+            and self.is_new_item(item_identifier)
+        ):
             problems.append(MissingRecommendedModel(item_identifier))
         elif recommended_model is not None and recommended_model not in list(
             ModelAlias

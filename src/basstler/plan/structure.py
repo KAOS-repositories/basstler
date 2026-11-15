@@ -12,7 +12,7 @@ from typing import Any
 
 from basstler.github.pull_request_state import LiveState, PullRequestRecord
 from basstler.github.repository import GitHubAddress, PullRequestReference
-from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model import ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
 from basstler.render_common import sanitize_http_url
 
@@ -180,6 +180,16 @@ class Item:
     Free-text descriptions of what's currently blocking this item.
     """
 
+    performed_by: Performer = Performer.SESSION
+    """
+    Who carries this item out.
+    """
+
+    commands: list[str] = field(default_factory=list)
+    """
+    The commands that carry out an item its owner performs, in order.
+    """
+
     live_state: LiveState = field(default=LiveState.NO_PULL_REQUEST, init=False)
     """
     This item's live GitHub state.
@@ -218,6 +228,13 @@ class Item:
     Whether this item has an open draft pull request and is not deferred: every pull
     request stays a draft until its author has reviewed it.
     """
+
+    @property
+    def is_performed_by_owner(self) -> bool:
+        """
+        Whether the plan's owner, not a session, carries this item out.
+        """
+        return self.performed_by is Performer.OWNER
 
     @property
     def has_open_pull_request(self) -> bool:
@@ -320,6 +337,10 @@ class Item:
             notes=notes.strip() if notes else None,
             depends_on=list(data.get(ManifestKey.DEPENDS_ON.key) or []),
             blockers=list(data.get(ManifestKey.BLOCKERS.key) or []),
+            performed_by=Performer(
+                data.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)
+            ),
+            commands=list(data.get(ManifestKey.COMMANDS.key) or []),
         )
 
     def is_effectively_done(self) -> bool:

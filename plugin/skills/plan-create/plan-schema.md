@@ -85,6 +85,8 @@ items:                         # the actual trackable units of work - flat,
     session: <url or omitted>
     notes: "short, freeform"
     blockers: ["freeform reasons", ...]   # optional, defaults to []
+    performed_by: session | owner  # optional, defaults to session; see "Steps the owner performs"
+    commands: ["<command>", ...]   # optional: what the owner runs for an owner's step, in order
 ```
 
 Validation is not documentation-only: `plan/validation.py` enforces this
@@ -127,6 +129,14 @@ it, but "GitHub confirms this PR is merged" has exactly one correct state: `done
 The page shows a merged item as `done` whatever its `status` says; the manifest
 follows at the next session start, which records every plan's merged items done
 and drops them.
+
+### Steps the owner performs
+
+Some steps no session's credential can take: storing a secret, running a command on the
+owner's own computer. Such a step is an item with `performed_by: owner`. It has no branch,
+pull request or `recommended_model`, and its `commands` list what the owner runs, in order.
+No "Start now" is offered for it: the plan page and a goal's path show it as the owner's,
+with its commands. Items that depend on it wait until its `status` is `done`.
 
 ### Depending on an item in another plan
 

@@ -12,6 +12,7 @@ from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, ManifestToolsExitCode
 from basstler.github.repository import Repository
+from basstler.plan.model import Performer
 
 if TYPE_CHECKING:
     from basstler.plan.merge import PlanPart
@@ -457,6 +458,47 @@ class InvalidBlockers(ValidationProblem):
 
     def error_message(self) -> str:
         return f"item {self.item_identifier!r} blockers must be a list, got {self.actual_type.__name__}"
+
+
+@dataclass
+class UnknownPerformer(ValidationProblem):
+    """
+    An item's ``performed_by`` isn't one of :class:`Performer`'s values.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    performed_by: Any
+    """
+    Whatever ``performed_by`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} has unknown performed_by "
+            f"{self.performed_by!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "set performed_by to one of: " + ", ".join(Performer)
+
+
+@dataclass
+class InvalidCommands(ValidationProblem):
+    """
+    An item's ``commands`` isn't a list of strings.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    def error_message(self) -> str:
+        return f"item {self.item_identifier!r} commands must be a list of strings"
 
 
 @dataclass

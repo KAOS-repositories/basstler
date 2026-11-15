@@ -87,6 +87,22 @@ class ItemStatus(StrEnum):
         return cls.underscore_spellings().get(value)
 
 
+class Performer(StrEnum):
+    """
+    Who carries a plan item out.
+    """
+
+    SESSION = "session"
+    """
+    A session, on a branch with a pull request.
+    """
+
+    OWNER = "owner"
+    """
+    The plan's owner, by hand: a step no session's credential can take.
+    """
+
+
 # %% the vocabulary a plan manifest is written in
 
 
@@ -369,6 +385,16 @@ class ManifestKey(KeySpecification, Enum):
     BLOCKERS = ("blockers", ValueStyle.SEQUENCE)
     """
     Why the item is stuck, written as a sequence.
+    """
+
+    PERFORMED_BY = ("performed_by",)
+    """
+    Who carries the item out - see :class:`Performer`.
+    """
+
+    COMMANDS = ("commands", ValueStyle.SEQUENCE)
+    """
+    The commands that carry out an item its owner performs, in order.
     """
 
     ITEMS = ("items",)

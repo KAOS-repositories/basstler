@@ -346,6 +346,12 @@ class DatasetLocation(PathEnumeration):
     goals directory.
     """
 
+    OWNER_STEP_PLANS = DIRECTORY / "owner-step-plans"
+    """
+    A plans directory whose one plan holds a step its owner performs, with a goal behind
+    that step.
+    """
+
     STUBS = DIRECTORY / "stubs"
     """
     Executables copied onto a scratch ``PATH`` to stand in for a real ``gh``, ``curl`` or

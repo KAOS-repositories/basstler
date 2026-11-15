@@ -5,6 +5,7 @@ what each step waits for and the action that carries it out.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
@@ -79,6 +80,11 @@ class PathStepReport(ValidatedJSONModel):
     What the item's pull request waits on the owner for, or ``None`` when nothing.
     """
 
+    owner_commands: list[str]
+    """
+    The commands the owner runs to make that move, in order.
+    """
+
     releases: list[str]
     """
     The steps that wait for this one, each as ``<plan-id>/<item-id>``.
@@ -148,10 +154,54 @@ class OwnerSituation(StrEnum):
     """
 
 
-@dataclass(frozen=True)
-class OwnerMove:
+@dataclass(frozen=True, kw_only=True)
+class OwnerMove(ABC):
     """
-    The one thing a step's pull request waits on the owner for.
+    The one thing a step waits on the owner for.
+    """
+
+    after: tuple[DependencyReference, ...] = ()
+    """
+    The steps that come before the owner's move.
+    """
+
+    @property
+    @abstractmethod
+    def summary(self) -> str:
+        """
+        The move, as a sentence fragment.
+        """
+
+    @property
+    @abstractmethod
+    def commands(self) -> tuple[str, ...]:
+        """
+        The commands the owner runs to make the move, in order.
+        """
+
+    @property
+    @abstractmethod
+    def waiting_phrase(self) -> str:
+        """
+        What the steps in :attr:`after` have to do first, as the words that follow their
+        names.
+        """
+
+    @property
+    def description(self) -> str:
+        """
+        The move as a sentence fragment, naming what it comes after.
+        """
+        if not self.after:
+            return self.summary
+        waited = ", ".join(reference.text for reference in self.after)
+        return f"{self.summary} after {waited} {self.waiting_phrase}"
+
+
+@dataclass(frozen=True, kw_only=True)
+class PullRequestMove(OwnerMove):
+    """
+    What a step's pull request waits on the owner for.
     """
 
     situation: OwnerSituation
@@ -164,21 +214,46 @@ class OwnerMove:
     The pull request the owner acts on.
     """
 
-    after: tuple[DependencyReference, ...] = ()
+    @property
+    def summary(self) -> str:
+        return self.situation.format(number=self.pull_request_number)
+
+    @property
+    def commands(self) -> tuple[str, ...]:
+        return ()
+
+    @property
+    def waiting_phrase(self) -> str:
+        return "merges"
+
+
+@dataclass(frozen=True, kw_only=True)
+class OwnerPerformedStep(OwnerMove):
     """
-    The steps whose pull requests the owner merges before this one.
+    A step the owner carries out by hand.
+    """
+
+    title: str
+    """
+    The title of the item the owner performs.
+    """
+
+    step_commands: tuple[str, ...]
+    """
+    The commands the item's plan records for it, in order.
     """
 
     @property
-    def description(self) -> str:
-        """
-        The move as a sentence fragment, naming what it comes after.
-        """
-        move = self.situation.format(number=self.pull_request_number)
-        if not self.after:
-            return move
-        waited = ", ".join(reference.text for reference in self.after)
-        return f"{move} after {waited} merges"
+    def summary(self) -> str:
+        return self.title
+
+    @property
+    def commands(self) -> tuple[str, ...]:
+        return self.step_commands
+
+    @property
+    def waiting_phrase(self) -> str:
+        return "is ready"
 
 
 # %% steps
@@ -262,6 +337,7 @@ class PathStep:
             command=self.action.command if self.action else None,
             blockers=self.item.blockers,
             owner_move=self.owner_move.description if self.owner_move else None,
+            owner_commands=list(self.owner_move.commands) if self.owner_move else [],
             releases=[reference.text for reference in releases],
         )
 
@@ -481,6 +557,7 @@ class GoalPath:
                 f" (releases {', '.join(step.releases)})" if step.releases else ""
             )
             lines.append(f"      you: {step.owner_move}{released}")
+        lines += [f"        {command}" for command in step.owner_commands]
         lines += [f"      blocked: {blocker}" for blocker in step.blockers]
         return lines
 
@@ -621,24 +698,34 @@ class NeededItems:
             dependencies=dependencies,
             awaited=awaited,
             action=action,
-            owner_move=self.owner_move_of(reference),
+            owner_move=self.owner_move_of(reference, awaited),
         )
 
-    def owner_move_of(self, reference: DependencyReference) -> OwnerMove | None:
+    def owner_move_of(
+        self, reference: DependencyReference, awaited: tuple[DependencyReference, ...]
+    ) -> OwnerMove | None:
         """
         :param reference: A needed item, its live state classified.
-        :return: What its pull request waits on the owner for, or ``None`` when nothing.
+        :param awaited: The dependencies the item still waits for.
+        :return: What the item waits on the owner for, or ``None`` when nothing.
         """
         item = self.resolved_by_reference[reference].item
+        if item.is_effectively_done():
+            return None
+        if item.is_performed_by_owner:
+            return OwnerPerformedStep(
+                title=item.title, step_commands=tuple(item.commands), after=awaited
+            )
         if item.live_state is LiveState.OPEN_DRAFT:
-            return OwnerMove(
-                OwnerSituation.DRAFT_AWAITING_REVIEW, item.pull_request_number
+            return PullRequestMove(
+                situation=OwnerSituation.DRAFT_AWAITING_REVIEW,
+                pull_request_number=item.pull_request_number,
             )
         if item.live_state is not LiveState.OPEN_READY:
             return None
-        return OwnerMove(
-            OwnerSituation.READY_TO_MERGE,
-            item.pull_request_number,
+        return PullRequestMove(
+            situation=OwnerSituation.READY_TO_MERGE,
+            pull_request_number=item.pull_request_number,
             after=tuple(
                 dependency
                 for dependency in self.dependencies_of(reference)

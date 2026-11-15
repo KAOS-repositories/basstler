@@ -22,6 +22,7 @@ items:
   track: a-track
   depends_on: []
   status: not started
+  recommended_model: sonnet
   notes: >
     A folded note whose wrapping must survive untouched, because a full YAML
     round trip re-flows it.
@@ -33,4 +34,5 @@ items:
   track: a-track
   depends_on: []
   status: in progress
+  recommended_model: sonnet
   session: https://example.invalid/session_second

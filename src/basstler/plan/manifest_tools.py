@@ -69,6 +69,11 @@ class ManifestToolsCommand(StrEnum):
     Print the plan's header and one item's entry.
     """
 
+    UNMODELLED_ITEMS = "unmodelled-items"
+    """
+    Print the identifiers of the items that carry no recommended model.
+    """
+
     MERGE = "merge"
     """
     Merge a session's edit of a plan onto the plan as it stands now.
@@ -131,6 +136,11 @@ class ManifestToolsOption(StrEnum):
     The URL of the ``origin`` of the checkout saving the manifest.
     """
 
+    SAVING = "--saving"
+    """
+    Marks the manifest as one about to be saved over the copy in ``--plans-dir``.
+    """
+
 
 class YamlBooleanCoercionError(ValueError):
     """
@@ -171,6 +181,16 @@ class PlanManifest:
         return self.string_field(self.content.get("id", ""), "id")
 
     @property
+    def item_identifiers(self) -> frozenset[str]:
+        """
+        :return: Every item's ``id``, or its ``branch`` for an item with no id.
+        """
+        return frozenset(
+            item.get("id") or item.get("branch")
+            for item in self.content.get("items") or []
+        )
+
+    @property
     def item_branches(self) -> list[str]:
         """
         :raises YamlBooleanCoercionError: If an item's ``branch`` was parsed as a
@@ -192,6 +212,7 @@ class PlanManifest:
         self,
         plan_directory: PlanDirectory | None = None,
         checkout_repository: Repository | None = None,
+        saved_item_identifiers: frozenset[str] | None = None,
     ) -> None:
         """
         Check the manifest against the same rules a plan page is built under, so nothing
@@ -202,10 +223,14 @@ class PlanManifest:
             against; without one, such an entry is refused.
         :param checkout_repository: The repository the ``origin`` of the checkout saving
             the manifest names, or ``None`` when no save is being checked.
+        :param saved_item_identifiers: The items the plan's saved copy holds, or ``None``
+            when no save is being checked.
         :raises PlanValidationError: If it breaks any rule, carrying every problem
             found.
         """
-        PlanValidator(self.content, plan_directory, checkout_repository).validate()
+        PlanValidator(
+            self.content, plan_directory, checkout_repository, saved_item_identifiers
+        ).validate()
 
     def string_field(self, value: object, field_name: str) -> str:
         """
@@ -329,6 +354,11 @@ class ManifestToolsCommandLine:
             default=None,
             help="The origin of the checkout saving the manifest; a plan for another repository, or an origin naming none, is refused",
         )
+        validate_parser.add_argument(
+            ManifestToolsOption.SAVING,
+            action="store_true",
+            help="Refuse an item the saved copy of the plan lacks unless it has a recommended_model",
+        )
 
         regenerate_parser = subcommands.add_parser(
             ManifestToolsCommand.REGENERATE_BRANCH_INDEX,
@@ -349,6 +379,12 @@ class ManifestToolsCommandLine:
             type=Path,
             help="Path to write the index to",
         )
+
+        unmodelled_parser = subcommands.add_parser(
+            ManifestToolsCommand.UNMODELLED_ITEMS,
+            help="Print the items that carry no recommended model, comma separated",
+        )
+        unmodelled_parser.add_argument("manifest_path", type=Path)
 
         item_parser = subcommands.add_parser(
             ManifestToolsCommand.ITEM,
@@ -388,6 +424,23 @@ class ManifestToolsCommandLine:
             raise PlanValidationError([OriginNamesNoRepository(origin_url)])
         return Repository.from_remote_url(origin_url)
 
+    @staticmethod
+    def saved_item_identifiers(
+        manifest: PlanManifest, arguments: argparse.Namespace
+    ) -> frozenset[str] | None:
+        """
+        :param manifest: The manifest being validated.
+        :param arguments: The parsed ``validate`` command line.
+        :return: The items the plan's copy in ``--plans-dir`` holds, none for a plan not
+            saved yet, or ``None`` when no save is being checked.
+        """
+        if not arguments.saving:
+            return None
+        saved = arguments.plans_dir / manifest.identifier / model.PlanDocument.MANIFEST
+        if not saved.is_file():
+            return frozenset()
+        return PlanManifest(saved).item_identifiers
+
     @classmethod
     def run(cls, arguments: argparse.Namespace) -> ManifestToolsExitCode:
         """
@@ -400,9 +453,11 @@ class ManifestToolsCommandLine:
             logger.info(PlanManifest(arguments.manifest_path).identifier)
         elif arguments.subcommand == ManifestToolsCommand.VALIDATE:
             try:
-                PlanManifest(arguments.manifest_path).validate(
+                manifest = PlanManifest(arguments.manifest_path)
+                manifest.validate(
                     PlanDirectory(arguments.plans_dir) if arguments.plans_dir else None,
                     cls.checkout_repository(arguments.origin_url),
+                    cls.saved_item_identifiers(manifest, arguments),
                 )
             except PlanValidationError as error:
                 logger.error(f"{arguments.manifest_path} failed validation: {error}")
@@ -412,6 +467,13 @@ class ManifestToolsCommandLine:
                 arguments.scratch_dir, arguments.plans_dir, arguments.manifest_filename
             )
             arguments.output.write_text(index.render())
+        elif arguments.subcommand == ManifestToolsCommand.UNMODELLED_ITEMS:
+            manifest = model.PlanManifest.from_file(arguments.manifest_path)
+            logger.info(
+                ", ".join(
+                    item.identifier for item in manifest.items_without_recommended_model
+                )
+            )
         elif arguments.subcommand == ManifestToolsCommand.ITEM:
             manifest = model.PlanManifest.from_file(arguments.manifest_path)
             item = (

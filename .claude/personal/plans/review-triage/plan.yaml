@@ -71,9 +71,12 @@ items:
 - id: directory-and-bash-fixes
   title: Fixes for directory removal and bash started by name
   track: pattern-fixes
+  branch: claude/kind-bohr-db512e
+  pull_request_number: 227
+  session: https://claude.ai/code/session_018wfiv9JCt7E3PATWtKuv68
   depends_on:
   - rule-fixes
-  status: not started
+  status: in progress
   recommended_model: sonnet
   notes: rmtree(x) becomes DirectoryTree(x).remove(); with ignore_errors=True the fix keeps
     ignoring errors through a declared DirectoryTree option, unless the rule wants it to raise,

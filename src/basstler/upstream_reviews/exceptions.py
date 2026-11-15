@@ -8,17 +8,11 @@ from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
 
-from basstler.exceptions import DataclassException
+from basstler.github.exceptions import UpstreamReadError
 from basstler.github.repository import Repository
 from basstler.upstream_reviews.action.branch import ActionBranch, ActionFile
 
 # %% errors
-
-
-class UpstreamReadError(DataclassException, ABC):
-    """
-    Base class for every failure reading an upstream pull request.
-    """
 
 
 @dataclass

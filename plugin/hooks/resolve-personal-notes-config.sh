@@ -390,6 +390,8 @@ PLAN_ITEM_MODE_MODULE="basstler.plan.item_mode"
 # basstler.plan.manifest_tools: reads a plan id out of a manifest and regenerates
 # the branch index - the manifest plumbing save-plan.sh calls.
 PLAN_MANIFEST_TOOLS_MODULE="basstler.plan.manifest_tools"
+# Its subcommand listing the items that carry no recommended model.
+PLAN_UNMODELLED_ITEMS_COMMAND="unmodelled-items"
 # basstler.plan.size_limits: prunes landed items and refuses a plan or progress
 # notes over their limits - the gate save-plan.sh and save-pr-progress.sh run.
 PLAN_SIZE_LIMITS_MODULE="basstler.plan.size_limits"

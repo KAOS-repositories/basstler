@@ -21,6 +21,7 @@ from basstler.plan.item_bootstrap.opening import (
 )
 from basstler.plan.item_bootstrap.record import ItemRecordRequest
 from basstler.plan.item_bootstrap.update import ItemUpdateRequest
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemLayout,
     ItemStatus,
@@ -247,6 +248,7 @@ def record_request(repository: ScratchRepository, **overrides: object):
         plan_identifier=PLAN_IDENTIFIER,
         item_identifier=EXISTING_ITEM,
         status=ItemStatus.IN_PROGRESS,
+        recommended_model=ModelAlias.SONNET,
     )
     defaults.update(overrides)
     return ItemRecordRequest(**defaults)

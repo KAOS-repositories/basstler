@@ -25,7 +25,7 @@ from pathlib import Path
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.environment import GitHubActionsVariable
 from basstler.github.repository import Repository
-from basstler.stack.configuration import (
+from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     MissingUpstreamRepositoryError,
 )
@@ -33,9 +33,7 @@ from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.clients import (
     GitHubCommandLineClient,
 )
-from basstler.upstream_reviews.exceptions import (
-    UpstreamReadError,
-)
+from basstler.github.exceptions import UpstreamReadError
 from basstler.upstream_reviews.readers import (
     ReadSource,
 )

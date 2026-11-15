@@ -4,6 +4,7 @@ The failures of a call to the GitHub REST API.
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 from http import HTTPStatus
 
@@ -197,3 +198,12 @@ class GraphQLErrorsReturned(DataclassException):
             "Check that what the request names exists and that the account gh is "
             "logged in as may read or change it: gh auth status"
         )
+
+
+# %% reading an upstream pull request
+
+
+class UpstreamReadError(DataclassException, ABC):
+    """
+    Base class for every failure reading an upstream pull request.
+    """

@@ -17,6 +17,7 @@ from basstler.plan.model import (
     ManifestKey,
     PlanDocument,
 )
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.size_limits import (
     Roadmap,
 )
@@ -129,6 +130,7 @@ def test_recording_a_new_item_appends_it_to_the_manifest(
         title="A brand new item",
         track="a-track",
         status=ItemStatus.NOT_STARTED,
+        recommended_model=ModelAlias.SONNET,
     ).record(project_root=bootstrap_repository.project_root)
 
     manifest = published_plan(bootstrap_repository)[PlanDocument.MANIFEST]
@@ -140,7 +142,56 @@ def test_recording_a_new_item_appends_it_to_the_manifest(
         + manifest_line(ManifestKey.TRACK, "a-track")
         + manifest_line(ManifestKey.DEPENDS_ON, ())
         + manifest_line(ManifestKey.STATUS, ItemStatus.NOT_STARTED.value)
+        + manifest_line(ManifestKey.RECOMMENDED_MODEL, ModelAlias.SONNET.value)
     )
+
+
+def test_recording_a_new_item_writes_its_recommended_model(
+    bootstrap_repository: ScratchRepository,
+):
+    record_request(
+        bootstrap_repository,
+        item_identifier=NEW_ITEM,
+        title="A brand new item",
+        track="a-track",
+        status=ItemStatus.NOT_STARTED,
+        recommended_model=ModelAlias.OPUS,
+    ).record(project_root=bootstrap_repository.project_root)
+
+    manifest = published_plan(bootstrap_repository)[PlanDocument.MANIFEST]
+    assert manifest.endswith(
+        manifest_line(ManifestKey.STATUS, ItemStatus.NOT_STARTED.value)
+        + manifest_line(ManifestKey.RECOMMENDED_MODEL, ModelAlias.OPUS.value)
+    )
+
+
+def test_recording_an_existing_item_sets_its_recommended_model(
+    bootstrap_repository: ScratchRepository,
+):
+    record_request(bootstrap_repository, recommended_model=ModelAlias.HAIKU).record(
+        project_root=bootstrap_repository.project_root
+    )
+
+    assert (
+        manifest_line(ManifestKey.RECOMMENDED_MODEL, ModelAlias.HAIKU.value)
+        in published_plan(bootstrap_repository)[PlanDocument.MANIFEST]
+    )
+
+
+def test_recording_a_new_item_without_a_recommended_model_names_the_key_it_needs(
+    bootstrap_repository: ScratchRepository,
+):
+    with pytest.raises(IncompleteNewItemError) as refusal:
+        record_request(
+            bootstrap_repository,
+            item_identifier=NEW_ITEM,
+            title="A brand new item",
+            track="a-track",
+            status=ItemStatus.NOT_STARTED,
+            recommended_model=None,
+        ).record(project_root=bootstrap_repository.project_root)
+
+    assert refusal.value.missing_keys == (ManifestKey.RECOMMENDED_MODEL,)
 
 
 def test_recording_a_new_item_without_a_title_names_the_key_it_needs(
@@ -152,6 +203,7 @@ def test_recording_a_new_item_without_a_title_names_the_key_it_needs(
             item_identifier=NEW_ITEM,
             track="a-track",
             status=ItemStatus.NOT_STARTED,
+            recommended_model=ModelAlias.SONNET,
         ).record(project_root=bootstrap_repository.project_root)
 
     assert refusal.value.missing_keys == (ManifestKey.TITLE,)

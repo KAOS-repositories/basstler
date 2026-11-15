@@ -17,7 +17,6 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest
 from basstler.exceptions import DataclassException
 from basstler.github.pull_request_models import (
@@ -36,7 +35,7 @@ from basstler.github.review_models import (
 from basstler.github.states import CheckOutcome, CombinedCheckState, ReviewState
 from basstler.json_model import JSONModel
 from basstler.locations import ProjectLocation
-from basstler.stack.configuration import CommittedStackConfiguration
+from basstler.github.stack_configuration import CommittedStackConfiguration
 from basstler.upstream_reviews.__main__ import (
     main,
     resolve_upstream_repository,
@@ -47,8 +46,8 @@ from basstler.upstream_reviews.clients import (
 from basstler.upstream_reviews.exceptions import (
     GitHubCommandFailed,
     UpstreamPullRequestNotFound,
-    UpstreamReadError,
 )
+from basstler.github.exceptions import GraphQLErrorsReturned, UpstreamReadError
 from basstler.upstream_reviews.failure_logs import (
     FailedJob,
     FailureLog,

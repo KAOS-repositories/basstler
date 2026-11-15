@@ -54,6 +54,10 @@ It refuses a target that names no item, and replaces a goal that already has the
 "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" __main__ goal path <id>
 ```
 
+The path numbers the unfinished steps in the order recommended to carry them out, and says
+whose move each is: a pull request under way is the owner's to review, unless its plan
+records a blocker or its checks failed, which a session resolves first.
+
 Read every step against the outcome, and against what the user said in this conversation:
 
 - **A step the owner performs that no item records** (storing a secret, enabling a
@@ -72,8 +76,8 @@ again.
 
 - The goal's page: `plan_site_page_url` gives the repository's page; the goal is listed
   there and has its own page under `_goals/<id>/`.
-- The next step, from `goal next <id>`, and each step that waits on the owner with its
-  commands, exactly as the path prints them.
+- The next move, from `goal next <id>`, then the whole numbered sequence with each step
+  that waits on the owner and its commands, exactly as the path prints them.
 - Every judgment made in steps 2 and 4, so the user can correct it.
 
 ## Later

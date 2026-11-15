@@ -403,7 +403,7 @@ class BranchUnderRestack:
             f"skipped.\n\n"
             f"Conflicting files:\n{files}\n\n"
             f"{self.conflict_resolution} This branch is labelled "
-            f"`needs-resolution` so later passes skip it rather than re-reporting the same "
+            f"`{self.configuration.needs_resolution_label}` so later passes skip it rather than re-reporting the same "
             f"conflict; the label is cleared automatically once it merges cleanly again, "
             f"and the branch rejoins the pass.{self.branch.owner_address}"
         )
@@ -420,8 +420,8 @@ class BranchUnderRestack:
             f"other open branch of the stack, so there is nothing to retarget it at.\n\n"
             f"Rebase it onto whatever superseded that base, or close this pull request "
             f"if the work went with it.\n\n"
-            f"Nothing was changed here. This branch is labelled `needs-resolution` so "
-            f"later passes skip it, and it rejoins the pass once its base leads "
+            f"Nothing was changed here. This branch is labelled "
+            f"`{self.configuration.needs_resolution_label}` so later passes skip it, and it rejoins the pass once its base leads "
             f"somewhere again.{self.branch.owner_address}"
         )
 

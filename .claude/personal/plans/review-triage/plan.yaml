@@ -97,7 +97,9 @@ items:
   recommended_model: opus
   notes: 'Done when #220''s rule-fix files (107 of 129 from the UTF-8 fix) are marked mechanical,
     run from this item''s branch. basstler-review-triage depends on basstler-rules; a new
-    change kind names the rule. Mark #220 only once windows-suite stops pushing.'
+    change kind names the rule. Mark #220 only once windows-suite stops pushing. Stack on the
+    highest pushed pattern-fixes branch (#227 or #228, else #222). Check: basstler review-triage
+    report 220, run from this branch, lists those files as mechanical.'
 - id: reduced-review-diff
   title: Show a reviewer only what is left once rule fixes are reversed
   track: pattern-fixes
@@ -164,9 +166,10 @@ items:
   notes: 'Draft #220, main merged at b2bb4d75; last Windows run 39 failed, 2712 passed. Runs on
     a Windows machine (.venv/Scripts/python.exe). Next, in order: install-lock liveness (kill -0
     sees MSYS PIDs); session start on Scripts/python.exe environments and their removal;
-    GH_CONFIG_DIR at a temporary folder for the no-credential tests; the no-upstream remote test;
-    skip the ~20 gh/bash stub tests on win32, naming the limit. Each push restacks #222 upward
-    and clears Viewed on the files it touches.'
+    GH_CONFIG_DIR at a temporary folder for no-credential tests; the no-upstream remote test;
+    skip the ~20 gh/bash stub tests on win32, naming the limit. Push only through basstler.sh
+    maintenance push; a push restacks #222 and clears Viewed. Update these notes per push
+    and say when the order is done: only then is #220 marked viewed.'
 
 - id: action-plan-triage
   title: Prove a file mechanical when replaying a recorded code modification plan reproduces
@@ -180,4 +183,17 @@ items:
   notes: 'Done when #223''s moved files are marked mechanical. A new change kind names the
     plan. Next: decide how a commit records the plan it applied; nothing stores #223''s
     relocation plan replayably yet. uv-workspace supplies the file actions it replays.'
+
+- id: actions-marking
+  title: Install the mark-viewed workflow in this repository
+  track: triage
+  branch: basstler/mark-viewed
+  pull_request_number: 221
+  depends_on:
+  - viewed-marking-workflow
+  status: in progress
+  recommended_model: haiku
+  notes: 'Open #221, written by set-up-mark-viewed. Its mark-viewed.yml calls #215''s reusable
+    review-triage-mark-viewed.yml, so the owner merges it only after #215 has merged. Needs
+    the REVIEW_TRIAGE_VIEWER_TOKEN secret stored by the owner.'
 landed_item_count: 1

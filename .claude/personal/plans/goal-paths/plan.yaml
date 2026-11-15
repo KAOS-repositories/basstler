@@ -1,0 +1,35 @@
+schema_version: 1
+id: goal-paths
+title: 'Goal paths: an always-current ordered path to an outcome'
+description: 'Ask basstler how to reach an outcome and get the ordered path to it, computed
+  from the plans on every build instead of worked out in a chat: a goal names target items
+  in any plan, and its path is their dependencies layered into what starts now and what waits,
+  with who acts, the command and what blocks each step. Adds steps the owner performs, dependencies
+  that require a merge, runnable done checks and a session-close check. Built as an experiment
+  first, then split into pull requests.'
+default_repository: KAOS-repositories/basstler
+tracking_issue: 231
+waves:
+- id: experiment
+  name: Experiment
+  description: The whole design end to end on one sandbox branch, used on real goals.
+tracks:
+- id: experiment
+  name: Sandbox
+  wave: experiment
+items:
+- id: experiment
+  title: Build goal paths end to end on one sandbox branch and use them on real goals
+  track: experiment
+  branch: claude/exciting-curie-ejbvk4
+  depends_on: []
+  status: in progress
+  recommended_model: opus
+  session: https://claude.ai/code/session_018wfiv5szXTK6zAAyzgUyKD
+  notes: 'Experiment entry. Sandbox: this branch off main, one draft PR, never merged. Stage:
+    running. Verdict: none. Built in this order, one commit series each, which become the
+    split''s items: goal-path, owner-steps, merged-dependencies, goal-page, done-checks, plan-goal-skill,
+    session-close-check. Real notes get only what the release accepts; goal data goes under
+    plans/_goals/ if the release ignores it. Each iteration ends by offering: keep iterating,
+    accept, drop, plan first. First goal: the #220 runbook. Feedback on experiment mode goes
+    to #192 at accept or drop.'

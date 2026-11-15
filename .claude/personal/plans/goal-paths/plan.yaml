@@ -10,26 +10,21 @@ description: 'Ask basstler how to reach an outcome and get the ordered path to i
 default_repository: KAOS-repositories/basstler
 tracking_issue: 231
 waves:
-- id: experiment
+- id: sandbox
   name: Experiment
   description: The whole design end to end on one sandbox branch, used on real goals.
 tracks:
-- id: experiment
+- id: sandbox
   name: Sandbox
-  wave: experiment
+  wave: sandbox
 items:
 - id: experiment
   title: Build goal paths end to end on one sandbox branch and use them on real goals
-  track: experiment
+  track: sandbox
   branch: claude/exciting-curie-ejbvk4
+  pull_request_number: 232
   depends_on: []
   status: in progress
   recommended_model: opus
   session: https://claude.ai/code/session_018wfiv5szXTK6zAAyzgUyKD
-  notes: 'Experiment entry. Sandbox: this branch off main, one draft PR, never merged. Stage:
-    running. Verdict: none. Built in this order, one commit series each, which become the
-    split''s items: goal-path, owner-steps, merged-dependencies, goal-page, done-checks, plan-goal-skill,
-    session-close-check. Real notes get only what the release accepts; goal data goes under
-    plans/_goals/ if the release ignores it. Each iteration ends by offering: keep iterating,
-    accept, drop, plan first. First goal: the #220 runbook. Feedback on experiment mode goes
-    to #192 at accept or drop.'
+  notes: 'Experiment entry. Sandbox: this branch off main, draft #232, never merged. Stage: running. Verdict: none. Parts, one commit series each, which become the split''s items: goal-path (done at 29bd414a: basstler goal set, path, next), then owner-steps, merged-dependencies, goal-page, done-checks, plan-goal-skill, session-close-check. Real notes get only what the release accepts; goals live under plans/_goals/, which the release ignores. Each iteration offers: keep iterating, accept, drop, plan first. First goal: mechanical-files-viewed. Feedback on experiment mode goes to #192 at accept or drop.'

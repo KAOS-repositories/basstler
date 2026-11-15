@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from basstler.setup.gate import GatedSkill
+from basstler.setup.gate import BasstlerSkill
 
 from ..constants.paths import RepositoryLocation, SkillDirectory
 
@@ -180,15 +180,22 @@ def gated_skill_names() -> list[str]:
     ]
 
 
+def gate_skill_names() -> set[str]:
+    """
+    :return: The name of every skill the gate knows.
+    """
+    return {skill.skill_name for skill in BasstlerSkill.every_skill()}
+
+
 def test_every_skill_a_document_gates_is_a_gated_skill() -> None:
     """
     A document runs the gate only with a skill the gate knows.
     """
-    assert set(gated_skill_names()) <= set(GatedSkill)
+    assert set(gated_skill_names()) <= gate_skill_names()
 
 
 def test_every_gated_skill_runs_its_gate() -> None:
     """
     Every skill the gate knows runs it from its own document.
     """
-    assert set(GatedSkill) <= set(gated_skill_names())
+    assert gate_skill_names() <= set(gated_skill_names())

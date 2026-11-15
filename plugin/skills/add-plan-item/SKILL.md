@@ -24,11 +24,8 @@ There are exactly four outcomes, and step 6 picks one:
 
 ## 0. Check the setup is in place, and run it if not
 
-Every plan's manifest lives on the personal-notes branch, which the user may not
-have set up yet. Follow
-`skills/setup-personal-notes/prerequisite-check.md` before step 1 with this skill's
-gate, and if it reports anything missing, run `/setup-personal-notes` without asking
-first, rather than failing on a branch that isn't there:
+Follow `skills/setup-personal-notes/prerequisite-check.md` before step 1, with this
+skill's gate:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate --skill add-plan-item; echo "setup gate exit status: $?"

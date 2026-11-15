@@ -31,7 +31,7 @@ from basstler.plan_site import build_start, dispatch_check, publication
 from basstler.plan_site.dispatch_check import UNVERIFIED_PREFIX
 from basstler.plan_site.hub import HubFileKey
 from basstler.plugin_root import PluginRoot
-from basstler.setup.gate import GatedSkill
+from basstler.setup.gate import BasstlerSkill, UpstreamReviews
 from basstler.setup.report import (
     CheckResult,
     CheckStatus,
@@ -980,7 +980,7 @@ def gate_script(repository: ScratchRepository) -> SetupCheckScript:
 
 PLANNING_SKILLS = [
     skill
-    for skill in GatedSkill
+    for skill in BasstlerSkill.every_skill()
     if SetupCheck.STACK_UPSTREAM not in skill.required_checks
 ]
 """
@@ -988,9 +988,9 @@ The gated skills that need no upstream named.
 """
 
 
-@pytest.mark.parametrize("skill", list(GatedSkill))
+@pytest.mark.parametrize("skill", BasstlerSkill.every_skill())
 def test_a_gate_reports_exactly_the_checks_its_skill_needs(
-    check_setup_repository: ScratchRepository, skill: GatedSkill
+    check_setup_repository: ScratchRepository, skill: type[BasstlerSkill]
 ):
     """
     A gate prints a row for each check its skill needs, and for no other.
@@ -1007,7 +1007,7 @@ def test_a_gate_reports_exactly_the_checks_its_skill_needs(
 
 @pytest.mark.parametrize("skill", PLANNING_SKILLS)
 def test_a_plan_site_needing_setup_does_not_stop_a_planning_skill(
-    dispatch_needing_setup: ScratchRepository, skill: GatedSkill
+    dispatch_needing_setup: ScratchRepository, skill: type[BasstlerSkill]
 ):
     """
     The row that sent every skill into the setup no longer gates a planning skill.
@@ -1028,7 +1028,7 @@ def test_a_plan_site_needing_setup_does_not_stop_reading_upstream_reviews(
         DatasetLocation.SCRATCH_FORK_STACK_CONFIGURATION.read_text(),
     )
 
-    report = GatedSkill.UPSTREAM_REVIEWS.gate(gate_script(dispatch_needing_setup))
+    report = UpstreamReviews.gate(gate_script(dispatch_needing_setup))
 
     assert report.exit_code is SetupCheckExitCode.SUCCESS
 
@@ -1039,7 +1039,7 @@ def test_reading_upstream_reviews_stops_without_a_named_upstream(
     """
     Reading upstream reviews needs an upstream named, so its gate requires one.
     """
-    report = GatedSkill.UPSTREAM_REVIEWS.gate(gate_script(check_setup_repository))
+    report = UpstreamReviews.gate(gate_script(check_setup_repository))
 
     assert report.exit_code is SetupCheckExitCode.SETUP_INCOMPLETE
     assert report.results[SetupCheck.STACK_UPSTREAM].status == CheckStatus.NEEDS_SETUP
@@ -1047,7 +1047,7 @@ def test_reading_upstream_reviews_stops_without_a_named_upstream(
 
 @pytest.mark.parametrize("skill", PLANNING_SKILLS)
 def test_a_planning_skill_needs_no_named_upstream(
-    check_setup_repository: ScratchRepository, skill: GatedSkill
+    check_setup_repository: ScratchRepository, skill: type[BasstlerSkill]
 ):
     """
     A planning skill runs in a project that names no upstream.
@@ -1057,9 +1057,11 @@ def test_a_planning_skill_needs_no_named_upstream(
     assert report.exit_code is SetupCheckExitCode.SUCCESS
 
 
-@pytest.mark.parametrize("skill", list(GatedSkill))
+@pytest.mark.parametrize("skill", BasstlerSkill.every_skill())
 def test_every_skill_stops_without_the_notes_branch(
-    check_setup_repository: ScratchRepository, skill: GatedSkill, tmp_path: Path
+    check_setup_repository: ScratchRepository,
+    skill: type[BasstlerSkill],
+    tmp_path: Path,
 ):
     """
     Every gated skill reads the notes branch, so a missing one stops each.

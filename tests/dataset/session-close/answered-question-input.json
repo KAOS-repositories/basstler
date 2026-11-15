@@ -1,0 +1,6 @@
+{
+  "session_id": "example",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "AskUserQuestion",
+  "tool_input": {}
+}

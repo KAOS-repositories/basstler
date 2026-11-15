@@ -9,6 +9,27 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh __main__ session-close decision"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh __main__ session-close stop-hook"
+          }
+        ]
+      }
     ]
   }
 }

@@ -139,6 +139,12 @@ class RepositoryStateLocation(PathEnumeration):
     the same name.
     """
 
+    SESSION_RECORD = DIRECTORY / "session-record.json"
+    """
+    What the sessions in this clone last settled with the plans, and the decisions made
+    since.
+    """
+
 
 class CommitScratchFile(PathEnumeration):
     """

@@ -26,6 +26,13 @@ source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 
 require_basstler_python
 
+# A save is the moment the plans say what the session did: the session record keeps the
+# commit it happened at, so the stop hook asks for nothing the save already covered.
+settle_session_record() {
+  "${BASSTLER_PYTHON}" -m basstler session-close settle \
+    || echo "Recording this save in the session record failed; the error is above." >&2
+}
+
 # The arguments as given, so a refused save names the command that repeats it.
 SAVE_ARGUMENTS=""
 [ $# -eq 0 ] || SAVE_ARGUMENTS="$(printf ' %q' "$@")"
@@ -246,6 +253,7 @@ while :; do
 
   if git -C "${SCRATCH_DIR}" diff --cached --quiet; then
     echo "No changes to save - plan '${PLAN_ID}' on '${NOTES_BRANCH}' (remote '${ACTIVE_NOTES_REMOTE}') is already up to date."
+    settle_session_record
     exit 0
   fi
 
@@ -267,9 +275,11 @@ done
 
 if [ "${STAGED_PLAN}" = "removed" ]; then
   echo "Every item of plan '${PLAN_ID}' has landed, so the plan was removed from '${NOTES_BRANCH}' on '${ACTIVE_NOTES_REMOTE}'."
+  settle_session_record
   exit 0
 fi
 echo "Saved plan '${PLAN_ID}' (plan.yaml, roadmap.md, and the branch index) back to '${NOTES_BRANCH}' on '${ACTIVE_NOTES_REMOTE}'."
+settle_session_record
 if ! SITE_URL="$(recorded_site_url)" || [ -z "${SITE_URL}" ]; then
   echo "No plan site lists this repository yet - /setup-personal-notes publishes one."
 else

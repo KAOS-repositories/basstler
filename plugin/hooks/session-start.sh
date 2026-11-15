@@ -427,6 +427,11 @@ if GOALS_REPORT="$("${BASSTLER_PYTHON}" -m basstler goal summary 2>/dev/null)"; 
   fi
 fi
 
+# The session record the stop hook reads starts here, at the checked-out commit; a
+# clone that already has one keeps it. Never fatal.
+"${BASSTLER_PYTHON}" -m basstler session-close begin \
+  || echo "Starting the session record failed; the error is above." >&2
+
 # Setup verdict from check-setup.sh, run last so it sees what this run wrote.
 SUMMARY_SETUP="$(setup_line_not_checked "${CHECK_SETUP_SCRIPT}")"
 if [ -f "${CHECK_SETUP_SCRIPT}" ]; then

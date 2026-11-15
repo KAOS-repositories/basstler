@@ -352,6 +352,12 @@ class DatasetLocation(PathEnumeration):
     that step.
     """
 
+    SESSION_CLOSE = DIRECTORY / "session-close"
+    """
+    The hook inputs Claude Code sends when a session is about to stop and after the user
+    decided something.
+    """
+
     STUBS = DIRECTORY / "stubs"
     """
     Executables copied onto a scratch ``PATH`` to stand in for a real ``gh``, ``curl`` or

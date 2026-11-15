@@ -43,22 +43,27 @@ items:
   track: triage
   blockers:
     - >-
-      Conflicts with main in 10 files (#213's review answers, #217, #209 landed after the cut);
-      merge main in and resolve. CI: test_skill_documents fails because setup-review-triage cites
-      ${CLAUDE_CODE_REMOTE}, which the shell configuration lacks. Upstream review not checked.
+      Mergeable with main at 1c54d6ff; CI there not yet read. Waits on the user storing
+      REVIEW_TRIAGE_VIEWER_TOKEN. #219 (stacked on this) now conflicts with it in token_form.py,
+      site_repository.py, user_steps.py, test_site_repository.py. Upstream review not checked (none
+      named).
   depends_on: []
   status: in progress
   recommended_model: sonnet
   branch: ccr-37402cb7-cls5ht-viewed-workflow
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 215
-  notes: 'Draft #215, stacked on #213: set-up-mark-viewed installs the workflow (on every
-    pull request with --on-every-pull-request), turns Actions on for forks and lists the token
-    steps left; mark-viewed falls back to Actions and names both routes and the README when
-    neither works. Waits on the user storing the token.
+  notes: >
+    Draft #215, stacked on #213: set-up-mark-viewed installs the workflow (on every pull request
+    with --on-every-pull-request), turns Actions on for forks and lists the token steps left;
+    mark-viewed falls back to Actions and names both routes and the README when neither works. Waits
+    on the user storing the token.
 
+    #221 merges only after #215: #221's mark-viewed.yml calls #215's reusable
+    review-triage-mark-viewed.yml.
 
-    #221 merges only after #215: #221''s mark-viewed.yml calls #215''s reusable review-triage-mark-viewed.yml.'
+    #213 has merged, so #215 now targets main; main was merged in at 1c54d6ff
+    (ViewedMarking.refusals feeds the routes; marking only directly raises GraphQLErrorsReturned).
 - id: rule-fixes
   title: Declare reversible fixes on code rules and apply them with code-rules fix
   track: pattern-fixes

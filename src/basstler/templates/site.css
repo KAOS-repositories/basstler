@@ -270,3 +270,6 @@ a.chip:hover { border-color: currentColor; }
 .goal-group .item h3 a:hover { text-decoration: underline; }
 .goal-group .item:target { outline: 2px solid var(--accent); outline-offset: 2px; }
 .goal-finished ul { font-size: 0.88rem; padding-left: var(--space-5); }
+.owner-move { font-size: 0.82rem; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.owner-releases { color: var(--text-muted); }
+.next-steps .owner-heading { margin-top: var(--space-3); }

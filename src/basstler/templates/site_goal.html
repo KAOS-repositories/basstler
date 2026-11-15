@@ -15,6 +15,9 @@
           {% endif %}
         </div>
         <span class="item-identifier">{{ step.reference.text }}</span>
+        {% if step.owner_move %}
+        <div class="owner-move"><strong>You:</strong> {{ step.owner_move.description }}{% for released in path.references_released_by(step) %}{% if loop.first %} <span class="owner-releases">releases</span>{% endif %} <a class="chip" href="#{{ anchor_of(released) }}">{{ released.text }}</a>{% endfor %}</div>
+        {% endif %}
         {% for blocker in item.blockers %}
         <div class="blocker">▸ {{ blocker }}</div>
         {% endfor %}
@@ -48,6 +51,14 @@
     <p class="goal-next">Nothing can be acted on now: every unfinished step waits for the steps named above it.</p>
     {% else %}
     <p class="goal-next">Every step is finished: the goal is reached.</p>
+    {% endif %}
+    {% if path.owner_steps %}
+    <h2 class="owner-heading">Yours now</h2>
+    <ul>
+    {% for step in path.owner_steps %}
+      <li><a href="#{{ anchor_of(step.reference) }}">{{ step.owner_move.description }}</a>{% for released in path.references_released_by(step) %}{% if loop.first %} <span class="next-reason">releases</span>{% endif %} <span class="next-reason">{{ released.text }}</span>{% endfor %}</li>
+    {% endfor %}
+    </ul>
     {% endif %}
   </section>
 

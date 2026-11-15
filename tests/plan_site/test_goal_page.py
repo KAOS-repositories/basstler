@@ -169,6 +169,19 @@ class TestTheGoalPage:
         for reference in references:
             assert link_to(reference.url) in page
 
+    def test_every_owner_move_is_shown(self, tmp_path: Path, goal_path: GoalPath):
+        """
+        A step whose pull request waits on the owner shows the owner's move.
+        """
+        build_site(tmp_path, goal_plan_files())
+        page = page_at(tmp_path, GOAL_URL)
+        moves = [
+            step.owner_move.description for step in goal_path.steps if step.owner_move
+        ]
+        assert moves
+        for move in moves:
+            assert html.escape(move) in page
+
     def test_a_waiting_group_links_the_steps_it_waits_for(self, goal_path: GoalPath):
         """
         A group's heading links each awaited step's place on the page.

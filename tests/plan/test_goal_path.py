@@ -14,7 +14,7 @@ from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyReference, PlanDirectory
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal
-from basstler.plan.goal_path import GoalPath, PathStep
+from basstler.plan.goal_path import GoalPath, OwnerMove, OwnerSituation, PathStep
 from basstler.plan.item_action import ItemAction, ResolveAction, StartNowAction
 from basstler.plan.model import ItemStatus
 from basstler.plan.structure import Item, Plan
@@ -64,6 +64,11 @@ class StepId(StrEnum):
     IN_ANOTHER_PLAN = "uv-workspace"
     """
     In :attr:`GoalPlanId.PACKAGES`.
+    """
+
+    STACKED_WITH_PULL_REQUEST = "actions-marking"
+    """
+    In progress with a pull request, depending on an item that has one too.
     """
 
     OUTSIDE_THE_PATH = "pypi-release"
@@ -413,3 +418,118 @@ class TestThePathReport:
         ]
 
         assert reported.status == ItemStatus.NOT_STARTED
+
+
+# %% the owner's moves
+
+
+class TestTheOwnersMoves:
+    """
+    A step whose pull request waits on the owner names the owner's move and the steps
+    that move releases.
+    """
+
+    def test_a_draft_pull_request_waits_for_the_owners_review(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A step with a draft pull request asks the owner to review it and mark it ready.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        step = step_of(path, reference_of(StepId.IN_PROGRESS))
+
+        assert step.owner_move == OwnerMove(
+            situation=OwnerSituation.DRAFT_AWAITING_REVIEW,
+            pull_request_number=step.item.pull_request_number,
+        )
+
+    def test_a_ready_pull_request_waits_for_the_owners_merge(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A step whose pull request is out of draft asks the owner to merge it.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=False))
+        step = step_of(path, reference_of(StepId.IN_PROGRESS))
+
+        assert step.owner_move == OwnerMove(
+            situation=OwnerSituation.READY_TO_MERGE,
+            pull_request_number=step.item.pull_request_number,
+        )
+
+    def test_a_merge_comes_after_the_unmerged_dependencies(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A ready pull request is merged only after the steps it depends on have merged.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=False))
+        step = step_of(path, reference_of(StepId.STACKED_WITH_PULL_REQUEST))
+
+        assert step.owner_move.after == step.dependencies
+
+    def test_a_merged_dependency_no_longer_holds_a_merge_back(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        Once every dependency has merged, the merge waits for nothing.
+        """
+        unmerged = step_of(
+            path_with(plan_directory, recorded_pull_requests(draft=False)),
+            reference_of(StepId.STACKED_WITH_PULL_REQUEST),
+        )
+        merged_items = frozenset(
+            dependency.item_identifier for dependency in unmerged.dependencies
+        )
+        path = path_with(
+            plan_directory,
+            recorded_pull_requests(draft=False, merged_items=merged_items),
+        )
+
+        step = step_of(path, reference_of(StepId.STACKED_WITH_PULL_REQUEST))
+        assert step.owner_move.after == ()
+
+    def test_a_step_without_a_pull_request_has_no_owner_move(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        Nothing waits on the owner before a pull request exists.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        step = step_of(path, reference_of(StepId.NOT_STARTED_BEHIND_DRAFTS))
+
+        assert step.owner_move is None
+
+    def test_a_step_releases_the_steps_waiting_for_it(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        The steps a move releases are exactly those that wait for its step.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        waiting = step_of(path, reference_of(StepId.NOT_STARTED_BEHIND_DRAFTS))
+
+        for awaited in waiting.awaited:
+            assert waiting.reference in path.references_released_by(
+                step_of(path, awaited)
+            )
+
+    def test_the_report_states_the_move_and_what_it_releases(
+        self, plan_directory: PlanDirectory
+    ):
+        """
+        A reported step carries the owner's move as a sentence and the released steps.
+        """
+        path = path_with(plan_directory, recorded_pull_requests(draft=True))
+        step = step_of(path, reference_of(StepId.IN_PROGRESS))
+        (reported,) = [
+            entry
+            for group in path.report().groups
+            for entry in group.steps
+            if entry.reference == step.reference.text
+        ]
+
+        assert reported.owner_move == step.owner_move.description
+        assert reported.releases == [
+            reference.text for reference in path.references_released_by(step)
+        ]

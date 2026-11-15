@@ -6,10 +6,12 @@ what each step waits for and the action that carries it out.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from functools import cached_property
 from graphlib import TopologicalSorter
 
 from basstler.github.pull_request_source import PullRequestSource
+from basstler.github.pull_request_state import LiveState
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.json_model import ValidatedJSONModel
 from basstler.plan.dependencies import (
@@ -72,6 +74,16 @@ class PathStepReport(ValidatedJSONModel):
     What the item's plan records as blocking it.
     """
 
+    owner_move: str | None
+    """
+    What the item's pull request waits on the owner for, or ``None`` when nothing.
+    """
+
+    releases: list[str]
+    """
+    The steps that wait for this one, each as ``<plan-id>/<item-id>``.
+    """
+
 
 class PathGroupReport(ValidatedJSONModel):
     """
@@ -116,6 +128,59 @@ class GoalPathReport(ValidatedJSONModel):
     """
 
 
+# %% the owner's moves
+
+
+class OwnerSituation(StrEnum):
+    """
+    What a step's pull request waits on the owner for; each value is the move, written
+    around the pull request's number.
+    """
+
+    DRAFT_AWAITING_REVIEW = "review #{number} and mark it ready for review"
+    """
+    The pull request is a draft: only the owner moves it out of draft.
+    """
+
+    READY_TO_MERGE = "merge #{number}"
+    """
+    The pull request is out of draft: only the owner merges it.
+    """
+
+
+@dataclass(frozen=True)
+class OwnerMove:
+    """
+    The one thing a step's pull request waits on the owner for.
+    """
+
+    situation: OwnerSituation
+    """
+    What the pull request waits for.
+    """
+
+    pull_request_number: int
+    """
+    The pull request the owner acts on.
+    """
+
+    after: tuple[DependencyReference, ...] = ()
+    """
+    The steps whose pull requests the owner merges before this one.
+    """
+
+    @property
+    def description(self) -> str:
+        """
+        The move as a sentence fragment, naming what it comes after.
+        """
+        move = self.situation.format(number=self.pull_request_number)
+        if not self.after:
+            return move
+        waited = ", ".join(reference.text for reference in self.after)
+        return f"{move} after {waited} merges"
+
+
 # %% steps
 
 
@@ -143,6 +208,11 @@ class PathStep:
     action: ItemAction | None
     """
     What carries the step out now; ``None`` while it waits, and once it is finished.
+    """
+
+    owner_move: OwnerMove | None = None
+    """
+    What the step's pull request waits on the owner for, or ``None`` when nothing.
     """
 
     @property
@@ -177,8 +247,9 @@ class PathStep:
         """
         return self.item.is_effectively_done()
 
-    def report(self) -> PathStepReport:
+    def report(self, releases: tuple[DependencyReference, ...]) -> PathStepReport:
         """
+        :param releases: The steps that wait for this one.
         :return: The step as a command prints it.
         """
         return PathStepReport(
@@ -190,6 +261,8 @@ class PathStep:
             recommended_model=self.item.recommended_model,
             command=self.action.command if self.action else None,
             blockers=self.item.blockers,
+            owner_move=self.owner_move.description if self.owner_move else None,
+            releases=[reference.text for reference in releases],
         )
 
 
@@ -218,13 +291,16 @@ class PathGroup:
             return "Now"
         return "After " + ", ".join(reference.text for reference in self.awaited)
 
-    def report(self) -> PathGroupReport:
+    def report(self, path: GoalPath) -> PathGroupReport:
         """
+        :param path: The path the group belongs to.
         :return: The group as a command prints it.
         """
         return PathGroupReport(
             awaited=[reference.text for reference in self.awaited],
-            steps=[step.report() for step in self.steps],
+            steps=[
+                step.report(path.references_released_by(step)) for step in self.steps
+            ],
         )
 
 
@@ -319,6 +395,28 @@ class GoalPath:
             )
         )
 
+    def references_released_by(self, step: PathStep) -> tuple[DependencyReference, ...]:
+        """
+        :param step: A step of the path.
+        :return: The steps that wait for it, in path order.
+        """
+        return tuple(
+            waiting.reference
+            for waiting in self.steps
+            if step.reference in waiting.awaited
+        )
+
+    @property
+    def owner_steps(self) -> tuple[PathStep, ...]:
+        """
+        The steps whose pull requests the owner can act on now, in path order.
+        """
+        return tuple(
+            step
+            for step in self.steps
+            if step.owner_move is not None and not step.owner_move.after
+        )
+
     @property
     def next_step(self) -> PathStep | None:
         """
@@ -342,7 +440,7 @@ class GoalPath:
         return GoalPathReport(
             goal=self.goal,
             next_command=next_step.action.command if next_step else None,
-            groups=[group.report() for group in self.groups],
+            groups=[group.report(self) for group in self.groups],
             finished=[step.reference.text for step in self.finished_steps],
         )
 
@@ -378,6 +476,11 @@ class GoalPath:
         lines = [f"  {step.reference}  [{' · '.join(state)}]", f"      {step.title}"]
         if step.command is not None:
             lines.append(f"      {step.command}")
+        if step.owner_move is not None:
+            released = (
+                f" (releases {', '.join(step.releases)})" if step.releases else ""
+            )
+            lines.append(f"      you: {step.owner_move}{released}")
         lines += [f"      blocked: {blocker}" for blocker in step.blockers]
         return lines
 
@@ -518,4 +621,27 @@ class NeededItems:
             dependencies=dependencies,
             awaited=awaited,
             action=action,
+            owner_move=self.owner_move_of(reference),
+        )
+
+    def owner_move_of(self, reference: DependencyReference) -> OwnerMove | None:
+        """
+        :param reference: A needed item, its live state classified.
+        :return: What its pull request waits on the owner for, or ``None`` when nothing.
+        """
+        item = self.resolved_by_reference[reference].item
+        if item.live_state is LiveState.OPEN_DRAFT:
+            return OwnerMove(
+                OwnerSituation.DRAFT_AWAITING_REVIEW, item.pull_request_number
+            )
+        if item.live_state is not LiveState.OPEN_READY:
+            return None
+        return OwnerMove(
+            OwnerSituation.READY_TO_MERGE,
+            item.pull_request_number,
+            after=tuple(
+                dependency
+                for dependency in self.dependencies_of(reference)
+                if not self.resolved_by_reference[dependency].item.is_effectively_done()
+            ),
         )

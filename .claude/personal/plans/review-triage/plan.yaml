@@ -127,13 +127,11 @@ items:
   depends_on: []
   status: in progress
   recommended_model: sonnet
-  notes: 'The general part of #214, split out onto a new branch from main: commit_tree, definitions,
-    python_source, renames, moved_definitions, module_moves, file_moves, definition_moves,
-    subclass_substitutions, base_branch_merges and the reviewed-commit / --last triage, the
-    changes to comparison, detection and triage, the git/ and github/ changes (dc0f2460''s
-    UTF-8 git text may overlap #220), with their tests and datasets. definition_moves defaults
-    to a plain PythonComparison. Exempt from the basstler-packages freeze on github. Split by moving files, not cherry-picking: #214''s commits mix
-    both parts.'
+  notes: 'The general part of #214 (moves, triage since a commit, opt-in rules), split out
+    by moving files. report and mark-viewed now default to the viewer''s last submitted
+    review, else the merge base; --from-merge-base asks for the whole change. Next: read CI;
+    restack #214 onto it, which lacks ee81557b. Exempt from the basstler-packages freeze
+    on github.'
 
 - id: generated-file-triage
   title: Prove a generated file mechanical by regenerating it
@@ -240,4 +238,19 @@ items:
     moved files are mechanical, and before you review #223. It waits for uv-workspace''s last push to
     be recorded (goal pushes-done), and again after any later push to #223. The report lists what will
     be marked; read it before marking.'
+
+- id: move-split
+  title: Split definition moves from their edits into two commits
+  track: triage
+  branch: review-triage-split-moves
+  pull_request_number: 241
+  depends_on:
+  - move-triage
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #241, stacked on #226. split-moves replaces a pull request''s commits with a
+    move-only commit, proven mechanical by the triage before anything is pushed, and a commit
+    holding the former head''s tree, both dated as that head and pushed with a lease. 116
+    triage tests pass on Windows; a local split of fork PR 609 held its proof. CI not read
+    yet. Retarget to main once #226 lands.'
 landed_item_count: 1

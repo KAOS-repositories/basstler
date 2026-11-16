@@ -1,23 +1,16 @@
 ## Plan
 
-Resolve the owner's 83-thread review of 1c54d6ff here (user chose the remodel in this PR; on a fork, propose upstream). One commit per step, tests first:
-
-1. Paths: hand-built REST/web addresses move onto `Repository`; the token page onto `GitHubAddress`.
-2. `BasstlerProject`: repository from package metadata, its name and default branch, replacing `BASSTLER_REPOSITORY`, `README_BRANCH`, hard-coded "basstler"/"main".
-3. Forms: `UrlQueryParameter` and `PrefilledForm` bases; one-pass truncation; `Branch` for base/head.
-4. Contents API: `GitObject` and `EncodedContent` bases; aliased full names; `FileCommit` replaces the commit dicts; `propose` split; listing reuses `RestPullRequestSummary`.
-5. Settings: `RepositoryRead[Resource]` and generic setting writes, each naming its manual user step; `RepositoryDetails` relates to `Repository`.
-6. Shared user steps in `basstler.github.user_steps`; the plan site's token steps reuse them.
-7. `ActionsSecret` base; token creation/storage steps live on the token.
-8. Fork: workflow proposed on the parent from a fork branch; docs and skill follow.
-9. Small threads: refusal enum, renames, `named_or_remote` onto `Repository`, weak tests.
-10. New code rule (REST models tied to their domain class; addresses on the class they address), `AGENTS.md` regenerated.
-11. Reply to every thread; resolve only those done.
+Resolve the owner's review of 1c54d6ff inside this PR (remodel here; on a fork, propose upstream).
 
 ## Done
 
-- #215 and #219 restacked on main 73801cd6; #215 clean at 7f6928a5.
+- 7ec5fc52: addresses on Repository, BasstlerProject, PrefilledForm/UrlQueryParameter, GitObject/EncodedContent/FileCommit, RepositoryRead/SettingWrite, user_steps, ActionsSecret, fork proposal upstream, tests strengthened.
+- 3be60760: two new code rules (+ HandBuiltAddressChecker), Repository.actions_secret_path with path_on on top (user's choice), Repository.from_name_or_remote, docs/skill for the fork contract.
+- Replied to all 83 threads; 71 resolved, 12 open for the owner.
+- Description updated; clean with main at 66d52e2c.
 
 ## Next
 
-- Step 1.
+- Read CI's pytest jobs on 3be60760.
+- Owner's answers on the 12 open threads (Specification design, wider remodel, per-reviewer marking plan item, recommending the setup step).
+- Carry the fix into #219 (GitHubAccountPage, from_requested_use, SiteRepository token pages).

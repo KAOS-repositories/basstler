@@ -29,6 +29,12 @@ GIT_TEXT_ENCODING = "utf-8"
 The encoding git's output and the files it commits are read and written in.
 """
 
+OBJECT_HEADER_FIELDS = 3
+"""
+How many fields ``git cat-file --batch`` prints before an object it found: its name,
+type and size in bytes.
+"""
+
 MERGE_CONFLICT_EXIT_STATUS = 1
 """
 The status ``git merge-tree`` exits with when the merge conflicts.
@@ -296,6 +302,45 @@ class GitCommandRunner:
         """
         shown = self.attempt("show", f"{commit}:{PurePosixPath(path)}")
         return shown.output if shown.succeeded else None
+
+    def object_texts(self, names: tuple[str, ...]) -> dict[str, str]:
+        """
+        :param names: Objects git names, such as ``<commit>:<path>`` for a file.
+        :return: The text of each, as :meth:`run` of ``git show`` prints it, all read
+            by one command.
+        :raises GitCommandFailed: If git fails or has no object of one of the names.
+        """
+        if not names:
+            return {}
+        arguments = ("cat-file", "--batch")
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=self.working_directory,
+            input="".join(f"{name}\n" for name in names).encode(GIT_TEXT_ENCODING),
+            capture_output=True,
+        )
+        error_output = completed.stderr.decode(GIT_TEXT_ENCODING).strip()
+        if completed.returncode:
+            raise GitCommandFailed(
+                status=completed.returncode, detail=error_output, arguments=arguments
+            )
+        texts: dict[str, str] = {}
+        output = completed.stdout
+        start = 0
+        for name in names:
+            header_end = output.index(b"\n", start)
+            header = output[start:header_end].split()
+            if len(header) != OBJECT_HEADER_FIELDS:
+                raise GitCommandFailed(
+                    status=completed.returncode,
+                    detail=output[start:header_end].decode(GIT_TEXT_ENCODING),
+                    arguments=arguments,
+                )
+            start = header_end + 1 + int(header[-1])
+            content = output[header_end + 1 : start].decode(GIT_TEXT_ENCODING)
+            texts[name] = content.replace("\r\n", "\n").replace("\r", "\n").strip()
+            start += 1
+        return texts
 
     def commit_files(
         self,

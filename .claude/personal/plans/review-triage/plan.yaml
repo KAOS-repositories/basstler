@@ -43,24 +43,26 @@ items:
   track: triage
   blockers:
     - >-
-      83 unresolved threads in the owner's review of 1c54d6ff: local fixes, questions, and a call to
-      remodel GitHub settings, readers/writers, tokens, secrets, forms and user steps codebase-wide.
-      That remodel's scope and order versus the local fixes await the user.
+      12 review threads of 1c54d6ff await the owner: Specification/partial-model design, remodelling
+      GitHub code outside this PR, per-reviewer marking since the last review, command names vs
+      cyclopts, and five answered questions.
     - >-
-      Owner rejects committing the workflow to a fork's default branch (viewed_setup.py:323,
-      setup-review-triage SKILL.md:112). Clean with main at 73801cd6 (head 7f6928a5); CI there still
-      running when read.
+      Clean with main at 66d52e2c (head 3be60760). CI on 3be60760: ruff, Actions usage, Windows
+      passed; both pytest jobs still running when read.
   depends_on: []
-  status: blocked
+  status: in progress
   recommended_model: sonnet
   branch: ccr-37402cb7-cls5ht-viewed-workflow
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 215
   notes: >
-    Draft #215, now on main (#213 merged): set-up-mark-viewed installs the workflow (on every pull
-    request with --on-every-pull-request), turns Actions on for forks and lists the token steps
-    left; mark-viewed falls back to Actions and names both routes and the README when neither works.
-    The user says the token is stored (not checked from a cloud session).
+    Draft #215, on main: set-up-mark-viewed proposes the workflow by pull request and never writes a
+    default branch - on a fork, to the parent from a fork branch, then the fork syncs; mark-viewed
+    falls back to Actions. The user says the token is stored (not checked from a cloud session).
+
+    GitHub settings, forms, files, user steps and secrets are modelled once
+    (RepositoryRead/SettingWrite generics, PrefilledForm, FileCommit, user_steps, ActionsSecret,
+    BasstlerProject), with two new code rules.
 
     #221 merges only after #215: #221's mark-viewed.yml calls #215's reusable
     review-triage-mark-viewed.yml.

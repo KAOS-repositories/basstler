@@ -2,6 +2,8 @@
 The board and its pieces.
 """
 
+from __future__ import annotations
+
 
 class Alpha:
     """

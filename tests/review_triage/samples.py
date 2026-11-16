@@ -176,8 +176,8 @@ class DefinitionMoveSample(SampleTrees):
 
 class DefinitionMoveEditedSample(SampleTrees):
     """
-    A pull request moving two classes into a module it adds, which gains a module
-    docstring and a section header and rewords one moved class's docstring.
+    A pull request moving two classes into another module, which rewords its module
+    docstring, gains a section header and rewords one moved class's docstring.
     """
 
     BASE_TREE = "base"

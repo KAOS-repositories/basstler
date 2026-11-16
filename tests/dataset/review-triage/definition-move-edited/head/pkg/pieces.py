@@ -2,6 +2,8 @@
 The pieces that move on the board.
 """
 
+from __future__ import annotations
+
 # %% pieces
 
 

@@ -11,7 +11,9 @@ import pytest
 
 from basstler.git.commands import GitCommandFailed
 from basstler.github.pull_request_changes import PullRequestChanges
+from basstler.review_triage.exceptions import UnprovenMoveError
 from basstler.review_triage.move_split import MoveSplit, MoveSplitter
+from basstler.review_triage.triage import PullRequestTriager
 
 from ..scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
@@ -50,9 +52,9 @@ def tree_files(scratch_repository: ScratchRepository, commit: str) -> dict[Path,
     :param commit: A commit.
     :return: The content of each file of its tree, by its path in the tree.
     """
-    paths = scratch_repository.run_git("ls-tree", "-r", "--name-only", commit)
+    paths = scratch_repository.git.run("ls-tree", "-r", "--name-only", commit)
     return {
-        Path(path): scratch_repository.git.file_at(commit, path) or ""
+        Path(path): scratch_repository.run_git("show", f"{commit}:{path}").stdout
         for path in paths.splitlines()
     }
 
@@ -143,7 +145,7 @@ def test_publishing_replaces_the_pull_request_branch(
 ):
     edited_move_split.publish(scratch_repository.git, str(published_branch))
     branch = f"refs/heads/{edited_move.pull_request.head.branch}"
-    published = scratch_repository.run_git(
+    published = scratch_repository.git.run(
         "ls-remote", str(published_branch), branch
     ).split()[0]
     assert published == edited_move_split.remaining_commit
@@ -165,3 +167,17 @@ def test_a_branch_moved_since_it_was_read_is_not_replaced(
     )
     with pytest.raises(GitCommandFailed):
         edited_move_split.publish(scratch_repository.git, str(published_branch))
+
+
+# %% the proof
+
+
+def test_a_move_commit_the_triage_cannot_prove_is_refused(
+    scratch_repository: ScratchRepository, edited_move: PullRequestChanges
+):
+    """
+    A triager without judgments proves no file mechanical, so the split is refused.
+    """
+    splitter = MoveSplitter(scratch_repository.git, PullRequestTriager(judgments=()))
+    with pytest.raises(UnprovenMoveError):
+        splitter.split(edited_move)

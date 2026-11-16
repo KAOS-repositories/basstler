@@ -79,9 +79,7 @@ class MoveOnlyTree:
             number for span in spans for number in range(span.first, span.last + 1)
         }
         return "".join(
-            line
-            for number, line in enumerate(lines, start=1)
-            if number not in removed
+            line for number, line in enumerate(lines, start=1) if number not in removed
         )
 
     def pasted(self, path: PurePosixPath, start: str) -> str:
@@ -96,8 +94,14 @@ class MoveOnlyTree:
             self.moved.arriving_at(path),
             key=lambda moved: head.definition_span(moved.name).first,
         )
-        blocks = [self.base_lines(moved) for moved in arriving]
-        return "\n\n".join([start, *blocks] if start else blocks)
+        parts = (
+            [start, *map(self.base_lines, arriving)]
+            if start
+            else map(self.base_lines, arriving)
+        )
+        return "\n\n".join(
+            part if part.endswith("\n") else f"{part}\n" for part in parts
+        )
 
     @staticmethod
     def base_lines(moved: MovedDefinition) -> str:
@@ -204,7 +208,9 @@ class MoveSplitter:
             base_commit,
             MoveOnlyTree(changes, moved).files(),
             "Move definitions unchanged\n\n"
-            + "\n".join(f"- {each.old_path} -> {each.new_path}" for each in moved.definitions),
+            + "\n".join(
+                f"- {each.old_path} -> {each.new_path}" for each in moved.definitions
+            ),
             date=date,
         )
         self.prove(changes, move_commit)

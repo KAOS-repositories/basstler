@@ -378,7 +378,9 @@ class GitCommandRunner:
             if date is None
             else {GitVariable.AUTHOR_DATE: date, GitVariable.COMMITTER_DATE: date}
         )
-        parent_arguments = [argument for commit in parents for argument in ("-p", commit)]
+        parent_arguments = [
+            argument for commit in parents for argument in ("-p", commit)
+        ]
         return self.run(
             "commit-tree", tree, *parent_arguments, "-m", message, environment=dates
         )

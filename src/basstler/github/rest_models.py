@@ -21,6 +21,7 @@ from basstler.github.review_models import (
     ThreadComment,
 )
 from basstler.github.states import ConclusionOutcome, PullRequestState, ReviewState
+from basstler.github.git_objects import GitObject
 from basstler.github.web_page import AbsentAsEmpty, WebPage
 from basstler.json_model import ValidatedJSONModel
 
@@ -42,14 +43,10 @@ class RestPullRequestState(StrEnum):
     CLOSED = "closed"
 
 
-class RestPullRequestHead(ValidatedJSONModel):
+class RestPullRequestHead(GitObject):
     """
-    The branch a pull request was opened from.
-    """
-
-    sha: str
-    """
-    The commit the branch points at, which the checks are reported against.
+    The branch a pull request was opened from, standing for the commit it points at,
+    which the checks are reported against.
     """
 
     owner: Annotated[Author, Field(alias="user")]
@@ -58,14 +55,20 @@ class RestPullRequestHead(ValidatedJSONModel):
     """
 
 
-class RestPullRequestSummary(RestResponse, WebPage):
+class PullRequestPage(WebPage):
     """
-    One pull request as REST describes it, whether listed or read on its own.
+    A pull request as every REST resource of one names it: by its number and its page.
     """
 
     number: int
     """
-    Its number on the upstream repository.
+    Its number on the repository it is opened on.
+    """
+
+
+class RestPullRequestSummary(RestResponse, PullRequestPage):
+    """
+    One pull request as REST describes it, whether listed or read on its own.
     """
 
     title: str

@@ -46,6 +46,7 @@ from basstler.github.exceptions import (
 )
 from basstler.github.repository import GitHubAddress, Repository
 from basstler.github.rest_models import RestPullRequestSummary
+from basstler.github.token_form import CreateToken, StoreToken, TokenStep
 from basstler.github.run_listing import ListedRun, RunListing
 from basstler.github.states import CheckOutcome
 from basstler.github.workflows import TriggerEvent, Workflow
@@ -2163,13 +2164,26 @@ def published_marking_viewed(published: Publishing):
     ).publish()
 
 
-def test_one_owner_s_build_and_marking_files_viewed_leave_one_token_step(published):
+def test_one_owner_s_build_and_marking_files_viewed_leave_one_pair_of_token_steps(
+    published,
+):
+    """
+    The plan site's own token steps are left out, and the mark-viewed part creates and
+    stores the one token both jobs share.
+    """
     report = published_marking_viewed(published)
-    assert [
-        pending.step
-        for pending in report.pending
-        if pending.step in (UserStep.CREATE_TOKEN, UserStep.STORE_TOKEN)
-    ] == []
+    assert (
+        [
+            pending.step
+            for pending in report.pending
+            if pending.step in (UserStep.CREATE_TOKEN, UserStep.STORE_TOKEN)
+        ],
+        [
+            (type(step), len(step.token.uses))
+            for step in report.mark_viewed.user_steps
+            if isinstance(step, TokenStep)
+        ],
+    ) == ([], [(CreateToken, 2), (StoreToken, 2)])
 
 
 def test_the_shared_token_is_stored_as_both_secrets(published):
@@ -2177,10 +2191,10 @@ def test_the_shared_token_is_stored_as_both_secrets(published):
     (command,) = [
         step.command for step in report.mark_viewed.user_steps if step.command
     ]
-    assert [
+    assert all(
         f"gh secret set {secret}" in command
         for secret in (PlanSiteSecret.TOKEN, ReviewTriageSecret.VIEWER_TOKEN)
-    ] == [True, True]
+    )
 
 
 def test_marking_files_viewed_is_reported_after_the_plan_site(published):

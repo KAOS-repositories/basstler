@@ -5,9 +5,13 @@ remote URL.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from basstler.git.branch import Branch
 from basstler.github.repository import (
+    GitHubAccountPage,
     GitHubAddress,
     MalformedRepositoryError,
     PullRequestReference,
@@ -18,6 +22,16 @@ from basstler.setup.steps import Host
 REPOSITORY = Repository("an-owner", "a-repository")
 """
 The repository every well-formed reference and remote URL in these tests names.
+"""
+
+BRANCH = Branch("main")
+"""
+The branch the page and path tests address.
+"""
+
+WORKFLOW = Path(".github/workflows/a-workflow.yml")
+"""
+The workflow the page and path tests address.
 """
 
 # %% repository references
@@ -119,7 +133,92 @@ def test_the_new_actions_secret_form_is_under_the_repository_s_settings():
     )
 
 
+def test_the_actions_settings_page_is_under_the_repository_s_settings():
+    assert REPOSITORY.actions_settings_url == f"{REPOSITORY.settings_url}/actions"
+
+
+def test_a_workflow_s_page_lists_its_runs_under_the_repository_s_actions():
+    assert (
+        REPOSITORY.workflow_page_url(WORKFLOW)
+        == f"{REPOSITORY.url}/actions/workflows/{WORKFLOW.name}"
+    )
+
+
+def test_the_new_file_page_is_under_its_branch():
+    assert REPOSITORY.new_file_page_url(BRANCH) == f"{REPOSITORY.url}/new/{BRANCH.name}"
+
+
+def test_the_edit_page_of_a_file_is_under_its_branch():
+    assert REPOSITORY.edit_file_url(BRANCH, "a/b.yml") == (
+        f"{REPOSITORY.url}/edit/{BRANCH.name}/a/b.yml"
+    )
+
+
+def test_a_file_s_page_is_under_its_branch():
+    assert REPOSITORY.file_url(BRANCH, "a/b.md") == (
+        f"{REPOSITORY.url}/blob/{BRANCH.name}/a/b.md"
+    )
+
+
+def test_the_compare_page_of_a_branch_on_the_same_repository_names_it_alone():
+    assert REPOSITORY.compare_url(BRANCH, Branch("topic")) == (
+        f"{REPOSITORY.url}/compare/{BRANCH.name}...topic"
+    )
+
+
+def test_the_compare_page_of_a_branch_on_a_fork_names_its_owner():
+    assert REPOSITORY.compare_url(BRANCH, Branch("topic"), "a-forker") == (
+        f"{REPOSITORY.url}/compare/{BRANCH.name}...a-forker:topic"
+    )
+
+
+def test_an_account_page_is_under_github_s_web_root():
+    assert GitHubAccountPage.NEW_FINE_GRAINED_TOKEN.url == (
+        f"{GitHubAddress.WEB}/{GitHubAccountPage.NEW_FINE_GRAINED_TOKEN}"
+    )
+
+
 # %% REST paths
+
+
+def test_a_file_s_contents_path_reads_it_at_a_revision():
+    assert REPOSITORY.contents_path("a/b.yml", "abc123") == (
+        f"repos/{REPOSITORY.full_name}/contents/a/b.yml?ref=abc123"
+    )
+
+
+def test_a_file_s_contents_path_without_a_revision_writes_it():
+    assert REPOSITORY.contents_path("a/b.yml") == (
+        f"repos/{REPOSITORY.full_name}/contents/a/b.yml"
+    )
+
+
+def test_the_git_references_path_creates_references():
+    assert REPOSITORY.git_references_path == f"repos/{REPOSITORY.full_name}/git/refs"
+
+
+def test_a_branch_s_reference_path_is_below_the_git_reference_api():
+    assert REPOSITORY.branch_reference_path(BRANCH) == (
+        f"repos/{REPOSITORY.full_name}/git/ref/heads/{BRANCH.name}"
+    )
+
+
+def test_the_actions_permissions_path_is_below_the_repository_s_actions():
+    assert REPOSITORY.actions_permissions_path == (
+        f"repos/{REPOSITORY.full_name}/actions/permissions"
+    )
+
+
+def test_a_workflow_s_path_is_below_the_repository_s_workflows():
+    assert REPOSITORY.workflow_path(WORKFLOW) == (
+        f"repos/{REPOSITORY.full_name}/actions/workflows/{WORKFLOW.name}"
+    )
+
+
+def test_a_workflow_s_dispatch_path_is_below_its_own_path():
+    assert REPOSITORY.workflow_dispatch_path(WORKFLOW) == (
+        f"{REPOSITORY.workflow_path(WORKFLOW)}/dispatches"
+    )
 
 
 def test_a_job_log_path_is_the_one_the_actions_api_serves_it_from():

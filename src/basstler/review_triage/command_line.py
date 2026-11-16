@@ -12,6 +12,7 @@ from cyclopts import App
 
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
+from basstler.github.basstler_project import BasstlerProject
 from basstler.github.client import GitHubRestClient
 from basstler.github.pull_request_changes import PullRequestChangesReader
 from basstler.github.repository import PullRequestReference, Repository
@@ -236,7 +237,7 @@ def set_up_mark_viewed(
     *,
     workflow_repository: str | None = None,
     repository: str | None = None,
-    branch_or_tag: str = "main",
+    branch_or_tag: str = BasstlerProject.default_branch.name,
     on_every_pull_request: bool = False,
 ) -> ReviewTriageExitCode:
     """

@@ -17,7 +17,7 @@ from basstler.git.branch import Branch
 from basstler.git.commands import CommitTrailer, GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.render_common import create_template_environment
-from basstler.github.repository import BASSTLER_REPOSITORY
+from basstler.github.basstler_project import BasstlerProject
 
 # %% the Action branch's names
 
@@ -89,7 +89,7 @@ class BasstlerSource(StrEnum):
     Where the reusable workflow and the package a run installs come from.
     """
 
-    REPOSITORY = BASSTLER_REPOSITORY.full_name
+    REPOSITORY = BasstlerProject.repository.full_name
     REUSABLE_WORKFLOW = ".github/workflows/upstream-reviews-action.yml"
     LATEST_RELEASE = "release"
     """

@@ -76,6 +76,11 @@ What the recorded pyright report holds in place of the checkout's absolute path.
         ("def () -> pkg.model.Plotter", None),
         ("(name: str) -> None", None),
         ("Any", None),
+        ("Literal[Outcome.SUCCEEDED]", "Outcome"),
+        ("Literal[pkg.model.Outcome.SUCCEEDED, pkg.model.Outcome.ABORTED]", "Outcome"),
+        ("Literal[Outcome.SUCCEEDED, Plotter.LINE]", None),
+        ("Literal['pkg.model']", None),
+        ("Literal[3]", None),
     ],
 )
 def test_a_revealed_type_names_the_one_class_it_is_an_instance_of(

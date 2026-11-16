@@ -41,6 +41,16 @@ NOT_INSTANCE_PREFIXES = ("type[", "def ", "(", "Overload[", "Module(")
 How a checker begins the type of a class itself, a function or a module.
 """
 
+LITERAL_TYPE = re.compile(r"(?:[\w.]+\.)?Literal\[(?P<values>.*)\]")
+"""
+A ``Literal`` type as a checker writes it, its values the group ``values``.
+"""
+
+LITERAL_VALUE_SEPARATOR = ","
+"""
+What separates the values of a ``Literal`` type.
+"""
+
 INFERRED_MARKER = "*"
 """
 What pyright appends to a type it inferred rather than read from a declaration.
@@ -144,10 +154,31 @@ class RevealedType:
         member = members[0].removesuffix(INFERRED_MARKER)
         if member.startswith(NOT_INSTANCE_PREFIXES):
             return None
-        name = member.split("[", 1)[0].rsplit(".", 1)[-1]
-        if name in UNKNOWN_TYPES or not name.isidentifier():
+        literal = LITERAL_TYPE.fullmatch(member)
+        name = (
+            self.enumeration_of(literal["values"])
+            if literal
+            else member.split("[", 1)[0].rsplit(".", 1)[-1]
+        )
+        if name is None or name in UNKNOWN_TYPES or not name.isidentifier():
             return None
         return name
+
+    @staticmethod
+    def enumeration_of(values: str) -> str | None:
+        """
+        :param values: The values of a ``Literal`` type, such as ``Color.RED, Color.BLUE``.
+        :return: The name of the one enumeration all of them are members of, ``None``
+            when they are not all members of one.
+        """
+        enumerations = {
+            tuple(value.strip().split(".")[-2:-1])
+            for value in values.split(LITERAL_VALUE_SEPARATOR)
+        }
+        if len(enumerations) != 1:
+            return None
+        [enumeration] = enumerations
+        return enumeration[0] if enumeration else None
 
 
 # %% the checkers

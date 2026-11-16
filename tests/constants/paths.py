@@ -415,6 +415,12 @@ class DatasetLocation(PathEnumeration):
     The file versions, descriptions and pull request the review triage is tested on.
     """
 
+    RECEIVER_INFERENCE = DIRECTORY / "experiments" / "receiver-inference"
+    """
+    The checker reports and probed files the receiver inference experiment is tested
+    on.
+    """
+
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
     """
     The recorded GraphQL responses the upstream review reader is replayed against.

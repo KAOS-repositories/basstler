@@ -140,6 +140,33 @@ class RepositoryStateLocation(PathEnumeration):
     """
 
 
+class ExperimentLocation(PathEnumeration):
+    """
+    Where experiments keep the tools they install, the checkouts they read and the
+    results they write; short, since Windows limits the length of a path.
+    """
+
+    WORKSPACE = Path.home() / ".cache" / "basstler-experiments"
+    """
+    Everything the experiments keep.
+    """
+
+    TOOLS = WORKSPACE / "tools"
+    """
+    One virtual environment per installed tool.
+    """
+
+    CHECKOUTS = WORKSPACE / "checkouts"
+    """
+    The worktrees of the commits an experiment reads files of.
+    """
+
+    RESULTS = WORKSPACE / "results"
+    """
+    The tables the experiments write.
+    """
+
+
 class CommitScratchFile(PathEnumeration):
     """
     The files a commit built outside the working tree is staged through, relative to a

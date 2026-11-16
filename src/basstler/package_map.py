@@ -132,6 +132,12 @@ class Distribution(StrEnum):
     The plan site.
     """
 
+    EXPERIMENTS = "basstler-experiments"
+    """
+    Experiments measuring basstler's choices against alternatives; installed by no
+    other distribution.
+    """
+
     META_PACKAGE = "basstler"
     """
     The command tree every command is mounted on, installing every default
@@ -386,6 +392,17 @@ PACKAGE_MAP = PackageMap(
                 Distribution.STACK,
                 Distribution.PLAN,
                 Distribution.NOTES,
+            ),
+        ),
+        DistributionDeclaration(
+            Distribution.EXPERIMENTS,
+            Layer.USER_FACING,
+            ("experiments",),
+            (
+                Distribution.CORE,
+                Distribution.GIT,
+                Distribution.GITHUB,
+                Distribution.REVIEW_TRIAGE,
             ),
         ),
         DistributionDeclaration(

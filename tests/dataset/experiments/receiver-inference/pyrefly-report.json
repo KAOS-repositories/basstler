@@ -1,0 +1,7 @@
+ WARN While finding Python interpreter: no Python interpreter could be found to query for values.
+{
+  "errors": [
+    {"line": 5, "column": 9, "stop_line": 5, "stop_column": 20, "path": "pkg/use.py", "code": -2, "name": "unimported-directive", "description": "`reveal_type` must be imported from `typing` for runtime usage", "concise_description": "", "severity": "error"},
+    {"line": 5, "column": 20, "stop_line": 5, "stop_column": 23, "path": "pkg/use.py", "code": -2, "name": "reveal-type", "description": "revealed type: Plotter", "concise_description": "revealed type: Plotter", "severity": "info"}
+  ]
+}

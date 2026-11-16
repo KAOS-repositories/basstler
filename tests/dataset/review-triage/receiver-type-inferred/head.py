@@ -41,7 +41,9 @@ def goal_plotter() -> GoalPlotter:
 
 
 executor = Executor([Recording()])
-executor.require_extension(extension_type=Recording).plotter.plot(file_name="trajectory.pdf")
+executor.require_extension(extension_type=Recording).plotter.plot(
+    file_name="trajectory.pdf"
+)
 goal_plotter().plot(goal_id=3)
 
 

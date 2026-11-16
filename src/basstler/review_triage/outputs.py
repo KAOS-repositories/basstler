@@ -90,8 +90,9 @@ class ViewedFile(ValidatedJSONModel):
 @dataclass(frozen=True)
 class ViewedMarking(TriageOutput):
     """
-    Marks every mechanical file viewed for the account whose credential the writer
-    sends, raising :class:`GraphQLErrorsReturned` when GitHub refuses one.
+    Marks every mechanical file not left for review as a sample viewed for the account
+    whose credential the writer sends, raising :class:`GraphQLErrorsReturned` when
+    GitHub refuses one.
     """
 
     github: GitHubWriter
@@ -101,7 +102,7 @@ class ViewedMarking(TriageOutput):
 
     def publish(self, outcome: TriageOutcome) -> None:
         document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
-        for file in outcome.mechanical_files:
+        for file in outcome.files_to_mark_viewed:
             variables = ViewedFile(
                 outcome.pull_request.node_identifier, file.change.path
             )

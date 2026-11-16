@@ -4,7 +4,7 @@ A whole pull request triaged: its renames and the verdict on each file it change
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 
 from basstler.github.pull_request_changes import (
@@ -35,6 +35,7 @@ from basstler.review_triage.definition_moves import (
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
+from basstler.review_triage.review_samples import ReviewSample, ReviewSampling
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.rules import TriageRule
@@ -69,6 +70,11 @@ class TriageOutcome:
     The commit its changes were triaged from, and why.
     """
 
+    samples: tuple[ReviewSample, ...] = ()
+    """
+    The mechanical files left for review to show a rename.
+    """
+
     @property
     def mechanical_files(self) -> tuple[MechanicalFile, ...]:
         """
@@ -82,6 +88,16 @@ class TriageOutcome:
         The files a reviewer has to read.
         """
         return tuple(file for file in self.files if isinstance(file, FileNeedingReview))
+
+    @property
+    def files_to_mark_viewed(self) -> tuple[MechanicalFile, ...]:
+        """
+        The mechanical files not left for review as a sample.
+        """
+        sampled = {sample.path for sample in self.samples}
+        return tuple(
+            file for file in self.mechanical_files if file.change.path not in sampled
+        )
 
 
 # %% triaging
@@ -119,6 +135,11 @@ class PullRequestTriager:
     The opt-in rules in force.
     """
 
+    sampling: ReviewSampling | None = None
+    """
+    Picks the mechanical files left for review to show a rename, ``None`` to leave none.
+    """
+
     def renames(self, changes: PullRequestChanges) -> RenameMap:
         """
         :param changes: A pull request and the files it changes.
@@ -135,30 +156,37 @@ class PullRequestTriager:
             changed mechanical without being judged.
         """
         separated = BaseBranchMergeDetection().separate(changes)
-        own_changes = separated.own
-        renames = self.renames(own_changes)
-        base_definitions = DefinitionIndex(CommitModules(own_changes.commits.base_tree))
-        triager = FileTriager(
-            JudgmentContext(
-                renames,
-                base_definitions,
-                DefinitionMoveDetection().moved_definitions(own_changes, renames),
-                RenameMap.from_decisions(
-                    [SubclassSubstitutionDetection().decisions(own_changes)]
-                ),
-                self.rules,
-            ),
-            self.judgments,
-        )
+        triager = self.file_triager(separated.own)
         verdicts: dict[PurePosixPath, FileVerdict] = {
             change.path: MechanicalFile(
                 change, frozenset({MechanicalChange.BASE_BRANCH_MERGE})
             )
             for change in separated.merged
-        } | {change.path: triager.triage(change) for change in own_changes.files}
-        return TriageOutcome(
-            changes.pull_request,
-            renames,
-            tuple(verdicts[change.path] for change in changes.files),
-            changes.start,
+        } | {change.path: triager.triage(change) for change in separated.own.files}
+        renames = triager.context.renames
+        files = tuple(verdicts[change.path] for change in changes.files)
+        outcome = TriageOutcome(changes.pull_request, renames, files, changes.start)
+        if self.sampling is None:
+            return outcome
+        return replace(outcome, samples=self.sampling.samples(renames, files))
+
+    def file_triager(self, changes: PullRequestChanges) -> FileTriager:
+        """
+        :param changes: A pull request's own changes, those of base branch merges
+            aside.
+        :return: What judges each of its files, with its renames, moves and
+            substitutions.
+        """
+        renames = self.renames(changes)
+        return FileTriager(
+            JudgmentContext(
+                renames,
+                DefinitionIndex(CommitModules(changes.commits.base_tree)),
+                DefinitionMoveDetection().moved_definitions(changes, renames),
+                RenameMap.from_decisions(
+                    [SubclassSubstitutionDetection().decisions(changes)]
+                ),
+                self.rules,
+            ),
+            self.judgments,
         )

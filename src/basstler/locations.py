@@ -271,6 +271,13 @@ class ReviewTriageLocation(PathEnumeration):
     The Markdown report of which files of a pull request need review.
     """
 
+    MECHANICAL_SUMMARY_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "review_triage_mechanical_summary.md.jinja"
+    )
+    """
+    The Markdown summary of the changes a pull request's mechanical commit makes.
+    """
+
 
 class PluginLocation(PathEnumeration):
     """

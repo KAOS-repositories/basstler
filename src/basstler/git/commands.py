@@ -320,21 +320,25 @@ class GitCommandRunner:
     def commit_files(
         self,
         parent: str | None,
-        files: Mapping[str, str],
+        files: Mapping[str, str | None],
         message: str,
         merged_parents: tuple[str, ...] = (),
         date: str | None = None,
+        copied: Mapping[str, str] | None = None,
     ) -> str:
         """
         Commit files on top of a commit without touching the working tree or the index,
         keeping every file of the parent not given.
 
         :param parent: The commit to build on, ``None`` for a commit with no parent.
-        :param files: What to write, by path, each without its final newline.
+        :param files: What to write, by path, each without its final newline;
+            ``None`` removes the file.
         :param message: The commit message.
         :param merged_parents: Further parents after *parent*, whose files the commit
             does not keep.
         :param date: The commit's author and committer date, the clock's when ``None``.
+        :param copied: Files to take byte for byte, mode included, from another
+            commit: that commit by each file's path there and here.
         :return: The new commit.
         """
         with tempfile.TemporaryDirectory() as scratch:
@@ -342,8 +346,20 @@ class GitCommandRunner:
                 GitVariable.INDEX_FILE: str(Path(scratch) / CommitScratchFile.INDEX)
             }
             self.run("read-tree", parent or "--empty", environment=index)
+            for path, commit in (copied or {}).items():
+                mode, _, blob = self.run("ls-tree", commit, "--", path).split()[:3]
+                self.run(
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    f"{mode},{blob},{path}",
+                    environment=index,
+                )
             blob_file = Path(scratch) / CommitScratchFile.BLOB
             for path, text in files.items():
+                if text is None:
+                    self.run("update-index", "--force-remove", path, environment=index)
+                    continue
                 blob_file.write_bytes(f"{text}\n".encode(GIT_TEXT_ENCODING))
                 blob = self.run("hash-object", "-w", str(blob_file))
                 self.run(

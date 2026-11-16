@@ -182,14 +182,45 @@ class DefinitionMoveEditedSample(SampleTrees):
 
     BASE_TREE = "base"
     HEAD_TREE = "head"
-    MOVE_ONLY_TREE = "move-only"
+    MECHANICAL_TREE = "mechanical"
     """
-    The tree that only moves the classes, unchanged.
+    The tree making only the mechanical changes: the classes moved, unchanged.
     """
 
     @classproperty
     def directory_name(cls) -> str:
         return "definition-move-edited"
+
+
+class RenameMixedSample(SampleTrees):
+    """
+    A pull request renaming two methods across two modules, rewrapping the line the
+    longer name makes too long, and changing a default value.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    MECHANICAL_TREE = "mechanical"
+    """
+    The tree making only the renames and the rewrap.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "rename-mixed"
+
+
+class RenameSampledSample(SampleTrees):
+    """
+    A pull request only renaming two methods across two modules, both defined in one.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "rename-sampled"
 
 
 class DefinitionMoveFromMovedModuleSample(SampleTrees):

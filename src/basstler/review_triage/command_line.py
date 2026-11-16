@@ -14,6 +14,7 @@ from cyclopts import App, Group, Parameter, validators
 
 from basstler.exit_codes import ExitCode
 from basstler.github.client import GitHubRestClient
+from basstler.github.pull_request import PullRequestDescription
 from basstler.git.commands import GitCommandRunner
 from basstler.github.pull_request_changes import (
     CommitStart,
@@ -28,8 +29,9 @@ from basstler.github.repository import Repository
 from basstler.locations import PackageLocation
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.exceptions import MissingHeadRepositoryError
-from basstler.review_triage.move_split import MoveSplitter
+from basstler.review_triage.mechanical_split import MechanicalSplitter
 from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
+from basstler.review_triage.review_samples import ReviewSampling
 from basstler.review_triage.rules import (
     ReviewTriageSettings,
     RuleSelection,
@@ -71,9 +73,9 @@ class ReviewTriageCommand(StrEnum):
     Print the description comment declaring renames.
     """
 
-    SPLIT_MOVES = "split-moves"
+    SPLIT_MECHANICAL = "split-mechanical"
     """
-    Replace a pull request's commits with one moving its definitions unchanged and one
+    Replace a pull request's commits with one making its mechanical changes and one
     making every other change.
     """
 
@@ -136,6 +138,11 @@ class TriagePublication:
     The rules turned on and off on the command line, outranking the project's settings.
     """
 
+    leaves_samples: bool = True
+    """
+    Whether one mechanical file showing each rename is left for review.
+    """
+
     @classmethod
     def from_arguments(
         cls,
@@ -147,6 +154,7 @@ class TriagePublication:
         select_rules: tuple[TriageRule, ...] = (),
         ignore_rules: tuple[TriageRule, ...] = (),
         from_merge_base: bool = False,
+        samples: bool = True,
     ) -> TriagePublication:
         """
         :param pull_request: The pull request's number.
@@ -157,6 +165,8 @@ class TriagePublication:
         :param select_rules: The rules to turn on.
         :param ignore_rules: The rules to turn off.
         :param from_merge_base: Whether to triage the whole change.
+        :param samples: Whether to leave one mechanical file showing each rename for
+            review.
         :return: The publication triaging from *since*, else from before the *last*
             commits, else from the merge base if *from_merge_base*, else from the
             viewer's last review.
@@ -177,6 +187,7 @@ class TriagePublication:
             rule_options=RuleSelection(
                 frozenset(select_rules), frozenset(ignore_rules)
             ),
+            leaves_samples=samples,
         )
 
     def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
@@ -222,6 +233,7 @@ class TriagePublication:
             rules=self.rule_options.applied_to(
                 ReviewTriageSettings.from_checkout(checkout).selection
             ),
+            sampling=ReviewSampling() if self.leaves_samples else None,
         )
 
 
@@ -260,6 +272,7 @@ def report(
     ] = False,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
+    samples: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown; by default only the
@@ -279,6 +292,8 @@ def report(
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param samples: Leave one mechanical file showing each rename for review, the file
+        defining the new name where it can; ``--no-samples`` leaves none.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -290,6 +305,7 @@ def report(
         select_rule,
         ignore_rule,
         from_merge_base,
+        samples,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -311,6 +327,7 @@ def mark_viewed(
     ] = False,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
+    samples: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the account whose GitHub
@@ -331,6 +348,8 @@ def mark_viewed(
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param samples: Leave one mechanical file showing each rename for review, the file
+        defining the new name where it can; ``--no-samples`` leaves none.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -342,6 +361,7 @@ def mark_viewed(
         select_rule,
         ignore_rule,
         from_merge_base,
+        samples,
     ).publish((ViewedMarking(GitHubRestClient()), MarkdownReport()))
     return ReviewTriageExitCode.SUCCESS
 
@@ -362,46 +382,73 @@ def declare(
     return ReviewTriageExitCode.SUCCESS
 
 
-@review_triage_app.command(name=ReviewTriageCommand.SPLIT_MOVES)
-def split_moves(
+@review_triage_app.command(name=ReviewTriageCommand.SPLIT_MECHANICAL)
+def split_mechanical(
     pull_request: int,
     *,
     repository: str | None = None,
     rename: tuple[str, ...] = (),
     rejected_rename: tuple[str, ...] = (),
+    since: Annotated[str | None, Parameter(group=COMPARISON_START_GROUP)] = None,
+    last: Annotated[
+        int | None,
+        Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
+    ] = None,
+    from_merge_base: Annotated[
+        bool, Parameter(group=COMPARISON_START_GROUP, negative=())
+    ] = False,
 ) -> ReviewTriageExitCode:
     """
-    Replace a pull request's commits with one moving its definitions unchanged, proven
-    mechanical, and one making every other change, whose tree is the former head's; a
-    reviewer then reads only the second. Nothing is pushed unless the proof holds.
+    Replace a pull request's commits since your last review with one making the changes
+    the triage proves mechanical and one making every other change, whose tree is the
+    former head's, and summarise the first in the description. Nothing is pushed unless
+    the proof holds.
 
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
         default.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
+    :param since: The commit to split from, keeping the commits up to it.
+    :param last: How many of the pull request's last commits to split.
+    :param from_merge_base: Split the whole change, not only what changed since your
+        last review.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
-    publication = TriagePublication(
+    publication = TriagePublication.from_arguments(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
-        MergeBaseStart(),
+        since,
+        last,
+        from_merge_base=from_merge_base,
+        samples=False,
     )
     git = GitCommandRunner(Path.cwd())
     changes = publication.changes(git)
-    split = MoveSplitter(git, publication.triager(git)).split(changes)
+    split = MechanicalSplitter(git, publication.triager(git)).split(changes)
     if split is None:
-        logger.info(f"#{pull_request} moves no definition; its branch is unchanged.")
+        logger.info(
+            f"#{pull_request} changes wholly mechanically, or nothing mechanically, "
+            f"since {changes.start.reason}; its branch is unchanged."
+        )
         return ReviewTriageExitCode.SUCCESS
     head_repository = changes.pull_request.head.repository
     if head_repository is None:
         raise MissingHeadRepositoryError(pull_request)
     split.publish(git, head_repository.repository.clone_url)
+    base_repository = publication.repository_in(git)
+    pull_request_url = base_repository.pull_request_url(pull_request)
+    GitHubRestClient().send(
+        PullRequestDescription(
+            repository=base_repository,
+            number=pull_request,
+            body=split.description(pull_request_url),
+        )
+    )
     logger.info(
-        f"#{pull_request} now moves its definitions unchanged in {split.move_commit} "
-        f"and makes every other change in {split.remaining_commit}; review the "
-        f"second: {publication.repository_in(git).url}/pull/{pull_request}/commits/"
-        f"{split.remaining_commit}"
+        f"#{pull_request} now makes its mechanical changes in {split.mechanical_commit}"
+        f" and every other change in {split.remaining_commit}; review the second: "
+        f"{pull_request_url}/commits/{split.remaining_commit}"
     )
     return ReviewTriageExitCode.SUCCESS

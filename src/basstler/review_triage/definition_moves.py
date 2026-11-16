@@ -45,6 +45,10 @@ class DefinitionMoveDetection(RenameSource):
     """
 
     @classproperty
+    def finds_moves(cls) -> bool:
+        return True
+
+    @classproperty
     def label(cls) -> str:
         return "definition move"
 

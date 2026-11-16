@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 from cyclopts import CycloptsError
 
+from basstler.git.commands import GitCommandRunner
 from basstler.github.pull_request_changes import (
     CommitStart,
     LastCommitsStart,
@@ -59,4 +60,47 @@ def test_conflicting_or_empty_starts_are_refused(command, options):
     with pytest.raises(CycloptsError):
         review_triage_app.parse_args(
             [command, "7", *options], exit_on_error=False, print_error=False
+        )
+
+
+# %% samples
+
+
+@pytest.mark.parametrize(
+    ("options", "samples"),
+    [((), True), (("--no-samples",), False)],
+    ids=["by default", "--no-samples"],
+)
+@pytest.mark.parametrize(
+    "command", [ReviewTriageCommand.REPORT, ReviewTriageCommand.MARK_VIEWED]
+)
+def test_samples_are_left_unless_turned_off(command, options, samples):
+    _, bound, _ = review_triage_app.parse_args(
+        [command, "7", *options], exit_on_error=False, print_error=False
+    )
+    assert bound.arguments.get("samples", True) is samples
+
+
+def test_a_publication_without_samples_leaves_none(tmp_path):
+    git = GitCommandRunner(tmp_path)
+    git.run("init", "--quiet")
+    publication = TriagePublication.from_arguments(
+        7, None, TriageDeclaration(), None, None, samples=False
+    )
+    assert publication.triager(git).sampling is None
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ("--since", "abc123", "--last", "2"),
+        ("--since", "abc123", "--from-merge-base"),
+    ],
+)
+def test_the_split_refuses_conflicting_starts(options):
+    with pytest.raises(CycloptsError):
+        review_triage_app.parse_args(
+            [ReviewTriageCommand.SPLIT_MECHANICAL, "7", *options],
+            exit_on_error=False,
+            print_error=False,
         )

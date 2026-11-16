@@ -1,11 +1,12 @@
-Plan (draft #238, experiments package, stacked on #214):
-- Compare basstler's receiver inference with mypy, pyright and Pyrefly on real PRs
+Plan (receiver inference experiment, draft #238, stacked on #214):
+- Measure basstler's receiver inference against mypy, pyright and Pyrefly, alone and combined
 
 Done:
-- Single-pass probing of every receiver, optional cross-check (on by default), fc6096a6 pushed
-- #967: basstler 12 needing review, Pyrefly/pyright 14, mypy 17; no checker disputes a basstler class
+- Single checker run per PR, optional cross-check (on by default)
+- #214 restacked at 2d202379 (the faster triage, folded in from closed #239)
+- basstler+<checker> ways from the same checker run; enum-member Literal read as its enumeration (e0ea70c0)
+- #967: basstler+Pyrefly leaves the same 12 files as basstler, +1.8 s; no disputes
 
 Next:
-- User decides: keep basstler's inference (recommended) or adopt Pyrefly
-- Profile shows triage time is mostly git processes (346 git show, 178 git grep) and AST deepcopy; offered as a follow-up
-- Read CI on fc6096a6
+- Decide whether to adopt Pyrefly: it changes no verdict on #967, #608, #609
+- Read CI on e0ea70c0 and on #214's 2d202379

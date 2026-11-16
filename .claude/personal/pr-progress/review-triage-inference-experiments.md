@@ -1,9 +1,11 @@
-Plan (experiments package, draft #238, stacked on #214):
-- Reusable basstler.experiments plus the receiver inference experiment (basstler vs mypy, pyright, Pyrefly)
+Plan (draft #238, experiments package, stacked on #214):
+- Compare basstler's receiver inference with mypy, pyright and Pyrefly on real PRs
 
 Done:
-- Package, tests (23), full run on cram #967/#608/#609 at ba1608bd; tables in ~/.cache/basstler-experiments/results
+- Single-pass probing of every receiver, optional cross-check (on by default), fc6096a6 pushed
+- #967: basstler 12 needing review, Pyrefly/pyright 14, mypy 17; no checker disputes a basstler class
 
 Next:
-- User decides whether to keep basstler's inference (12/154 on #967, no install) or adopt a checker
-- Optionally add a plan item for the experiments package
+- User decides: keep basstler's inference (recommended) or adopt Pyrefly
+- Profile shows triage time is mostly git processes (346 git show, 178 git grep) and AST deepcopy; offered as a follow-up
+- Read CI on fc6096a6

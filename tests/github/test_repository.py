@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from basstler.git.branch import Branch
+from basstler.git.commands import GitCommandRunner
 from basstler.github.repository import (
     GitHubAccountPage,
     GitHubAddress,
@@ -77,6 +78,20 @@ def test_repository_reads_the_owner_and_name_from_a_remote_url(url: str):
 def test_repository_rejects_a_remote_url_naming_no_repository(malformed: str):
     with pytest.raises(MalformedRepositoryError):
         Repository.from_remote_url(malformed)
+
+
+def test_a_named_repository_is_taken_as_named(tmp_path: Path):
+    assert (
+        Repository.from_name_or_remote(REPOSITORY.full_name, GitCommandRunner(tmp_path))
+        == REPOSITORY
+    )
+
+
+def test_without_a_name_the_remote_s_repository_is_meant(tmp_path: Path):
+    git = GitCommandRunner(tmp_path)
+    git.run("init", "--quiet")
+    git.run("remote", "add", "a-remote", REPOSITORY.clone_url)
+    assert Repository.from_name_or_remote(None, git, "a-remote") == REPOSITORY
 
 
 # %% clone roots
@@ -190,6 +205,12 @@ def test_a_file_s_contents_path_reads_it_at_a_revision():
 def test_a_file_s_contents_path_without_a_revision_writes_it():
     assert REPOSITORY.contents_path("a/b.yml") == (
         f"repos/{REPOSITORY.full_name}/contents/a/b.yml"
+    )
+
+
+def test_an_actions_secret_s_path_is_below_the_repository_s_secrets():
+    assert REPOSITORY.actions_secret_path("A_SECRET") == (
+        f"repos/{REPOSITORY.full_name}/actions/secrets/A_SECRET"
     )
 
 

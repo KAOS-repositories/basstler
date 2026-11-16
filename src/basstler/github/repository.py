@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from basstler.git.branch import Branch
+from basstler.git.commands import GitCommandRunner
 
 
 class GitHubAddress(StrEnum):
@@ -122,6 +123,21 @@ class Repository:
             raise MalformedRepositoryError(text)
         owner, _, name = text.partition("/")
         return cls(owner, name)
+
+    @classmethod
+    def from_name_or_remote(
+        cls, name: str | None, git: GitCommandRunner, remote: str = "origin"
+    ) -> Repository:
+        """
+        :param name: A repository as ``owner/name``, or ``None``.
+        :param git: The current checkout.
+        :param remote: The remote whose repository is meant when no name is given.
+        :return: The repository named, else the one *remote* points at.
+        :raises MalformedRepositoryError: If *name* is not ``owner/name``.
+        """
+        if name:
+            return cls.parse(name)
+        return cls.from_remote_url(git.run("remote", "get-url", remote))
 
     @staticmethod
     def is_full_name(text: str) -> bool:
@@ -383,6 +399,13 @@ class Repository:
         The REST path of whether Actions may run in the repository.
         """
         return f"{self.api_path}/actions/permissions"
+
+    def actions_secret_path(self, secret: str) -> str:
+        """
+        :param secret: The Actions secret's name.
+        :return: The REST path of its metadata; GitHub never serves its value.
+        """
+        return f"{self.api_path}/actions/secrets/{secret}"
 
     def contents_path(self, file_path: str, revision: str | None = None) -> str:
         """

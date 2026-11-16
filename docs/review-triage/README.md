@@ -36,10 +36,10 @@ is left.
 - **Whose files:** it marks them viewed for the token's owner, one account per
   repository. Everyone who can push to the repository can read its secrets through a
   workflow, so give the token the least it needs and an expiry.
-- **Changing it:** on a repository that is no fork, the command never commits to the
-  default branch. It opens a pull request adding the workflow from its own branch,
-  `basstler/mark-viewed`, for you to review and merge. Where it may not push, it gives
-  you GitHub's new-file page with the workflow already filled in.
+- **Changing it:** the command never commits to a default branch. It opens a pull
+  request adding the workflow from its own branch, `basstler/mark-viewed`, for you to
+  review and merge. Where it may not push, it gives you GitHub's new-file page with the
+  workflow already filled in.
 
 The run uses `pull_request_target`, so pull requests from forks are marked too. It reads
 their commits but runs none of their code.
@@ -91,7 +91,10 @@ basstler review-triage set-up-mark-viewed
 ```
 
 It takes every step a command can:
-- it installs `.github/workflows/mark-viewed.yml` on your fork's default branch;
+- it proposes `.github/workflows/mark-viewed.yml`: on a fork, as a pull request to the
+  fork's parent from the fork's `basstler/mark-viewed` branch, so the fork's default
+  branch stays the same as its parent's; on any other repository, as a pull request to
+  that repository;
 - it turns on Actions and enables the workflow, which a fork starts with off;
 - it checks whether the secret is stored.
 
@@ -110,12 +113,15 @@ It then lists the steps only you can take, with links that fill the forms in:
 
    Keep it in your fork where you have one: everyone who can push to a repository can
    read its secrets through a workflow.
-3. **Merge the pull request adding the workflow** if the repository is no fork. When
-   an open pull request already carries the workflow, the command names it (the lowest
-   one, for stacked pull requests) and opens nothing. Otherwise it opens one. Where
-   GitHub refuses to open it, it links the pull request form with the title and
-   description filled in. Where it may not even push the branch, it links GitHub's
-   new-file page with the workflow filled in.
+3. **Merge the pull request adding the workflow.** When an open pull request already
+   carries the workflow, the command names it (the lowest one, for stacked pull
+   requests) and opens nothing. Otherwise it opens one. Where GitHub refuses to open
+   it, it links the pull request form with the title and description filled in. Where
+   it may not even push the branch, it links GitHub's new-file page with the workflow
+   filled in.
+4. **Sync your fork** once the parent has merged it, so the fork's default branch
+   carries the workflow too: `gh repo sync <owner>/<fork>`, or Sync fork on its page.
+   Until then the fork's Actions cannot run it.
 
 Where the secret cannot be read, as from a cloud session, the two token steps say to
 skip them if it is stored already.

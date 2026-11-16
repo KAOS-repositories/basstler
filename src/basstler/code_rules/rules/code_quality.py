@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import override
 
 from basstler.class_property import classproperty
+from basstler.code_rules.address_building import HandBuiltAddressChecker
 from basstler.code_rules.docstring_presence import MissingDocstringChecker
 from basstler.code_rules.prose_length import ProseLengthChecker
 from basstler.code_rules.rule import CodeReference, Section
@@ -429,6 +430,24 @@ class DesignPrinciplesRules(Section):
         "Before writing a new class, look for an existing class it can hold as a "
         "field or subclass, and use it; when related classes share fields or "
         "behaviour, give them a common base"
+    )
+
+    MODELS_BOUND_TO_THEIR_CONCEPT = (
+        "A model of an external resource or payload is bound to the concept it "
+        "describes, so every representation of one concept can be found from it: a "
+        "repository setting's model, the read that parses it and the write that "
+        "changes it are generic over that setting or hold it as a field, and the "
+        "step a user takes when the write is refused belongs to the write. Never a "
+        "free-standing copy of a concept another class already models"
+    )
+
+    ADDRESSES_ON_THEIR_SUBJECT = (
+        "Every address of an external service - a REST path, a web page - is built "
+        "by a method of the class of what it addresses (`Repository` for one within "
+        "a repository), never appended to that class's address by hand where it is "
+        "used",
+        (),
+        HandBuiltAddressChecker(),
     )
 
 

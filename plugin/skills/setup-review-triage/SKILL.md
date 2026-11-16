@@ -64,9 +64,9 @@ Control).
 
 ## 3. Actions
 
-Run the setup. It installs the workflow on the user's fork, turns on Actions, enables
-the workflow and checks for the token secret, then prints what each step came to and
-what is left:
+Run the setup. It proposes the workflow - on a fork, to the fork's parent from a fork
+branch - turns on Actions, enables the workflow and checks for the token secret, then
+prints what each step came to and what is left:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/hooks/resolve-personal-notes-config.sh" && ready_basstler_python && "${BASSTLER_PYTHON}" -m basstler review-triage set-up-mark-viewed --branch-or-tag "$(basstler_branch_or_tag)"
@@ -78,9 +78,10 @@ Relay its *Left to you* section as it printed it, with every link and command:
 - **Storing it:** the user runs `gh secret set` on their computer, or uses the browser
   steps. Never ask for the token in the chat, and never pass it on a command line you
   run.
-- **A repository that is no fork:** the setup opens a pull request adding the
-  workflow, or, where it may not push, links the new-file page with it filled in.
-  Relay the link; the user reviews and merges it.
+- **The workflow:** the setup opens a pull request adding it - on a fork, to the
+  parent, followed by syncing the fork - or, where it may not push, links the new-file
+  page with it filled in. Relay the link; the user, or the parent's maintainers,
+  review and merge it.
 
 **One token with the plan site:** when the user publishes a plan site whose repository
 has the same owner as the pull requests' repository, offer one token for both instead.
@@ -108,7 +109,7 @@ the README.
 
 - **Never handle the token's value.** It goes from GitHub's form into the user's
   `gh secret set` prompt or the browser, never through the session.
-- **Never push the workflow to a repository's default branch yourself.** The setup
-  writes only to a fork's default branch; anything else goes through a pull request the
-  user accepted.
+- **Never push the workflow to a repository's default branch.** Neither you nor the
+  setup writes one, a fork's included: a fork's default branch stays the same as its
+  parent's, so the workflow reaches it only by merging upstream and syncing.
 - **Never call a route set up from an unread or failed check.**

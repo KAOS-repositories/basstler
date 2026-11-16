@@ -20,6 +20,6 @@ class ActionsSecret(StrEnum):
     def path_on(self, repository: Repository) -> str:
         """
         :param repository: The repository that stores it.
-        :return: The REST path of its metadata there; GitHub never serves its value.
+        :return: :meth:`Repository.actions_secret_path` of this secret there.
         """
-        return f"{repository.api_path}/actions/secrets/{self}"
+        return repository.actions_secret_path(self)

@@ -22,6 +22,7 @@ from basstler.review_triage.comparison import (
     ProseComparison,
     PythonComparison,
 )
+from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.renames import Rename, RenameMap
 
 from .samples import TEMPLATE_REINDENTED, FileSample
@@ -233,6 +234,51 @@ def test_a_text_file_of_another_type_whose_whitespace_changes_needs_review():
         FileSample.TEMPLATE_RENAMED.change(), head_text=TEMPLATE_REINDENTED.read_text()
     )
     assert FileTriager(JudgmentContext(MODULE_MOVED)).triage(
+        change
+    ) == FileNeedingReview(change)
+
+
+# %% rules
+
+MODULE_DOCUMENTATION_SKIPPED = JudgmentContext(
+    rules=frozenset({TriageRule.MODULE_DOCUMENTATION})
+)
+"""
+The context of a triage that skips the documentation at the top of modules.
+"""
+
+
+def test_a_reworded_module_documentation_is_mechanical_once_its_rule_is_enabled():
+    """
+    A file whose only change is its module's documentation is mechanical under the
+    module documentation rule.
+    """
+    change = FileSample.MODULE_DOCUMENTATION_REWORDED.change()
+    assert FileTriager(MODULE_DOCUMENTATION_SKIPPED).triage(change) == MechanicalFile(
+        change, frozenset({MechanicalChange.MODULE_DOCUMENTATION})
+    )
+
+
+def test_a_reworded_module_documentation_needs_review_by_default():
+    """
+    No rule is enabled unless asked for, so reworded module documentation needs review.
+    """
+    change = FileSample.MODULE_DOCUMENTATION_REWORDED.change()
+    assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [FileSample.MODULE_DOCUMENTATION_AND_CODE_CHANGED, FileSample.DOCSTRING_REWORDED],
+    ids=["code changes too", "documentation of a function"],
+)
+def test_the_module_documentation_rule_skips_nothing_else(sample: FileSample):
+    """
+    Changed code, and the documentation of anything but the module, need review under
+    the module documentation rule too.
+    """
+    change = sample.change()
+    assert FileTriager(MODULE_DOCUMENTATION_SKIPPED).triage(
         change
     ) == FileNeedingReview(change)
 

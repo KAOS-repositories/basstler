@@ -33,6 +33,8 @@ class FileSample(StrEnum):
     IDENTIFIER_RENAMED = "identifier-renamed"
     IMPORT_SOURCE_CHANGED = "import-source-changed"
     IMPORTS_REORDERED = "imports-reordered"
+    MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
+    MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
     RELATIVE_IMPORT_MOVED = "relative-import-moved"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
     TEMPLATE_RENAMED = "template-renamed"
@@ -243,4 +245,12 @@ TEMPLATE_REINDENTED = (
 )
 """
 The renamed template's head version, its renamed line also indented.
+"""
+
+
+# %% rule settings
+
+RULE_SETTINGS = DatasetLocation.REVIEW_TRIAGE / "rules"
+"""
+The checkouts, each holding a ``pyproject.toml``, the rule settings are read from.
 """

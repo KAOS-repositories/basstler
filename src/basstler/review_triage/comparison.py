@@ -16,6 +16,7 @@ from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameDecisions, RenameMap
+from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
 
 # %% what a mechanical change consists of
@@ -88,6 +89,12 @@ class MechanicalChange(ChangeKind):
     """
     A class was replaced by a subclass the pull request adds, holding only members
     moved down from the class unchanged.
+    """
+
+    MODULE_DOCUMENTATION = "module documentation"
+    """
+    The documentation at the top of a module changed, which the module documentation
+    rule counts as mechanical.
     """
 
     BASE_BRANCH_MERGE = "base branch merge"
@@ -189,6 +196,11 @@ class JudgmentContext:
     substitutions: RenameMap = RenameMap()
     """
     Classes a file may replace by a subclass the pull request adds, as renames.
+    """
+
+    rules: frozenset[TriageRule] = frozenset()
+    """
+    The opt-in rules in force.
     """
 
     @cached_property
@@ -343,6 +355,37 @@ class PythonComparison(ContentComparison):
         :return: What the change consists of, ``None`` when it is not provably
             mechanical.
         """
+        skips_module_documentation = TriageRule.MODULE_DOCUMENTATION in context.rules
+        if skips_module_documentation:
+            kinds = self.compared_changes(
+                base.without_module_documentation,
+                head.without_module_documentation,
+                context,
+            )
+        else:
+            kinds = self.compared_changes(base, head, context)
+        if kinds is None:
+            return None
+        kinds = set(kinds)
+        if (
+            skips_module_documentation
+            and base.module_documentation != head.module_documentation
+        ):
+            kinds.add(MechanicalChange.MODULE_DOCUMENTATION)
+        if not kinds and base.text != head.text:
+            kinds.add(MechanicalChange.FORMATTING)
+        return frozenset(kinds)
+
+    def compared_changes(
+        self, base: PythonSource, head: PythonSource, context: JudgmentContext
+    ) -> ChangeKinds | None:
+        """
+        :param base: The file's base version.
+        :param head: The file's head version.
+        :param context: What the judgment may consult about the pull request.
+        :return: What the change consists of, formatting of the whole file aside,
+            ``None`` when it is not provably mechanical.
+        """
         code_kinds = self.code_changes(base, head, context)
         if code_kinds is None:
             return None
@@ -360,8 +403,6 @@ class PythonComparison(ContentComparison):
             if prose_kinds is None:
                 return None
             kinds |= prose_kinds
-        if not kinds and base.text != head.text:
-            kinds.add(MechanicalChange.FORMATTING)
         return frozenset(kinds)
 
     def code_changes(

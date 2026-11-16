@@ -1,0 +1,2 @@
+[tool.basstler.review-triage]
+select = ["no-such-rule"]

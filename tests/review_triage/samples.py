@@ -118,6 +118,12 @@ class SampleTrees(StrEnum):
             if file.is_file()
         }
 
+    def payload(self) -> Any:
+        """
+        :return: The part's JSON, parsed.
+        """
+        return json.loads(self.path.read_text(encoding="utf-8"))
+
 
 class PullRequestSample(SampleTrees):
     """
@@ -133,12 +139,6 @@ class PullRequestSample(SampleTrees):
     @classproperty
     def directory_name(cls) -> str:
         return "pull-request"
-
-    def payload(self) -> dict[str, Any]:
-        """
-        :return: The REST payload, parsed.
-        """
-        return json.loads(self.path.read_text())
 
 
 # %% the module move
@@ -230,6 +230,17 @@ class BaseBranchMergeSample(SampleTrees):
     The files the pull request changed after merging the update.
     """
 
+    REVIEWS = "reviews.json"
+    """
+    The pull request's reviews as REST lists them, each ``commit_id`` naming a
+    :class:`ReviewedHistory` commit by its field.
+    """
+
+    AUTHENTICATED_USER = "authenticated-user.json"
+    """
+    The account the credential belongs to, as REST describes it.
+    """
+
     @classproperty
     def directory_name(cls) -> str:
         return "base-branch-merge"
@@ -246,7 +257,6 @@ TEMPLATE_REINDENTED = (
 """
 The renamed template's head version, its renamed line also indented.
 """
-
 
 # %% rule settings
 

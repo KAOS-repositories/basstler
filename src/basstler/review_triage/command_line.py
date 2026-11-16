@@ -19,6 +19,7 @@ from basstler.github.pull_request_changes import (
     CommitStart,
     ComparisonStart,
     LastCommitsStart,
+    LastReviewStart,
     MergeBaseStart,
     PullRequestChangesReader,
 )
@@ -110,7 +111,7 @@ class TriagePublication:
     Renames given and rejected beyond the description's, outranking them.
     """
 
-    start: ComparisonStart = MergeBaseStart()
+    start: ComparisonStart = LastReviewStart()
     """
     Where the changes are triaged from.
     """
@@ -136,6 +137,7 @@ class TriagePublication:
         last: int | None,
         select_rules: tuple[TriageRule, ...] = (),
         ignore_rules: tuple[TriageRule, ...] = (),
+        from_merge_base: bool = False,
     ) -> TriagePublication:
         """
         :param pull_request: The pull request's number.
@@ -145,15 +147,19 @@ class TriagePublication:
         :param last: How many of the last commits to triage, or ``None``.
         :param select_rules: The rules to turn on.
         :param ignore_rules: The rules to turn off.
+        :param from_merge_base: Whether to triage the whole change.
         :return: The publication triaging from *since*, else from before the *last*
-            commits, else from the merge base.
+            commits, else from the merge base if *from_merge_base*, else from the
+            viewer's last review.
         """
         if since is not None:
             start: ComparisonStart = CommitStart(since)
         elif last is not None:
             start = LastCommitsStart(last)
-        else:
+        elif from_merge_base:
             start = MergeBaseStart()
+        else:
+            start = LastReviewStart()
         return cls(
             pull_request,
             repository,
@@ -224,11 +230,15 @@ def report(
         int | None,
         Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
     ] = None,
+    from_merge_base: Annotated[
+        bool, Parameter(group=COMPARISON_START_GROUP, negative=())
+    ] = False,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
 ) -> ReviewTriageExitCode:
     """
-    Print which files of a pull request need review, as Markdown.
+    Print which files of a pull request need review, as Markdown; by default only the
+    changes since your last review, the whole change if you have not reviewed it.
 
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
@@ -239,6 +249,8 @@ def report(
         reviewed; a file only merges of the base branch changed since is mechanical.
     :param last: How many of the pull request's last commits to triage, a merge
         counting as one, as GitHub's view of its last commits shows them.
+    :param from_merge_base: Triage the whole change, not only what changed since your
+        last review.
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
@@ -252,6 +264,7 @@ def report(
         last,
         select_rule,
         ignore_rule,
+        from_merge_base,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -268,12 +281,16 @@ def mark_viewed(
         int | None,
         Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
     ] = None,
+    from_merge_base: Annotated[
+        bool, Parameter(group=COMPARISON_START_GROUP, negative=())
+    ] = False,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the account whose GitHub
-    credential is configured, and print the triage.
+    credential is configured, and print the triage; by default only the changes since
+    that account's last review, the whole change if it has not reviewed it.
 
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
@@ -284,6 +301,8 @@ def mark_viewed(
         reviewed; a file only merges of the base branch changed since is mechanical.
     :param last: How many of the pull request's last commits to triage, a merge
         counting as one, as GitHub's view of its last commits shows them.
+    :param from_merge_base: Triage the whole change, not only what changed since your
+        last review.
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
@@ -297,6 +316,7 @@ def mark_viewed(
         last,
         select_rule,
         ignore_rule,
+        from_merge_base,
     ).publish((ViewedMarking(GitHubRestClient()), MarkdownReport()))
     return ReviewTriageExitCode.SUCCESS
 

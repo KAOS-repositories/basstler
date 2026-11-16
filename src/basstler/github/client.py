@@ -89,6 +89,13 @@ class GitHubAttemptReader(ABC):
         """
 
 
+class GitHubFullReader(GitHubReader, GitHubAttemptReader, ABC):
+    """
+    Reading REST resources, with a refusal raised or returned on the answer as the
+    caller chooses.
+    """
+
+
 class GitHubWrite(ValidatedJSONModel, ABC):
     """
     A change sent to the REST API, carrying the resource it changes.
@@ -156,7 +163,7 @@ class GitHubClient(GitHubReader, GitHubWriter, ABC):
     """
 
 
-class GitHubFullClient(GitHubClient, GitHubAttemptClient, ABC):
+class GitHubFullClient(GitHubClient, GitHubAttemptClient, GitHubFullReader, ABC):
     """
     Reading and writing REST resources, with a refusal raised or returned on the answer
     as the caller chooses.
@@ -290,6 +297,16 @@ class GitHubResponse:
         return (
             isinstance(self.failure, GitHubRequestFailed)
             and self.failure.status == HTTPStatus.NOT_FOUND
+        )
+
+    @property
+    def is_forbidden(self) -> bool:
+        """
+        :return: Whether GitHub answered 403: the credential may not read the resource.
+        """
+        return (
+            isinstance(self.failure, GitHubRequestFailed)
+            and self.failure.status == HTTPStatus.FORBIDDEN
         )
 
     def raise_if_failed(self) -> Any:

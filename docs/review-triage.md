@@ -25,6 +25,13 @@ credential is configured (`GH_TOKEN`, or `gh auth login`). It uses GitHub's Grap
 API, which Claude Code cloud sessions cannot reach, so run it on your own machine.
 Both commands default `--repository` to the checkout's `origin`.
 
+By default both triage only what changed since your last submitted review of the pull
+request, the head commit GitHub recorded for it, and the whole change when you have
+not reviewed it. A credential GitHub names no account for, such as an Actions token,
+has no review, so CI triages the whole change. The report's first line says where the
+triage started. `--since <commit>`, `--last <count>` and `--from-merge-base` choose
+another start.
+
 A pre-commit hook is no place for it: a triage needs a pull request on GitHub.
 
 ## Declaring renames

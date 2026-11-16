@@ -1,0 +1,30 @@
+[
+  {
+    "user": {"login": "reviewer"},
+    "state": "COMMENTED",
+    "body": "",
+    "submitted_at": "2026-01-01T10:00:00Z",
+    "commit_id": "base_branch_commit"
+  },
+  {
+    "user": {"login": "reviewer"},
+    "state": "APPROVED",
+    "body": "",
+    "submitted_at": "2026-01-02T10:00:00Z",
+    "commit_id": "reviewed_commit"
+  },
+  {
+    "user": {"login": "someone-else"},
+    "state": "COMMENTED",
+    "body": "",
+    "submitted_at": "2026-01-03T10:00:00Z",
+    "commit_id": "head_commit"
+  },
+  {
+    "user": {"login": "reviewer"},
+    "state": "PENDING",
+    "body": null,
+    "submitted_at": null,
+    "commit_id": "head_commit"
+  }
+]

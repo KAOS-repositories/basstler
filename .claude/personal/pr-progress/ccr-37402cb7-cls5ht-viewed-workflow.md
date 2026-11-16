@@ -1,20 +1,23 @@
-Plan (review-triage/mechanical-file-triage, draft #213 merged; follow-ups draft #214, #215):
-- #213: extensible basstler-review-triage distribution, CI summary, mark-viewed (merged)
-- #214: keyword arguments; module, definition and file-path moves; relative imports;
-  the modules definitions move between; class replaced by a subclass
-- #215: mark viewed on every PR or on demand; set-up-mark-viewed; README; skill
+## Plan
 
-Done:
-- #214 (026ccf19): #213's review answers merged in; class replaced by a subclass of
-  moved-down members; section headers optional; shared git lookups
-- #215 (1c54d6ff): main merged in (10 conflicts: TriagePublication, PullRequestChangesReader,
-  github.* module moves, GraphQLErrorsReturned); CLAUDE_CODE_REMOTE defined in the shell
-  configuration (CI failure of test_skill_documents); test_package_contract back to main's.
-  Merge probe against main fbb29c45: clean. Local suite 2903 passed; CI on 1c54d6ff not read
+Resolve the owner's 83-thread review of 1c54d6ff here (user chose the remodel in this PR; on a fork, propose upstream). One commit per step, tests first:
 
-Next:
-- Read CI on 1c54d6ff
-- #219 (stacked on #215) conflicts with the resolved #215 in token_form.py, site_repository.py,
-  user_steps.py, tests/plan_site/test_site_repository.py: its owner resolves or asks
-- User: review and merge #214, #215; store the token; re-run set-up-mark-viewed afterwards
-- Follow-up suggested: plan site onto github.token_form (#219)
+1. Paths: hand-built REST/web addresses move onto `Repository`; the token page onto `GitHubAddress`.
+2. `BasstlerProject`: repository from package metadata, its name and default branch, replacing `BASSTLER_REPOSITORY`, `README_BRANCH`, hard-coded "basstler"/"main".
+3. Forms: `UrlQueryParameter` and `PrefilledForm` bases; one-pass truncation; `Branch` for base/head.
+4. Contents API: `GitObject` and `EncodedContent` bases; aliased full names; `FileCommit` replaces the commit dicts; `propose` split; listing reuses `RestPullRequestSummary`.
+5. Settings: `RepositoryRead[Resource]` and generic setting writes, each naming its manual user step; `RepositoryDetails` relates to `Repository`.
+6. Shared user steps in `basstler.github.user_steps`; the plan site's token steps reuse them.
+7. `ActionsSecret` base; token creation/storage steps live on the token.
+8. Fork: workflow proposed on the parent from a fork branch; docs and skill follow.
+9. Small threads: refusal enum, renames, `named_or_remote` onto `Repository`, weak tests.
+10. New code rule (REST models tied to their domain class; addresses on the class they address), `AGENTS.md` regenerated.
+11. Reply to every thread; resolve only those done.
+
+## Done
+
+- #215 and #219 restacked on main 73801cd6; #215 clean at 7f6928a5.
+
+## Next
+
+- Step 1.

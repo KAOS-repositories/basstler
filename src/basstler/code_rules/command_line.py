@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import libcst
 from cyclopts import App
 
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_rules import rules
 from basstler.code_rules.checker import CodeRulesCheck, StagedLines
 from basstler.code_rules.commands import CodeRulesCommand
@@ -92,19 +92,17 @@ def fix(paths: list[Path] | None = None) -> CodeRulesExitCode:
     """
     fixer = SourceFixer(RuleModule(rules).fixable_checkers)
     fixed_sources = {
-        path: fixer.fixed(
-            libcst.parse_module(path.read_text(encoding="utf-8"))
-        ).module.code
-        for path in paths or []
+        source_file: fixer.fix_module(source_file).module.code
+        for source_file in map(PythonSourceFile, paths or [])
     }
     changed = {
-        path: source
-        for path, source in fixed_sources.items()
-        if source != path.read_text(encoding="utf-8")
+        source_file: source
+        for source_file, source in fixed_sources.items()
+        if source != source_file.read()
     }
-    for path, source in changed.items():
-        path.write_text(source, encoding="utf-8")
-        logger.info("Fixed %s", path)
+    for source_file, source in changed.items():
+        source_file.write(source)
+        logger.info("Fixed %s", source_file.path)
     if changed:
         return CodeRulesExitCode.CHANGES_NEEDED
     return CodeRulesExitCode.SUCCESS

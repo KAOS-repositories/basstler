@@ -22,6 +22,8 @@ from basstler.review_triage.keyword_arguments import (
     KEYWORD_RULES,
     KeywordArgumentComparison,
     KeywordChange,
+    UnprovenBinding,
+    UnprovenKeywordCall,
 )
 from basstler.review_triage.python_source import ImportBindings, PythonSource
 from basstler.review_triage.renames import RenameMap
@@ -91,6 +93,60 @@ def test_the_plain_comparison_verdicts_are_kept(old_name_renamed: RenameMap):
         MechanicalChange.IMPORTS,
         MechanicalChange.RENAME,
     }
+
+
+# %% receivers of inferred classes
+
+
+@pytest.mark.parametrize(
+    "sample", [FileSample.RECEIVER_TYPE_INFERRED, FileSample.RECEIVER_TYPE_FOLLOWED]
+)
+def test_a_method_of_a_receiver_whose_class_is_inferred_is_resolved(
+    sample: FileSample,
+):
+    """
+    Calls on an instance a class makes, an attribute declares, a function returns, a
+    type variable binds or a container holds, through loops, comprehensions, ``next``
+    and names bound alike several times, reach only that class's methods.
+    """
+    assert triaged(sample, RenameMap()) == MechanicalFile(
+        sample.change(), frozenset({KeywordChange.KEYWORD_ARGUMENTS})
+    )
+
+
+@pytest.mark.parametrize(
+    ("sample", "unproven"),
+    [
+        (
+            FileSample.RECEIVER_TYPE_UNKNOWN,
+            UnprovenKeywordCall(16, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN),
+        ),
+        (
+            FileSample.RECEIVER_BINDS_DIFFERENTLY,
+            UnprovenKeywordCall(14, "plot", UnprovenBinding.BINDS_DIFFERENTLY),
+        ),
+    ],
+)
+def test_a_call_not_shown_to_bind_as_before_is_the_reason_for_review(
+    sample: FileSample, unproven: UnprovenKeywordCall
+):
+    """
+    A file needing review names each call not shown to bind as before, and why.
+    """
+    assert triaged(sample, RenameMap()).reasons == (unproven,)
+
+
+def test_a_name_bound_to_different_classes_leaves_the_receiver_unknown():
+    """
+    A name assigned instances of two classes, or bound by a lambda's parameter, a
+    comprehension's loop or a ``match`` capture over an outer binding, gives the
+    receiver no class.
+    """
+    reasons = triaged(FileSample.RECEIVER_TYPE_AMBIGUOUS, RenameMap()).reasons
+    assert reasons == tuple(
+        UnprovenKeywordCall(line, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN)
+        for line in (21, 25, 30, 38)
+    )
 
 
 # %% the comparison of trees

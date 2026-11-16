@@ -108,6 +108,25 @@ class MechanicalChange(ChangeKind):
 
 
 @dataclass(frozen=True)
+class ReviewReason(ABC):
+    """
+    A part of a changed file that could not be shown to be mechanical.
+    """
+
+    line: int
+    """
+    The line of the head version it is on.
+    """
+
+    @property
+    @abstractmethod
+    def explanation(self) -> str:
+        """
+        What could not be shown, for a reviewer.
+        """
+
+
+@dataclass(frozen=True)
 class FileVerdict(ABC):
     """
     The verdict on one changed file.
@@ -135,6 +154,12 @@ class MechanicalFile(FileVerdict):
 class FileNeedingReview(FileVerdict):
     """
     A file whose change could not be shown to be mechanical.
+    """
+
+    reasons: tuple[ReviewReason, ...] = field(default=(), compare=False)
+    """
+    The parts of the change a judgment tried and failed to show mechanical; empty when
+    no judgment names one.
     """
 
 
@@ -201,6 +226,13 @@ class JudgmentContext:
     rules: frozenset[TriageRule] = frozenset()
     """
     The opt-in rules in force.
+    """
+
+    review_reasons: list[ReviewReason] = field(
+        default_factory=list, compare=False, hash=False, repr=False, kw_only=True
+    )
+    """
+    The reasons for review the judgments of the file being judged found so far.
     """
 
     @cached_property
@@ -490,16 +522,23 @@ class FileTriager:
         :param change: A file the pull request changes.
         :return: Whether a reviewer has to read it.
         """
-        kinds = self.judged_changes(change)
+        context = replace(self.context, review_reasons=[])
+        kinds = self.judged_changes(change, context)
         if change.previous_path is not None and kinds is not None:
             kinds |= {MechanicalChange.MOVE}
         if not kinds:
-            return FileNeedingReview(change)
+            return FileNeedingReview(
+                change, tuple(dict.fromkeys(context.review_reasons))
+            )
         return MechanicalFile(change, kinds)
 
-    def judged_changes(self, change: FileVersions) -> frozenset[ChangeKind] | None:
+    def judged_changes(
+        self, change: FileVersions, context: JudgmentContext
+    ) -> frozenset[ChangeKind] | None:
         """
         :param change: A file the pull request changes.
+        :param context: What the judgments may consult, collecting this file's reasons
+            for review.
         :return: What its content change consists of, ``None`` when it is not
             provably mechanical.
         """
@@ -511,15 +550,15 @@ class FileTriager:
         )
         if judgment is None:
             return None
-        kinds = judgment.changes(change, self.context)
-        substituted_class = self.context.substitutions.word_pattern
+        kinds = judgment.changes(change, context)
+        substituted_class = context.substitutions.word_pattern
         if (
             kinds is not None
             or substituted_class is None
             or not substituted_class.search(change.base_text or "")
         ):
             return kinds
-        substituted = judgment.changes(change, self.context.substituted)
+        substituted = judgment.changes(change, context.substituted)
         if substituted is None:
             return None
         return substituted - {MechanicalChange.RENAME} | {

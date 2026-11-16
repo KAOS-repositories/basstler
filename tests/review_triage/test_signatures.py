@@ -58,34 +58,82 @@ def test_the_positional_parameters_are_read_from_the_definition(
 @pytest.mark.parametrize(
     ("conversion", "binds"),
     [
-        (KeywordConversion(NamedTarget("Derived"), 1, ("label",)), True),
-        (KeywordConversion(NamedTarget("Derived"), 0, ("label", "identifier")), False),
-        (KeywordConversion(NamedTarget("Plain"), 0, ("first", "second")), False),
-        (KeywordConversion(NamedTarget("gather"), 0, ("items",)), False),
-        (KeywordConversion(NamedTarget("read"), 0, ("path",)), False),
-        (KeywordConversion(MethodTarget("read", "FastReader"), 0, ("path",)), True),
-        (KeywordConversion(ClassTarget("Derived"), 1, ("label",)), True),
         (
             KeywordConversion(
-                AttributeMethodTarget("read", "Library", "reader"), 0, ("path",)
+                NamedTarget("Derived"), 1, ("label",), "Derived", 1, False
             ),
             True,
         ),
         (
             KeywordConversion(
-                AttributeMethodTarget("read", "Library", "fallback"), 0, ("path",)
+                NamedTarget("Derived"), 0, ("label", "identifier"), "Derived", 1, False
+            ),
+            False,
+        ),
+        (
+            KeywordConversion(
+                NamedTarget("Plain"), 0, ("first", "second"), "Plain", 1, False
+            ),
+            False,
+        ),
+        (
+            KeywordConversion(NamedTarget("gather"), 0, ("items",), "gather", 1, False),
+            False,
+        ),
+        (KeywordConversion(NamedTarget("read"), 0, ("path",), "read", 1, False), False),
+        (
+            KeywordConversion(
+                MethodTarget("read", "FastReader"), 0, ("path",), "read", 1, True
             ),
             True,
         ),
         (
             KeywordConversion(
-                AttributeMethodTarget("read", "Library", "parser"), 0, ("text",)
+                ClassTarget("Derived"), 1, ("label",), "Derived", 1, False
             ),
             True,
         ),
         (
             KeywordConversion(
-                AttributeMethodTarget("read", "Library", "undeclared"), 0, ("path",)
+                AttributeMethodTarget("read", "Library", "reader"),
+                0,
+                ("path",),
+                "read",
+                1,
+                True,
+            ),
+            True,
+        ),
+        (
+            KeywordConversion(
+                AttributeMethodTarget("read", "Library", "fallback"),
+                0,
+                ("path",),
+                "read",
+                1,
+                True,
+            ),
+            True,
+        ),
+        (
+            KeywordConversion(
+                AttributeMethodTarget("read", "Library", "parser"),
+                0,
+                ("text",),
+                "read",
+                1,
+                True,
+            ),
+            True,
+        ),
+        (
+            KeywordConversion(
+                AttributeMethodTarget("read", "Library", "undeclared"),
+                0,
+                ("path",),
+                "read",
+                1,
+                True,
             ),
             False,
         ),
@@ -99,4 +147,4 @@ def test_a_keyword_binds_only_where_the_parameter_takes_it(
     definition the call may reach: by name anywhere, through the class hierarchy, or
     through the class an attribute is declared to hold, by name where none is declared.
     """
-    assert conversion.holds(reader, RenameMap()) is binds
+    assert (conversion.unproven_reason(reader, RenameMap()) is None) is binds

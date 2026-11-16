@@ -12,7 +12,7 @@ import keyword
 import tokenize
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import Enum, StrEnum, auto
 from functools import cached_property
 
 from basstler.review_triage.renames import RenameMap
@@ -86,6 +86,270 @@ SECTION_HEADER = "# %%"
 """
 What a comment opening a section of a file starts with.
 """
+
+METADATA_ANNOTATION = "Annotated"
+"""
+The typing name of a type followed by metadata that does not change it.
+"""
+
+LITERAL = "Literal"
+"""
+The typing name of a type allowing only the values it lists.
+"""
+
+TUPLE_CLASSES = frozenset({"tuple", "Tuple"})
+"""
+The names of the tuple class, whose annotation ``tuple[X, ...]`` declares any number
+of ``X``.
+"""
+
+
+# %% type annotations
+
+
+class ContainerKind(Enum):
+    """
+    How a standard container gives the values it holds.
+    """
+
+    SEQUENCE = auto()
+    """
+    Iterating, indexing and removing an item give its one type argument.
+    """
+
+    MAPPING = auto()
+    """
+    Iterating gives its first type argument, the key; indexing, ``get``, ``pop`` and
+    ``setdefault`` give its second, the value.
+    """
+
+
+CONTAINER_KINDS: dict[str, ContainerKind] = {
+    **dict.fromkeys(
+        (
+            "list",
+            "List",
+            "set",
+            "Set",
+            "frozenset",
+            "FrozenSet",
+            "AbstractSet",
+            "MutableSet",
+            "Sequence",
+            "MutableSequence",
+            "Collection",
+            "Iterable",
+            "Iterator",
+            "Generator",
+            "Reversible",
+            "deque",
+            "Deque",
+            "KeysView",
+            "ValuesView",
+            *TUPLE_CLASSES,
+        ),
+        ContainerKind.SEQUENCE,
+    ),
+    **dict.fromkeys(
+        (
+            "dict",
+            "Dict",
+            "Mapping",
+            "MutableMapping",
+            "defaultdict",
+            "DefaultDict",
+            "OrderedDict",
+        ),
+        ContainerKind.MAPPING,
+    ),
+}
+"""
+The standard containers, by the name of their class or typing alias.
+"""
+
+REMOVED_ITEM_METHODS: dict[ContainerKind, frozenset[str]] = {
+    ContainerKind.SEQUENCE: frozenset({"pop", "popleft"}),
+    ContainerKind.MAPPING: frozenset({"get", "pop", "setdefault"}),
+}
+"""
+The methods of each kind of container returning one of the items indexing gives.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class MappingView:
+    """
+    A view a method of a mapping returns.
+    """
+
+    view_class: str
+    """
+    The name of the view's class.
+    """
+
+    held_argument: int
+    """
+    The position of the mapping's type argument the view holds.
+    """
+
+
+MAPPING_VIEWS: dict[str, MappingView] = {
+    "keys": MappingView("KeysView", 0),
+    "values": MappingView("ValuesView", 1),
+}
+"""
+The methods of a mapping returning a view, by name.
+"""
+
+COPY_METHOD = "copy"
+"""
+The method of a standard container returning a shallow copy of it.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class AnnotatedType:
+    """
+    What a type annotation declares a value to be: an instance of one class, holding
+    the values its type arguments declare.
+    """
+
+    class_name: str
+    """
+    The name of the class the value is an instance of.
+    """
+
+    arguments: tuple[AnnotatedType | None, ...] = ()
+    """
+    What the type arguments declare, ``None`` for one allowing no single class; a
+    tuple of any length has its one item type only.
+    """
+
+    @classmethod
+    def from_annotation(
+        cls, annotation: ast.expr, type_variables: frozenset[str] = frozenset()
+    ) -> AnnotatedType | None:
+        """
+        :param annotation: A type annotation.
+        :param type_variables: The type variables in scope, which allow no single
+            class.
+        :return: What it declares, ``None`` aside, ``None`` when it allows no single
+            class.
+        """
+        if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
+            sides = [
+                side
+                for side in (annotation.left, annotation.right)
+                if not (isinstance(side, ast.Constant) and side.value is None)
+            ]
+            if len(sides) != 1:
+                return None
+            return cls.from_annotation(sides[0], type_variables)
+        if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+            reference = PythonSource(annotation.value)
+            if not (
+                reference.parses
+                and len(reference.tree.body) == 1
+                and isinstance(reference.tree.body[0], ast.Expr)
+            ):
+                return None
+            return cls.from_annotation(reference.tree.body[0].value, type_variables)
+        if isinstance(annotation, (ast.Name, ast.Attribute)):
+            name = PythonSource.referenced_name(annotation)
+            return None if name is None or name in type_variables else cls(name)
+        if not isinstance(annotation, ast.Subscript):
+            return None
+        name = PythonSource.referenced_name(annotation.value)
+        elements = annotation.slice
+        arguments = elements.elts if isinstance(elements, ast.Tuple) else [elements]
+        if name in (OPTIONAL, METADATA_ANNOTATION):
+            return cls.from_annotation(arguments[0], type_variables)
+        if name is None or name in type_variables or name == LITERAL:
+            return None
+        if (
+            name in TUPLE_CLASSES
+            and len(arguments) == 2
+            and isinstance(arguments[1], ast.Constant)
+            and arguments[1].value is Ellipsis
+        ):
+            arguments = arguments[:1]
+        return cls(
+            name,
+            tuple(
+                cls.from_annotation(argument, type_variables) for argument in arguments
+            ),
+        )
+
+    @property
+    def plain_class(self) -> str | None:
+        """
+        The class name when the annotation gives it no type arguments, ``None``
+        otherwise.
+        """
+        return None if self.arguments else self.class_name
+
+    @property
+    def container_kind(self) -> ContainerKind | None:
+        """
+        How the value gives what it holds, ``None`` when it is no standard container or
+        the annotation does not declare what it holds.
+        """
+        kind = CONTAINER_KINDS.get(self.class_name)
+        if kind is ContainerKind.MAPPING and len(self.arguments) != 2:
+            return None
+        if kind is ContainerKind.SEQUENCE and len(self.arguments) != 1:
+            return None
+        return kind
+
+    @property
+    def element(self) -> AnnotatedType | None:
+        """
+        What iterating over the value gives, ``None`` when not declared.
+        """
+        if self.container_kind is None:
+            return None
+        return self.arguments[0]
+
+    @property
+    def item(self) -> AnnotatedType | None:
+        """
+        What indexing the value with one key gives, ``None`` when not declared.
+        """
+        if self.container_kind is None:
+            return None
+        return self.arguments[-1]
+
+    def method_result(self, method: str) -> AnnotatedType | None:
+        """
+        :param method: The name of a method of the value.
+        :return: What calling it returns, ``None`` when it is no method of a standard
+            container returning a declared value.
+        """
+        kind = self.container_kind
+        if kind is None:
+            return None
+        if method == COPY_METHOD:
+            return self
+        if method in REMOVED_ITEM_METHODS[kind]:
+            return self.item
+        if kind is ContainerKind.MAPPING and method in MAPPING_VIEWS:
+            view = MAPPING_VIEWS[method]
+            return AnnotatedType(view.view_class, (self.arguments[view.held_argument],))
+        return None
+
+    def in_base(self, renames: RenameMap) -> AnnotatedType:
+        """
+        :param renames: The renames from the names it is spelled with to the base
+            commit's.
+        :return: It with every class named as the base commit names it.
+        """
+        return AnnotatedType(
+            renames.original_identifier(self.class_name),
+            tuple(
+                None if argument is None else argument.in_base(renames)
+                for argument in self.arguments
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -506,32 +770,6 @@ class PythonSource:
         return None
 
     @staticmethod
-    def annotated_class(annotation: ast.expr) -> str | None:
-        """
-        :param annotation: A type annotation.
-        :return: The name of the one class it allows, ``None`` aside, ``None`` when it
-            allows none or several or names a generic container.
-        """
-        if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
-            sides = [
-                side
-                for side in (annotation.left, annotation.right)
-                if not (isinstance(side, ast.Constant) and side.value is None)
-            ]
-            return PythonSource.annotated_class(sides[0]) if len(sides) == 1 else None
-        if isinstance(annotation, ast.Subscript):
-            if PythonSource.referenced_name(annotation.value) != OPTIONAL:
-                return None
-            return PythonSource.annotated_class(annotation.slice)
-        if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
-            return PythonSource.annotated_class(
-                ast.parse(annotation.value, mode="eval").body
-            )
-        if isinstance(annotation, (ast.Name, ast.Attribute)):
-            return PythonSource.referenced_name(annotation)
-        return None
-
-    @staticmethod
     def annotated_parameters(
         function: ast.FunctionDef | ast.AsyncFunctionDef,
     ) -> dict[str, str]:
@@ -557,7 +795,8 @@ class PythonSource:
             for parameter in parameters
             if parameter.annotation is not None
             and parameter.arg not in assigned
-            and (annotated := PythonSource.annotated_class(parameter.annotation))
+            and (declared := AnnotatedType.from_annotation(parameter.annotation))
+            and (annotated := declared.plain_class)
         }
 
     @staticmethod

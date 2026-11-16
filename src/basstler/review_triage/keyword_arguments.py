@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+from enum import StrEnum
 
 from basstler.class_property import classproperty
 from basstler.review_triage.calls import (
@@ -21,8 +22,14 @@ from basstler.review_triage.comparison import (
     JudgmentContext,
     MechanicalChange,
     PythonComparison,
+    ReviewReason,
 )
-from basstler.review_triage.definitions import DataclassName
+from basstler.review_triage.definitions import (
+    DataclassName,
+    DefinitionIndex,
+    SourceDefinitions,
+)
+from basstler.review_triage.name_scopes import NameScope
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import DecoratorPolicy, SignatureReader
@@ -53,6 +60,80 @@ class KeywordChange(ChangeKind):
     """
 
 
+# %% why a difference needs review
+
+
+class UnprovenBinding(StrEnum):
+    """
+    Why a call passing arguments by keyword is not shown to bind them as before.
+    """
+
+    RECEIVER_CLASS_UNKNOWN = (
+        "the receiver's class is not inferred, and the methods of this name bind the"
+        " arguments differently"
+    )
+    """
+    The method is found by name only, and its definitions disagree.
+    """
+
+    SEVERAL_DEFINITIONS = "the definitions of this name bind the arguments differently"
+    """
+    The function is found by name only, and its definitions disagree.
+    """
+
+    BINDS_DIFFERENTLY = "the callee binds the arguments to other parameters"
+    """
+    The keywords name other parameters than the arguments were bound to.
+    """
+
+    NO_DEFINITION = "no definition of the callee in the base commit takes the arguments"
+    """
+    The callee is defined outside the repository, or takes fewer arguments.
+    """
+
+    UNREADABLE_SIGNATURE = "a definition the call may reach has an unreadable signature"
+    """
+    A definition is decorated or built so its parameters cannot be read.
+    """
+
+
+@dataclass(frozen=True)
+class UnprovenKeywordCall(ReviewReason):
+    """
+    A call passing arguments by keyword, not shown to bind them as before.
+    """
+
+    callee: str
+    """
+    The name the call refers to its callee by.
+    """
+
+    cause: UnprovenBinding
+    """
+    Why it is not shown.
+    """
+
+    @property
+    def explanation(self) -> str:
+        return f"`{self.callee}` - {self.cause}"
+
+
+@dataclass(frozen=True)
+class UnprovenDecorator(ReviewReason):
+    """
+    An added decorator not shown to return what it decorates.
+    """
+
+    decorator: str
+    """
+    The name the decorator is referred to by.
+    """
+
+    @property
+    def explanation(self) -> str:
+        return f"`@{self.decorator}` is not shown to return what it decorates"
+
+
 # %% findings
 
 
@@ -77,29 +158,71 @@ class KeywordConversion(Finding):
     The keywords of the arguments from that position on, in order.
     """
 
+    callee: str
+    """
+    The name the call refers to its callee by.
+    """
+
+    line: int
+    """
+    The line of the head version the call starts on.
+    """
+
+    calls_method: bool
+    """
+    Whether the callee is an attribute of a receiver.
+    """
+
     @classproperty
     def kind(cls) -> ChangeKind:
         return KeywordChange.KEYWORD_ARGUMENTS
 
-    def holds(self, reader: SignatureReader, renames: RenameMap) -> bool:
+    def unproven_reason(
+        self, reader: SignatureReader, renames: RenameMap
+    ) -> UnprovenKeywordCall | None:
         """
-        Every definition the call may reach that takes its positional arguments binds
-        each to the parameter of its keyword, and at least one takes them.
+        ``None`` when every definition the call may reach that takes its positional
+        arguments binds each to the parameter of its keyword, and at least one takes
+        them.
         """
-        signatures = self.target.in_base(renames).reachable_signatures(reader)
+        cause = self.unproven_binding(reader, renames)
+        if cause is None:
+            return None
+        return UnprovenKeywordCall(self.line, self.callee, cause)
+
+    def unproven_binding(
+        self, reader: SignatureReader, renames: RenameMap
+    ) -> UnprovenBinding | None:
+        """
+        :param reader: Reads the base commit's signatures.
+        :param renames: The renames the pull request makes throughout.
+        :return: Why the call is not shown to bind its arguments as before, ``None``
+            when it is.
+        """
+        target = self.target.in_base(renames)
+        signatures = target.reachable_signatures(reader)
         if None in signatures:
-            return False
+            return UnprovenBinding.UNREADABLE_SIGNATURE
         keywords = tuple(map(renames.original_identifier, self.keywords))
         taking = [
             signature
             for signature in signatures
             if signature.accepts(self.first_position + len(keywords))
         ]
-        return bool(taking) and all(
-            signature.binds(self.first_position, keywords) for signature in taking
-        )
+        if not taking:
+            return UnprovenBinding.NO_DEFINITION
+        if all(signature.binds(self.first_position, keywords) for signature in taking):
+            return None
+        if not target.known_by_name_only(reader):
+            return UnprovenBinding.BINDS_DIFFERENTLY
+        if self.calls_method:
+            return UnprovenBinding.RECEIVER_CLASS_UNKNOWN
+        return UnprovenBinding.SEVERAL_DEFINITIONS
 
     def looked_up_names(self, renames: RenameMap) -> frozenset[str]:
+        """
+        :meth:`Finding.looked_up_names`: those of the call's target.
+        """
         return self.target.in_base(renames).looked_up_names()
 
 
@@ -114,12 +237,14 @@ class KeywordOnlyDefinition(Finding):
     def kind(cls) -> ChangeKind:
         return KeywordChange.KEYWORD_ONLY
 
-    def holds(self, reader: SignatureReader, renames: RenameMap) -> bool:
+    def unproven_reason(
+        self, reader: SignatureReader, renames: RenameMap
+    ) -> ReviewReason | None:
         """
-        Always: a call still passing such a parameter positionally fails instead of
-        binding it to another parameter.
+        Always ``None``: a call still passing such a parameter positionally fails
+        instead of binding it to another parameter.
         """
-        return True
+        return None
 
 
 @dataclass(frozen=True)
@@ -133,18 +258,30 @@ class AddedDecorator(Finding):
     The name the decorator is referred to by.
     """
 
+    line: int
+    """
+    The line of the head version the decorator is on.
+    """
+
     @classproperty
     def kind(cls) -> ChangeKind:
         return KeywordChange.IDENTITY_DECORATORS
 
-    def holds(self, reader: SignatureReader, renames: RenameMap) -> bool:
+    def unproven_reason(
+        self, reader: SignatureReader, renames: RenameMap
+    ) -> UnprovenDecorator | None:
         """
-        Every definition of the decorator in the base commit returns what it
-        decorates.
+        ``None`` when every definition of the decorator in the base commit returns what
+        it decorates.
         """
-        return reader.definitions.is_identity(renames.original_identifier(self.name))
+        if reader.definitions.is_identity(renames.original_identifier(self.name)):
+            return None
+        return UnprovenDecorator(self.line, self.name)
 
     def looked_up_names(self, renames: RenameMap) -> frozenset[str]:
+        """
+        :meth:`Finding.looked_up_names`: the decorator's name.
+        """
         return frozenset({renames.original_identifier(self.name)})
 
 
@@ -185,7 +322,7 @@ class ArgumentsPassedByKeyword(DifferenceRule):
             (
                 found
                 for resolution in self.resolutions
-                if (found := resolution.target(head.func, scope)) is not None
+                if (found := resolution.target(base.func, scope)) is not None
             ),
             None,
         )
@@ -198,7 +335,12 @@ class ArgumentsPassedByKeyword(DifferenceRule):
             return False
         matcher.record(
             KeywordConversion(
-                target, kept, tuple(keyword.arg for keyword in new_keywords)
+                target,
+                kept,
+                tuple(keyword.arg for keyword in new_keywords),
+                PythonSource.referenced_name(head.func) or "",
+                head.lineno,
+                isinstance(head.func, ast.Attribute),
             )
         )
         return True
@@ -262,18 +404,18 @@ class DefinitionDecorators(DifferenceRule):
         head: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
         matcher: TreeMatcher,
     ) -> bool:
-        scopes = (
-            matcher.enclosing_classes
-            if isinstance(base, ast.ClassDef)
-            else matcher.parameter_types
-        )
-        scopes.append(
-            base.name
-            if isinstance(base, ast.ClassDef)
-            else PythonSource.annotated_parameters(base)
-        )
-        fields_match = matcher.matches_fields(base, head, frozenset({"decorator_list"}))
-        scopes.pop()
+        if isinstance(base, ast.ClassDef):
+            matcher.enclosing_classes.append(base.name)
+            fields_match = matcher.matches_fields(
+                base, head, frozenset({"decorator_list"})
+            )
+            matcher.enclosing_classes.pop()
+        else:
+            matcher.parameter_types.append(PythonSource.annotated_parameters(base))
+            fields_match = matcher.matches_fields(
+                base, head, frozenset({"decorator_list"})
+            )
+            matcher.parameter_types.pop()
         return fields_match and self.matches_decorators(base, head, matcher)
 
     def matches_decorators(
@@ -297,7 +439,11 @@ class DefinitionDecorators(DifferenceRule):
                 remaining.pop(0)
                 matcher.record(KeywordOnlyDefinition())
             elif isinstance(decorator, (ast.Name, ast.Attribute)):
-                matcher.record(AddedDecorator(PythonSource.referenced_name(decorator)))
+                matcher.record(
+                    AddedDecorator(
+                        PythonSource.referenced_name(decorator), decorator.lineno
+                    )
+                )
             else:
                 return False
         return not remaining
@@ -378,10 +524,15 @@ class KeywordArgumentComparison(PythonComparison):
         kinds = super().code_changes(base, head, context)
         if kinds is not None:
             return kinds
-        matcher = TreeMatcher(self.rules, head.import_bindings)
-        if not matcher.matches(
-            base.code_tree(context.renames), head.code_tree(RenameMap())
-        ):
+        base_tree = base.code_tree(context.renames)
+        matcher = TreeMatcher(
+            self.rules,
+            head.import_bindings,
+            imports=NameScope.from_imports(base.renamed_tree(context.renames)),
+            file_definitions=DefinitionIndex(SourceDefinitions((base.text,))),
+            module=base,
+        )
+        if not matcher.matches(base_tree, head.code_tree(RenameMap())):
             return None
         reader = SignatureReader(context.base_definitions, self.decorators)
         renames = context.renames
@@ -390,7 +541,13 @@ class KeywordArgumentComparison(PythonComparison):
                 *(finding.looked_up_names(renames) for finding in matcher.findings)
             )
         )
-        if not all(finding.holds(reader, renames) for finding in matcher.findings):
+        reasons = [
+            reason
+            for finding in matcher.findings
+            if (reason := finding.unproven_reason(reader, renames)) is not None
+        ]
+        if reasons:
+            context.review_reasons.extend(reasons)
             return None
         found: set[ChangeKind] = {finding.kind for finding in matcher.findings}
         if base.code(renames) != base.code(RenameMap()):

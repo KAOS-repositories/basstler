@@ -12,8 +12,10 @@ from functools import cached_property
 
 from basstler.class_property import classproperty
 from basstler.review_triage.calls import CallScope
-from basstler.review_triage.comparison import ChangeKind
-from basstler.review_triage.python_source import ImportBindings
+from basstler.review_triage.comparison import ChangeKind, ReviewReason
+from basstler.review_triage.definitions import DefinitionIndex
+from basstler.review_triage.name_scopes import SCOPED_FIELDS, NameScope
+from basstler.review_triage.python_source import ImportBindings, PythonSource
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import SignatureReader
 
@@ -22,7 +24,8 @@ from basstler.review_triage.signatures import SignatureReader
 
 class Finding(ABC):
     """
-    One allowed difference between the trees, harmless only once :meth:`holds`.
+    One allowed difference between the trees, harmless only once :meth:`unproven_reason`
+    finds nothing.
     """
 
     @classproperty
@@ -33,17 +36,20 @@ class Finding(ABC):
         """
 
     @abstractmethod
-    def holds(self, reader: SignatureReader, renames: RenameMap) -> bool:
+    def unproven_reason(
+        self, reader: SignatureReader, renames: RenameMap
+    ) -> ReviewReason | None:
         """
         :param reader: Reads the base commit's signatures.
         :param renames: The renames the pull request makes throughout.
-        :return: Whether the difference cannot change what the code does.
+        :return: Why the difference may change what the code does, ``None`` when it
+            cannot.
         """
 
     def looked_up_names(self, renames: RenameMap) -> frozenset[str]:
         """
         :param renames: The renames the pull request makes throughout.
-        :return: The names whose definitions :meth:`holds` looks up, to find every
+        :return: The names whose definitions :meth:`unproven_reason` looks up, to find every
             finding's together in one search.
         """
         return frozenset()
@@ -110,6 +116,26 @@ class TreeMatcher:
     parameter it never assigns to is annotated with.
     """
 
+    name_scopes: list[NameScope] = field(default_factory=list)
+    """
+    The scopes whose code is being compared, the module's first and the innermost last.
+    """
+
+    imports: NameScope = field(default_factory=NameScope)
+    """
+    The names the imports of the base version bind, wherever they are.
+    """
+
+    file_definitions: DefinitionIndex = field(default_factory=DefinitionIndex)
+    """
+    The definitions of the base version of the file being compared.
+    """
+
+    module: PythonSource | None = None
+    """
+    The base version of the file being compared, ``None`` when unknown.
+    """
+
     @cached_property
     def rule_by_type(self) -> dict[type[ast.AST], DifferenceRule]:
         """
@@ -126,8 +152,14 @@ class TreeMatcher:
         What the code around the nodes being compared tells about the names they use.
         """
         return CallScope(
-            self.enclosing_classes[-1] if self.enclosing_classes else None,
-            self.parameter_types[-1] if self.parameter_types else {},
+            enclosing_class=(
+                self.enclosing_classes[-1] if self.enclosing_classes else None
+            ),
+            parameter_types=self.parameter_types[-1] if self.parameter_types else {},
+            name_scopes=tuple(self.name_scopes),
+            imports=self.imports,
+            file_definitions=self.file_definitions,
+            module=self.module,
         )
 
     def matches(self, base: object, head: object) -> bool:
@@ -160,13 +192,20 @@ class TreeMatcher:
         :param skipped: The fields the caller compares itself.
         :return: Whether every other field matches.
         """
-        return all(
-            self.matches(base_value, head_value)
-            for (field_name, base_value), (_, head_value) in zip(
-                ast.iter_fields(base), ast.iter_fields(head), strict=True
-            )
-            if field_name not in skipped
-        )
+        scoped = SCOPED_FIELDS.get(type(base), frozenset())
+        for (field_name, base_value), (_, head_value) in zip(
+            ast.iter_fields(base), ast.iter_fields(head), strict=True
+        ):
+            if field_name in skipped:
+                continue
+            if field_name in scoped:
+                self.name_scopes.append(NameScope.opened_by(base))
+            matched = self.matches(base_value, head_value)
+            if field_name in scoped:
+                self.name_scopes.pop()
+            if not matched:
+                return False
+        return True
 
     def attempt(self, base: object, head: object) -> bool:
         """

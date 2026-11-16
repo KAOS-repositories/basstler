@@ -15,6 +15,7 @@ from basstler.review_triage.definitions import (
     DefinitionIndex,
     FunctionDefinition,
 )
+from basstler.review_triage.python_source import AnnotatedType
 
 # %% names the reading recognises
 
@@ -223,16 +224,16 @@ class SignatureReader:
             return self.class_signature(definition)
         return self.signature_of(method)
 
-    def attribute_class(self, class_name: str, attribute: str) -> str | None:
+    def attribute_type(self, class_name: str, attribute: str) -> AnnotatedType | None:
         """
         :param class_name: The name of a class.
         :param attribute: The name of an attribute of its instances.
-        :return: The class every declaration of the attribute in the class and its
-            ancestors allows, ``None`` when there is none or they disagree.
+        :return: What every declaration of the attribute in the class and its ancestors
+            declares, ``None`` when there is none or they disagree.
         """
         classes = list(self.definitions.classes_named(class_name))
         declared = {
-            declaration.class_name
+            declaration.declared_type
             for definition in [*classes, *self.definitions.ancestors_of(classes)]
             for declaration in definition.attribute_types
             if declaration.name == attribute
@@ -240,6 +241,16 @@ class SignatureReader:
         if len(declared) != 1:
             return None
         return declared.pop()
+
+    def attribute_class(self, class_name: str, attribute: str) -> str | None:
+        """
+        :param class_name: The name of a class.
+        :param attribute: The name of an attribute of its instances.
+        :return: The class of :meth:`attribute_type` when it has no type arguments,
+            ``None`` otherwise.
+        """
+        declared = self.attribute_type(class_name, attribute)
+        return None if declared is None else declared.plain_class
 
     @staticmethod
     def defines(definition: ClassDefinition, name: str) -> bool:

@@ -41,6 +41,11 @@ class FileSample(StrEnum):
     KEYWORD_ONLY_PARAMETERS = "keyword-only-parameters"
     MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
     MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
+    RECEIVER_BINDS_DIFFERENTLY = "receiver-binds-differently"
+    RECEIVER_TYPE_AMBIGUOUS = "receiver-type-ambiguous"
+    RECEIVER_TYPE_FOLLOWED = "receiver-type-followed"
+    RECEIVER_TYPE_INFERRED = "receiver-type-inferred"
+    RECEIVER_TYPE_UNKNOWN = "receiver-type-unknown"
     RELATIVE_IMPORT_MOVED = "relative-import-moved"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
     TEMPLATE_RENAMED = "template-renamed"
@@ -67,10 +72,16 @@ class FileSample(StrEnum):
 
     def base_definitions(self) -> DefinitionIndex:
         """
-        :return: What the base version defines, as the base commit's definitions.
+        :return: What the base version and the sample's ``other_*.py`` files define, as
+            the base commit's definitions.
         """
-        base = next(self.directory.glob("base.*"))
-        return DefinitionIndex(SourceDefinitions((base.read_text(),)))
+        files = [
+            next(self.directory.glob("base.*")),
+            *sorted(self.directory.glob("other_*.py")),
+        ]
+        return DefinitionIndex(
+            SourceDefinitions(tuple(file.read_text(encoding="utf-8") for file in files))
+        )
 
 
 SIGNATURE_DEFINITIONS = DatasetLocation.REVIEW_TRIAGE / "signatures" / "definitions.py"
@@ -258,7 +269,6 @@ TEMPLATE_REINDENTED = (
 """
 The renamed template's head version, its renamed line also indented.
 """
-
 
 # %% rule settings
 

@@ -76,6 +76,24 @@ class MaintenanceText(StrEnum):
     of them at a glance.
     """
 
+    MERGE_RESOLUTION = (
+        "Merge `{parent}` into this branch, resolve the conflicts in the merge commit "
+        "and push. A plain push publishes it; the pass never force-pushes a merged branch."
+    )
+    """
+    How the owner of a conflicting branch resolves it when the pass merges its parent,
+    with the parent's name to fill in.
+    """
+
+    REBASE_RESOLUTION = (
+        "Rebase this branch onto `{parent}`, resolve the conflicts and push with "
+        "`--force-with-lease`. Its `rebase` label is what allows the rewrite."
+    )
+    """
+    How the owner of a conflicting branch resolves it when the pass rebases it onto its
+    parent, with the parent's name to fill in.
+    """
+
     PROMOTION_HEADING = "## Promote"
     """
     Heading the compare-and-create link is written under, in the fork pull request's own

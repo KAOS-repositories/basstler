@@ -199,6 +199,31 @@ def test_a_text_file_of_another_type_that_only_follows_a_rename_is_mechanical():
     )
 
 
+DEFINITION_MOVED = RenameMap(
+    (
+        Rename(
+            "package.repository.Repository",
+            "package.storage.repository.Repository",
+            "test",
+        ),
+    )
+)
+"""
+The rename of a definition to the same name in another module.
+"""
+
+
+def test_a_documented_import_of_a_moved_definition_is_mechanical():
+    """
+    An import line in documentation that only follows the module a definition moved
+    to is mechanical, like the import of a Python file.
+    """
+    change = FileSample.DOCUMENTATION_IMPORT_MOVED.change()
+    assert FileTriager(JudgmentContext(DEFINITION_MOVED)).triage(
+        change
+    ) == MechanicalFile(change, frozenset({MechanicalChange.RENAME}))
+
+
 def test_a_text_file_of_another_type_whose_whitespace_changes_needs_review():
     """
     Whitespace can carry meaning in a file of unknown type, so a renamed line that is

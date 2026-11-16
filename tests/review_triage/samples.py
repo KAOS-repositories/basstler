@@ -27,6 +27,7 @@ class FileSample(StrEnum):
     CODE_REFORMATTED = "code-reformatted"
     DOCSTRING_REFLOWED = "docstring-reflowed"
     DOCSTRING_REWORDED = "docstring-reworded"
+    DOCUMENTATION_IMPORT_MOVED = "documentation-import-moved"
     DOCUMENTATION_REFLOWED = "documentation-reflowed"
     DOCUMENTATION_RENAMED = "documentation-renamed"
     IDENTIFIER_RENAMED = "identifier-renamed"

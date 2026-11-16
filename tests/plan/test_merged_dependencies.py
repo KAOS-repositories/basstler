@@ -26,7 +26,7 @@ from basstler.plan.exceptions import DependsOnMergedNotDependedOn, PlanValidatio
 from basstler.plan.goal import Goal
 from basstler.plan.goal_path import GoalPath
 from basstler.plan.item_action import StartNowAction
-from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument
+from basstler.plan.model import DependencyRelease, ItemStatus, ManifestKey, PlanDocument
 from basstler.plan.structure import Plan
 from basstler.plan.validation import PlanValidator
 
@@ -194,7 +194,7 @@ class TestWhatAMergedDependencyHoldsBack:
         (readiness,) = DependencyReadiness.of_item(
             plan, DEPENDENT, live_pull_requests(merged)
         )
-        assert readiness.must_be_merged
+        assert readiness.release is DependencyRelease.MERGED
         assert readiness.is_ready is merged
 
     def test_a_path_keeps_the_dependent_waiting_for_the_merge(self, tmp_path: Path):

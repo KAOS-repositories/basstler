@@ -15,7 +15,7 @@ import yaml
 from basstler.class_property import classproperty
 from basstler.github.pull_request_state import LivePullRequests, LiveState
 from basstler.github.repository import PullRequestReference, Repository
-from basstler.plan.model import PlanDocument, PlanManifest
+from basstler.plan.model import DependencyRelease, PlanDocument, PlanManifest
 from basstler.plan.structure import Item, Plan
 
 # %% references
@@ -155,14 +155,24 @@ class Dependency(ABC):
         Whether the item this dependency names is done or merged.
         """
 
-    def releases_dependent(self, must_be_merged: bool) -> bool:
+    @abstractmethod
+    def has_finished_pushing(self) -> bool:
         """
-        :param must_be_merged: Whether the dependent needs this dependency merged.
+        Whether the item this dependency names takes no more pushes.
+        """
+
+    def releases_dependent(self, release: DependencyRelease) -> bool:
+        """
+        :param release: What the dependent waits for of this dependency.
         :return: Whether the dependent can start as far as this dependency goes.
         """
-        if must_be_merged:
-            return self.is_finished()
-        return self.is_ready_to_unblock_dependents()
+        match release:
+            case DependencyRelease.MERGED:
+                return self.is_finished()
+            case DependencyRelease.PUSHES_DONE:
+                return self.is_finished() or self.has_finished_pushing()
+            case DependencyRelease.READY_FOR_REVIEW:
+                return self.is_ready_to_unblock_dependents()
 
     @abstractmethod
     def classify_live_state(
@@ -243,12 +253,18 @@ class ResolvedDependency(Dependency):
     def is_finished(self) -> bool:
         return self.item.is_effectively_done()
 
+    def has_finished_pushing(self) -> bool:
+        return self.item.has_finished_pushing
+
     def classify_live_state(
         self,
         live_pull_requests: LivePullRequests,
     ) -> None:
         self.item.live_state = LiveState.classify(
             self.item.pull_request_number, self.repository, live_pull_requests
+        )
+        self.item.pull_request_record = live_pull_requests.record_of(
+            self.repository, self.item.pull_request_number
         )
 
 
@@ -285,6 +301,9 @@ class UnresolvedDependency(Dependency):
         return False
 
     def is_finished(self) -> bool:
+        return False
+
+    def has_finished_pushing(self) -> bool:
         return False
 
     def classify_live_state(
@@ -476,7 +495,7 @@ class DependencyResolver:
             item with none.
         """
         return all(
-            self.resolve(entry).releases_dependent(entry in item.depends_on_merged)
+            self.resolve(entry).releases_dependent(item.release_needed_from(entry))
             for entry in item.depends_on
         )
 

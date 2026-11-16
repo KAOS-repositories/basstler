@@ -11,6 +11,7 @@ from typing import Any
 
 from basstler.github.pull_request_state import LivePullRequests
 from basstler.plan.dependencies import Dependency, DependencyResolver, PlanDirectory
+from basstler.plan.model import DependencyRelease
 from basstler.plan.structure import Plan
 
 
@@ -42,9 +43,9 @@ class DependencyReadiness:
     The dependency, with its live state already classified.
     """
 
-    must_be_merged: bool = False
+    release: DependencyRelease = DependencyRelease.READY_FOR_REVIEW
     """
-    Whether the dependent needs the dependency merged, not only out of draft.
+    What the dependent waits for of the dependency.
     """
 
     @property
@@ -52,7 +53,7 @@ class DependencyReadiness:
         """
         Whether the dependent can start as far as this dependency goes.
         """
-        return self.dependency.releases_dependent(self.must_be_merged)
+        return self.dependency.releases_dependent(self.release)
 
     def to_json(self) -> dict[str, Any]:
         """
@@ -94,6 +95,6 @@ class DependencyReadiness:
         resolver = DependencyResolver(plan=plan, plan_directory=plan_directory)
         resolver.classify_live_states(live_pull_requests)
         return [
-            cls(resolver.resolve(entry), entry in item.depends_on_merged)
+            cls(resolver.resolve(entry), item.release_needed_from(entry))
             for entry in item.depends_on
         ]

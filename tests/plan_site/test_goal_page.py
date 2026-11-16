@@ -40,6 +40,7 @@ from ..constants.site import SiteRepository, SiteSampleText
 from ..github.pull_request_api import api_pull_request
 from ..plan.test_goal_path import GOAL, recorded_pull_requests
 from ..plan import test_merged_dependencies as merged_dependency_plan
+from ..plan import test_pushes_done_dependencies as pushes_done_plan
 from ..plan.test_owner_steps import GOAL as OWNER_STEP_GOAL
 from ..plan.test_owner_steps import PLAN_ID as OWNER_STEP_PLAN_ID
 from ..recorded_pull_requests import RecordedPullRequestSource
@@ -388,6 +389,38 @@ class TestAStepWaitingForAMerge:
         )
         awaited_link = f'<a class="chip" {link_to("#" + GoalPage.anchor_of(base))}>'
         assert f"Starts once merged: {awaited_link}{base.text}</a>" in page
+
+
+class TestAStepWaitingForPushes:
+    """
+    A step that waits for a dependency's pushes to be done says so on the goal's page.
+    """
+
+    def test_the_goal_page_names_the_awaited_pushes(self, tmp_path: Path):
+        """
+        The dependent's card links the step whose last push it starts after.
+        """
+        goal = pushes_done_plan.GOAL
+        (target,) = goal.target_references
+        records = pushes_done_plan.base_pull_request(pushes_done_plan.LATER_COMMIT)
+        build_site(
+            tmp_path,
+            {
+                Path(target.plan_id) / PlanDocument.MANIFEST: yaml.safe_dump(
+                    pushes_done_plan.manifest()
+                ),
+                Path(ProjectLocation.PLAN_GOALS.name) / f"{goal.identifier}.yaml": (
+                    goal.render()
+                ),
+            },
+            RecordedPullRequestSource(records=records),
+        )
+        page = page_at(tmp_path, ADDRESS.goal_url(NOTES_REPOSITORY, goal.identifier))
+        base = DependencyReference(
+            item_identifier=pushes_done_plan.BASE, plan_id=target.plan_id
+        )
+        awaited_link = f'<a class="chip" {link_to("#" + GoalPage.anchor_of(base))}>'
+        assert f"Starts once its pushes are done: {awaited_link}{base.text}</a>" in page
 
 
 # %% the sequence and whose turn each step is

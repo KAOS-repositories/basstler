@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.goal_path import GoalPath
@@ -41,13 +43,13 @@ class BasstlerCommandRunner:
         ).returncode
 
 
-# %% recording a step as done
+# %% recording what a step reached
 
 
 @dataclass(frozen=True)
-class FinishedStep:
+class StepRecord(ABC):
     """
-    A step that has been carried out and is to be recorded as done on its plan.
+    Something a step has reached, to be recorded on its item.
     """
 
     reference: DependencyReference
@@ -55,9 +57,16 @@ class FinishedStep:
     The step's item, named with its plan.
     """
 
+    @property
+    @abstractmethod
+    def values_by_key(self) -> dict[ManifestKey, Any]:
+        """
+        The fields this record sets on the item.
+        """
+
     def record(self, project_root: Path) -> None:
         """
-        Set the item to done on its plan and push it.
+        Set the fields on the item's plan and push it.
 
         :param project_root: The repository whose notes branch holds the plan.
         :raises UnknownPlanError: If the plan has no manifest on the notes branch.
@@ -66,8 +75,35 @@ class FinishedStep:
         ItemUpdateRequest(
             plan_identifier=self.reference.plan_id,
             item_identifier=self.reference.item_identifier,
-            values_by_key={ManifestKey.STATUS: ItemStatus.DONE},
+            values_by_key=self.values_by_key,
         ).update(project_root)
+
+
+@dataclass(frozen=True)
+class FinishedStep(StepRecord):
+    """
+    A step that has been carried out and is to be recorded as done on its plan.
+    """
+
+    @property
+    def values_by_key(self) -> dict[ManifestKey, Any]:
+        return {ManifestKey.STATUS: ItemStatus.DONE}
+
+
+@dataclass(frozen=True)
+class FinishedPushes(StepRecord):
+    """
+    A step whose pull request takes no more pushes after one commit.
+    """
+
+    commit: str
+    """
+    The full id of the commit the item's pushes ended at.
+    """
+
+    @property
+    def values_by_key(self) -> dict[ManifestKey, Any]:
+        return {ManifestKey.PUSHES_DONE_AT: self.commit}
 
 
 # %% checking the steps of a path

@@ -12,7 +12,7 @@ from typing import Any
 
 from basstler.github.pull_request_state import LiveState, PullRequestRecord
 from basstler.github.repository import GitHubAddress, PullRequestReference
-from basstler.plan.model import ItemStatus, ManifestKey, Performer
+from basstler.plan.model import DependencyRelease, ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
 from basstler.render_common import sanitize_http_url
 
@@ -179,6 +179,18 @@ class Item:
     """
     The entries of :attr:`depends_on` that must be merged, not only out of draft, before
     this item can start.
+    """
+
+    depends_on_pushes_done: list[str] = field(default_factory=list)
+    """
+    The entries of :attr:`depends_on` whose pushes must be done, though still drafts,
+    before this item can start.
+    """
+
+    pushes_done_at: str | None = None
+    """
+    The commit this item's pull request takes no more pushes after, ``None`` while its
+    pushes go on.
     """
 
     blockers: list[str] = field(default_factory=list)
@@ -357,12 +369,40 @@ class Item:
             notes=notes.strip() if notes else None,
             depends_on=list(data.get(ManifestKey.DEPENDS_ON.key) or []),
             depends_on_merged=list(data.get(ManifestKey.DEPENDS_ON_MERGED.key) or []),
+            depends_on_pushes_done=list(
+                data.get(ManifestKey.DEPENDS_ON_PUSHES_DONE.key) or []
+            ),
+            pushes_done_at=data.get(ManifestKey.PUSHES_DONE_AT.key),
             blockers=list(data.get(ManifestKey.BLOCKERS.key) or []),
             performed_by=Performer(
                 data.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)
             ),
             commands=list(data.get(ManifestKey.COMMANDS.key) or []),
             done_when=list(data.get(ManifestKey.DONE_WHEN.key) or []),
+        )
+
+    def release_needed_from(self, entry: str) -> DependencyRelease:
+        """
+        :param entry: One entry of :attr:`depends_on`.
+        :return: What this item waits for of that dependency.
+        """
+        if entry in self.depends_on_merged:
+            return DependencyRelease.MERGED
+        if entry in self.depends_on_pushes_done:
+            return DependencyRelease.PUSHES_DONE
+        return DependencyRelease.READY_FOR_REVIEW
+
+    @property
+    def has_finished_pushing(self) -> bool:
+        """
+        Whether this item's live pull request still points at the commit its pushes
+        were recorded done at.
+        """
+        record = self.pull_request_record
+        return (
+            self.pushes_done_at is not None
+            and record is not None
+            and record.head_commit == self.pushes_done_at
         )
 
     def is_effectively_done(self) -> bool:

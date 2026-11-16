@@ -202,6 +202,12 @@ Push the item's branch, from its checkout, only with
 against a board it exports now and pushes only when that is clear. Any status
 but 0 means nothing was pushed - never follow it with a `git push` of your own.
 
+When another item lists this one under `depends_on_pushes_done` and this push ends the
+work its notes list, record it after the push:
+`"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" __main__ goal pushes-done <plan-id>/<item-id> "$(git rev-parse HEAD)"`.
+A push after a recorded one holds those items back again, so record the new last push
+too (`plan-schema.md`, "Needing a dependency's pushes done").
+
 Once the fix is pushed, carry it into the pull requests stacked on this item's
 branch, which a resolve otherwise leaves holding the state it replaced — follow
 [`propagating-a-fix.md`](./propagating-a-fix.md).

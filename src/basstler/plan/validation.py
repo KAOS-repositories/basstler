@@ -5,6 +5,7 @@ every :class:`~basstler.plan.exceptions.ValidationProblem` it carries at once.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -15,11 +16,13 @@ import rustworkx
 from basstler.plan.exceptions import (
     DependencyCycle,
     DependsOnMergedNotDependedOn,
+    DependsOnPushesDoneNotDependedOn,
     DuplicateItemId,
     InvalidBlockers,
     InvalidCommands,
     InvalidDependsOn,
     InvalidLandedItemCount,
+    InvalidPushesDoneAt,
     InvalidManifestRoot,
     InvalidSchemaVersion,
     MalformedDependencyReference,
@@ -47,6 +50,11 @@ from basstler.plan.dependencies import (
 from basstler.plan.model import ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
 
+COMMIT_IDENTIFIER = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?")
+"""
+A full git commit id: SHA-1, or SHA-256.
+"""
+
 # %% dependency cycles
 
 
@@ -62,7 +70,9 @@ class DependencyGraph:
     """
 
     plan_id: Any
-    """The validated plan's own id."""
+    """
+    The validated plan's own id.
+    """
 
     plan_directory: PlanDirectory | None = None
     """
@@ -461,6 +471,24 @@ class PlanValidator:
             problems.append(
                 DependsOnMergedNotDependedOn(item_identifier, depends_on_merged)
             )
+        depends_on_pushes_done = item.get(ManifestKey.DEPENDS_ON_PUSHES_DONE.key) or []
+        if not isinstance(depends_on_pushes_done, list) or not all(
+            isinstance(depends_on, list)
+            and entry in depends_on
+            and entry not in depends_on_merged
+            for entry in depends_on_pushes_done
+        ):
+            problems.append(
+                DependsOnPushesDoneNotDependedOn(
+                    item_identifier, depends_on_pushes_done
+                )
+            )
+        pushes_done_at = item.get(ManifestKey.PUSHES_DONE_AT.key)
+        if pushes_done_at is not None and not (
+            isinstance(pushes_done_at, str)
+            and COMMIT_IDENTIFIER.fullmatch(pushes_done_at)
+        ):
+            problems.append(InvalidPushesDoneAt(item_identifier, pushes_done_at))
         blockers = item.get(ManifestKey.BLOCKERS.key)
         if blockers is not None and not isinstance(blockers, list):
             problems.append(InvalidBlockers(item_identifier, type(blockers)))

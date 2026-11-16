@@ -24,7 +24,7 @@ from basstler.plan.dependencies import (
 from basstler.plan.exceptions import UnresolvedGoalReferenceError
 from basstler.plan.goal import Goal
 from basstler.plan.item_action import ItemAction
-from basstler.plan.model import ItemStatus
+from basstler.plan.model import DependencyRelease, ItemStatus
 from basstler.plan.model_alias import ModelAlias
 from basstler.plan.structure import Item
 
@@ -74,6 +74,11 @@ class GoalCommandName(StrEnum):
     MARK_DONE = "mark-done"
     """
     Records one step as done on its owner's word.
+    """
+
+    PUSHES_DONE = "pushes-done"
+    """
+    Records the commit a step's pull request takes no more pushes after.
     """
 
     def invocation(self, *arguments: str) -> str:
@@ -151,6 +156,12 @@ class PathStepReport(ValidatedJSONModel):
     awaited_merges: list[str]
     """
     The items the step cannot start before the merge of, each as ``<plan-id>/<item-id>``.
+    """
+
+    awaited_pushes: list[str]
+    """
+    The items the step cannot start before the pushes of are done, each as
+    ``<plan-id>/<item-id>``.
     """
 
     owner_move: str | None
@@ -379,6 +390,11 @@ class PathStep:
     The entries of :attr:`awaited` the step needs merged, not only out of draft.
     """
 
+    awaited_pushes: tuple[DependencyReference, ...] = ()
+    """
+    The entries of :attr:`awaited` whose pushes the step needs done.
+    """
+
     closing_command: str | None = None
     """
     The command that records the step as done once it is carried out, or ``None`` for a
@@ -495,6 +511,7 @@ class PathStep:
             command=self.action.command if self.action else None,
             blockers=self.item.blockers,
             awaited_merges=[reference.text for reference in self.awaited_merges],
+            awaited_pushes=[reference.text for reference in self.awaited_pushes],
             owner_move=self.owner_move.description if self.owner_move else None,
             owner_commands=list(self.owner_move.commands) if self.owner_move else [],
             closing_command=self.closing_command,
@@ -751,6 +768,8 @@ class GoalPath:
             lines.append(f"      then: {step.closing_command}")
         if step.awaited_merges:
             lines.append(f"      needs merged: {', '.join(step.awaited_merges)}")
+        if step.awaited_pushes:
+            lines.append(f"      needs pushes done: {', '.join(step.awaited_pushes)}")
         lines += [f"      blocked: {blocker}" for blocker in step.blockers]
         return lines
 
@@ -848,9 +867,6 @@ class NeededItems:
         )
         for resolved in self.resolved_by_reference.values():
             resolved.classify_live_state(live_pull_requests)
-            resolved.item.pull_request_record = live_pull_requests.record_of(
-                resolved.repository, resolved.item.pull_request_number
-            )
 
     def in_dependency_order(self) -> list[DependencyReference]:
         """
@@ -875,20 +891,19 @@ class NeededItems:
         """
         resolved = self.resolved_by_reference[reference]
         dependencies = self.dependencies_of(reference)
-        merged_dependencies = tuple(
-            dependency
+        release_by_dependency = {
+            dependency: resolved.item.release_needed_from(entry)
             for entry, dependency in zip(
                 resolved.item.depends_on, dependencies, strict=True
             )
-            if entry in resolved.item.depends_on_merged
-        )
+        }
         awaited: tuple[DependencyReference, ...] = ()
         if resolved.item.status is ItemStatus.NOT_STARTED:
             awaited = tuple(
                 dependency
-                for dependency in dependencies
+                for dependency, release in release_by_dependency.items()
                 if not self.resolved_by_reference[dependency].releases_dependent(
-                    dependency in merged_dependencies
+                    release
                 )
             )
         action = None
@@ -905,7 +920,12 @@ class NeededItems:
             awaited_merges=tuple(
                 dependency
                 for dependency in awaited
-                if dependency in merged_dependencies
+                if release_by_dependency[dependency] is DependencyRelease.MERGED
+            ),
+            awaited_pushes=tuple(
+                dependency
+                for dependency in awaited
+                if release_by_dependency[dependency] is DependencyRelease.PUSHES_DONE
             ),
             closing_command=self.closing_command_of(reference),
         )

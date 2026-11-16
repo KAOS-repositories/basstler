@@ -66,6 +66,8 @@ Read every step against the outcome, and against what the user said in this conv
   performs" says.
 - **A step that must wait for a merge, not only a pull request out of draft**: list the
   dependency under `depends_on_merged` ("Needing a dependency merged").
+- **A step a further push to a draft would undo** (marking its files viewed): list the
+  dependency under `depends_on_pushes_done` ("Needing a dependency's pushes done").
 - **A step a command can prove done**: give it `done_when` ("Done checks"). A step with
   none is closed on the owner's word with `goal mark-done`.
 

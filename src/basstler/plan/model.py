@@ -87,6 +87,27 @@ class ItemStatus(StrEnum):
         return cls.underscore_spellings().get(value)
 
 
+class DependencyRelease(StrEnum):
+    """
+    What of a dependency an item waits for before it can start.
+    """
+
+    READY_FOR_REVIEW = "ready for review"
+    """
+    The dependency's pull request is out of draft, or merged.
+    """
+
+    MERGED = "merged"
+    """
+    The dependency is merged or done.
+    """
+
+    PUSHES_DONE = "pushes done"
+    """
+    The dependency's pull request still points at the commit its pushes ended at.
+    """
+
+
 class Performer(StrEnum):
     """
     Who carries a plan item out.
@@ -365,6 +386,17 @@ class ManifestKey(KeySpecification, Enum):
     DEPENDS_ON_MERGED = ("depends_on_merged", ValueStyle.SEQUENCE)
     """
     The entries of :attr:`DEPENDS_ON` that must be merged before the item starts.
+    """
+
+    DEPENDS_ON_PUSHES_DONE = ("depends_on_pushes_done", ValueStyle.SEQUENCE)
+    """
+    The entries of :attr:`DEPENDS_ON` whose pushes must be done, though still drafts,
+    before the item starts.
+    """
+
+    PUSHES_DONE_AT = ("pushes_done_at",)
+    """
+    The commit an item's pull request takes no more pushes after.
     """
 
     STATUS = ("status",)

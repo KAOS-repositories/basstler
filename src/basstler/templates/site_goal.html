@@ -33,6 +33,9 @@
         {% if step.awaited_merges %}
         <div class="blocker">▸ Starts once merged:{% for awaited in step.awaited_merges %} <a class="chip" href="#{{ anchor_of(awaited) }}">{{ awaited.text }}</a>{% endfor %}</div>
         {% endif %}
+        {% if step.awaited_pushes %}
+        <div class="blocker">▸ Starts once its pushes are done:{% for awaited in step.awaited_pushes %} <a class="chip" href="#{{ anchor_of(awaited) }}">{{ awaited.text }}</a>{% endfor %}</div>
+        {% endif %}
         {% for blocker in item.blockers %}
         <div class="blocker">▸ {{ blocker }}</div>
         {% endfor %}

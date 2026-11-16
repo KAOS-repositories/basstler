@@ -505,6 +505,63 @@ class DependsOnMergedNotDependedOn(ValidationProblem):
 
 
 @dataclass
+class DependsOnPushesDoneNotDependedOn(ValidationProblem):
+    """
+    An item's ``depends_on_pushes_done`` isn't a list of entries of its ``depends_on``
+    that are not under ``depends_on_merged``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    depends_on_pushes_done: Any
+    """
+    Whatever ``depends_on_pushes_done`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} depends_on_pushes_done must list entries of "
+            f"its depends_on not under depends_on_merged, got "
+            f"{self.depends_on_pushes_done!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "list each entry under depends_on as well, and under at most one of "
+            "depends_on_merged and depends_on_pushes_done"
+        )
+
+
+@dataclass
+class InvalidPushesDoneAt(ValidationProblem):
+    """
+    An item's ``pushes_done_at`` isn't a full commit id.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    pushes_done_at: Any
+    """
+    Whatever ``pushes_done_at`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} pushes_done_at must be a full commit id, "
+            f"got {self.pushes_done_at!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "record the id git rev-parse HEAD prints after the item's last push"
+
+
+@dataclass
 class UnknownPerformer(ValidationProblem):
     """
     An item's ``performed_by`` isn't one of :class:`Performer`'s values.

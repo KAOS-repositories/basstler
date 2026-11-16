@@ -81,6 +81,10 @@ items:                         # the actual trackable units of work - flat,
                                    # one in another plan (see below)
     depends_on_merged: [<entry>, ...]  # optional: the depends_on entries that must be merged,
                                    # not only out of draft, before this item starts
+    depends_on_pushes_done: [<entry>, ...]  # optional: the depends_on entries whose pushes must be
+                                   # done, though still drafts; never also under depends_on_merged
+    pushes_done_at: <commit>       # optional: the full commit id this item's pull request takes
+                                   # no more pushes after; see "Needing a dependency's pushes done"
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
     recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
                                                # difficulty; see "Choosing the recommended model"
@@ -140,6 +144,15 @@ A `depends_on` entry is satisfied once its item is done, merged, or has a pull r
 draft: enough to stack a branch on. Where the item must not start before the dependency has
 *merged* - it reads what the merge publishes, or runs on the default branch - list that entry
 under `depends_on_merged` too, spelled as in `depends_on`.
+
+### Needing a dependency's pushes done
+
+Some steps act on a dependency's pull request while it is still a draft and are undone by
+its next push: marking its files viewed, for one. List that entry under
+`depends_on_pushes_done`. The dependency releases it once its session, after its last push,
+records `basstler goal pushes-done <plan-id>/<item-id> "$(git rev-parse HEAD)"`, and only
+while the pull request's head is still that commit: a later push makes the dependent wait
+again until a new last push is recorded.
 
 ### Steps the owner performs
 

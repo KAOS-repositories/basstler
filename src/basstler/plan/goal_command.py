@@ -18,7 +18,12 @@ from basstler.github.pull_request_source import (
 )
 from basstler.plan.goal import Goal, GoalStore
 from basstler.plan.dependencies import DependencyReference, PlanDirectory
-from basstler.plan.done_check import BasstlerCommandRunner, DoneChecker, FinishedStep
+from basstler.plan.done_check import (
+    BasstlerCommandRunner,
+    DoneChecker,
+    FinishedPushes,
+    FinishedStep,
+)
 from basstler.plan.exceptions import StepReferenceWithoutPlanError
 from basstler.plan.goal_path import GoalCommandName, GoalPath, NeededItems
 from basstler.plan.item_bootstrap.documents import ProjectCheckout
@@ -220,8 +225,30 @@ def mark_done(step: str) -> GoalExitCode:
 
     :param step: The step's item, as ``<plan-id>/<item-id>``.
     """
+    FinishedStep(step_reference_from(step)).record(Path.cwd())
+    return GoalExitCode.SUCCESS
+
+
+@goal_app.command(name=GoalCommandName.PUSHES_DONE)
+def record_pushes_done(step: str, commit: str) -> GoalExitCode:
+    """
+    Record that a step's pull request takes no more pushes after a commit, releasing the
+    items that wait for its pushes while its head stays there.
+
+    :param step: The step's item, as ``<plan-id>/<item-id>``.
+    :param commit: The full id of the step's last pushed commit.
+    """
+    FinishedPushes(step_reference_from(step), commit).record(Path.cwd())
+    return GoalExitCode.SUCCESS
+
+
+def step_reference_from(step: str) -> DependencyReference:
+    """
+    :param step: A step's item, as ``<plan-id>/<item-id>``.
+    :raises StepReferenceWithoutPlanError: If it does not name the item with its plan.
+    :return: The step's item.
+    """
     reference = DependencyReference.from_text(step)
     if not reference.is_well_formed or not reference.names_another_plan:
         raise StepReferenceWithoutPlanError(step)
-    FinishedStep(reference).record(Path.cwd())
-    return GoalExitCode.SUCCESS
+    return reference

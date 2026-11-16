@@ -13,6 +13,7 @@ from cyclopts import App
 
 from basstler.experiments.receiver_inference.experiment import (
     PullRequestCase,
+    ResultName,
     ReceiverInferenceExperiment,
 )
 from basstler.experiments.receiver_inference.type_checkers import (
@@ -24,9 +25,9 @@ from basstler.experiments.receiver_inference.type_checkers import (
 from basstler.experiments.tool_installation import ToolInstallation
 from basstler.locations import ExperimentLocation
 
-EXPERIMENT_NAME = "receiver-inference"
+EXPERIMENT_NAME = ResultName.OUTCOMES
 """
-The name the experiment's command and result files share.
+The name of the experiment's command, its main table's.
 """
 
 TYPE_CHECKERS: tuple[TypeChecker, ...] = (
@@ -59,6 +60,7 @@ def run(
     *pull_requests: str,
     checkout: Path,
     repetitions: int = 2,
+    cross_check: bool = True,
     output: Path = ExperimentLocation.RESULTS,
 ) -> None:
     """
@@ -68,6 +70,8 @@ def run(
         ``:rule,rule`` naming opt-in triage rules.
     :param checkout: A clone holding the pull requests' commits.
     :param repetitions: How often each triage is timed.
+    :param cross_check: Whether every receiver basstler infers is compared with what
+        each checker reveals.
     :param output: The directory the tables are written to.
     """
     experiment = ReceiverInferenceExperiment(
@@ -75,12 +79,9 @@ def run(
         tuple(map(PullRequestCase.parse, pull_requests)),
         TYPE_CHECKERS,
         repetitions,
+        cross_check,
     )
-    outcomes, costs = experiment.run()
-    for table, name in (
-        (outcomes, EXPERIMENT_NAME),
-        (costs, f"{EXPERIMENT_NAME}-costs"),
-    ):
+    for name, table in experiment.run().items():
         written, _ = table.write(output, name)
         print(written)
         print(table.markdown())

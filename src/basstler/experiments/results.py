@@ -42,6 +42,11 @@ class ResultTable:
     The rows one experiment produced, all of one row class.
     """
 
+    row_type: type[ResultRow]
+    """
+    The class of every row, whose fields are the columns.
+    """
+
     rows: tuple[ResultRow, ...]
     """
     The rows, in the order they are shown.
@@ -49,12 +54,11 @@ class ResultTable:
 
     def column_names(self) -> list[str]:
         """
-        :return: The heading of each column, empty for a table without rows.
+        :return: The heading of each column.
         """
-        if not self.rows:
-            return []
         return [
-            column.name.replace("_", " ") for column in dataclasses.fields(self.rows[0])
+            column.name.replace("_", " ")
+            for column in dataclasses.fields(self.row_type)
         ]
 
     @staticmethod

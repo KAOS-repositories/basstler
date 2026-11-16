@@ -14,6 +14,7 @@ from basstler.experiments.receiver_inference.type_checkers import (
     SourcePosition,
 )
 from basstler.review_triage.calls import CallScope, ReceiverInference
+from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import SignatureReader
 
@@ -88,6 +89,16 @@ class ExpressionSpan:
             characters(end_line, end_offset),
         )
 
+    def source_in(self, text: str) -> str:
+        """
+        :param text: The file's text.
+        :return: The expression's source.
+        """
+        lines = text.split(LINE_END)[self.line - 1 : self.end_line]
+        lines[-1] = lines[-1][: self.end_column]
+        lines[0] = lines[0][self.column :]
+        return LINE_END.join(lines)
+
 
 @dataclass(frozen=True)
 class ReceiverQuestion:
@@ -104,6 +115,22 @@ class ReceiverQuestion:
     """
     Where it is in that text.
     """
+
+    @classmethod
+    def from_method_calls(cls, module: str) -> frozenset[ReceiverQuestion]:
+        """
+        :param module: The base text of a file.
+        :return: The receiver of every method call in it, every receiver a triage can
+            ask about among them; none when it is not valid Python.
+        """
+        source = PythonSource(module)
+        if not source.parses:
+            return frozenset()
+        return frozenset(
+            cls(module, ExpressionSpan.of(node.func.value, module))
+            for node in ast.walk(source.tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        )
 
 
 # %% the triage's questions
@@ -129,7 +156,7 @@ class NoInference(ReceiverInference):
 class AnswerRecording(ReceiverInference):
     """
     Answers as another inference does, recording each receiver whose file is known that
-    it is asked about, and those it answers with a class the base commit defines.
+    it is asked about, and the class it answers each with that the base commit defines.
     """
 
     inference: ReceiverInference
@@ -142,9 +169,9 @@ class AnswerRecording(ReceiverInference):
     Every receiver asked about so far.
     """
 
-    answered: set[ReceiverQuestion] = field(default_factory=set)
+    answers: dict[ReceiverQuestion, str] = field(default_factory=dict)
     """
-    Every receiver answered so far.
+    The class every receiver answered so far was answered with.
     """
 
     def receiver_class(
@@ -162,7 +189,7 @@ class AnswerRecording(ReceiverInference):
         )
         self.asked.add(question)
         if found is not None and reader.definitions.classes_named(found):
-            self.answered.add(question)
+            self.answers[question] = found
         return found
 
 

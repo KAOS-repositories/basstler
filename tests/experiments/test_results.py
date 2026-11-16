@@ -85,7 +85,7 @@ def test_a_table_shows_each_field_as_a_column():
     """
     The Markdown table has a column per field and shows an absent value as such.
     """
-    table = ResultTable((ROW,))
+    table = ResultTable(type(ROW), (ROW,))
 
     assert table.markdown().splitlines() == [
         "| name | count | seconds | size |",
@@ -94,11 +94,23 @@ def test_a_table_shows_each_field_as_a_column():
     ]
 
 
+def test_a_table_without_rows_still_shows_its_columns():
+    """
+    A table that measured nothing still has a column per field of its row class.
+    """
+    table = ResultTable(type(ROW), ())
+
+    assert table.markdown().splitlines() == [
+        "| name | count | seconds | size |",
+        "|---|---|---|---|",
+    ]
+
+
 def test_a_table_is_written_for_people_and_for_analysis(tmp_path: Path):
     """
     Writing a table writes the Markdown table and the rows as JSON under one name.
     """
-    table = ResultTable((ROW,))
+    table = ResultTable(type(ROW), (ROW,))
 
     written = table.write(tmp_path, "measured")
 

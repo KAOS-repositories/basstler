@@ -1,16 +1,25 @@
 """
 Triages pull requests once per way of inferring receiver classes, and tabulates the
-files each way proves mechanical, the time it takes and what it costs to install.
+files each way proves mechanical, the time it takes, what it costs to install and where
+a type checker disputes basstler's inference.
 """
 
 from __future__ import annotations
 
 import re
 import tempfile
+from collections import Counter
 from dataclasses import dataclass, replace
+from enum import StrEnum
+from functools import cached_property
 from pathlib import Path
 
 from basstler.experiments.measurement import Measurement, Stopwatch, Unit
+from basstler.experiments.receiver_inference.cross_check import (
+    ReceiverAgreement,
+    ReceiverCrossCheck,
+)
+from basstler.experiments.receiver_inference.exceptions import ReceiversNotProbed
 from basstler.experiments.receiver_inference.probes import (
     AnswerRecording,
     FileProbe,
@@ -35,7 +44,9 @@ from basstler.review_triage.calls import (
     InferredReceiverMethod,
     ReceiverInference,
 )
+from basstler.review_triage.commit_tree import CommitModules
 from basstler.review_triage.definition_moves import DefinitionMoveComparison
+from basstler.review_triage.definitions import DefinitionIndex
 from basstler.review_triage.keyword_arguments import (
     KEYWORD_RULES,
     ArgumentsPassedByKeyword,
@@ -67,6 +78,33 @@ PYTHON_SUFFIX = ".py"
 """
 The suffix of the files a type checker reads.
 """
+
+
+class ResultName(StrEnum):
+    """
+    The name of each table the experiment writes.
+    """
+
+    OUTCOMES = "receiver-inference"
+    """
+    What each way of inferring receivers made of each pull request.
+    """
+
+    COSTS = "receiver-inference-costs"
+    """
+    What each way costs to install.
+    """
+
+    AGREEMENTS = "receiver-inference-agreements"
+    """
+    How often each checker's classes agree with basstler's.
+    """
+
+    DISPUTES = "receiver-inference-disputes"
+    """
+    Every receiver whose inferred class a checker disputes.
+    """
+
 
 # %% what is triaged
 
@@ -151,6 +189,11 @@ class InferenceOutcome(ResultRow):
     Those inferred to be of a class the base commit defines.
     """
 
+    receivers_probed: int | None
+    """
+    The receivers a type checker was asked for, ``None`` without a checker.
+    """
+
     needing_review: int
     """
     The files left for a reviewer to read.
@@ -217,6 +260,81 @@ class InferenceCost(ResultRow):
     dependency_names: str
     """
     Their names.
+    """
+
+
+@dataclass(frozen=True)
+class AgreementCount(ResultRow):
+    """
+    How many receivers of one pull request a checker answered in one relation to
+    basstler's answer.
+    """
+
+    pull_request: str
+    """
+    The pull request triaged, as ``owner/name#number``.
+    """
+
+    checker: str
+    """
+    The type checker compared with basstler.
+    """
+
+    agreement: ReceiverAgreement
+    """
+    How the two answers relate.
+    """
+
+    receivers: int
+    """
+    The receivers answered so.
+    """
+
+
+@dataclass(frozen=True)
+class DisputedReceiver(ResultRow):
+    """
+    A receiver whose class basstler inferred and a checker disputes.
+    """
+
+    pull_request: str
+    """
+    The pull request triaged, as ``owner/name#number``.
+    """
+
+    checker: str
+    """
+    The type checker disputing it.
+    """
+
+    path: str
+    """
+    The file holding it in the base commit.
+    """
+
+    line: int
+    """
+    The line it starts on, counted from one.
+    """
+
+    receiver: str
+    """
+    Its source.
+    """
+
+    inferred_class: str
+    """
+    The class basstler inferred.
+    """
+
+    revealed_class: str
+    """
+    The class the checker revealed.
+    """
+
+    agreement: ReceiverAgreement
+    """
+    How the two classes relate.
     """
 
 
@@ -295,14 +413,19 @@ class TriageRun:
     The method call receivers the triage asked the class of.
     """
 
-    receivers_inferred: int
+    answers: dict[ReceiverQuestion, str]
     """
-    Those inferred to be of a class the base commit defines.
+    The class each receiver was answered with that the base commit defines.
     """
 
     checker_seconds: float | None = None
     """
     The time of the type checker's run alone, ``None`` without a checker.
+    """
+
+    receivers_probed: int | None = None
+    """
+    The receivers the type checker was asked for, ``None`` without a checker.
     """
 
     @property
@@ -313,6 +436,33 @@ class TriageRun:
         return frozenset(
             str(file.change.path) for file in self.outcome.files_needing_review
         )
+
+
+@dataclass(frozen=True)
+class RevealedAnswers:
+    """
+    What one type checker revealed about the receivers of one pull request.
+    """
+
+    answers: dict[ReceiverQuestion, str]
+    """
+    The class revealed for each receiver revealed as an instance of one.
+    """
+
+    receivers_probed: int
+    """
+    The receivers the checker was asked for.
+    """
+
+    seconds: float
+    """
+    The time of probing the files, running the checker and restoring them.
+    """
+
+    checker_seconds: float
+    """
+    The time of the checker's run alone.
+    """
 
 
 @dataclass(frozen=True)
@@ -350,10 +500,10 @@ class PullRequestTriages:
         with Stopwatch() as stopwatch:
             outcome = triager.triage(self.changes)
         return TriageRun(
-            outcome, stopwatch.seconds, len(recording.asked), len(recording.answered)
+            outcome, stopwatch.seconds, len(recording.asked), dict(recording.answers)
         )
 
-    @property
+    @cached_property
     def base_paths(self) -> dict[str, str]:
         """
         The path, relative to the checkout, of each changed Python file by its base
@@ -366,6 +516,25 @@ class PullRequestTriages:
             and (file.previous_path or file.path).suffix == PYTHON_SUFFIX
         }
 
+    @cached_property
+    def receivers(self) -> frozenset[ReceiverQuestion]:
+        """
+        The receiver of every method call in the changed Python files' base versions,
+        every receiver a triage asks about among them.
+        """
+        return frozenset(
+            question
+            for module in self.base_paths
+            for question in ReceiverQuestion.from_method_calls(module)
+        )
+
+    @cached_property
+    def base_definitions(self) -> DefinitionIndex:
+        """
+        The definitions of the base commit.
+        """
+        return DefinitionIndex(CommitModules(self.changes.commits.base_tree))
+
     def restore(self, paths: list[str]) -> None:
         """
         Check the files out of the base commit again, undoing any probe written over
@@ -376,66 +545,139 @@ class PullRequestTriages:
         if paths:
             GitCommandRunner(self.base_checkout).run("checkout", "--", *paths)
 
-    def checked(
-        self, checker: TypeChecker, questions: set[ReceiverQuestion], recording: float
-    ) -> TriageRun:
+    def reveal(self, checker: TypeChecker) -> RevealedAnswers:
+        """
+        :param checker: A type checker.
+        :return: The classes it reveals for every receiver of the files it checks,
+            asked for in one run before any triage.
+        """
+        with Stopwatch() as whole:
+            probes = {
+                module: FileProbe.of(
+                    path,
+                    module,
+                    sorted(
+                        question.span
+                        for question in self.receivers
+                        if question.module == module
+                    ),
+                )
+                for module, path in self.base_paths.items()
+                if checker.checks(path, self.base_checkout)
+            }
+            probed = sorted(probe.path for probe in probes.values())
+            self.restore(probed)
+            for probe in probes.values():
+                (self.base_checkout / probe.path).write_text(
+                    probe.text, encoding="utf-8", newline=""
+                )
+            search_paths = [
+                path
+                for pattern in self.source_roots
+                for path in sorted(self.base_checkout.glob(pattern))
+                if path.is_dir()
+            ]
+            with tempfile.TemporaryDirectory() as workspace, Stopwatch() as running:
+                revealed = (
+                    checker.reveal(
+                        probed, search_paths, self.base_checkout, Path(workspace)
+                    )
+                    if probed
+                    else []
+                )
+            self.restore(probed)
+            answers = {
+                question: class_name
+                for module, probe in probes.items()
+                for question, class_name in probe.answers(module, revealed).items()
+            }
+        return RevealedAnswers(
+            answers,
+            sum(len(probe.arguments) for probe in probes.values()),
+            whole.seconds,
+            running.seconds,
+        )
+
+    def checked(self, checker: TypeChecker) -> TriageRun:
         """
         :param checker: The type checker asked for the receivers' classes.
-        :param questions: The receivers the triage asks about.
-        :param recording: The time the triage recording them took.
-        :return: The pull request triaged with the classes the checker revealed.
+        :return: The pull request triaged with the classes the checker revealed, its
+            time the checker's run and the triage's together.
+        :raises ReceiversNotProbed: If the triage asked about a receiver of a Python
+            file the checker was not asked for.
         """
-        paths = {
-            module: path
-            for module, path in self.base_paths.items()
-            if checker.checks(path, self.base_checkout)
-        }
-        probes = {
-            module: FileProbe.of(
-                paths[module],
-                module,
-                sorted(
-                    question.span for question in questions if question.module == module
+        revealed = self.reveal(checker)
+        recording = AnswerRecording(RevealedInference(revealed.answers))
+        run = self.triage(recording)
+        unprobed = {
+            question
+            for question in recording.asked
+            if question.module in self.base_paths
+        } - self.receivers
+        if unprobed:
+            raise ReceiversNotProbed(
+                str(self.case),
+                tuple(
+                    f"{self.base_paths[question.module]}:{question.span.line}: "
+                    f"{question.span.source_in(question.module)}"
+                    for question in unprobed
                 ),
             )
-            for module in {question.module for question in questions}
-            if module in paths
-        }
-        probed = sorted(probe.path for probe in probes.values())
-        self.restore(probed)
-        for probe in probes.values():
-            (self.base_checkout / probe.path).write_text(
-                probe.text, encoding="utf-8", newline=""
-            )
-        search_paths = [
-            path
-            for pattern in self.source_roots
-            for path in sorted(self.base_checkout.glob(pattern))
-            if path.is_dir()
-        ]
-        with tempfile.TemporaryDirectory() as workspace, Stopwatch() as stopwatch:
-            revealed = (
-                checker.reveal(
-                    probed, search_paths, self.base_checkout, Path(workspace)
-                )
-                if probes
-                else []
-            )
-        self.restore(probed)
-        answers = {
-            question: class_name
-            for module, probe in probes.items()
-            for question, class_name in probe.answers(module, revealed).items()
-        }
-        run = self.triage(AnswerRecording(RevealedInference(answers)))
         return replace(
             run,
-            seconds=recording + stopwatch.seconds + run.seconds,
-            checker_seconds=stopwatch.seconds,
+            seconds=revealed.seconds + run.seconds,
+            checker_seconds=revealed.checker_seconds,
+            receivers_probed=revealed.receivers_probed,
+        )
+
+    def cross_check(
+        self, inferred: TriageRun, revealed: TriageRun
+    ) -> ReceiverCrossCheck:
+        """
+        :param inferred: The triage with basstler's inference.
+        :param revealed: The triage with a checker's answers.
+        :return: The receivers of the changed Python files either answered.
+        """
+
+        def in_python_files(
+            answers: dict[ReceiverQuestion, str],
+        ) -> dict[ReceiverQuestion, str]:
+            return {
+                question: class_name
+                for question, class_name in answers.items()
+                if question.module in self.base_paths
+            }
+
+        return ReceiverCrossCheck(
+            in_python_files(inferred.answers),
+            in_python_files(revealed.answers),
+            self.base_definitions,
         )
 
 
 # %% the experiment
+
+
+@dataclass(frozen=True)
+class CaseResults:
+    """
+    The rows one pull request contributes to each table.
+    """
+
+    outcomes: tuple[InferenceOutcome, ...]
+    """
+    One row per way of inferring receivers.
+    """
+
+    agreements: tuple[AgreementCount, ...] = ()
+    """
+    How often each checker agrees with basstler, empty without a cross-check.
+    """
+
+    disputes: tuple[DisputedReceiver, ...] = ()
+    """
+    Every receiver whose inferred class a checker disputes.
+    """
 
 
 @dataclass(frozen=True)
@@ -462,6 +704,11 @@ class ReceiverInferenceExperiment:
     repetitions: int = 2
     """
     How often each triage is timed.
+    """
+
+    cross_check: bool = True
+    """
+    Whether every receiver basstler infers is compared with what each checker reveals.
     """
 
     source_roots: tuple[str, ...] = ("src", "*/src")
@@ -499,51 +746,105 @@ class ReceiverInferenceExperiment:
             case, changes, self.base_checkout(changes), self.source_roots
         )
 
-    def outcomes(self, case: PullRequestCase) -> list[InferenceOutcome]:
+    def results(self, case: PullRequestCase) -> CaseResults:
         """
         :param case: A pull request.
-        :return: One row per way of inferring receivers.
+        :return: Its rows of every table, its first repetition's triages compared.
         """
         triages = self.triages(case)
         runs: dict[str, list[TriageRun]] = {}
         for _ in range(self.repetitions):
-            recording = AnswerRecording(NoInference())
-            unaided = triages.triage(recording)
-            runs.setdefault(NO_INFERENCE, []).append(unaided)
+            runs.setdefault(NO_INFERENCE, []).append(
+                triages.triage(AnswerRecording(NoInference()))
+            )
             runs.setdefault(OWN_INFERENCE, []).append(
                 triages.triage(AnswerRecording(AnnotationInference()))
             )
             for checker in self.checkers:
-                runs.setdefault(checker.name, []).append(
-                    triages.checked(checker, recording.asked, unaided.seconds)
+                runs.setdefault(checker.name, []).append(triages.checked(checker))
+        outcomes = tuple(
+            self.outcome(case, name, timed, runs) for name, timed in runs.items()
+        )
+        if not self.cross_check:
+            return CaseResults(outcomes)
+        compared = {
+            checker.name: triages.cross_check(
+                runs[OWN_INFERENCE][0], runs[checker.name][0]
+            ).compare_all()
+            for checker in self.checkers
+        }
+        return CaseResults(
+            outcomes,
+            tuple(
+                AgreementCount(str(case), name, agreement, counted[agreement])
+                for name, agreements in compared.items()
+                for counted in (Counter(agreements.values()),)
+                for agreement in ReceiverAgreement
+            ),
+            tuple(
+                DisputedReceiver(
+                    str(case),
+                    name,
+                    triages.base_paths[question.module],
+                    question.span.line,
+                    question.span.source_in(question.module),
+                    runs[OWN_INFERENCE][0].answers[question],
+                    runs[name][0].answers[question],
+                    agreement,
                 )
+                for name, agreements in compared.items()
+                for question, agreement in sorted(
+                    agreements.items(),
+                    key=lambda item: (
+                        triages.base_paths[item[0].module],
+                        item[0].span,
+                    ),
+                )
+                if agreement.disputes_inference
+            ),
+        )
+
+    @staticmethod
+    def outcome(
+        case: PullRequestCase,
+        name: str,
+        timed: list[TriageRun],
+        runs: dict[str, list[TriageRun]],
+    ) -> InferenceOutcome:
+        """
+        :param case: A pull request.
+        :param name: One way of inferring receivers.
+        :param timed: Its triages of the pull request, one per repetition.
+        :param runs: Every way's triages, to compare its verdicts with.
+        :return: Its row, its first repetition's verdicts compared.
+        """
+        first = timed[0]
+        checker_seconds = [
+            run.checker_seconds for run in timed if run.checker_seconds is not None
+        ]
         unaided = runs[NO_INFERENCE][0].needing_review
         own = runs[OWN_INFERENCE][0].needing_review
-        return [
-            InferenceOutcome(
-                pull_request=str(case),
-                inference=name,
-                files=len(timed[0].outcome.files),
-                receivers=timed[0].receivers,
-                receivers_inferred=timed[0].receivers_inferred,
-                needing_review=len(timed[0].needing_review),
-                newly_mechanical=len(unaided - timed[0].needing_review),
-                newly_needing_review=len(timed[0].needing_review - unaided),
-                mechanical_beyond_basstler=len(own - timed[0].needing_review),
-                needing_review_beyond_basstler=len(timed[0].needing_review - own),
-                seconds=Measurement.from_samples(
-                    [run.seconds for run in timed], Unit.SECONDS
-                ),
-                checker_seconds=(
-                    None
-                    if timed[0].checker_seconds is None
-                    else Measurement.from_samples(
-                        [run.checker_seconds for run in timed], Unit.SECONDS
-                    )
-                ),
-            )
-            for name, timed in runs.items()
-        ]
+        return InferenceOutcome(
+            pull_request=str(case),
+            inference=name,
+            files=len(first.outcome.files),
+            receivers=first.receivers,
+            receivers_inferred=len(first.answers),
+            receivers_probed=first.receivers_probed,
+            needing_review=len(first.needing_review),
+            newly_mechanical=len(unaided - first.needing_review),
+            newly_needing_review=len(first.needing_review - unaided),
+            mechanical_beyond_basstler=len(own - first.needing_review),
+            needing_review_beyond_basstler=len(first.needing_review - own),
+            seconds=Measurement.from_samples(
+                [run.seconds for run in timed], Unit.SECONDS
+            ),
+            checker_seconds=(
+                Measurement.from_samples(checker_seconds, Unit.SECONDS)
+                if checker_seconds
+                else None
+            ),
+        )
 
     def costs(self) -> list[InferenceCost]:
         """
@@ -569,13 +870,31 @@ class ReceiverInferenceExperiment:
             ),
         ]
 
-    def run(self) -> tuple[ResultTable, ResultTable]:
+    def run(self) -> dict[ResultName, ResultTable]:
         """
         Install the checkers, then triage every pull request with every way.
 
-        :return: The outcome of each triage, and what each way costs to install.
+        :return: Each table, the cross-check's only when it is made.
         """
         for checker in self.checkers:
             checker.installation.install()
-        outcomes = [row for case in self.cases for row in self.outcomes(case)]
-        return ResultTable(tuple(outcomes)), ResultTable(tuple(self.costs()))
+        results = [self.results(case) for case in self.cases]
+        tables = {
+            ResultName.OUTCOMES: ResultTable(
+                InferenceOutcome,
+                tuple(row for result in results for row in result.outcomes),
+            ),
+            ResultName.COSTS: ResultTable(InferenceCost, tuple(self.costs())),
+        }
+        if not self.cross_check:
+            return tables
+        return tables | {
+            ResultName.AGREEMENTS: ResultTable(
+                AgreementCount,
+                tuple(row for result in results for row in result.agreements),
+            ),
+            ResultName.DISPUTES: ResultTable(
+                DisputedReceiver,
+                tuple(row for result in results for row in result.disputes),
+            ),
+        }

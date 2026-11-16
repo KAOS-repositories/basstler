@@ -10,6 +10,10 @@ from pathlib import Path
 
 import pytest
 
+from basstler.experiments.receiver_inference.cross_check import (
+    ReceiverAgreement,
+    ReceiverCrossCheck,
+)
 from basstler.experiments.receiver_inference.experiment import (
     InferringTriage,
     PullRequestCase,
@@ -39,6 +43,7 @@ from basstler.review_triage.comparison import (
     JudgmentContext,
     MechanicalFile,
 )
+from basstler.review_triage.definitions import DefinitionIndex, SourceDefinitions
 from basstler.review_triage.keyword_arguments import KeywordChange
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.rules import TriageRule
@@ -144,13 +149,34 @@ A file whose receivers a probe wraps, two of them starting at one place.
 def receiver_spans(text: str) -> list[ExpressionSpan]:
     """
     :param text: A Python file.
-    :return: The span of the receiver of every method call in it, but ``print``'s.
+    :return: The span of the receiver of every method call in it.
     """
-    return [
-        ExpressionSpan.of(node.func.value, text)
+    return sorted(
+        question.span for question in ReceiverQuestion.from_method_calls(text)
+    )
+
+
+def test_the_receivers_of_a_file_are_those_of_its_method_calls():
+    """
+    Every expression a method is called on is a receiver, nested ones included, and its
+    span covers its source exactly.
+    """
+    text = RECEIVERS.read_text(encoding="utf-8")
+
+    found = {span.source_in(text) for span in receiver_spans(text)}
+
+    assert found == {
+        ast.get_source_segment(text, node.func.value)
         for node in ast.walk(ast.parse(text))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-    ]
+    }
+
+
+def test_a_file_that_does_not_parse_has_no_receivers():
+    """
+    A file that is not valid Python has no receiver to probe.
+    """
+    assert ReceiverQuestion.from_method_calls("def broken(:\n") == frozenset()
 
 
 def test_a_probe_wraps_each_receiver_where_it_is():
@@ -250,7 +276,82 @@ def test_the_triage_is_answered_the_receivers_it_asked_about():
     assert verdict == MechanicalFile(
         sample.change(), frozenset({KeywordChange.KEYWORD_ARGUMENTS})
     )
-    assert (unanswered.answered, answering.answered) == (set(), unanswered.asked)
+    assert (unanswered.answers, answering.answers) == ({}, answers)
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [
+        FileSample.RECEIVER_TYPE_AMBIGUOUS,
+        FileSample.RECEIVER_TYPE_FOLLOWED,
+        FileSample.RECEIVER_TYPE_INFERRED,
+        FileSample.RECEIVER_TYPE_UNKNOWN,
+    ],
+)
+def test_every_receiver_the_triage_asks_about_is_probed(sample: FileSample):
+    """
+    The receivers of a file's method calls, probed before any triage, hold every
+    receiver the triage then asks about, so one checker run answers them all.
+    """
+    recording = AnswerRecording(NoInference())
+    triaged_with(sample, recording)
+
+    probed = ReceiverQuestion.from_method_calls(sample.change().base_text)
+
+    assert recording.asked
+    assert recording.asked <= probed
+
+
+# %% the cross-check
+
+CLASS_HIERARCHY = DatasetLocation.RECEIVER_INFERENCE / "class-hierarchy.py"
+"""
+A base class, its subclass and an unrelated class.
+"""
+
+
+@pytest.mark.parametrize(
+    ("inferred", "revealed", "agreement"),
+    [
+        ("Shape", "Shape", ReceiverAgreement.SAME_CLASS),
+        ("Shape", "Circle", ReceiverAgreement.SUBCLASS_REVEALED),
+        ("Circle", "Shape", ReceiverAgreement.BASE_CLASS_REVEALED),
+        ("Shape", "Colour", ReceiverAgreement.UNRELATED_CLASSES),
+        ("Shape", None, ReceiverAgreement.INFERRED_ONLY),
+        (None, "Shape", ReceiverAgreement.REVEALED_ONLY),
+    ],
+)
+def test_a_cross_check_compares_the_inferred_class_with_the_revealed_one(
+    inferred: str | None, revealed: str | None, agreement: ReceiverAgreement
+):
+    """
+    A receiver's inferred and revealed classes agree, one is a subclass of the other,
+    they are unrelated, or only one way answers it.
+    """
+    question = ReceiverQuestion("receiver.method()", ExpressionSpan(1, 0, 1, 8))
+    cross_check = ReceiverCrossCheck(
+        {question: inferred} if inferred else {},
+        {question: revealed} if revealed else {},
+        DefinitionIndex(
+            SourceDefinitions((CLASS_HIERARCHY.read_text(encoding="utf-8"),))
+        ),
+    )
+
+    assert cross_check.compare_all() == {question: agreement}
+
+
+@pytest.mark.parametrize("agreement", [agreement for agreement in ReceiverAgreement])
+def test_only_a_revealed_class_unlike_the_inferred_one_disputes_it(
+    agreement: ReceiverAgreement,
+):
+    """
+    A revealed class disputes the inferred one only when both answer and the revealed
+    one is not the inferred class or a subclass of it.
+    """
+    assert agreement.disputes_inference == (
+        agreement
+        in {ReceiverAgreement.BASE_CLASS_REVEALED, ReceiverAgreement.UNRELATED_CLASSES}
+    )
 
 
 # %% the pull requests triaged

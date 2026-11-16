@@ -1,11 +1,12 @@
-Plan (split moves from edits, draft #241, stacked on #226):
-- `basstler review-triage split-moves <pr>` replaces a PR's commits with a proven move-only commit and a commit holding every other change (tree = former head)
+Plan (mechanical split and review samples, draft #241, stacked on #226):
+- `basstler review-triage split-mechanical <pr>` replaces the commits since the last review with a proven mechanical commit (statement level) and a commit holding the former head's tree, and summarises the first in the description
+- `report` and `mark-viewed` leave one mechanical file per rename unviewed (`--no-samples` to turn off)
 
 Done:
-- MoveOnlyTree, MoveSplitter (proof by the triage, dates fixed to the head), MoveSplit.publish (force-with-lease), command, docs
-- 116 triage tests pass on Windows; split of fork PR 609 checked locally (1190 new lines -> 274)
+- SourceRenaming, StatementMerge, MechanicalTree/Splitter/Split, MechanicalSummary, ReviewSampling; 15dee971 pushed
+- 140 triage, git and command-line tests pass on Windows; local splits: CRAM 609 3435 -> 1455 lines, business_consulting 125 2757 -> 2084
 
 Next:
-- Read CI once #226 and #241 run
+- Read CI on 15dee971
 - When #226 lands, retarget #241 to main
-- Optional: detect moves into probabilistic_query_rules.py-like targets the triage misses today
+- Follow-up, not approved: renames scoped to one class's members (what keeps #125's evaluation.py renames for review)

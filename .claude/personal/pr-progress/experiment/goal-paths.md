@@ -7,9 +7,10 @@
 ## Done
 - All seven parts; a path numbers its steps and says whose move each is; the goal page shows its refresh time and re-reads pull requests (f3b9f9a0).
 - Real owner steps mark-220-viewed and mark-223-viewed in review-triage; goal-paths/verdict and the goal goal-paths-decided.
+- Experiment-mode feedback is in the experiments plan (sandbox-ownership, running-stage-rules, sandbox-site, feedback-intake widened to every plan), linked from #192.
 
 ## Next
 - Write the two further goals with the user (mark-viewed pip installable; first basstler-service items).
 - The owner's verdict; then stack-board back to main, feedback comment on #192, split into pull requests.
-- #192 feedback adds: a long-running experiment goes stale against the default branch; nothing detects that an experiment is finished.
+- pushes-done: depends_on_pushes_done and pushes_done_at, goal pushes-done; wide run, commit, push, then save review-triage so mark-220/223-viewed wait on it.
 - Unverified: whether plugin Stop/PostToolUse hooks fire in cloud sessions.

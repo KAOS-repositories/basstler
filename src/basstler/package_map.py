@@ -300,6 +300,7 @@ PACKAGE_MAP = PackageMap(
             (
                 "bash",
                 "class_property",
+                "command_run",
                 "command_line",
                 "credential_origin",
                 "email_address",

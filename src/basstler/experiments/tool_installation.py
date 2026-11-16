@@ -6,12 +6,11 @@ own, so its size and dependencies can be measured apart from everything else.
 from __future__ import annotations
 
 import importlib.metadata
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from basstler.experiments.exceptions import ExperimentCommandFailed
+from basstler.command_run import CommandRun
 from basstler.experiments.measurement import BYTES_PER_MEGABYTE
 
 INSTALLER_DISTRIBUTIONS = frozenset({"pip", "setuptools"})
@@ -23,75 +22,6 @@ WINDOWS_PLATFORM = "win32"
 """
 The platform whose virtual environments keep their programs in ``Scripts``.
 """
-
-# %% running a command
-
-
-@dataclass(frozen=True)
-class CommandRun:
-    """
-    What one command printed and how it exited.
-    """
-
-    command: tuple[str, ...]
-    """
-    The program and its arguments.
-    """
-
-    output: str
-    """
-    Its standard output.
-    """
-
-    errors: str
-    """
-    Its standard error.
-    """
-
-    exit_status: int
-    """
-    The status it exited with.
-    """
-
-    @classmethod
-    def of(
-        cls,
-        command: list[str],
-        directory: Path | None = None,
-        environment: dict[str, str] | None = None,
-    ) -> CommandRun:
-        """
-        :param command: The program and its arguments.
-        :param directory: Where it runs, the current directory when ``None``.
-        :param environment: The environment it runs with, the current one when
-            ``None``.
-        :return: How it ran, whatever its exit status.
-        """
-        completed = subprocess.run(
-            command,
-            cwd=directory,
-            env=environment,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        return cls(
-            tuple(command), completed.stdout, completed.stderr, completed.returncode
-        )
-
-    def finished(self, statuses: frozenset[int] = frozenset({0})) -> CommandRun:
-        """
-        :param statuses: The exit statuses of a run that did its work.
-        :return: This run.
-        :raises ExperimentCommandFailed: If it exited with another status.
-        """
-        if self.exit_status not in statuses:
-            raise ExperimentCommandFailed(
-                self.command, self.exit_status, self.output + self.errors
-            )
-        return self
-
 
 # %% the installation's footprint
 
@@ -186,7 +116,7 @@ class ToolInstallation:
         Create the environment and install the latest release of the tool in it, unless
         it already is.
 
-        :raises ExperimentCommandFailed: If either step fails.
+        :raises CommandFailed: If either step fails.
         """
         if self.python.exists():
             return

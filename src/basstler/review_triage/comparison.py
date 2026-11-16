@@ -15,6 +15,7 @@ from basstler.git.commit_range import FileVersions
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
+from basstler.review_triage.receiver_probes import RevealedReceivers
 from basstler.review_triage.renames import RenameDecisions, RenameMap
 from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
@@ -226,6 +227,12 @@ class JudgmentContext:
     rules: frozenset[TriageRule] = frozenset()
     """
     The opt-in rules in force.
+    """
+
+    revealed_receivers: RevealedReceivers | None = None
+    """
+    The classes a type checker reveals for the pull request's receivers, ``None``
+    without a type checker.
     """
 
     review_reasons: list[ReviewReason] = field(

@@ -142,8 +142,8 @@ class RepositoryStateLocation(PathEnumeration):
 
 class ExperimentLocation(PathEnumeration):
     """
-    Where experiments keep the tools they install, the checkouts they read and the
-    results they write; short, since Windows limits the length of a path.
+    Where experiments keep the tools they install and the results they write; short,
+    since Windows limits the length of a path.
     """
 
     WORKSPACE = Path.home() / ".cache" / "basstler-experiments"
@@ -154,11 +154,6 @@ class ExperimentLocation(PathEnumeration):
     TOOLS = WORKSPACE / "tools"
     """
     One virtual environment per installed tool.
-    """
-
-    CHECKOUTS = WORKSPACE / "checkouts"
-    """
-    The worktrees of the commits an experiment reads files of.
     """
 
     RESULTS = WORKSPACE / "results"

@@ -33,6 +33,7 @@ from basstler.review_triage.python_source import (
     ContainerKind,
     PythonSource,
 )
+from basstler.review_triage.receiver_probes import RevealedReceivers
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import (
     STATIC_METHOD,
@@ -116,6 +117,12 @@ class CallScope:
     module: PythonSource | None = None
     """
     The base version of the file holding the call, ``None`` when unknown.
+    """
+
+    revealed_receivers: RevealedReceivers | None = None
+    """
+    The classes a type checker reveals for the pull request's receivers, ``None``
+    without a type checker.
     """
 
 
@@ -435,6 +442,58 @@ class AnnotationInference(ReceiverInference):
         if found is None or found.class_name == CLASS_OBJECT:
             return None
         return found.class_name
+
+
+@dataclass(frozen=True)
+class RevealedInference(ReceiverInference):
+    """
+    Answers each receiver with the class a type checker reveals for it in the base
+    commit.
+    """
+
+    def receiver_class(
+        self,
+        receiver: ast.expr,
+        scope: CallScope,
+        reader: SignatureReader,
+        renames: RenameMap,
+    ) -> str | None:
+        if scope.module is None or scope.revealed_receivers is None:
+            return None
+        return scope.revealed_receivers.class_of(receiver, scope.module.text)
+
+
+@dataclass(frozen=True)
+class CombinedInference(ReceiverInference):
+    """
+    Answers each receiver as the first of several inferences that answers it.
+    """
+
+    inferences: tuple[ReceiverInference, ...]
+    """
+    The inferences asked, in order.
+    """
+
+    def receiver_class(
+        self,
+        receiver: ast.expr,
+        scope: CallScope,
+        reader: SignatureReader,
+        renames: RenameMap,
+    ) -> str | None:
+        answers = (
+            inference.receiver_class(receiver, scope, reader, renames)
+            for inference in self.inferences
+        )
+        return next((answer for answer in answers if answer is not None), None)
+
+
+DEFAULT_RECEIVER_INFERENCE = CombinedInference(
+    (AnnotationInference(), RevealedInference())
+)
+"""
+basstler's own inference, then the type checker for each receiver it leaves open.
+"""
 
 
 @dataclass(frozen=True)
@@ -896,7 +955,7 @@ class InferredReceiverMethod(CalleeResolution):
     be an instance of.
     """
 
-    inference: ReceiverInference = field(default_factory=AnnotationInference)
+    inference: ReceiverInference = DEFAULT_RECEIVER_INFERENCE
     """
     Finds the receiver's class.
     """

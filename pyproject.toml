@@ -39,6 +39,7 @@ dependencies = [
     "rustworkx>=0.15",
     "cyclopts>=5.3",
     "pydantic>=2.11",
+    "pyrefly==1.4.1",
 ]
 dynamic = ["version"]
 

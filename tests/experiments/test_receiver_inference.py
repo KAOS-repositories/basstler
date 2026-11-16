@@ -6,6 +6,7 @@ files for it and answering the triage's questions with it.
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -18,26 +19,24 @@ from basstler.experiments.receiver_inference.experiment import (
     InferringTriage,
     PullRequestCase,
 )
+from basstler.command_run import CommandRun
 from basstler.experiments.receiver_inference.probes import (
-    REVEAL_FUNCTION,
     AnswerRecording,
-    CombinedInference,
-    ExpressionSpan,
-    FileProbe,
     NoInference,
-    ReceiverQuestion,
-    RevealedInference,
 )
 from basstler.experiments.receiver_inference.type_checkers import (
+    InstalledPyrefly,
+    InstalledTypeChecker,
     Mypy,
-    Pyrefly,
     Pyright,
-    RevealedType,
-    SourcePosition,
-    TypeChecker,
 )
-from basstler.experiments.tool_installation import CommandRun, ToolInstallation
+from basstler.experiments.tool_installation import ToolInstallation
 from basstler.github.repository import Repository
+from basstler.review_triage.calls import (
+    CallScope,
+    CombinedInference,
+    ReceiverInference,
+)
 from basstler.review_triage.comparison import (
     FileTriager,
     FileVerdict,
@@ -46,8 +45,16 @@ from basstler.review_triage.comparison import (
 )
 from basstler.review_triage.definitions import DefinitionIndex, SourceDefinitions
 from basstler.review_triage.keyword_arguments import KeywordChange
+from basstler.review_triage.receiver_probes import (
+    REVEAL_FUNCTION,
+    ExpressionSpan,
+    FileProbe,
+    ReceiverQuestion,
+)
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.rules import TriageRule
+from basstler.review_triage.signatures import SignatureReader
+from basstler.review_triage.type_checkers import RevealedType, SourcePosition
 from tests.constants.paths import DatasetLocation
 from tests.review_triage.samples import FileSample
 
@@ -117,14 +124,14 @@ def test_a_revealed_type_names_the_one_class_it_is_an_instance_of(
             ],
         ),
         (
-            Pyrefly,
+            InstalledPyrefly,
             "pyrefly-report.json",
             [RevealedType(SourcePosition(PROBED_PATH, 5, 20), "Plotter")],
         ),
     ],
 )
 def test_each_checker_reports_the_types_it_revealed_at_their_arguments(
-    checker: type[TypeChecker],
+    checker: type[InstalledTypeChecker],
     report: str,
     revealed: list[RevealedType],
     tmp_path: Path,
@@ -253,6 +260,30 @@ def test_revealed_types_answer_the_receivers_revealed_as_one_class():
 # %% the triage's questions
 
 
+@dataclass(frozen=True)
+class AnswersGivenInAdvance(ReceiverInference):
+    """
+    Answers each receiver of a file with the class given for it beforehand.
+    """
+
+    answers: dict[ReceiverQuestion, str]
+    """
+    The class given for each receiver.
+    """
+
+    def receiver_class(
+        self,
+        receiver: ast.expr,
+        scope: CallScope,
+        reader: SignatureReader,
+        renames: RenameMap,
+    ) -> str | None:
+        if scope.module is None:
+            return None
+        span = ExpressionSpan.of(receiver, scope.module.text)
+        return self.answers.get(ReceiverQuestion(scope.module.text, span))
+
+
 def triaged_with(sample: FileSample, recording: AnswerRecording) -> FileVerdict:
     """
     :param sample: A file in two versions.
@@ -275,7 +306,7 @@ def test_the_triage_is_answered_the_receivers_it_asked_about():
     unanswered = AnswerRecording(NoInference())
     triaged_with(sample, unanswered)
     answers = dict.fromkeys(unanswered.asked, "TrajectoryPlotter")
-    answering = AnswerRecording(RevealedInference(answers))
+    answering = AnswerRecording(AnswersGivenInAdvance(answers))
 
     verdict = triaged_with(sample, answering)
 
@@ -302,7 +333,7 @@ def test_combined_inferences_answer_what_the_first_leaves_open():
     sample = FileSample.RECEIVER_TYPE_UNKNOWN
     answers = dict.fromkeys(asked_receivers(sample), "TrajectoryPlotter")
     answering = AnswerRecording(
-        CombinedInference((NoInference(), RevealedInference(answers)))
+        CombinedInference((NoInference(), AnswersGivenInAdvance(answers)))
     )
 
     triaged_with(sample, answering)
@@ -319,7 +350,10 @@ def test_combined_inferences_keep_the_first_answer():
     first = dict.fromkeys(asked, "TrajectoryPlotter")
     answering = AnswerRecording(
         CombinedInference(
-            (RevealedInference(first), RevealedInference(dict.fromkeys(asked, "Map")))
+            (
+                AnswersGivenInAdvance(first),
+                AnswersGivenInAdvance(dict.fromkeys(asked, "Map")),
+            )
         )
     )
 

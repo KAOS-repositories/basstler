@@ -149,6 +149,28 @@ class CommitModules(DefinitionSearch):
         return DOTTED_NAME_SEPARATOR.join(components)
 
     @cached_property
+    def import_roots(self) -> tuple[PurePosixPath, ...]:
+        """
+        The directories the commit's modules are imported from: its root and every
+        directory holding a package that no package encloses.
+        """
+        packages = {
+            path.parent
+            for path in self.tree.file_paths
+            if path.name == PACKAGE_INITIALIZER
+        }
+        return tuple(
+            sorted(
+                {PurePosixPath(".")}
+                | {
+                    package.parent
+                    for package in packages
+                    if packages.isdisjoint(package.parents)
+                }
+            )
+        )
+
+    @cached_property
     def definition_files(self) -> dict[str, tuple[str, ...]]:
         """
         The files defining a function, method or class of each name, listed by one

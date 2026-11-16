@@ -126,6 +126,11 @@ class TriagePublication:
     The rules turned on and off on the command line, outranking the project's settings.
     """
 
+    type_checker: bool = True
+    """
+    Whether a type checker answers the receivers basstler's own inference leaves open.
+    """
+
     @classmethod
     def from_arguments(
         cls,
@@ -136,6 +141,7 @@ class TriagePublication:
         last: int | None,
         select_rules: tuple[TriageRule, ...] = (),
         ignore_rules: tuple[TriageRule, ...] = (),
+        type_checker: bool = True,
     ) -> TriagePublication:
         """
         :param pull_request: The pull request's number.
@@ -145,6 +151,7 @@ class TriagePublication:
         :param last: How many of the last commits to triage, or ``None``.
         :param select_rules: The rules to turn on.
         :param ignore_rules: The rules to turn off.
+        :param type_checker: Whether a type checker answers the receivers left open.
         :return: The publication triaging from *since*, else from before the *last*
             commits, else from the merge base.
         """
@@ -162,6 +169,7 @@ class TriagePublication:
             rule_options=RuleSelection(
                 frozenset(select_rules), frozenset(ignore_rules)
             ),
+            type_checker=type_checker,
         )
 
     def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
@@ -188,6 +196,7 @@ class TriagePublication:
             rules=self.rule_options.applied_to(
                 ReviewTriageSettings.from_checkout(checkout).selection
             ),
+            type_checker=default.type_checker if self.type_checker else None,
         )
         outcome = triager.triage(changes)
         for output in outputs:
@@ -226,6 +235,7 @@ def report(
     ] = None,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
+    type_checker: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown.
@@ -242,6 +252,8 @@ def report(
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param type_checker: Whether Pyrefly answers the method call receivers whose class
+        basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -252,6 +264,7 @@ def report(
         last,
         select_rule,
         ignore_rule,
+        type_checker,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -270,6 +283,7 @@ def mark_viewed(
     ] = None,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
+    type_checker: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the account whose GitHub
@@ -287,6 +301,8 @@ def mark_viewed(
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param type_checker: Whether Pyrefly answers the method call receivers whose class
+        basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -297,6 +313,7 @@ def mark_viewed(
         last,
         select_rule,
         ignore_rule,
+        type_checker,
     ).publish((ViewedMarking(GitHubRestClient()), MarkdownReport()))
     return ReviewTriageExitCode.SUCCESS
 

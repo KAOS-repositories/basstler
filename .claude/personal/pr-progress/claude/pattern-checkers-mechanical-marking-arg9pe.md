@@ -1,13 +1,12 @@
 Plan:
-- Answer the 18 owner review threads of #222 (read at 8b6656f6).
-- TextFile (core) reads and writes UTF-8; PythonSourceFile parses it; SourceFixer.fix_module takes the file.
-- Rename FixableChecker.specifications to specifications_of_module.
-- basstler.code_modification.syntax: ConstantName, ExpressionSyntax and CallSyntax wrapper classes, after krracker's LibCSTNodeFactory (cited as krrood).
-- KeywordArgumentFix: a general fix adding or substituting one keyword argument; UTF8EncodingFix subclasses it.
-- Keep AppliedAction.inverse a field (owner agreed); reply on the question threads.
+- Wait for the owner on the 7 open review threads of #222, among them whether the remaining modules move onto TextFile.
 
 Done:
-- Stack pass; merge probe clean at 8b6656f6; blocker recorded.
+- TextFile (core) and PythonSourceFile; SourceFixer.fix_module(source_file); specifications_of_module.
+- basstler.code_modification.syntax: ConstantName, ExpressionSyntax, CallSyntax, after krracker's LibCSTNodeFactory.
+- KeywordArgumentFix and CallLackingKeywordArgument; UTF8EncodingFix subclasses it.
+- Fixed the UTF-8 violation the main merge brought onto #220 (afbd09d8) and merged it in.
+- 2865 passed, 1 skipped at 59f12519; pushed; replies posted; description updated.
 
 Next:
-- Tests first, then the refactor, ruff, docformatter, code-rules check, full suite, push, replies.
+- Act on the owner's answers to the open threads.

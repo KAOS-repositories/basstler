@@ -137,7 +137,7 @@ items:
     and back to main, never by hand: it broke when goal-paths'' branch was renamed.'
 
 - id: feedback-intake
-  title: Feedback on experiment mode becomes plan changes the owner approves
+  title: Every plan skill starts by taking in the plan's unhandled feedback
   branch: null
   pull_request_number: null
   track: finishing
@@ -145,7 +145,8 @@ items:
   - experiment-skill
   status: not started
   recommended_model: opus
-  notes: 'At a verdict, and whenever the owner gives feedback, the session maps each point to an item''s
-    notes, a new item or a roadmap rule, shows the mapping, and saves the plan once on approval. The
-    tracking issue gets only a link to that change. Without this, feedback left on a tracking issue is
-    read only when one of its items is worked on, and nothing restructures the plan.'
+  notes: 'Any plan, not only experiments. Kickoff, resolve, add-plan-item, plan-goal and every plan
+    edit start by listing the tracking-issue comments since the plan''s last handled one (a command,
+    not a read by eye), then sort each: announcement, an item''s notes, or a structural change asked
+    first. The last handled comment is recorded on the plan; session start counts the unhandled ones.
+    Today skills read comments only as context for their item, and nothing records what was handled.'

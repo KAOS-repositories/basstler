@@ -293,6 +293,7 @@ PACKAGE_MAP = PackageMap(
             Layer.CORE,
             (
                 "bash",
+                "class_name",
                 "class_property",
                 "command_line",
                 "credential_origin",

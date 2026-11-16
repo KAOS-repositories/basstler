@@ -33,7 +33,7 @@ items:
   recommended_model: opus
   notes: 'A validated model on the notes branch beside the hub: goal, sandbox (fork, scratch repository
     or branch), stage, verdict and session. Stages: described, running, accepted, dropped, split, upstream.
-    Each stage declares its allowed moves once (described: plan first, experiment first, one PR; running:
+    Each stage declares its allowed moves once (described: plan first, experiment first, one PR, fold into an existing plan; running:
     keep iterating, accept, drop, switch to plan first; accepted: split into a plan and implement it,
     open upstream as one PR, keep as a fork-only PR), so the session''s prompt and the hub''s links read
     one source.'
@@ -92,3 +92,60 @@ items:
     to the upstream, and records it on the entry, which moves to upstream. Keep as a fork-only PR opens
     it on the fork instead. Shares the promotion path with basstler-v3-stacks/upstream-promotion once
     that lands.
+
+- id: sandbox-ownership
+  title: An experiment's sandbox is a plan item from the start, on a descriptive branch
+  branch: null
+  pull_request_number: null
+  track: record
+  depends_on:
+  - experiment-record
+  status: not started
+  recommended_model: sonnet
+  notes: 'The sandbox branch is owned by an item from the first push and named experiment/<id> at the
+    start: renaming it later closes its pull request (goal-paths #232 became #235). Stage and verdict
+    are entry fields, not item notes, which hit the 600-character limit. The end is an owner step with
+    its own goal, so the session-start goals line and the site show the verdict as the owner''s move;
+    nothing else tells the owner an experiment is ready to decide.'
+
+- id: running-stage-rules
+  title: The running stage keeps the sandbox splittable, fresh and usable from other sessions
+  branch: null
+  pull_request_number: null
+  track: record
+  depends_on:
+  - experiment-skill
+  status: not started
+  recommended_model: sonnet
+  notes: 'One commit series per future item, never mixing two. Ask only on design decisions, not after
+    every iteration. Merge the default branch into the sandbox at every session start or resume of
+    the experiment; its conflicts become the next step. When the experiment changes the plan schema,
+    real plans are saved with the sandbox''s tooling, since the release refuses the new fields. Its
+    unreleased skills run from another session through the checkout''s plugin folder.'
+
+- id: sandbox-site
+  title: The plan site builds from a sandbox only while its experiment runs, and every push rebuilds it
+  branch: null
+  pull_request_number: null
+  track: hub
+  depends_on:
+  - hub-experiments
+  status: not started
+  recommended_model: sonnet
+  notes: 'While the site repository''s basstler_branch_or_tag names the sandbox, each push to the sandbox
+    starts a build; today only plan saves do. The experiment''s moves set that setting to the sandbox
+    and back to main, never by hand: it broke when goal-paths'' branch was renamed.'
+
+- id: feedback-intake
+  title: Feedback on experiment mode becomes plan changes the owner approves
+  branch: null
+  pull_request_number: null
+  track: finishing
+  depends_on:
+  - experiment-skill
+  status: not started
+  recommended_model: opus
+  notes: 'At a verdict, and whenever the owner gives feedback, the session maps each point to an item''s
+    notes, a new item or a roadmap rule, shows the mapping, and saves the plan once on approval. The
+    tracking issue gets only a link to that change. Without this, feedback left on a tracking issue is
+    read only when one of its items is worked on, and nothing restructures the plan.'

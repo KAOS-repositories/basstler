@@ -95,6 +95,7 @@ from basstler.plan_site.workflows import (
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
+from ..executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from ..constants.paths import DatasetLocation
 from ..constants.stack import RemoteName
 from ..maintenance.fork import UPSTREAM_BASE, ForkCheckout
@@ -1879,6 +1880,7 @@ def test_a_cloud_session_s_store_command_runs_without_this_session_s_python(publ
     assert sys.executable not in pending_step(report, UserStep.STORE_TOKEN).line
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_cloud_session_s_store_command_proves_the_token_by_starting_the_build(
     published, tmp_path, monkeypatch
 ):
@@ -1893,6 +1895,7 @@ def test_a_cloud_session_s_store_command_proves_the_token_by_starting_the_build(
     )
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_cloud_session_s_store_command_stores_the_token_in_every_registered_repository(
     published, tmp_path, monkeypatch
 ):
@@ -1910,6 +1913,7 @@ def test_a_cloud_session_s_store_command_stores_the_token_in_every_registered_re
     ]
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_cloud_session_s_store_command_stores_nothing_when_the_build_is_refused(
     published, tmp_path, monkeypatch
 ):

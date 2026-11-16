@@ -21,7 +21,9 @@ from basstler.code_modification.actions import (
     NodeReplacement,
 )
 from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_modification.specification import Specification
+from basstler.code_modification.syntax import CallSyntax
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.exceptions import FixDoesNotConvergeError
@@ -86,6 +88,51 @@ class CodeFix[SpecificationType: Specification](ABC):
         """
 
 
+@dataclass(frozen=True)
+class CallLackingKeywordArgument(Specification):
+    """
+    A call that has to pass one more keyword argument.
+    """
+
+    node: libcst.Call
+    """
+    The call.
+    """
+
+    superseded_argument: libcst.Arg | None = None
+    """
+    The argument of the call the keyword argument takes the place of, if any.
+    """
+
+
+class KeywordArgumentFix(CodeFix[CallLackingKeywordArgument], ABC):
+    """
+    Passes a call one keyword argument, in place of the argument it supersedes where
+    the call has one.
+    """
+
+    @classproperty
+    @abstractmethod
+    def keyword(cls) -> str:
+        """
+        The keyword the argument is passed by.
+        """
+
+    @classproperty
+    @abstractmethod
+    def value(cls) -> libcst.BaseExpression:
+        """
+        The value passed.
+        """
+
+    def replacement(self, specification: CallLackingKeywordArgument) -> libcst.Call:
+        call = CallSyntax(specification.node)
+        argument = CallSyntax.keyword_argument(self.keyword, self.value)
+        if specification.superseded_argument is None:
+            return call.with_argument_appended(argument)
+        return call.with_argument_replaced(specification.superseded_argument, argument)
+
+
 class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
     """
     A checker each place it reports specifies the change its fix makes there.
@@ -106,15 +153,17 @@ class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
         """
 
     @abstractmethod
-    def specifications(self, module: PositionedModule) -> Iterator[SpecificationType]:
+    def specifications_of_module(
+        self, module: PositionedModule
+    ) -> Iterator[SpecificationType]:
         """
         :param module: A module to check.
         :return: Every place in it that breaks the rule.
         """
 
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = PositionedModule(libcst.parse_module(path.read_text(encoding="utf-8")))
-        for specification in self.specifications(module):
+        module = PositionedModule(PythonSourceFile(path).parse())
+        for specification in self.specifications_of_module(module):
             yield CodeRuleViolation(
                 path,
                 specification.location.start.line,
@@ -167,15 +216,16 @@ class SourceFixer:
     The checkers whose fixes are applied.
     """
 
-    def fixed(self, module: libcst.Module) -> AppliedAction:
+    def fix_module(self, source_file: PythonSourceFile) -> AppliedAction:
         """
-        :param module: The module to fix, which is left as it is.
+        :param source_file: The module to fix, which is left as it is.
         :return: The module with every place the checkers report fixed, and the action
-            restoring *module* exactly.
+            restoring the module exactly.
         :raises FixDoesNotConvergeError: If a round of fixes leaves at least as many
             places breaking a rule as there were before it.
         """
         inverses: list[Action] = []
+        module = source_file.parse()
         places = self.places(module)
         while places:
             applied = self.round_of_fixes(places).apply(module)
@@ -199,7 +249,7 @@ class SourceFixer:
         return [
             FixablePlace(checker.fix, specification)
             for checker in self.checkers
-            for specification in checker.specifications(positioned)
+            for specification in checker.specifications_of_module(positioned)
         ]
 
     @staticmethod

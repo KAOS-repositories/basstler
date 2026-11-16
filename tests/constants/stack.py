@@ -170,6 +170,11 @@ class StackLabel(StrEnum):
     Put on a branch whose owner has been asked to resolve a conflict.
     """
 
+    RENAMED_NEEDS_RESOLUTION = "stuck-on-a-conflict"
+    """
+    What a project that renamed the needs-resolution label calls it.
+    """
+
     BUG = "bug"
     """
     Carried by a fix, and never acted on by this tooling - a label it reads past.

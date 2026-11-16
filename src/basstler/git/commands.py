@@ -293,6 +293,26 @@ class GitCommandRunner:
         :return: The commit it names."""
         return self.run("rev-parse", reference)
 
+    def local_commit(self, branch: str) -> str | None:
+        """:param branch: A branch name.
+        :return: The commit this checkout's own copy of the branch is at, ``None`` when
+            it has none."""
+        found = self.attempt("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}")
+        return found.output if found.succeeded else None
+
+    def restore_branch(self, branch: str, commit: str | None) -> None:
+        """
+        Put this checkout's own copy of a branch back where it was.
+
+        :param branch: The branch to restore.
+        :param commit: Where it was, or ``None`` to have no copy of it.
+        """
+        reference = f"refs/heads/{branch}"
+        if commit is None:
+            self.run("update-ref", "-d", reference)
+            return
+        self.run("update-ref", reference, commit)
+
     def file_at(self, commit: str, path: str | PurePath) -> str | None:
         """
         :param commit: The commit to read from.

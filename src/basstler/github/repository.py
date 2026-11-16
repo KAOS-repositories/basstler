@@ -274,6 +274,13 @@ class Repository:
         """
         return f"{self.pull_requests_path}/{number}"
 
+    def pull_request_reviews_path(self, number: int) -> str:
+        """
+        :param number: The pull request's number.
+        :return: The REST path listing that pull request's reviews, oldest first.
+        """
+        return f"{self.pull_request_path(number)}/reviews"
+
     def workflow_run_path(self, run: int) -> str:
         """
         :param run: The Actions workflow run's own number.

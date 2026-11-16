@@ -32,7 +32,13 @@ from basstler.plan.goal import Goal
 from basstler.plan.goal_command import GoalExitCode, record_pushes_done
 from basstler.plan.goal_path import GoalPath
 from basstler.plan.item_action import StartNowAction
-from basstler.plan.model import DependencyRelease, ItemStatus, ManifestKey, PlanDocument
+from basstler.plan.model import (
+    DependencyRelease,
+    ItemStatus,
+    ManifestKey,
+    Performer,
+    PlanDocument,
+)
 from basstler.plan.structure import Plan
 from basstler.plan.validation import PlanValidator
 
@@ -82,11 +88,22 @@ The goal whose only target is the dependent.
 """
 
 
-def manifest(pushes_done_at: str | None = FINAL_COMMIT) -> dict:
+def manifest(
+    pushes_done_at: str | None = FINAL_COMMIT,
+    dependent_performer: Performer = Performer.SESSION,
+) -> dict:
     """
     :param pushes_done_at: The base's recorded last push, or ``None`` for none yet.
+    :param dependent_performer: Who carries the dependent out.
     :return: A plan whose dependent waits for the base's pushes to be done.
     """
+    owner_fields = {}
+    if dependent_performer is Performer.OWNER:
+        owner_fields = {
+            "performed_by": Performer.OWNER.value,
+            "branch": None,
+            "recommended_model": None,
+        }
     return minimal_plan(
         items=[
             manifest_item(
@@ -95,7 +112,12 @@ def manifest(pushes_done_at: str | None = FINAL_COMMIT) -> dict:
                 pull_request_number=BASE_PULL_REQUEST_NUMBER,
                 pushes_done_at=pushes_done_at,
             ),
-            manifest_item(DEPENDENT, depends_on=[BASE], depends_on_pushes_done=[BASE]),
+            manifest_item(
+                DEPENDENT,
+                depends_on=[BASE],
+                depends_on_pushes_done=[BASE],
+                **owner_fields,
+            ),
         ]
     )
 
@@ -136,13 +158,19 @@ def resolver_with(
     return resolver
 
 
-def path_with(tmp_path: Path, head_commit: str) -> GoalPath:
+def path_with(
+    tmp_path: Path,
+    head_commit: str,
+    dependent_performer: Performer = Performer.SESSION,
+) -> GoalPath:
     """
     :return: The goal's path over the plan written under ``tmp_path``.
     """
     plan_file = tmp_path / PLAN_UNDER_TEST_ID / PlanDocument.MANIFEST
     plan_file.parent.mkdir()
-    plan_file.write_text(yaml.safe_dump(manifest()))
+    plan_file.write_text(
+        yaml.safe_dump(manifest(dependent_performer=dependent_performer))
+    )
     return GoalPath.compute(
         GOAL,
         PlanDirectory(tmp_path),
@@ -298,6 +326,42 @@ class TestWhatAPushesDoneDependencyHoldsBack:
         )
         assert step.awaited == ()
         assert isinstance(step.action, StartNowAction)
+
+
+# %% what the owner is told
+
+
+class TestWhatTheOwnerIsToldOfAPushesDoneDependency:
+    """
+    The owner's review of a draft does not release what waits for its pushes, and an
+    owner step that waits for them says so.
+    """
+
+    def test_reviewing_the_draft_is_not_said_to_release_the_dependent(
+        self, tmp_path: Path
+    ):
+        """
+        Marking the base ready leaves the dependent waiting for the base's pushes.
+        """
+        path = path_with(tmp_path, head_commit=LATER_COMMIT)
+        base = step_of(
+            path, DependencyReference(item_identifier=BASE, plan_id=PLAN_UNDER_TEST_ID)
+        )
+        assert path.references_released_by(base) == ()
+
+    def test_an_owner_step_names_the_pushes_it_waits_for(self, tmp_path: Path):
+        """
+        The owner's step comes after the base's pushes are done, in those words.
+        """
+        path = path_with(
+            tmp_path, head_commit=LATER_COMMIT, dependent_performer=Performer.OWNER
+        )
+        base = DependencyReference(item_identifier=BASE, plan_id=PLAN_UNDER_TEST_ID)
+        move = step_of(path, dependent_step_reference()).owner_move
+        assert move.description == (
+            f"{move.summary} after {base.text} "
+            f"{move.waiting_phrase_of(DependencyRelease.PUSHES_DONE)}"
+        )
 
 
 # %% recording that an item's pushes are done

@@ -6,6 +6,7 @@ what each step waits for and the action that carries it out.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
@@ -260,6 +261,13 @@ class OwnerMove(ABC):
     The steps that come before the owner's move.
     """
 
+    release_by_awaited: Mapping[DependencyReference, DependencyRelease] = field(
+        default_factory=dict
+    )
+    """
+    What the move waits for of each step in :attr:`after`; ready for review when absent.
+    """
+
     @property
     @abstractmethod
     def summary(self) -> str:
@@ -274,12 +282,11 @@ class OwnerMove(ABC):
         The commands the owner runs to make the move, in order.
         """
 
-    @property
     @abstractmethod
-    def waiting_phrase(self) -> str:
+    def waiting_phrase_of(self, release: DependencyRelease) -> str:
         """
-        What the steps in :attr:`after` have to do first, as the words that follow their
-        names.
+        :param release: What the move waits for of a step in :attr:`after`.
+        :return: The words that follow that step's name.
         """
 
     @property
@@ -289,8 +296,18 @@ class OwnerMove(ABC):
         """
         if not self.after:
             return self.summary
-        waited = ", ".join(reference.text for reference in self.after)
-        return f"{self.summary} after {waited} {self.waiting_phrase}"
+        names_by_phrase: dict[str, list[str]] = {}
+        for reference in self.after:
+            release = self.release_by_awaited.get(
+                reference, DependencyRelease.READY_FOR_REVIEW
+            )
+            names_by_phrase.setdefault(self.waiting_phrase_of(release), []).append(
+                reference.text
+            )
+        waited = " and ".join(
+            f"{', '.join(names)} {phrase}" for phrase, names in names_by_phrase.items()
+        )
+        return f"{self.summary} after {waited}"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -317,8 +334,7 @@ class PullRequestMove(OwnerMove):
     def commands(self) -> tuple[str, ...]:
         return ()
 
-    @property
-    def waiting_phrase(self) -> str:
+    def waiting_phrase_of(self, release: DependencyRelease) -> str:
         return "merges"
 
 
@@ -346,9 +362,14 @@ class OwnerPerformedStep(OwnerMove):
     def commands(self) -> tuple[str, ...]:
         return self.step_commands
 
-    @property
-    def waiting_phrase(self) -> str:
-        return "is ready"
+    def waiting_phrase_of(self, release: DependencyRelease) -> str:
+        match release:
+            case DependencyRelease.READY_FOR_REVIEW:
+                return "is ready"
+            case DependencyRelease.MERGED:
+                return "merges"
+            case DependencyRelease.PUSHES_DONE:
+                return "has its pushes done"
 
 
 # %% steps
@@ -652,12 +673,14 @@ class GoalPath:
     def references_released_by(self, step: PathStep) -> tuple[DependencyReference, ...]:
         """
         :param step: A step of the path.
-        :return: The steps that wait for it, in path order.
+        :return: The steps that wait for its owner's move, in path order; a step waiting
+            for its pushes waits for its session instead.
         """
         return tuple(
             waiting.reference
             for waiting in self.steps
             if step.reference in waiting.awaited
+            and step.reference not in waiting.awaited_pushes
         )
 
     @cached_property
@@ -958,7 +981,17 @@ class NeededItems:
             return None
         if item.is_performed_by_owner:
             return OwnerPerformedStep(
-                title=item.title, step_commands=tuple(item.commands), after=awaited
+                title=item.title,
+                step_commands=tuple(item.commands),
+                after=awaited,
+                release_by_awaited={
+                    dependency: release
+                    for entry, dependency in zip(
+                        item.depends_on, self.dependencies_of(reference), strict=True
+                    )
+                    if (release := item.release_needed_from(entry))
+                    is not DependencyRelease.READY_FOR_REVIEW
+                },
             )
         if item.live_state is LiveState.OPEN_DRAFT:
             return PullRequestMove(

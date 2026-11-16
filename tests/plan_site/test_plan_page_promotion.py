@@ -195,6 +195,12 @@ def test_a_pull_request_that_may_not_be_promoted_gets_a_disabled_button(
     assert f'title="{escape(blocker.value)}"' in page.render().html
 
 
+def test_the_reason_a_button_is_disabled_is_visible_without_hovering():
+    page = a_page(a_ready_record(draft=True))
+    reason = escape(PromotionBlocker.DRAFT.value)
+    assert f'<span class="promote-reason">{reason}</span>' in page.render().html
+
+
 # %% no button
 
 

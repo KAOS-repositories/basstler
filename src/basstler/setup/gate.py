@@ -17,6 +17,7 @@ from typing import Annotated
 
 from cyclopts import App, Parameter
 
+from basstler.class_name import HyphenatedClassName
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.locations import ClaudeCodeVariable
@@ -55,7 +56,7 @@ class CheckSetupOption(StrEnum):
 
 
 @dataclass(frozen=True)
-class BasstlerSkill(ABC):
+class BasstlerSkill(HyphenatedClassName, ABC):
     """
     A skill that checks its setup before its first step.
 
@@ -64,11 +65,11 @@ class BasstlerSkill(ABC):
     """
 
     @classproperty
-    @abstractmethod
     def skill_name(cls) -> str:
         """
-        The name a session invokes the skill with.
+        The name a session invokes the skill with: its class name, hyphenated.
         """
+        return cls.hyphenated_class_name()
 
     @classproperty
     @abstractmethod
@@ -192,19 +193,11 @@ class PlanCreate(PlanSavingSkill):
     Creates a plan on the personal-notes branch.
     """
 
-    @classproperty
-    def skill_name(cls) -> str:
-        return "plan-create"
-
 
 class AddPlanItem(PlanSavingSkill):
     """
     Decides where new work belongs and adds it to a plan.
     """
-
-    @classproperty
-    def skill_name(cls) -> str:
-        return "add-plan-item"
 
 
 class PlanItemKickoff(PlanSavingSkill):
@@ -212,29 +205,17 @@ class PlanItemKickoff(PlanSavingSkill):
     Starts a plan item.
     """
 
-    @classproperty
-    def skill_name(cls) -> str:
-        return "plan-item-kickoff"
-
 
 class PlanItemResolve(PlanSavingSkill):
     """
     Unblocks or resumes a plan item already underway.
     """
 
-    @classproperty
-    def skill_name(cls) -> str:
-        return "plan-item-resolve"
-
 
 class UpstreamReviews(BasstlerSkill):
     """
     Reports a fork branch's upstream pull request.
     """
-
-    @classproperty
-    def skill_name(cls) -> str:
-        return "upstream-reviews"
 
     @classproperty
     def additional_checks(cls) -> frozenset[SetupCheck]:

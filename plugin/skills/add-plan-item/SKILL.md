@@ -24,7 +24,7 @@ There are exactly four outcomes, and step 6 picks one:
 
 ## 0. Check the setup is in place, and run it if not
 
-Follow `skills/setup-personal-notes/prerequisite-check.md` before step 1, with this
+Follow [`prerequisite-check.md`](../setup-personal-notes/prerequisite-check.md) before step 1, with this
 skill's gate:
 
 ```bash

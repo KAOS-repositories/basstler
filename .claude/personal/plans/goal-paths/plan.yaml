@@ -21,13 +21,13 @@ items:
 - id: experiment
   title: Build goal paths end to end on one sandbox branch and use them on real goals
   track: sandbox
-  branch: claude/exciting-curie-ejbvk4
-  pull_request_number: 232
+  branch: experiment/goal-paths
+  pull_request_number: 235
   depends_on: []
   status: in progress
   recommended_model: opus
   session: https://claude.ai/code/session_018wfiv5szXTK6zAAyzgUyKD
-  notes: 'Experiment entry. Sandbox: this branch off main, draft #232, never merged. Stage: running.
+  notes: 'Experiment entry. Sandbox: this branch off main, draft #235 (#232 closed at the rename), never merged. Stage: running.
     Verdict: none (the owner''s step verdict). Seven parts built, one commit series each; they
     become the split''s items. At f3b9f9a0 a path numbers its steps and says whose move each
     is, and a goal page shows its refresh time. Real owner steps are in review-triage. Unverified:
@@ -42,7 +42,7 @@ items:
   status: not started
   performed_by: owner
   notes: 'Yours whenever you have used it enough. Tell a session one of: accept (it splits
-    #232 into the seven items as stacked draft pull requests and closes #232), drop (it closes
-    #232 and deletes the branch), or keep iterating (say what to change). On accept or drop
+    #235 into the seven items as stacked draft pull requests and closes #235), drop (it closes
+    #235 and deletes the branch), or keep iterating (say what to change). On accept or drop
     the session sets stack-board''s plan-site.yml back to main and posts the experiment-mode
     feedback on #192, then marks this step done.'

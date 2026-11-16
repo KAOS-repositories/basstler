@@ -1,6 +1,7 @@
 """
 Classes whose relations a cross-check of receiver classes reads.
 """
+
 from __future__ import annotations
 
 

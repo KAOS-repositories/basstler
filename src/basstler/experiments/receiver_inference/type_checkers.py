@@ -11,7 +11,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PureWindowsPath
 
 from basstler.experiments.receiver_inference.checker_reports import (
     MypyDiagnostic,
@@ -263,11 +263,11 @@ class TypeChecker(ABC):
     @staticmethod
     def relative_path(reported: str, checkout: Path) -> str:
         """
-        :param reported: A file's path as a checker reports it.
+        :param reported: A file's path as a checker reports it, with either separator.
         :param checkout: The directory the checker ran in.
         :return: The path relative to the checkout, with forward slashes.
         """
-        path = Path(reported)
+        path = Path(PureWindowsPath(reported).as_posix())
         if path.is_absolute():
             path = path.resolve().relative_to(checkout.resolve())
         return PurePath(path).as_posix()

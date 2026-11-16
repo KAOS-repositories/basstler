@@ -17,21 +17,6 @@ tracks:
   name: Fail-closed checks and verified records
   wave: now
 items:
-- id: per-skill-setup-gates
-  title: Each skill's prerequisite check reads only the setup rows it needs
-  track: guards
-  branch: claude/plan-item-kickoff-basstler-reliability-t6szdl
-  pull_request_number: 216
-  session: https://claude.ai/code/session_018wfiv8PysLKLcPoZsGDypF
-  depends_on: []
-  status: in progress
-  recommended_model: sonnet
-  notes: 'prerequisite-check.md runs check-setup.sh bare, so a plan_site row needing setup
-    sends every skill into /setup-personal-notes. Each skill names its rows with --only (in
-    code, as a mapping from skill to checks, not prose), and an unrelated row is reported
-    in one line, never a stop. From Hesham87/Platform_maintainer: kickoff''s check-setup.sh
-    --require-upstream exits 1 on a repository that is neither a fork nor has an upstream;
-    skip the stack pass there instead.'
 - id: conflict-audit
   title: Every step that acts on mergeability or check state reads it deterministically
   track: guards
@@ -76,7 +61,6 @@ items:
   title: Regression tests replay the reliability report's failures against fixture repositories
   track: guards
   depends_on:
-  - per-skill-setup-gates
   - conflict-audit
   - verified-records
   - session-start-marker
@@ -168,23 +152,23 @@ items:
     schema the record commands export and validate their input against, size limits included.
     A Claude run in an Action uses claude -p --bare --output-format json --json-schema with
     that schema and records only structured_output, failing when it is absent.
-
 - id: structured-run-listing-requests
-  title: "Tests read the run listings they asked for as models, not as parsed REST paths"
+  title: Tests read the run listings they asked for as models, not as parsed REST paths
   branch: null
   track: guards
   depends_on: []
   status: not started
   recommended_model: sonnet
-
 - id: action-exchange-models
-  title: "The upstream-reviews Action's requests and answers are ValidatedJSONModel subclasses"
+  title: The upstream-reviews Action's requests and answers are ValidatedJSONModel subclasses
   branch: null
   track: guards
-  notes: >
-    Also convert the nested RecordedJobLog (upstream_reviews/helper/recording.py) and
-    UpstreamPullRequests (maintenance/board.py), with their key enums. Each model then is a
-    JSONSerializable through ValidatedJSONModel, and branch writes pass it directly.
+  notes: 'Also convert the nested RecordedJobLog (upstream_reviews/helper/recording.py) and
+    UpstreamPullRequests (maintenance/board.py), with their key enums. Each model then is
+    a JSONSerializable through ValidatedJSONModel, and branch writes pass it directly.
+
+    '
   depends_on: []
   status: not started
   recommended_model: sonnet
+landed_item_count: 1

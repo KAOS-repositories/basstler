@@ -1117,13 +1117,14 @@ create_basstler_environment() {
     create_basstler_environment_with "${uv}"
     return
   fi
-  local candidate
+  local candidate found=0
   for candidate in ${BASSTLER_INTERPRETER_CANDIDATES}; do
     command -v "${candidate}" > /dev/null 2>&1 || continue
+    found=1
     BASSTLER_ENVIRONMENT_OUTPUT="$("${candidate}" -m venv --without-pip \
-      "${BASSTLER_ENVIRONMENT_DIRECTORY}" 2>&1)"
-    return
+      "${BASSTLER_ENVIRONMENT_DIRECTORY}" 2>&1)" && return
   done
+  [ "${found}" = "0" ] || return 1
   if ! install_uv; then
     BASSTLER_ENVIRONMENT_OUTPUT="no uv and none of ${BASSTLER_INTERPRETER_CANDIDATES} on PATH, and uv could not be installed: $(printf '%s' "${BASSTLER_ENVIRONMENT_OUTPUT}" | tail -1)"
     return 1

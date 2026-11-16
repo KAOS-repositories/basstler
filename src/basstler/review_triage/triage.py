@@ -29,6 +29,7 @@ from basstler.review_triage.definition_moves import (
     DefinitionMoveDetection,
 )
 from basstler.review_triage.file_moves import FileMoveDetection
+from basstler.review_triage.markdown import MarkdownComparison
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
@@ -97,6 +98,7 @@ class PullRequestTriager:
 
     judgments: tuple[FileJudgment, ...] = (
         DefinitionMoveComparison(),
+        MarkdownComparison(),
         ProseComparison(),
         EmptyPackageAddition(),
         RenamedTextComparison(),

@@ -248,6 +248,16 @@ class PythonSource:
         """
         return ast.parse(self.text)
 
+    @cached_property
+    def parses(self) -> bool:
+        """
+        Whether the text is valid Python.
+        """
+        try:
+            return isinstance(self.tree, ast.Module)
+        except SyntaxError:
+            return False
+
     def renamed_tree(self, renames: RenameMap) -> ast.Module:
         """
         :param renames: The renames to apply.

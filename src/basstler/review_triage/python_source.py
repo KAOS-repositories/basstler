@@ -418,6 +418,30 @@ class PythonSource:
         )
 
     @cached_property
+    def module_documentation(self) -> str | None:
+        """
+        The documentation string at the top of the file, ``None`` when it has none.
+        """
+        return ast.get_docstring(self.tree, clean=False)
+
+    @cached_property
+    def without_module_documentation(self) -> PythonSource:
+        """
+        The file without the documentation string at the top, itself when it has none
+        or shares its lines with other code.
+        """
+        first = next(iter(self.tree.body), None)
+        if first is None or not self.is_documentation(first):
+            return self
+        span = LineSpan(first.lineno, first.end_lineno)
+        shares_lines = any(
+            statement.lineno <= span.last for statement in self.tree.body[1:2]
+        )
+        if shares_lines:
+            return self
+        return self.without((span,))
+
+    @cached_property
     def comments(self) -> str:
         """
         The text of the file's comments, one per line, in the order they occur.

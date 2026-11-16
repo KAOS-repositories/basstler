@@ -16,3 +16,4 @@ items:
     branch: item-a-branch
     track: track-1
     status: almost there
+    recommended_model: sonnet

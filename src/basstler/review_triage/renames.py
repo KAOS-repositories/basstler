@@ -68,6 +68,15 @@ DOTTED_NAME_SEPARATOR = "."
 What separates the components of a dotted module or attribute path.
 """
 
+IMPORT_LINE_PATTERN = (
+    r"^(?P<lead>[ 	]*from[ 	]+)(?P<module>[\w.]+)"
+    r"(?P<middle>[ 	]+import[ 	]+)(?P<name>\w+)"
+)
+"""
+Matches the start of an import statement in prose, such as a documentation code block,
+up to the first name it imports.
+"""
+
 
 @dataclass(frozen=True)
 class RenameMap:
@@ -180,16 +189,39 @@ class RenameMap:
             identifier,
         )
 
-    def renamed_prose(self, text: str) -> str:
+    @cached_property
+    def prose_pattern(self) -> re.Pattern[str] | None:
         """
-        :param text: Prose, such as a docstring or a comment.
-        :return: It with every old identifier occurring as a whole word replaced.
+        Matches an import statement's start or an old identifier as a whole word,
+        ``None`` when there are no renames.
         """
         if self.word_pattern is None:
-            return text
-        return self.word_pattern.sub(
-            lambda match: self.replacements[match.group()], text
+            return None
+        return re.compile(
+            f"{IMPORT_LINE_PATTERN}|{self.word_pattern.pattern}", re.MULTILINE
         )
+
+    def renamed_prose(self, text: str) -> str:
+        """
+        :param text: Prose, such as a docstring, a comment or a documentation file.
+        :return: It with every old identifier occurring as a whole word replaced, and
+            the module and first name of every import statement following the renames.
+        """
+        if self.prose_pattern is None:
+            return text
+        return self.prose_pattern.sub(self.renamed_match, text)
+
+    def renamed_match(self, match: re.Match[str]) -> str:
+        """
+        :param match: An import statement's start or an old identifier in prose.
+        :return: What replaces it.
+        """
+        if match.group("module") is None:
+            return self.replacements[match.group()]
+        module, _, name = self.renamed_identifier(
+            f"{match.group('module')}{DOTTED_NAME_SEPARATOR}{match.group('name')}"
+        ).rpartition(DOTTED_NAME_SEPARATOR)
+        return f"{match.group('lead')}{module}{match.group('middle')}{name}"
 
 
 # %% candidate renames found in a diff

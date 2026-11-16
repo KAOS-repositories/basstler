@@ -351,6 +351,11 @@ class ManifestKey(KeySpecification, Enum):
     The session's own planning assessment - see :class:`ItemStatus`.
     """
 
+    RECOMMENDED_MODEL = ("recommended_model",)
+    """
+    The Claude model suited to the item's difficulty - see :class:`ModelAlias`.
+    """
+
     SESSION = ("session",)
     """
     The session doing the work.
@@ -711,6 +716,17 @@ class PlanManifest:
         """
         return [
             PlanItem(item) for item in self.content.get(ManifestKey.ITEMS.key) or []
+        ]
+
+    @property
+    def items_without_recommended_model(self) -> list[PlanItem]:
+        """
+        :return: The items that carry no ``recommended_model``, in manifest order.
+        """
+        return [
+            item
+            for item in self.items
+            if ManifestKey.RECOMMENDED_MODEL.key not in item.content
         ]
 
     @property

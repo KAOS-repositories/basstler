@@ -103,6 +103,9 @@ to read it.
 For a single piece of work rather than a whole plan, `/add-plan-item` runs that
 same decision on its own and is the lighter-weight way in.
 
+Give every item its `recommended_model` by invoking the `plan-recommend-models` skill (`Skill` tool, `<plan-id>`) on the
+drafted `plan.yaml` before the first save.
+
 Write only what a future session needs to act, whether drafting fresh or
 migrating a source doc. Structured facts (branch, PR, status, blockers)
 become `plan.yaml` items, with each item's scope and binding decisions in its

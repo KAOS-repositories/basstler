@@ -26,6 +26,11 @@ from basstler.github.repository import Repository
 from basstler.locations import PackageLocation
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
+from basstler.review_triage.rules import (
+    ReviewTriageSettings,
+    RuleSelection,
+    TriageRule,
+)
 from basstler.review_triage.triage import PullRequestTriager
 from basstler.standard_streams import StandardStreamHandler
 
@@ -116,6 +121,11 @@ class TriagePublication:
     :attr:`repository` is ``None``.
     """
 
+    rule_options: RuleSelection = RuleSelection()
+    """
+    The rules turned on and off on the command line, outranking the project's settings.
+    """
+
     @classmethod
     def from_arguments(
         cls,
@@ -124,6 +134,8 @@ class TriagePublication:
         declaration: TriageDeclaration,
         since: str | None,
         last: int | None,
+        select_rules: tuple[TriageRule, ...] = (),
+        ignore_rules: tuple[TriageRule, ...] = (),
     ) -> TriagePublication:
         """
         :param pull_request: The pull request's number.
@@ -131,6 +143,8 @@ class TriagePublication:
         :param declaration: Renames given and rejected on the command line.
         :param since: The commit to triage from, or ``None``.
         :param last: How many of the last commits to triage, or ``None``.
+        :param select_rules: The rules to turn on.
+        :param ignore_rules: The rules to turn off.
         :return: The publication triaging from *since*, else from before the *last*
             commits, else from the merge base.
         """
@@ -140,13 +154,22 @@ class TriagePublication:
             start = LastCommitsStart(last)
         else:
             start = MergeBaseStart()
-        return cls(pull_request, repository, declaration, start)
+        return cls(
+            pull_request,
+            repository,
+            declaration,
+            start,
+            rule_options=RuleSelection(
+                frozenset(select_rules), frozenset(ignore_rules)
+            ),
+        )
 
     def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
         """
         :param outputs: Where the outcome goes, in order.
         """
         git = GitCommandRunner(Path.cwd())
+        checkout = Path(git.run("rev-parse", "--show-toplevel"))
         repository = (
             Repository.parse(self.repository)
             if self.repository
@@ -161,6 +184,9 @@ class TriagePublication:
             rename_sources=(
                 *default.rename_sources,
                 ArgumentDeclaration(self.declaration),
+            ),
+            rules=self.rule_options.applied_to(
+                ReviewTriageSettings.from_checkout(checkout).selection
             ),
         )
         outcome = triager.triage(changes)
@@ -198,6 +224,8 @@ def report(
         int | None,
         Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
     ] = None,
+    select_rule: tuple[TriageRule, ...] = (),
+    ignore_rule: tuple[TriageRule, ...] = (),
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown.
@@ -211,6 +239,10 @@ def report(
         reviewed; a file only merges of the base branch changed since is mechanical.
     :param last: How many of the pull request's last commits to triage, a merge
         counting as one, as GitHub's view of its last commits shows them.
+    :param select_rule: An opt-in rule to turn on, adding to the checkout's
+        ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
+    :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
         pull_request,
@@ -218,6 +250,8 @@ def report(
         TriageDeclaration.from_arguments(rename, rejected_rename),
         since,
         last,
+        select_rule,
+        ignore_rule,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -234,6 +268,8 @@ def mark_viewed(
         int | None,
         Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
     ] = None,
+    select_rule: tuple[TriageRule, ...] = (),
+    ignore_rule: tuple[TriageRule, ...] = (),
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the account whose GitHub
@@ -248,6 +284,10 @@ def mark_viewed(
         reviewed; a file only merges of the base branch changed since is mechanical.
     :param last: How many of the pull request's last commits to triage, a merge
         counting as one, as GitHub's view of its last commits shows them.
+    :param select_rule: An opt-in rule to turn on, adding to the checkout's
+        ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
+    :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
         pull_request,
@@ -255,6 +295,8 @@ def mark_viewed(
         TriageDeclaration.from_arguments(rename, rejected_rename),
         since,
         last,
+        select_rule,
+        ignore_rule,
     ).publish((ViewedMarking(GitHubRestClient()), MarkdownReport()))
     return ReviewTriageExitCode.SUCCESS
 
@@ -269,6 +311,7 @@ def declare(
     :param rename: A rename as ``old=new``; repeatable.
     :param rejected_rename: An old identifier whose detected rename is rejected;
         repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     logger.info(TriageDeclaration.from_arguments(rename, rejected_rename).comment())
     return ReviewTriageExitCode.SUCCESS

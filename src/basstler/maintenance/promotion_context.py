@@ -51,7 +51,9 @@ class ChangeSize:
     """
 
     @classmethod
-    def of(cls, changes: Sequence[FileChange], file_limit: int) -> ChangeSize:
+    def from_file_changes(
+        cls, changes: Sequence[FileChange], file_limit: int
+    ) -> ChangeSize:
         """
         :param changes: Every file the branch changes.
         :param file_limit: How many of the largest to name.
@@ -202,7 +204,9 @@ class PromotionContextReader:
             ),
             commit_subjects=tuple(subjects[: self.commit_limit]),
             commits_not_listed=max(len(subjects) - self.commit_limit, 0),
-            change_size=ChangeSize.of(commits.file_changes(), self.file_limit),
+            change_size=ChangeSize.from_file_changes(
+                commits.file_changes(), self.file_limit
+            ),
         )
 
     def shortened(self, description: str) -> str:

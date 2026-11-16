@@ -33,6 +33,7 @@ from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.renames import RenameMap
+from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
 
 # %% the outcome
@@ -104,6 +105,11 @@ class PullRequestTriager:
     The judgments of each file, the first one applying to a file deciding it.
     """
 
+    rules: frozenset[TriageRule] = frozenset()
+    """
+    The opt-in rules in force.
+    """
+
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
@@ -124,6 +130,7 @@ class PullRequestTriager:
                 RenameMap.from_decisions(
                     [SubclassSubstitutionDetection().decisions(own_changes)]
                 ),
+                self.rules,
             ),
             self.judgments,
         )

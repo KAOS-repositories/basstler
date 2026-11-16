@@ -142,7 +142,7 @@ def test_the_plugin_runs_the_hook_before_the_attach_tool_and_nothing_else():
     """
     plugin_root = Path(os.environ[BasstlerVariable.PLUGIN_ROOT])
     manifest = json.loads(
-        (plugin_root / PluginLocation.HOOKS / "hooks.json").read_text()
+        (plugin_root / PluginLocation.HOOKS / "hooks.json").read_text(encoding="utf-8")
     )
 
     (registration,) = manifest["hooks"][HOOK_EVENT]

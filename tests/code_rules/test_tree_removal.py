@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import fields
 from pathlib import Path
 
-import libcst
 
 from basstler import directory_tree
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.checker import CodeRulesCheck
 from basstler.code_rules.fixes import SourceFixer
@@ -58,9 +58,9 @@ def test_the_fix_leaves_a_call_with_an_error_handler_as_it_is():
     """
     Fixing changes nothing in a module whose only removal has a handler.
     """
-    source = TreeRemovalSnippet.HANDLED_RMTREE.read_text(encoding="utf-8")
-    fixed = SourceFixer((TreeRemovalChecker(),)).fixed(libcst.parse_module(source))
-    assert fixed.module.code == source
+    source_file = PythonSourceFile(TreeRemovalSnippet.HANDLED_RMTREE)
+    fixed = SourceFixer((TreeRemovalChecker(),)).fix_module(source_file)
+    assert fixed.module.code == source_file.read()
 
 
 def test_the_keyword_the_fix_keeps_is_a_field_of_the_tree():

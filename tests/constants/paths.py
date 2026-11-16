@@ -874,6 +874,42 @@ class CodeModificationSnippet(PathEnumeration):
     requires the future import in every Python file.
     """
 
+    CALLED_NAMES = DIRECTORY / "called-names.py"
+    """
+    Calls of a name, an attribute, a subscript and the result of another call.
+    """
+
+    EXPRESSIONS = DIRECTORY / "expressions.py"
+    """
+    A tuple of constants followed by a variable and a formatted string.
+    """
+
+    CALL_ARGUMENTS = DIRECTORY / "call-arguments.py"
+    """
+    Calls without arguments, with one argument, and with a trailing comma.
+    """
+
+    CALL_ARGUMENTS_WITH_CHECK = DIRECTORY / "call-arguments-with-check.py"
+    """
+    :attr:`CALL_ARGUMENTS` with ``check=True`` passed to every call.
+    """
+
+
+class TextFileSnippet(PathEnumeration):
+    """
+    Text files the UTF-8 text file tests read.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "text-file"
+    """
+    The directory holding them.
+    """
+
+    NON_ASCII = DIRECTORY / "non-ascii.txt"
+    """
+    One line of text no single-byte code page encodes.
+    """
+
 
 class RuleFixExample(PathEnumeration):
     """

@@ -310,6 +310,7 @@ PACKAGE_MAP = PackageMap(
                 "render_common",
                 "shell_configuration",
                 "standard_streams",
+                "text_file",
             ),
         ),
         DistributionDeclaration(

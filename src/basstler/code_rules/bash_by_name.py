@@ -199,7 +199,9 @@ class BashByNameChecker(FixableChecker[BashCommandLine]):
         )
 
     @override
-    def specifications(self, module: PositionedModule) -> Iterator[BashCommandLine]:
+    def specifications_of_module(
+        self, module: PositionedModule
+    ) -> Iterator[BashCommandLine]:
         for command, location in self.command_lines(module, with_environment=True):
             yield BashCommandLine(location, command)
 

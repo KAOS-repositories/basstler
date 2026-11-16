@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import libcst
 
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_rules.bash_by_name import BashByNameChecker
 from basstler.code_rules.checker import CodeRulesCheck
 from basstler.code_rules.commands import CodeRulesCommand
@@ -67,9 +67,9 @@ def test_the_fix_leaves_a_command_with_no_environment_in_scope_as_it_is():
     """
     Fixing changes nothing where there is no environment to locate bash in.
     """
-    source = BashByNameSnippet.SUBPROCESS_CALL.read_text(encoding="utf-8")
-    fixed = SourceFixer((BashByNameChecker(),)).fixed(libcst.parse_module(source))
-    assert fixed.module.code == source
+    source_file = PythonSourceFile(BashByNameSnippet.SUBPROCESS_CALL)
+    fixed = SourceFixer((BashByNameChecker(),)).fix_module(source_file)
+    assert fixed.module.code == source_file.read()
 
 
 # %% this repository

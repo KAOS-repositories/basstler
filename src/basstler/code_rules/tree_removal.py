@@ -112,7 +112,9 @@ class TreeRemovalChecker(FixableChecker[TreeRemovalCall]):
         )
 
     @override
-    def specifications(self, module: PositionedModule) -> Iterator[TreeRemovalCall]:
+    def specifications_of_module(
+        self, module: PositionedModule
+    ) -> Iterator[TreeRemovalCall]:
         for node, location in self.rmtree_calls(module):
             if self.is_replaceable(node):
                 yield TreeRemovalCall(location, node)

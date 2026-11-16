@@ -7,14 +7,19 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import Field
 
 from basstler.git.commands import GitCommandRunner
 from basstler.git.commit_range import CommitRange, FileVersions
-from basstler.github.client import GitHubReader
+from basstler.github.client import GitHubFullReader
 from basstler.github.repository import Repository
+from basstler.github.repository_access import GitHubPath
+from basstler.github.rest_models import RestReview
+from basstler.github.review_models import Author
+from basstler.github.states import ReviewState
 from basstler.github.web_page import AbsentAsEmpty
 from basstler.json_model import ValidatedJSONModel
 
@@ -101,16 +106,94 @@ class RestPullRequest(ValidatedJSONModel):
 # %% where the changes are read from
 
 
+@dataclass(frozen=True)
+class FetchedPullRequest:
+    """
+    A pull request whose commits a checkout holds, with where it was read from.
+    """
+
+    git: GitCommandRunner
+    """
+    The checkout holding its commits.
+    """
+
+    github: GitHubFullReader
+    """
+    Where it was read from.
+    """
+
+    repository: Repository
+    """
+    The repository it is opened on.
+    """
+
+    pull_request: RestPullRequest
+    """
+    The pull request.
+    """
+
+    @property
+    def merge_base(self) -> str:
+        """
+        The commit its whole change is read from.
+        """
+        return self.git.merge_base(
+            self.pull_request.base.commit, self.pull_request.head.commit
+        )
+
+
+class StartReason(StrEnum):
+    """
+    Why the changes are read from the commit they start at, as the report says it.
+    """
+
+    MERGE_BASE = "the merge base"
+    """
+    The whole change is read.
+    """
+
+    GIVEN_COMMIT = "the commit given"
+    """
+    The commit was named on the command line.
+    """
+
+    LAST_COMMITS = "the commit before the last commits"
+    """
+    Only the pull request's last commits are read.
+    """
+
+    LAST_REVIEW = "your last review"
+    """
+    The commit is the head the viewer's last submitted review was made against.
+    """
+
+
+@dataclass(frozen=True)
+class StartCommit:
+    """
+    The commit a pull request's changes are read from, and why.
+    """
+
+    commit: str
+    """
+    The commit.
+    """
+
+    reason: StartReason
+    """
+    Why the changes start there.
+    """
+
+
 class ComparisonStart(ABC):
     """
     The commit a pull request's changes are read from.
     """
 
     @abstractmethod
-    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
+    def start_commit(self, fetched: FetchedPullRequest) -> StartCommit:
         """
-        :param git: The checkout holding the pull request's commits.
-        :param pull_request: The pull request.
+        :param fetched: The pull request, its commits in the checkout.
         :return: The commit its changes are read from.
         """
 
@@ -121,8 +204,8 @@ class MergeBaseStart(ComparisonStart):
     The pull request's merge base, from which its whole change is read.
     """
 
-    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
-        return git.merge_base(pull_request.base.commit, pull_request.head.commit)
+    def start_commit(self, fetched: FetchedPullRequest) -> StartCommit:
+        return StartCommit(fetched.merge_base, StartReason.MERGE_BASE)
 
 
 @dataclass(frozen=True)
@@ -136,8 +219,10 @@ class CommitStart(ComparisonStart):
     Any reference git can resolve to the commit.
     """
 
-    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
-        return git.commit_at(self.reference)
+    def start_commit(self, fetched: FetchedPullRequest) -> StartCommit:
+        return StartCommit(
+            fetched.git.commit_at(self.reference), StartReason.GIVEN_COMMIT
+        )
 
 
 @dataclass(frozen=True)
@@ -152,8 +237,44 @@ class LastCommitsStart(ComparisonStart):
     How many of its last commits the changes span.
     """
 
-    def commit(self, git: GitCommandRunner, pull_request: RestPullRequest) -> str:
-        return git.commit_at(f"{pull_request.head.commit}~{self.count}")
+    def start_commit(self, fetched: FetchedPullRequest) -> StartCommit:
+        return StartCommit(
+            fetched.git.commit_at(f"{fetched.pull_request.head.commit}~{self.count}"),
+            StartReason.LAST_COMMITS,
+        )
+
+
+@dataclass(frozen=True)
+class LastReviewStart(ComparisonStart):
+    """
+    The head commit of the last review the credential's account submitted on the pull
+    request, else its merge base, as for a credential GitHub names no account for, such
+    as an Actions token.
+    """
+
+    def start_commit(self, fetched: FetchedPullRequest) -> StartCommit:
+        account = fetched.github.attempt_get(GitHubPath.AUTHENTICATED_USER)
+        if account.is_forbidden:
+            return MergeBaseStart().start_commit(fetched)
+        viewer = Author.from_json(account.raise_if_failed()).login
+        reviewed_commits = [
+            review.commit
+            for page in fetched.github.get_pages(
+                fetched.repository.pull_request_reviews_path(
+                    fetched.pull_request.number
+                )
+            )
+            for review in map(RestReview.from_json, page)
+            if review.author.login == viewer
+            and review.state != ReviewState.PENDING
+            and review.commit is not None
+        ]
+        if not reviewed_commits:
+            return MergeBaseStart().start_commit(fetched)
+        commit = reviewed_commits[-1]
+        if fetched.git.commit_or_none(f"{commit}^{{commit}}") is None:
+            fetched.git.fetch(fetched.repository.clone_url, commit)
+        return StartCommit(commit, StartReason.LAST_REVIEW)
 
 
 # %% the pull request with its changes
@@ -181,6 +302,11 @@ class PullRequestChanges:
     Every file it changes.
     """
 
+    start: StartCommit
+    """
+    The commit the changes are read from, and why.
+    """
+
 
 @dataclass(frozen=True)
 class PullRequestChangesReader:
@@ -193,7 +319,7 @@ class PullRequestChangesReader:
     The checkout the changes are read in.
     """
 
-    github: GitHubReader
+    github: GitHubFullReader
     """
     Where the pull request is read from.
     """
@@ -223,18 +349,17 @@ class PullRequestChangesReader:
                 pull_request.head_reference,
                 pull_request.base.branch,
             )
+        fetched = FetchedPullRequest(self.git, self.github, repository, pull_request)
         whole_change = CommitRange(
-            self.git,
-            self.git.merge_base(pull_request.base.commit, pull_request.head.commit),
-            pull_request.head.commit,
+            self.git, fetched.merge_base, pull_request.head.commit
         )
-        start_commit = start.commit(self.git, pull_request)
-        if start_commit == whole_change.base_commit:
+        start_commit = start.start_commit(fetched)
+        if start_commit.commit == whole_change.base_commit:
             return PullRequestChanges(
-                pull_request, whole_change, whole_change.file_versions()
+                pull_request, whole_change, whole_change.file_versions(), start_commit
             )
-        commits = CommitRange(self.git, start_commit, pull_request.head.commit)
+        commits = CommitRange(self.git, start_commit.commit, pull_request.head.commit)
         own_paths = frozenset(change.path for change in whole_change.file_changes())
         return PullRequestChanges(
-            pull_request, commits, commits.file_versions(own_paths)
+            pull_request, commits, commits.file_versions(own_paths), start_commit
         )

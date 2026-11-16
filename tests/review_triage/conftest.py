@@ -6,24 +6,31 @@ committed to a scratch repository.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from basstler.environment import GitHubCredentialVariable
 from basstler.github.client import (
-    GitHubReader,
+    GitHubFullReader,
     GitHubResponse,
     GitHubWrite,
     GitHubWriter,
+    HttpMethod,
 )
 from basstler.git.commit_range import CommitRange
 from basstler.github.repository import Repository
+from basstler.github.exceptions import GitHubRequestFailed
+from basstler.github.repository_access import GitHubPath
 from basstler.github.pull_request_changes import (
     MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
     RestPullRequest,
+    StartCommit,
+    StartReason,
 )
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameMap
@@ -40,7 +47,7 @@ The repository the sample pull request is opened on.
 
 
 @dataclass(frozen=True)
-class OnePullRequestReader(GitHubReader):
+class OnePullRequestReader(GitHubFullReader):
     """
     Answers every read with one pull request's payload.
     """
@@ -54,6 +61,49 @@ class OnePullRequestReader(GitHubReader):
         return self.payload
 
     def get_pages(self, path: str) -> list[Any]:
+        return [self.payload]
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        return GitHubResponse(self.payload)
+
+
+@dataclass(frozen=True)
+class ReviewedPullRequestReader(OnePullRequestReader):
+    """
+    Answers the reads of the authenticated account and of the pull request's reviews,
+    and every other read with the pull request's payload.
+    """
+
+    account: dict[str, Any] | None
+    """
+    The account the credential belongs to, as REST describes it; ``None`` for a
+    credential GitHub names no account for, whose read of it is refused.
+    """
+
+    reviews: list[dict[str, Any]]
+    """
+    The pull request's reviews, as REST lists them on one page.
+    """
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        if path != GitHubPath.AUTHENTICATED_USER:
+            return GitHubResponse(self.payload)
+        if self.account is None:
+            return GitHubResponse(
+                None,
+                failure=GitHubRequestFailed.for_status(
+                    HTTPStatus.FORBIDDEN,
+                    "Resource not accessible by integration",
+                    HttpMethod.GET,
+                    path,
+                    GitHubCredentialVariable.GITHUB_TOKEN,
+                ),
+            )
+        return GitHubResponse(self.account)
+
+    def get_pages(self, path: str) -> list[Any]:
+        if path == SAMPLE_REPOSITORY.pull_request_reviews_path(self.payload["number"]):
+            return [self.reviews]
         return [self.payload]
 
 
@@ -129,7 +179,10 @@ def committed_pull_request(
     payload["base"]["sha"] = commits.base_commit
     payload["head"]["sha"] = commits.head_commit
     return PullRequestChanges(
-        RestPullRequest.from_json(payload), commits, commits.file_versions()
+        RestPullRequest.from_json(payload),
+        commits,
+        commits.file_versions(),
+        StartCommit(commits.base_commit, StartReason.MERGE_BASE),
     )
 
 

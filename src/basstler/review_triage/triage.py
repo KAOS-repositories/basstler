@@ -110,6 +110,15 @@ class PullRequestTriager:
     The opt-in rules in force.
     """
 
+    def renames(self, changes: PullRequestChanges) -> RenameMap:
+        """
+        :param changes: A pull request and the files it changes.
+        :return: The renames its files are judged with.
+        """
+        return RenameMap.from_decisions(
+            source.decisions(changes) for source in self.rename_sources
+        )
+
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
@@ -118,9 +127,7 @@ class PullRequestTriager:
         """
         separated = BaseBranchMergeDetection().separate(changes)
         own_changes = separated.own
-        renames = RenameMap.from_decisions(
-            source.decisions(own_changes) for source in self.rename_sources
-        )
+        renames = self.renames(own_changes)
         base_definitions = DefinitionIndex(CommitModules(own_changes.commits.base_tree))
         triager = FileTriager(
             JudgmentContext(

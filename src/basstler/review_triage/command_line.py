@@ -20,11 +20,14 @@ from basstler.github.pull_request_changes import (
     ComparisonStart,
     LastCommitsStart,
     MergeBaseStart,
+    PullRequestChanges,
     PullRequestChangesReader,
 )
 from basstler.github.repository import Repository
 from basstler.locations import PackageLocation
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
+from basstler.review_triage.exceptions import MissingHeadRepositoryError
+from basstler.review_triage.move_split import MoveSplitter
 from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
 from basstler.review_triage.rules import (
     ReviewTriageSettings,
@@ -65,6 +68,12 @@ class ReviewTriageCommand(StrEnum):
     DECLARE = "declare"
     """
     Print the description comment declaring renames.
+    """
+
+    SPLIT_MOVES = "split-moves"
+    """
+    Replace a pull request's commits with one moving its definitions unchanged and one
+    making every other change.
     """
 
     @property
@@ -169,17 +178,36 @@ class TriagePublication:
         :param outputs: Where the outcome goes, in order.
         """
         git = GitCommandRunner(Path.cwd())
+        outcome = self.triager(git).triage(self.changes(git))
+        for output in outputs:
+            output.publish(outcome)
+
+    def changes(self, git: GitCommandRunner) -> PullRequestChanges:
+        """
+        :param git: The checkout the pull request is read in.
+        :return: The pull request and its changes since :attr:`start`.
+        """
+        return PullRequestChangesReader(git, GitHubRestClient()).read(
+            self.repository_in(git), self.pull_request, self.start
+        )
+
+    def repository_in(self, git: GitCommandRunner) -> Repository:
+        """
+        :param git: The checkout whose :attr:`remote` names the repository by default.
+        :return: The repository the pull request is opened on.
+        """
+        if self.repository:
+            return Repository.parse(self.repository)
+        return Repository.from_remote_url(git.run("remote", "get-url", self.remote))
+
+    def triager(self, git: GitCommandRunner) -> PullRequestTriager:
+        """
+        :param git: The checkout whose settings choose the rules.
+        :return: The triager judging with the declared renames and the chosen rules.
+        """
         checkout = Path(git.run("rev-parse", "--show-toplevel"))
-        repository = (
-            Repository.parse(self.repository)
-            if self.repository
-            else Repository.from_remote_url(git.run("remote", "get-url", self.remote))
-        )
-        changes = PullRequestChangesReader(git, GitHubRestClient()).read(
-            repository, self.pull_request, self.start
-        )
         default = PullRequestTriager()
-        triager = replace(
+        return replace(
             default,
             rename_sources=(
                 *default.rename_sources,
@@ -189,9 +217,6 @@ class TriagePublication:
                 ReviewTriageSettings.from_checkout(checkout).selection
             ),
         )
-        outcome = triager.triage(changes)
-        for output in outputs:
-            output.publish(outcome)
 
 
 # %% the commands
@@ -314,4 +339,49 @@ def declare(
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     logger.info(TriageDeclaration.from_arguments(rename, rejected_rename).comment())
+    return ReviewTriageExitCode.SUCCESS
+
+
+@review_triage_app.command(name=ReviewTriageCommand.SPLIT_MOVES)
+def split_moves(
+    pull_request: int,
+    *,
+    repository: str | None = None,
+    rename: tuple[str, ...] = (),
+    rejected_rename: tuple[str, ...] = (),
+) -> ReviewTriageExitCode:
+    """
+    Replace a pull request's commits with one moving its definitions unchanged, proven
+    mechanical, and one making every other change, whose tree is the former head's; a
+    reviewer then reads only the second. Nothing is pushed unless the proof holds.
+
+    :param pull_request: The pull request's number.
+    :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
+        default.
+    :param rename: A rename as ``old=new``, outranking the description's; repeatable.
+    :param rejected_rename: An old identifier whose rename is rejected; repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
+    """
+    publication = TriagePublication(
+        pull_request,
+        repository,
+        TriageDeclaration.from_arguments(rename, rejected_rename),
+        MergeBaseStart(),
+    )
+    git = GitCommandRunner(Path.cwd())
+    changes = publication.changes(git)
+    split = MoveSplitter(git, publication.triager(git)).split(changes)
+    if split is None:
+        logger.info(f"#{pull_request} moves no definition; its branch is unchanged.")
+        return ReviewTriageExitCode.SUCCESS
+    head_repository = changes.pull_request.head.repository
+    if head_repository is None:
+        raise MissingHeadRepositoryError(pull_request)
+    split.publish(git, head_repository.repository.clone_url)
+    logger.info(
+        f"#{pull_request} now moves its definitions unchanged in {split.move_commit} "
+        f"and makes every other change in {split.remaining_commit}; review the "
+        f"second: {publication.repository_in(git).url}/pull/{pull_request}/commits/"
+        f"{split.remaining_commit}"
+    )
     return ReviewTriageExitCode.SUCCESS

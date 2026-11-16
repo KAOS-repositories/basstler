@@ -27,6 +27,31 @@ Both commands default `--repository` to the checkout's `origin`.
 
 A pre-commit hook is no place for it: a triage needs a pull request on GitHub.
 
+## Splitting moves from edits
+
+GitHub shows a definition moved into a new file and edited there as a new file. To
+review only the edits:
+
+```bash
+basstler review-triage split-moves <pull request> --repository <owner>/<name>
+```
+
+It replaces the pull request's commits with two on its merge base:
+
+1. one that only moves the definitions, cut unchanged from the files they leave and
+   pasted into the files they move into;
+2. one that makes every other change, whose tree is the former head's tree.
+
+Before pushing, the triage must prove the first commit mechanical; otherwise nothing
+is pushed. The second commit's tree is the head's, so the pull request's files are the
+same as before. Both commits are dated as the former head, so splitting the same pull
+request again gives the same commits and pushes nothing new. The push is refused if
+the branch moved since it was read. Open the second commit in the pull request's
+commits view to review the edits and comment on them.
+
+It rewrites the branch, squashing its history into the two commits: run it as the
+author, or with permission to push to the author's branch.
+
 ## Declaring renames
 
 The triage detects a rename from the diff. To declare one it missed, or reject one it

@@ -174,6 +174,24 @@ class DefinitionMoveSample(SampleTrees):
         return "definition-move"
 
 
+class DefinitionMoveEditedSample(SampleTrees):
+    """
+    A pull request moving two classes into a module it adds, which gains a module
+    docstring and a section header and rewords one moved class's docstring.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    MOVE_ONLY_TREE = "move-only"
+    """
+    The tree that only moves the classes, unchanged.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-edited"
+
+
 class DefinitionMoveFromMovedModuleSample(SampleTrees):
     """
     A pull request moving a module and, out of it, one class into a module it adds.

@@ -323,6 +323,7 @@ class GitCommandRunner:
         files: Mapping[str, str],
         message: str,
         merged_parents: tuple[str, ...] = (),
+        date: str | None = None,
     ) -> str:
         """
         Commit files on top of a commit without touching the working tree or the index,
@@ -333,6 +334,7 @@ class GitCommandRunner:
         :param message: The commit message.
         :param merged_parents: Further parents after *parent*, whose files the commit
             does not keep.
+        :param date: The commit's author and committer date, the clock's when ``None``.
         :return: The new commit.
         """
         with tempfile.TemporaryDirectory() as scratch:
@@ -352,13 +354,34 @@ class GitCommandRunner:
                     environment=index,
                 )
             tree = self.run("write-tree", environment=index)
-        parents = [
-            argument
-            for commit in (parent, *merged_parents)
-            if commit
-            for argument in ("-p", commit)
-        ]
-        return self.run("commit-tree", tree, *parents, "-m", message)
+        parents = tuple(commit for commit in (parent, *merged_parents) if commit)
+        return self.commit_tree(tree, parents, message, date)
+
+    def commit_tree(
+        self,
+        tree: str,
+        parents: tuple[str, ...],
+        message: str,
+        date: str | None = None,
+    ) -> str:
+        """
+        Record a tree as a commit without touching any branch.
+
+        :param tree: The tree the commit records.
+        :param parents: Its parents, its first parent first.
+        :param message: The commit message.
+        :param date: The commit's author and committer date, the clock's when ``None``.
+        :return: The new commit.
+        """
+        dates = (
+            {}
+            if date is None
+            else {GitVariable.AUTHOR_DATE: date, GitVariable.COMMITTER_DATE: date}
+        )
+        parent_arguments = [argument for commit in parents for argument in ("-p", commit)]
+        return self.run(
+            "commit-tree", tree, *parent_arguments, "-m", message, environment=dates
+        )
 
     def parents_of(self, commit: str) -> tuple[str, ...]:
         """:param commit: Any reference git can resolve to a commit.

@@ -22,6 +22,32 @@ function planPageMarkDependencyReady(chip) {
   }
 }
 
+function planPageShowPromotion(card, pullRequest) {
+  var button = card.querySelector("[{{ vocabulary.promotion_attribute.FORM_URL }}]");
+  if (!button || pullRequest["{{ vocabulary.pull_request_field.STATE.key }}"] !== "{{ vocabulary.pull_request_state.OPEN.value }}") {
+    return;
+  }
+  var reasons = JSON.parse(button.getAttribute("{{ vocabulary.promotion_attribute.OTHER_BLOCKERS }}"));
+  if (pullRequest["{{ vocabulary.pull_request_field.DRAFT.key }}"]) {
+    reasons.unshift({{ vocabulary.promotion_blocker.DRAFT.value | tojson }});
+  }
+  button.classList.toggle("promote-button-disabled", reasons.length > 0);
+  card.querySelector(".promote-reason").textContent = reasons.join("; ");
+  if (reasons.length > 0) {
+    button.setAttribute("aria-disabled", "true");
+    button.removeAttribute("href");
+    button.removeAttribute("target");
+    button.removeAttribute("rel");
+    button.title = reasons.join("; ");
+    return;
+  }
+  button.removeAttribute("aria-disabled");
+  button.href = button.getAttribute("{{ vocabulary.promotion_attribute.FORM_URL }}");
+  button.target = "_blank";
+  button.rel = "noopener";
+  button.title = button.getAttribute("{{ vocabulary.promotion_attribute.ENABLED_TITLE }}");
+}
+
 function planPageChangeCount(status, change) {
   var count = document.querySelector("[{{ vocabulary.live_state_attribute.STATUS_COUNT }}=\"" + status + "\"]");
   if (count) {
@@ -134,6 +160,7 @@ function planPageRecheckPullRequests() {
         var stateName = siteLiveStateOf(pullRequest);
         chips.items.forEach(function (chip) {
           planPageShowLiveState(chip, stateName);
+          planPageShowPromotion(chip.closest(".item"), pullRequest);
         });
       })
       .catch(function () {

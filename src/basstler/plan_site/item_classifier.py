@@ -134,8 +134,6 @@ class ItemClassifier:
         if lineage is None or record is None or not item.has_open_pull_request:
             return None
         blockers = self._readiness_of(record, lineage).blockers
-        if blockers:
-            return PromotionButton(lineage.upstream_repository, None, blockers)
         fork = Repository.parse(self._repository_of(item))
         link = PromotionLink.for_target(
             PromotionTarget(
@@ -149,7 +147,7 @@ class ItemClassifier:
                 fork.pull_request_url(item.pull_request_number)
             ),
         )
-        return PromotionButton(lineage.upstream_repository, link.url, [])
+        return PromotionButton(lineage.upstream_repository, link.url, blockers)
 
     def _readiness_of(
         self, record: PullRequestRecord, lineage: ForkLineage

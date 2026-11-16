@@ -80,14 +80,15 @@ siteRecheckWhenShown(siteRecountProgress);
 {% endif %}
 {% endmacro %}
 
-{# A link to the upstream's prefilled pull request form, or the reason it cannot open yet. #}
+{# A link to the upstream's prefilled pull request form, or the reason it cannot open yet; the page's script re-evaluates it against the pull request's live draft state. #}
 {% macro promotion_button(promotion) %}
 {% if promotion %}
+{%- set attributes %}{{ vocabulary.promotion_attribute.FORM_URL }}="{{ promotion.form_url }}" {{ vocabulary.promotion_attribute.ENABLED_TITLE }}="{{ promotion.enabled_title }}" {{ vocabulary.promotion_attribute.OTHER_BLOCKERS }}="{{ promotion.other_blockers | tojson | forceescape }}"{% endset %}
 {% if promotion.url %}
-<a class="promote-button" href="{{ promotion.url }}" target="_blank" rel="noopener" title="Open a pull request on {{ promotion.upstream_repository }}">{{ promotion.label }} ↗</a>
+<a class="promote-button" href="{{ promotion.url }}" target="_blank" rel="noopener" title="{{ promotion.enabled_title }}" {{ attributes }}>{{ promotion.label }} ↗</a>
 {% else %}
-<span class="promote-button promote-button-disabled" aria-disabled="true" title="{{ promotion.reason }}">{{ promotion.label }} ↗</span>
-<span class="promote-reason">{{ promotion.reason }}</span>
+<a class="promote-button promote-button-disabled" aria-disabled="true" title="{{ promotion.reason }}" {{ attributes }}>{{ promotion.label }} ↗</a>
 {% endif %}
+<span class="promote-reason">{{ promotion.reason }}</span>
 {% endif %}
 {% endmacro %}

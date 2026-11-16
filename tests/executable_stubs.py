@@ -47,14 +47,15 @@ class ExecutableStubDirectory:
         """
         return DatasetLocation.STUBS / f"{executable_name}.sh"
 
-    def install(self, executable_name: str) -> None:
+    def install(self, executable_name: str, stub_name: str | None = None) -> None:
         """
-        Copy the stub backing *executable_name* into this directory.
+        Copy a stub into this directory under the name of the executable it replaces.
 
         :param executable_name: The executable to stand in for.
+        :param stub_name: The stub to copy; the one named like *executable_name* if omitted.
         """
         destination = self.path / executable_name
-        shutil.copy(self.stub_for(executable_name), destination)
+        shutil.copy(self.stub_for(stub_name or executable_name), destination)
         destination.chmod(FileMode.EXECUTABLE)
 
     def ahead_of(self, search_path: str) -> str:

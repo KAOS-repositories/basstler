@@ -240,7 +240,8 @@ items:
     be marked; read it before marking.'
 
 - id: move-split
-  title: Split definition moves from their edits into two commits
+  title: Split every proven mechanical change out of a pull request, and leave one sample
+    per rename unviewed
   track: triage
   branch: review-triage-split-moves
   pull_request_number: 241
@@ -248,9 +249,9 @@ items:
   - move-triage
   status: in progress
   recommended_model: opus
-  notes: 'Draft #241, stacked on #226. split-moves replaces a pull request''s commits with a
-    move-only commit, proven mechanical by the triage before anything is pushed, and a commit
-    holding the former head''s tree, both dated as that head and pushed with a lease. 116
-    triage tests pass on Windows; a local split of fork PR 609 held its proof. CI not read
-    yet. Retarget to main once #226 lands.'
+  notes: 'Draft #241 at 15dee971, on #226. split-mechanical: statement-level mechanical
+    commit proven with the PR''s renames, head tree after, summary in the description.
+    Samples: one unviewed file per rename. Local splits: CRAM 609 3435 to 1455 lines,
+    business_consulting 125 2757 to 2084. CI not read. Retarget to main once #226 lands.'
+
 landed_item_count: 1

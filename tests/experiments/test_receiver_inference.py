@@ -21,6 +21,7 @@ from basstler.experiments.receiver_inference.experiment import (
 from basstler.experiments.receiver_inference.probes import (
     REVEAL_FUNCTION,
     AnswerRecording,
+    CombinedInference,
     ExpressionSpan,
     FileProbe,
     NoInference,
@@ -277,6 +278,49 @@ def test_the_triage_is_answered_the_receivers_it_asked_about():
         sample.change(), frozenset({KeywordChange.KEYWORD_ARGUMENTS})
     )
     assert (unanswered.answers, answering.answers) == ({}, answers)
+
+
+def asked_receivers(sample: FileSample) -> set[ReceiverQuestion]:
+    """
+    :param sample: A file in two versions.
+    :return: The receivers its triage asks about.
+    """
+    unanswered = AnswerRecording(NoInference())
+    triaged_with(sample, unanswered)
+    return unanswered.asked
+
+
+def test_combined_inferences_answer_what_the_first_leaves_open():
+    """
+    A receiver the first inference leaves unanswered is answered by the next one.
+    """
+    sample = FileSample.RECEIVER_TYPE_UNKNOWN
+    answers = dict.fromkeys(asked_receivers(sample), "TrajectoryPlotter")
+    answering = AnswerRecording(
+        CombinedInference((NoInference(), RevealedInference(answers)))
+    )
+
+    triaged_with(sample, answering)
+
+    assert answering.answers == answers
+
+
+def test_combined_inferences_keep_the_first_answer():
+    """
+    A receiver the first inference answers keeps that answer, whatever a later one says.
+    """
+    sample = FileSample.RECEIVER_TYPE_UNKNOWN
+    asked = asked_receivers(sample)
+    first = dict.fromkeys(asked, "TrajectoryPlotter")
+    answering = AnswerRecording(
+        CombinedInference(
+            (RevealedInference(first), RevealedInference(dict.fromkeys(asked, "Map")))
+        )
+    )
+
+    triaged_with(sample, answering)
+
+    assert answering.answers == first
 
 
 @pytest.mark.parametrize(

@@ -22,6 +22,7 @@ from basstler.experiments.receiver_inference.cross_check import (
 from basstler.experiments.receiver_inference.exceptions import ReceiversNotProbed
 from basstler.experiments.receiver_inference.probes import (
     AnswerRecording,
+    CombinedInference,
     FileProbe,
     NoInference,
     ReceiverQuestion,
@@ -78,6 +79,40 @@ PYTHON_SUFFIX = ".py"
 """
 The suffix of the files a type checker reads.
 """
+
+
+class CheckerUse(StrEnum):
+    """
+    How the classes a type checker revealed answer a triage's receivers.
+    """
+
+    ALONE = "alone"
+    """
+    The checker answers every receiver.
+    """
+
+    AFTER_BASSTLER = "after basstler"
+    """
+    The checker answers the receivers basstler's inference leaves unanswered.
+    """
+
+    def inference(self, revealed: dict[ReceiverQuestion, str]) -> ReceiverInference:
+        """
+        :param revealed: The class the checker revealed for each receiver.
+        :return: The inference answering the triage this way.
+        """
+        if self is CheckerUse.ALONE:
+            return RevealedInference(revealed)
+        return CombinedInference((AnnotationInference(), RevealedInference(revealed)))
+
+    def way_name(self, checker: TypeChecker) -> str:
+        """
+        :param checker: The type checker.
+        :return: The name of this way of inferring receivers in the result tables.
+        """
+        if self is CheckerUse.ALONE:
+            return checker.name
+        return f"{OWN_INFERENCE}+{checker.name}"
 
 
 class ResultName(StrEnum):
@@ -598,37 +633,40 @@ class PullRequestTriages:
             running.seconds,
         )
 
-    def checked(self, checker: TypeChecker) -> TriageRun:
+    def checked(self, checker: TypeChecker) -> dict[CheckerUse, TriageRun]:
         """
         :param checker: The type checker asked for the receivers' classes.
-        :return: The pull request triaged with the classes the checker revealed, its
-            time the checker's run and the triage's together.
-        :raises ReceiversNotProbed: If the triage asked about a receiver of a Python
-            file the checker was not asked for.
+        :return: The pull request triaged with the classes the checker revealed in one
+            run, once per use of them, each time the checker's run and its triage's.
+        :raises ReceiversNotProbed: If a triage asked about a receiver of a Python file
+            the checker was not asked for.
         """
         revealed = self.reveal(checker)
-        recording = AnswerRecording(RevealedInference(revealed.answers))
-        run = self.triage(recording)
-        unprobed = {
-            question
-            for question in recording.asked
-            if question.module in self.base_paths
-        } - self.receivers
-        if unprobed:
-            raise ReceiversNotProbed(
-                str(self.case),
-                tuple(
-                    f"{self.base_paths[question.module]}:{question.span.line}: "
-                    f"{question.span.source_in(question.module)}"
-                    for question in unprobed
-                ),
+        runs = {}
+        for use in CheckerUse:
+            recording = AnswerRecording(use.inference(revealed.answers))
+            run = self.triage(recording)
+            unprobed = {
+                question
+                for question in recording.asked
+                if question.module in self.base_paths
+            } - self.receivers
+            if unprobed:
+                raise ReceiversNotProbed(
+                    str(self.case),
+                    tuple(
+                        f"{self.base_paths[question.module]}:{question.span.line}: "
+                        f"{question.span.source_in(question.module)}"
+                        for question in unprobed
+                    ),
+                )
+            runs[use] = replace(
+                run,
+                seconds=revealed.seconds + run.seconds,
+                checker_seconds=revealed.checker_seconds,
+                receivers_probed=revealed.receivers_probed,
             )
-        return replace(
-            run,
-            seconds=revealed.seconds + run.seconds,
-            checker_seconds=revealed.checker_seconds,
-            receivers_probed=revealed.receivers_probed,
-        )
+        return runs
 
     def cross_check(
         self, inferred: TriageRun, revealed: TriageRun
@@ -761,7 +799,8 @@ class ReceiverInferenceExperiment:
                 triages.triage(AnswerRecording(AnnotationInference()))
             )
             for checker in self.checkers:
-                runs.setdefault(checker.name, []).append(triages.checked(checker))
+                for use, run in triages.checked(checker).items():
+                    runs.setdefault(use.way_name(checker), []).append(run)
         outcomes = tuple(
             self.outcome(case, name, timed, runs) for name, timed in runs.items()
         )

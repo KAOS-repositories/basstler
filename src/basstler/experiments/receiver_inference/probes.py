@@ -217,6 +217,31 @@ class RevealedInference(ReceiverInference):
         return self.answers.get(ReceiverQuestion(scope.module.text, span))
 
 
+@dataclass(frozen=True)
+class CombinedInference(ReceiverInference):
+    """
+    Answers each receiver as the first of several inferences that answers it.
+    """
+
+    inferences: tuple[ReceiverInference, ...]
+    """
+    The inferences asked, in order.
+    """
+
+    def receiver_class(
+        self,
+        receiver: ast.expr,
+        scope: CallScope,
+        reader: SignatureReader,
+        renames: RenameMap,
+    ) -> str | None:
+        answers = (
+            inference.receiver_class(receiver, scope, reader, renames)
+            for inference in self.inferences
+        )
+        return next((answer for answer in answers if answer is not None), None)
+
+
 # %% the probe of one file
 
 

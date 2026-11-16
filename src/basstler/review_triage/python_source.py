@@ -6,7 +6,6 @@ bind, its documentation strings and its comments.
 from __future__ import annotations
 
 import ast
-import copy
 import io
 import keyword
 import tokenize
@@ -525,10 +524,11 @@ class PythonSource:
     def renamed_tree(self, renames: RenameMap) -> ast.Module:
         """
         :param renames: The renames to apply.
-        :return: A copy of :attr:`tree` with every identifier the renames rename
-            replaced.
+        :return: A new syntax tree of the file with every identifier the renames
+            rename replaced.
+        :raises SyntaxError: If the file is not valid Python.
         """
-        tree = copy.deepcopy(self.tree)
+        tree = ast.parse(self.text)
         IdentifierRenamer(renames).visit(tree)
         return tree
 

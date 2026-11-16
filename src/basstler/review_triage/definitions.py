@@ -570,18 +570,18 @@ class DefinitionSearch(ABC):
         """
 
     @abstractmethod
-    def files_mentioning(self, name: str) -> tuple[str, ...]:
+    def files_subclassing(self, name: str) -> tuple[str, ...]:
         """
-        :param name: A name, such as that of a class.
-        :return: A key for every file holding it as a whole word; files not holding it
-            may be among them.
+        :param name: The name of a class.
+        :return: A key for every file defining a class that names it among its bases;
+            files defining none may be among them.
         """
 
     @abstractmethod
-    def text_of(self, file: str) -> str:
+    def texts_of(self, files: tuple[str, ...]) -> dict[str, str]:
         """
-        :param file: The key of a file this search found.
-        :return: Its content.
+        :param files: Keys of files this search found.
+        :return: The content of each, by its key.
         """
 
 
@@ -599,11 +599,11 @@ class SourceDefinitions(DefinitionSearch):
     def files_defining(self, names: frozenset[str]) -> tuple[str, ...]:
         return tuple(map(str, range(len(self.texts))))
 
-    def files_mentioning(self, name: str) -> tuple[str, ...]:
+    def files_subclassing(self, name: str) -> tuple[str, ...]:
         return tuple(map(str, range(len(self.texts))))
 
-    def text_of(self, file: str) -> str:
-        return self.texts[int(file)]
+    def texts_of(self, files: tuple[str, ...]) -> dict[str, str]:
+        return {file: self.texts[int(file)] for file in files}
 
 
 # %% the index
@@ -641,12 +641,16 @@ class DefinitionIndex:
     def file_definitions(self, files: tuple[str, ...]) -> Iterator[Definition]:
         """
         :param files: Keys of files the search found.
-        :return: Every definition they hold, each file read the first time only.
+        :return: Every definition they hold, the files not read yet read together.
         """
+        unread = tuple(
+            dict.fromkeys(file for file in files if file not in self.by_file)
+        )
+        for file, text in self.search.texts_of(unread).items():
+            self.by_file[file] = tuple(
+                DefinitionReader(PythonSource(text)).definitions()
+            )
         for file in files:
-            if file not in self.by_file:
-                source = PythonSource(self.search.text_of(file))
-                self.by_file[file] = tuple(DefinitionReader(source).definitions())
             yield from self.by_file[file]
 
     def load(self, names: frozenset[str]) -> None:
@@ -710,7 +714,7 @@ class DefinitionIndex:
         while pending:
             current = pending.pop()
             if current not in self.direct_subclasses:
-                files = self.search.files_mentioning(current)
+                files = self.search.files_subclassing(current)
                 self.direct_subclasses[current] = tuple(
                     definition
                     for definition in self.file_definitions(files)

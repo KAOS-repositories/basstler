@@ -421,6 +421,12 @@ class DatasetLocation(PathEnumeration):
     on.
     """
 
+    CLASS_HEADERS = DIRECTORY / "review-triage" / "class-headers"
+    """
+    A base class, two subclasses naming it on and after the line defining them, and a
+    class only mentioning it.
+    """
+
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
     """
     The recorded GraphQL responses the upstream review reader is replayed against.

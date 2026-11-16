@@ -87,6 +87,7 @@ siteRecheckWhenShown(siteRecountProgress);
 <a class="promote-button" href="{{ promotion.url }}" target="_blank" rel="noopener" title="Open a pull request on {{ promotion.upstream_repository }}">{{ promotion.label }} ↗</a>
 {% else %}
 <span class="promote-button promote-button-disabled" aria-disabled="true" title="{{ promotion.reason }}">{{ promotion.label }} ↗</span>
+<span class="promote-reason">{{ promotion.reason }}</span>
 {% endif %}
 {% endif %}
 {% endmacro %}

@@ -134,6 +134,11 @@ class DatasetLocation(PathEnumeration):
     indented under it.
     """
 
+    SHARED_IDENTIFIER_PLAN = DIRECTORY / "shared-identifier-plan.yaml"
+    """
+    A plan whose only wave, track and item all carry the id ``experiment``.
+    """
+
     BOOTSTRAP_ROADMAP = DIRECTORY / "bootstrap-roadmap.md"
     """
     The item-bootstrap fixture plan's roadmap.

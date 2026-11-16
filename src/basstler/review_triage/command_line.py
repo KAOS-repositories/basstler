@@ -12,6 +12,7 @@ from cyclopts import App
 
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
+from basstler.github.basstler_project import BasstlerProject
 from basstler.github.client import GitHubRestClient
 from basstler.github.pull_request_changes import PullRequestChangesReader
 from basstler.github.repository import PullRequestReference, Repository
@@ -49,20 +50,6 @@ class ReviewTriageExitCode(ExitCode):
 # %% publishing the triage
 
 
-def named_or_remote(
-    repository: str | None, git: GitCommandRunner, remote: str = "origin"
-) -> Repository:
-    """
-    :param repository: A repository as ``owner/name``, or ``None``.
-    :param git: The current checkout.
-    :param remote: The remote whose repository is meant when none is named.
-    :return: That repository, the one of ``remote`` when ``None``.
-    """
-    if repository:
-        return Repository.parse(repository)
-    return Repository.from_remote_url(git.run("remote", "get-url", remote))
-
-
 @dataclass(frozen=True)
 class TriagePublication:
     """
@@ -96,7 +83,8 @@ class TriagePublication:
         """
         git = GitCommandRunner(Path.cwd())
         changes = PullRequestChangesReader(git, GitHubRestClient()).read(
-            named_or_remote(self.repository, git, self.remote), self.pull_request
+            Repository.from_name_or_remote(self.repository, git, self.remote),
+            self.pull_request,
         )
         default = PullRequestTriager()
         triager = replace(
@@ -191,8 +179,10 @@ def mark_viewed(
     routes = ViewedMarkingRoutes(
         ViewedMarking(GitHubRestClient()),
         MarkViewedRequest(
-            named_or_remote(workflow_repository, git),
-            PullRequestReference(named_or_remote(repository, git), pull_request),
+            Repository.from_name_or_remote(workflow_repository, git),
+            PullRequestReference(
+                Repository.from_name_or_remote(repository, git), pull_request
+            ),
         ),
         GitHubRestClient(),
         ClaudeCodeVariable.REMOTE.is_true(),
@@ -221,8 +211,12 @@ def request_mark_viewed(
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     git = GitCommandRunner(Path.cwd())
-    reference = PullRequestReference(named_or_remote(repository, git), pull_request)
-    request = MarkViewedRequest(named_or_remote(workflow_repository, git), reference)
+    reference = PullRequestReference(
+        Repository.from_name_or_remote(repository, git), pull_request
+    )
+    request = MarkViewedRequest(
+        Repository.from_name_or_remote(workflow_repository, git), reference
+    )
     runs = request.send(GitHubRestClient())
     logger.info(
         f"Asked {request.workflow_repository.full_name}'s Actions to mark the "
@@ -236,7 +230,7 @@ def set_up_mark_viewed(
     *,
     workflow_repository: str | None = None,
     repository: str | None = None,
-    branch_or_tag: str = "main",
+    branch_or_tag: str = BasstlerProject.default_branch.name,
     on_every_pull_request: bool = False,
 ) -> ReviewTriageExitCode:
     """
@@ -256,7 +250,7 @@ def set_up_mark_viewed(
     if on_every_pull_request and workflow_repository is None:
         workflow_repository = repository
     setup = MarkViewedSetup(
-        named_or_remote(workflow_repository, git),
+        Repository.from_name_or_remote(workflow_repository, git),
         Repository.parse(repository) if repository else None,
         branch_or_tag,
         on_every_pull_request,

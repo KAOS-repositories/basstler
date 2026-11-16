@@ -10,6 +10,9 @@ from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from basstler.git.branch import Branch
+from basstler.git.commands import GitCommandRunner
+
 
 class GitHubAddress(StrEnum):
     """
@@ -50,6 +53,29 @@ class GitHubAddress(StrEnum):
         if is_short_ssh_form or urlsplit(remote_url).scheme == urlsplit(cls.SSH).scheme:
             return cls.SSH
         return cls.WEB
+
+
+class GitHubAccountPage(StrEnum):
+    """
+    The pages of the signed-in account's own settings, below :attr:`GitHubAddress.WEB`.
+    """
+
+    NEW_FINE_GRAINED_TOKEN = "settings/personal-access-tokens/new"
+    """
+    The form creating a fine-grained personal access token.
+    """
+
+    NEW_CLASSIC_TOKEN = "settings/tokens/new"
+    """
+    The form creating a classic personal access token.
+    """
+
+    @property
+    def url(self) -> str:
+        """
+        The page's address.
+        """
+        return f"{GitHubAddress.WEB}/{self}"
 
 
 @dataclass
@@ -97,6 +123,21 @@ class Repository:
             raise MalformedRepositoryError(text)
         owner, _, name = text.partition("/")
         return cls(owner, name)
+
+    @classmethod
+    def from_name_or_remote(
+        cls, name: str | None, git: GitCommandRunner, remote: str = "origin"
+    ) -> Repository:
+        """
+        :param name: A repository as ``owner/name``, or ``None``.
+        :param git: The current checkout.
+        :param remote: The remote whose repository is meant when no name is given.
+        :return: The repository named, else the one *remote* points at.
+        :raises MalformedRepositoryError: If *name* is not ``owner/name``.
+        """
+        if name:
+            return cls.parse(name)
+        return cls.from_remote_url(git.run("remote", "get-url", remote))
 
     @staticmethod
     def is_full_name(text: str) -> bool:
@@ -210,6 +251,56 @@ class Repository:
         return f"{self.url}/actions/runs/{run}"
 
     @property
+    def actions_settings_url(self) -> str:
+        """
+        The settings page that allows or forbids Actions in the repository.
+        """
+        return f"{self.settings_url}/actions"
+
+    def workflow_page_url(self, workflow: Path) -> str:
+        """
+        :param workflow: The workflow's file in the repository.
+        :return: The page listing the workflow's runs, where it is also enabled.
+        """
+        return f"{self.url}/actions/workflows/{workflow.name}"
+
+    def new_file_page_url(self, branch: Branch) -> str:
+        """
+        :param branch: The branch a file is added to.
+        :return: The page adding a file to it.
+        """
+        return f"{self.url}/new/{branch.name}"
+
+    def edit_file_url(self, branch: Branch, file_path: str) -> str:
+        """
+        :param branch: The branch holding the file.
+        :param file_path: The file's path from the repository's root.
+        :return: The page editing the file; it takes no content to fill in.
+        """
+        return f"{self.url}/edit/{branch.name}/{file_path}"
+
+    def file_url(self, branch: Branch, file_path: str) -> str:
+        """
+        :param branch: The branch holding the file.
+        :param file_path: The file's path from the repository's root.
+        :return: The file's page, rendered.
+        """
+        return f"{self.url}/blob/{branch.name}/{file_path}"
+
+    def compare_url(
+        self, base: Branch, head: Branch, head_owner: str | None = None
+    ) -> str:
+        """
+        :param base: The branch the comparison merges into.
+        :param head: The branch compared against it.
+        :param head_owner: The owner of the fork holding *head*, ``None`` when it is on
+            this repository.
+        :return: The page comparing the two, from which a pull request is opened.
+        """
+        compared = head.name if head_owner is None else f"{head_owner}:{head.name}"
+        return f"{self.url}/compare/{base.name}...{compared}"
+
+    @property
     def new_actions_secret_url(self) -> str:
         """
         The form on GitHub that adds an Actions secret to the repository.
@@ -288,12 +379,56 @@ class Repository:
         """
         return f"{self.api_path}/actions/jobs/{job}/logs"
 
+    def workflow_path(self, workflow: Path) -> str:
+        """
+        :param workflow: The workflow's file in the repository.
+        :return: The REST path of that workflow, which reads its state.
+        """
+        return f"{self.api_path}/actions/workflows/{workflow.name}"
+
     def workflow_dispatch_path(self, workflow: Path) -> str:
         """
         :param workflow: The workflow's file in the repository.
         :return: The REST path that starts a run of that workflow.
         """
-        return f"{self.api_path}/actions/workflows/{workflow.name}/dispatches"
+        return f"{self.workflow_path(workflow)}/dispatches"
+
+    @property
+    def actions_permissions_path(self) -> str:
+        """
+        The REST path of whether Actions may run in the repository.
+        """
+        return f"{self.api_path}/actions/permissions"
+
+    def actions_secret_path(self, secret: str) -> str:
+        """
+        :param secret: The Actions secret's name.
+        :return: The REST path of its metadata; GitHub never serves its value.
+        """
+        return f"{self.api_path}/actions/secrets/{secret}"
+
+    def contents_path(self, file_path: str, revision: str | None = None) -> str:
+        """
+        :param file_path: The file's path from the repository's root.
+        :param revision: The branch or commit to read it at, ``None`` to write it.
+        :return: The REST path of the file's contents.
+        """
+        path = f"{self.api_path}/contents/{file_path}"
+        return path if revision is None else f"{path}?ref={revision}"
+
+    @property
+    def git_references_path(self) -> str:
+        """
+        The REST path that creates git references, such as a new branch.
+        """
+        return f"{self.api_path}/git/refs"
+
+    def branch_reference_path(self, branch: Branch) -> str:
+        """
+        :param branch: A branch of the repository.
+        :return: The REST path of its git reference.
+        """
+        return f"{self.api_path}/git/ref/{branch.reference.removeprefix('refs/')}"
 
     def git_requirement(self, distribution: str, reference: str) -> str:
         """
@@ -308,12 +443,6 @@ class Repository:
     def __str__(self) -> str:
         """:return: :attr:`full_name`."""
         return self.full_name
-
-
-BASSTLER_REPOSITORY = Repository("KAOS-repositories", "basstler")
-"""
-The repository basstler is developed in, whose reusable workflows users' callers run.
-"""
 
 
 @dataclass(frozen=True)

@@ -200,6 +200,35 @@ class GraphQLErrorsReturned(DataclassException):
         )
 
 
+@dataclass
+class BasstlerSourceUnknown(DataclassException):
+    """
+    Raised when the installed package's metadata names no source repository.
+    """
+
+    distribution: str
+    """
+    The distribution whose metadata was read.
+    """
+
+    project_urls: tuple[str, ...]
+    """
+    Every ``Project-URL`` entry it declares.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"the {self.distribution} package's metadata names no Source among its "
+            f"project URLs ({', '.join(self.project_urls) or 'none'})"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Reinstall {self.distribution} from its published release or repository, "
+            "whose pyproject.toml declares its Source URL"
+        )
+
+
 # %% reading an upstream pull request
 
 

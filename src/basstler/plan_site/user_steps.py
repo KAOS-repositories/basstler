@@ -18,10 +18,16 @@ from basstler.github.client import (
 )
 from basstler.github.exceptions import GitHubCallFailed
 from basstler.github.pull_request import NewPullRequest
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.basstler_project import BasstlerProject
+from basstler.github.repository import GitHubAccountPage, GitHubAddress, Repository
 from basstler.github.rest_models import RestPullRequestSummary
 from basstler.github.run_listing import ListedRun
-from basstler.github.token_form import FINE_GRAINED_TOKEN_PAGE, SharedToken, TokenUse
+from basstler.github.token_form import (
+    CreateToken,
+    SharedToken,
+    StoreToken,
+    TokenUse,
+)
 from basstler.plan_site import token_storage
 from basstler.plan_site.build_start import CodeFence
 from basstler.plan_site.site_repository import SiteRepository
@@ -186,8 +192,8 @@ class UserSteps:
         The token starting the build and doing the jobs of :attr:`shared_uses` it can
         share, ``None`` when it shares none.
         """
-        token = SharedToken.joining(
-            "basstler",
+        token = SharedToken.from_requested_use(
+            BasstlerProject.name,
             self.site.token_use([Repository.parse(name) for name in self.registered]),
             self.shared_uses,
         )
@@ -264,31 +270,15 @@ class UserSteps:
             has not run.
         :return: Creating that token and storing it as every job's secret.
         """
+        creating, storing = CreateToken(token), StoreToken(token)
         return {
             UserStep.CREATE_TOKEN: PendingStep(
-                UserStep.CREATE_TOKEN,
-                None,
-                (
-                    f"Open {token.form.url} - its name, owner and permissions are "
-                    "filled in. One token "
-                    + " and ".join(use.purpose for use in token.uses)
-                    + ".",
-                    "Under Repository access, choose Only select repositories and "
-                    f"select {token.selection} alone.",
-                    "Click Generate token and copy the token now; GitHub shows it "
-                    "once.",
-                ),
-                latest_run,
+                UserStep.CREATE_TOKEN, None, creating.browser_steps, latest_run
             ),
             UserStep.STORE_TOKEN: PendingStep(
                 UserStep.STORE_TOKEN,
-                token.store_command,
-                tuple(
-                    f"Open {entry.repository.new_actions_secret_url}, set the name to "
-                    f"{entry.secret}, paste the token as the secret, then click Add "
-                    "secret."
-                    for entry in token.secrets
-                ),
+                storing.command,
+                storing.browser_steps,
                 latest_run,
             ),
         }
@@ -379,7 +369,7 @@ class PrivateRepositoryAccess:
             )
             if len(owners) > 1
             else (
-                f"Open {FINE_GRAINED_TOKEN_PAGE}.",
+                f"Open {GitHubAccountPage.NEW_FINE_GRAINED_TOKEN.url}.",
                 f"Name the token and set Resource owner to {owners[0]}.",
                 "Under Repository access, choose Only select repositories and "
                 f"select {names}.",

@@ -171,6 +171,12 @@ class CommitReport(StrEnum):
     """
 
 
+MAXIMUM_PULL_REQUESTS_PER_PAGE = 100
+"""
+The most pull requests one page of GitHub's pull request listing holds.
+"""
+
+
 class ListingParameter(StrEnum):
     """
     The query parameters a paged listing takes.
@@ -184,6 +190,16 @@ class ListingParameter(StrEnum):
     PAGE_SIZE = "per_page"
     """
     How many entries one page holds.
+    """
+
+    HEAD = "head"
+    """
+    The branch the pull requests are opened from, as ``owner:branch``.
+    """
+
+    BASE = "base"
+    """
+    The branch the pull requests merge into.
     """
 
 

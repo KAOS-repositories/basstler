@@ -9,19 +9,11 @@ from dataclasses import dataclass
 from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.locations import BasstlerRepositoryLocation
-from basstler.github.repository import (
-    BASSTLER_REPOSITORY,
-    PullRequestReference,
-    Repository,
-)
+from basstler.github.basstler_project import BasstlerProject
+from basstler.github.repository import PullRequestReference, Repository
 from basstler.review_triage.command_names import ReviewTriageCommand
 
 # %% the routes a correction offers
-
-README_BRANCH = "main"
-"""
-The branch of basstler's repository whose README a correction links.
-"""
 
 
 class MarkingRoutes:
@@ -34,8 +26,10 @@ class MarkingRoutes:
         """
         Where both routes are described, readable from any terminal.
         """
-        readme = BasstlerRepositoryLocation.REVIEW_TRIAGE_README.as_posix()
-        return f"{BASSTLER_REPOSITORY.url}/blob/{README_BRANCH}/{readme}"
+        return BasstlerProject.repository.file_url(
+            BasstlerProject.default_branch,
+            BasstlerRepositoryLocation.REVIEW_TRIAGE_README.as_posix(),
+        )
 
     @classproperty
     def instructions(cls) -> str:

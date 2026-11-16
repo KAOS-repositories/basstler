@@ -5,17 +5,21 @@ address.
 
 from __future__ import annotations
 
+from bisect import bisect_right
+from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import StrEnum
+from itertools import accumulate
 from urllib.parse import quote
 
 from basstler.class_property import classproperty
+from basstler.git.branch import Branch
 from basstler.github.repository import Repository
+from basstler.github.web_form import PrefilledForm, UrlQueryParameter
 
 # %% the form's parameters
 
 
-class PullRequestFormParameter(StrEnum):
+class PullRequestFormParameter(UrlQueryParameter):
     """
     The query parameters of a compare-and-create link.
     """
@@ -57,7 +61,7 @@ class PrefilledPullRequestLink:
 
 
 @dataclass(frozen=True)
-class PullRequestForm:
+class PullRequestForm(PrefilledForm):
     """
     The pull request form for one branch, filled in from its address.
 
@@ -70,14 +74,14 @@ class PullRequestForm:
     The repository the pull request is opened on.
     """
 
-    base: str
+    base: Branch
     """
     The branch it merges into.
     """
 
-    head: str
+    head: Branch
     """
-    The branch it proposes, as ``owner:branch`` when it is on another owner's fork.
+    The branch it proposes.
     """
 
     title: str
@@ -88,6 +92,12 @@ class PullRequestForm:
     body: str
     """
     The description to prefill, shortened if the URL would not otherwise fit.
+    """
+
+    head_owner: str | None = None
+    """
+    The owner of the fork holding :attr:`head`, ``None`` when it is on
+    :attr:`repository`.
     """
 
     @classproperty
@@ -105,17 +115,20 @@ class PullRequestForm:
         """
         return "..."
 
-    def url_for(self, body: str) -> str:
+    @property
+    def page_url(self) -> str:
+        return self.repository.compare_url(self.base, self.head, self.head_owner)
+
+    @property
+    def filled_fields(self) -> Mapping[UrlQueryParameter, str]:
+        return self._fields_with_description(self.body)
+
+    @property
+    def url_without_description(self) -> str:
         """
-        :param body: The description to prefill.
-        :return: The form's address with :attr:`title` and *body* filled in.
+        The form's address with the title alone filled in, the shortest it can be.
         """
-        return (
-            f"{self.repository.url}/compare/{self.base}...{self.head}"
-            f"?{PullRequestFormParameter.EXPAND}=1"
-            f"&{PullRequestFormParameter.TITLE}={quote(self.title)}"
-            f"&{PullRequestFormParameter.BODY}={quote(body)}"
-        )
+        return self.url_filling(self._fields_with_description(""))
 
     @property
     def link(self) -> PrefilledPullRequestLink | None:
@@ -123,22 +136,32 @@ class PullRequestForm:
         The link with :attr:`body` filled in, shortened to fit
         :attr:`url_character_limit`; ``None`` when even the title does not fit.
         """
-        if len(self.url_for(self.body)) <= self.url_character_limit:
-            return PrefilledPullRequestLink(
-                self.url_for(self.body), body_was_truncated=False
-            )
-        if len(self.url_for(self.truncation_marker)) > self.url_character_limit:
+        if len(self.url) <= self.url_character_limit:
+            return PrefilledPullRequestLink(self.url, body_was_truncated=False)
+        marked = self.url_filling(self._fields_with_description(self.truncation_marker))
+        room = self.url_character_limit - len(marked)
+        if room < 0:
             return None
-        shortest, longest = 0, len(self.body)
-        while shortest < longest:
-            midpoint = (shortest + longest + 1) // 2
-            candidate = self.url_for(self.body[:midpoint] + self.truncation_marker)
-            shortest, longest = (
-                (midpoint, longest)
-                if len(candidate) <= self.url_character_limit
-                else (shortest, midpoint - 1)
-            )
+        encoded_lengths = accumulate(
+            len(quote(character, safe="")) for character in self.body
+        )
+        kept = bisect_right(list(encoded_lengths), room)
         return PrefilledPullRequestLink(
-            self.url_for(self.body[:shortest] + self.truncation_marker),
+            self.url_filling(
+                self._fields_with_description(self.body[:kept] + self.truncation_marker)
+            ),
             body_was_truncated=True,
         )
+
+    def _fields_with_description(
+        self, description: str
+    ) -> dict[UrlQueryParameter, str]:
+        """
+        :param description: The description to prefill.
+        :return: The fields filling in :attr:`title` and *description*.
+        """
+        return {
+            PullRequestFormParameter.EXPAND: "1",
+            PullRequestFormParameter.TITLE: self.title,
+            PullRequestFormParameter.BODY: description,
+        }

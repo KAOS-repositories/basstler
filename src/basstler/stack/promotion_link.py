@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from basstler.class_property import classproperty
+from basstler.git.branch import Branch
 from basstler.github.pull_request_form import (
     PrefilledPullRequestLink,
     PullRequestForm,
@@ -31,16 +32,25 @@ This module's logger, which is also what its command prints through.
 
 @dataclass(frozen=True)
 class PromotionTarget:
-    """Where a fork branch is promoted to: the upstream repository and branch, and the fork's owner."""
+    """
+    Where a fork branch is promoted to: the upstream repository and branch, and the
+    fork's owner.
+    """
 
     upstream_repository: Repository
-    """The repository the pull request is opened in."""
+    """
+    The repository the pull request is opened in.
+    """
 
     upstream_base: str
-    """The upstream branch it is opened against."""
+    """
+    The upstream branch it is opened against.
+    """
 
     fork_owner: str
-    """The account owning the fork the branch lives in."""
+    """
+    The account owning the fork the branch lives in.
+    """
 
     @classmethod
     def from_configuration(cls, configuration: Configuration) -> PromotionTarget:
@@ -86,12 +96,14 @@ class PromotionLink(PrefilledPullRequestLink):
     def build(
         cls, configuration: Configuration, branch: str, title: str, body: str
     ) -> PromotionLink:
-        """Build the link promoting a fork branch to the upstream base.
+        """
+        Build the link promoting a fork branch to the upstream base.
 
         :param configuration: The resolved configuration naming both repositories.
         :param branch: The fork branch to promote.
         :param title: Title to prefill.
-        :param body: Description to prefill, shortened if the URL would not otherwise fit.
+        :param body: Description to prefill, shortened if the URL would not otherwise
+            fit.
         :return: The link, flagged if the body was shortened.
         :raises MissingUpstreamRepositoryError: If the project names no upstream.
         """
@@ -103,31 +115,35 @@ class PromotionLink(PrefilledPullRequestLink):
     def for_target(
         cls, target: PromotionTarget, branch: str, title: str, body: str
     ) -> PromotionLink:
-        """Build the link promoting a fork branch to a target.
+        """
+        Build the link promoting a fork branch to a target.
 
         :param target: Where the branch is promoted to.
         :param branch: The fork branch to promote.
         :param title: Title to prefill.
-        :param body: Description to prefill, shortened if the URL would not otherwise fit.
+        :param body: Description to prefill, shortened if the URL would not otherwise
+            fit.
         :return: The link, flagged if the body was shortened.
         """
-
         form = PullRequestForm(
             target.upstream_repository,
-            target.upstream_base,
-            f"{target.fork_owner}:{branch}",
+            Branch(target.upstream_base),
+            Branch(branch),
             title,
             body,
+            head_owner=target.fork_owner,
         )
         link = form.link
         if link is None:
             raise PromotionLinkTooLongError(
-                branch, len(form.url_for("")), cls.url_character_limit
+                branch, len(form.url_without_description), cls.url_character_limit
             )
         return cls(link.url, link.body_was_truncated)
 
     def print_url(self) -> None:
-        """Print the compare-and-create URL, reporting on stderr if the body was shortened."""
+        """
+        Print the compare-and-create URL, reporting on stderr if the body was shortened.
+        """
         logger.info(self.url)
         if self.body_was_truncated:
             logger.error("the description was shortened to fit the URL length limit")

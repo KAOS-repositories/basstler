@@ -5,124 +5,50 @@ far as a command can, and naming the steps only the user can take.
 
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Annotated
-
-from pydantic import Field
 
 from basstler.class_property import classproperty
-from basstler.github.client import (
-    GitHubAttemptClient,
-    GitHubResponse,
-    HttpMethod,
-    RepositoryWrite,
+from basstler.git.branch import Branch
+from basstler.github.actions_settings import (
+    ActionsEnabling,
+    ActionsPermissionsRead,
+    ActionsSecretRead,
+    WorkflowEnabling,
+    WorkflowRead,
+    WorkflowState,
 )
+from basstler.github.basstler_project import BasstlerProject
+from basstler.github.client import GitHubAttemptClient
 from basstler.github.file_proposal import (
+    FileCommit,
     FileProposal,
-    FileUpdate,
-    FileWrite,
+    ProposalOutcome,
     RepositoryFile,
 )
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository import Repository
+from basstler.github.repository_details import RepositoryDetails, RepositoryDetailsRead
+from basstler.github.repository_resources import SettingWrite
 from basstler.github.token_form import (
+    CreateToken,
     PermissionLevel,
     RepositoryPermission,
     SharedToken,
+    StoreToken,
     TokenUse,
 )
-from basstler.json_model import ValidatedJSONModel
+from basstler.github.user_steps import (
+    AllowActions,
+    MergePullRequest,
+    OpenPullRequestFromForm,
+    SyncFork,
+    UserStep,
+)
+from basstler.github.workflows import Workflow
 from basstler.locations import ReviewTriageLocation, WorkflowLocation
 from basstler.render_common import TemplatePage
-from basstler.github.repository import BASSTLER_REPOSITORY, Repository
 from basstler.review_triage.exceptions import MarkViewedWorkflowRefused
 from basstler.review_triage.viewed_request import ReviewTriageSecret
-from basstler.github.workflows import Workflow
-
-# %% the REST resources the setup reads and writes
-
-
-class ActionsPermissions(ValidatedJSONModel):
-    """
-    Whether a repository runs Actions at all.
-    """
-
-    enabled: bool
-    """
-    Whether Actions may run in the repository.
-    """
-
-
-class ActionsEnabling(RepositoryWrite):
-    """
-    Lets a repository run Actions.
-    """
-
-    enabled: bool = True
-    """
-    Whether Actions may run; always on.
-    """
-
-    @classproperty
-    def method(cls) -> HttpMethod:
-        return HttpMethod.PUT
-
-    @property
-    def path(self) -> str:
-        return f"{self.repository.api_path}/actions/permissions"
-
-
-class WorkflowState(StrEnum):
-    """
-    The states GitHub reports a workflow in.
-    """
-
-    ACTIVE = "active"
-    """
-    It runs when started.
-    """
-
-
-class WorkflowDetails(ValidatedJSONModel):
-    """
-    One workflow of a repository, as its REST resource describes it.
-    """
-
-    state: str
-    """
-    Whether it runs, :attr:`WorkflowState.ACTIVE`, or why not; a fork's workflows
-    start out disabled.
-    """
-
-
-class WorkflowEnabling(RepositoryWrite):
-    """
-    Enables one workflow of a repository.
-    """
-
-    workflow: Annotated[WorkflowLocation, Field(exclude=True)]
-    """
-    The workflow.
-    """
-
-    @classproperty
-    def method(cls) -> HttpMethod:
-        return HttpMethod.PUT
-
-    @property
-    def path(self) -> str:
-        return f"{self.workflow_path(self.repository, self.workflow)}/enable"
-
-    @staticmethod
-    def workflow_path(repository: Repository, workflow: WorkflowLocation) -> str:
-        """
-        :param repository: The repository holding the workflow.
-        :param workflow: The workflow.
-        :return: The workflow's REST path.
-        """
-        return f"{repository.api_path}/actions/workflows/{workflow.name}"
-
 
 # %% what each step came to
 
@@ -141,7 +67,7 @@ class SetupState(StrEnum):
 
 class ProposalBranch(StrEnum):
     """
-    The branches the setup proposes files on, for a repository that is no fork.
+    The branches the setup proposes files on.
     """
 
     MARK_VIEWED = "basstler/mark-viewed"
@@ -172,34 +98,6 @@ class SetupStep:
     """
 
 
-@dataclass(frozen=True)
-class UserStep:
-    """
-    A step only the user can take, with the command and the browser steps that take
-    it.
-    """
-
-    description: str
-    """
-    What the step does.
-    """
-
-    browser_steps: tuple[str, ...]
-    """
-    The step taken on github.com, one click or entry each, in order.
-    """
-
-    command: str | None = None
-    """
-    The command that takes it, ``None`` when GitHub offers none.
-    """
-
-    text: str | None = None
-    """
-    A file the step writes, shown in full, ``None`` when it writes none.
-    """
-
-
 # %% the setup
 
 
@@ -220,7 +118,7 @@ class MarkViewedSetup(TemplatePage):
     or itself, when ``None``.
     """
 
-    branch_or_tag: str = "main"
+    branch_or_tag: str = BasstlerProject.default_branch.name
     """
     The basstler branch or tag the installed workflow runs.
     """
@@ -273,13 +171,13 @@ class MarkViewedSetup(TemplatePage):
         How the caller workflow names basstler's reusable workflow: as its own file on
         basstler's repository, whose budget counts only such jobs.
         """
-        if self.workflow_repository == BASSTLER_REPOSITORY:
+        if self.workflow_repository == BasstlerProject.repository:
             return (
                 f"{Workflow.local_reference_prefix}"
                 f"{WorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.name}"
             )
         return (
-            f"{BASSTLER_REPOSITORY.full_name}/"
+            f"{BasstlerProject.repository.full_name}/"
             f"{WorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.as_posix()}@{self.branch_or_tag}"
         )
 
@@ -287,16 +185,17 @@ class MarkViewedSetup(TemplatePage):
         """
         Take every step a command can, then report them and the steps left.
 
-        :param client: Reads and writes the workflow repository.
+        :param client: Reads and writes the workflow repository and, for a fork, its
+            parent.
         :return: The report, as Markdown.
         :raises MarkViewedWorkflowRefused: If the workflow repository cannot be read.
         """
-        answer = client.attempt_get(self.workflow_repository.api_path)
-        if answer.failure is not None:
+        read = RepositoryDetailsRead(self.workflow_repository).attempt(client)
+        if read.resource is None:
             raise MarkViewedWorkflowRefused(
-                self.workflow_repository, answer.failure.error_message()
+                self.workflow_repository, read.response.failure.error_message()
             )
-        details = RepositoryDetails.from_json(answer.body)
+        details = read.resource
         if self.on_every_pull_request and details.parent is not None:
             self.steps.append(
                 SetupStep(
@@ -316,94 +215,96 @@ class MarkViewedSetup(TemplatePage):
             setup=self, workflow_location=WorkflowLocation.MARK_VIEWED.as_posix()
         )
 
+    # %% the workflow file
+
     def install_workflow(
         self, client: GitHubAttemptClient, details: RepositoryDetails
     ) -> bool:
         """
-        Commit the caller workflow to the default branch of a fork lacking it or
-        holding another version of it.
+        Check that the workflow repository's default branch holds the caller workflow,
+        else propose it through a pull request; a fork's is proposed to its parent.
 
-        :param client: Reads and writes the workflow repository.
+        :param client: Reads and writes the workflow repository and its parent.
         :param details: The workflow repository.
-        :return: Whether the workflow is on the default branch now.
+        :return: Whether its default branch holds the workflow, in any version.
         """
         description = (
             f"the {WorkflowLocation.MARK_VIEWED.name} workflow on "
             f"{self.workflow_repository.full_name}'s {details.default_branch}"
         )
-        location = WorkflowLocation.MARK_VIEWED.as_posix()
-        existing = client.attempt_get(
-            f"{self.workflow_repository.api_path}/contents/{location}"
-            f"?ref={details.default_branch}"
-        )
         installed = (
-            None
-            if existing.failure is not None
-            else RepositoryFile.from_json(existing.body)
+            self.workflow_commit(self.workflow_repository, details.default_branch)
+            .read_at(details.default_branch)
+            .attempt(client)
+            .resource
         )
         if installed is not None and installed.text == self.caller_workflow:
             self.steps.append(SetupStep(description, SetupState.ALREADY_DONE))
             return True
-        if not details.is_fork:
-            self.propose_installation(client, description, details, installed)
-            return installed is not None
-        commit = {
-            "repository": self.workflow_repository,
-            "file": location,
-            "message": "Mark pull requests' mechanical files viewed from Actions\n\n"
-            f"Installed by basstler {self.branch_or_tag}.",
-            "content": base64.b64encode(self.caller_workflow.encode()).decode(),
-            "branch": details.default_branch,
-        }
-        written = client.attempt_send(
-            FileWrite(**commit)
-            if installed is None
-            else FileUpdate(**commit, sha=installed.sha)
+        outcome = self.workflow_proposal(details).propose(client)
+        self.report_proposal(description, details, outcome, installed)
+        return installed is not None
+
+    def workflow_commit(self, repository: Repository, branch: str) -> FileCommit:
+        """
+        :param repository: The repository the caller workflow is committed to.
+        :param branch: The branch it is committed on.
+        :return: The caller workflow, committed there.
+        """
+        return FileCommit(
+            repository,
+            Branch(branch),
+            WorkflowLocation.MARK_VIEWED.as_posix(),
+            self.caller_workflow,
+            "Mark pull requests' mechanical files viewed from Actions",
         )
-        if written.failure is not None:
-            self.leave_installation(
-                description, written.failure.error_message(), details, installed
-            )
-            return False
-        self.steps.append(SetupStep(description, SetupState.DONE))
-        return True
+
+    def proposal_repository(self, details: RepositoryDetails) -> Repository:
+        """
+        :param details: The workflow repository.
+        :return: The repository the workflow is proposed to: a fork's parent, whose
+            default branch the fork follows, else the workflow repository itself.
+        """
+        if details.parent is None:
+            return self.workflow_repository
+        return details.parent.repository
 
     def workflow_proposal(self, details: RepositoryDetails) -> FileProposal:
         """
         :param details: The workflow repository.
-        :return: The caller workflow, proposed for the default branch.
+        :return: The caller workflow, on a branch of the workflow repository, proposed
+            for the default branch of :meth:`proposal_repository`.
         """
         return FileProposal(
-            repository=self.workflow_repository,
-            base=details.default_branch,
-            branch=ProposalBranch.MARK_VIEWED,
-            file=WorkflowLocation.MARK_VIEWED.as_posix(),
-            text=self.caller_workflow,
-            title="Mark pull requests' mechanical files viewed from Actions",
-            body=f"Installed by `basstler review-triage set-up-mark-viewed` "
+            commit=self.workflow_commit(
+                self.workflow_repository, ProposalBranch.MARK_VIEWED
+            ),
+            base_repository=self.proposal_repository(details),
+            base=Branch(details.default_branch),
+            description=f"Installed by `basstler review-triage set-up-mark-viewed` "
             f"({self.branch_or_tag}). Merging it lets the workflow mark files viewed "
             f"for the owner of the token stored as `{ReviewTriageSecret.VIEWER_TOKEN}`.",
         )
 
-    def propose_installation(
+    def report_proposal(
         self,
-        client: GitHubAttemptClient,
         description: str,
         details: RepositoryDetails,
+        outcome: ProposalOutcome,
         installed: RepositoryFile | None,
     ) -> None:
         """
-        Open a pull request adding the caller workflow to a repository that is no
-        fork, leaving its merge to the user.
+        Record the workflow's installation as left to the user, with the step that
+        finishes it: merging the pull request, opening it from its form, or committing
+        the file by hand; a fork is then synced with its parent.
 
-        :param client: Reads and writes the workflow repository.
         :param description: What installing sets up.
         :param details: The workflow repository.
+        :param outcome: What proposing the workflow came to.
         :param installed: The version of the workflow on the default branch, ``None``
             when there is none.
         """
-        outcome = self.workflow_proposal(details).propose(client)
-        name = WorkflowLocation.MARK_VIEWED.name
+        change = f"adding {WorkflowLocation.MARK_VIEWED.name}"
         if outcome.form_url:
             self.steps.append(
                 SetupStep(
@@ -413,25 +314,42 @@ class MarkViewedSetup(TemplatePage):
                     f"request could be opened: {outcome.failure}",
                 )
             )
-            self.user_steps.append(
-                UserStep(
-                    f"open and merge the pull request adding {name}",
-                    (
-                        f"Open {outcome.form_url} - its title and description are "
-                        "filled in.",
-                        "Click Create pull request, review it, then merge it.",
-                    ),
+            self.user_steps.append(OpenPullRequestFromForm(outcome.form_url, change))
+        elif outcome.pull_request is None:
+            self.steps.append(
+                SetupStep(
+                    description,
+                    SetupState.LEFT_TO_USER,
+                    f"no pull request adding it could be opened: {outcome.failure}",
                 )
             )
-            return
-        if outcome.pull_request is None:
-            self.leave_installation(
-                description,
-                f"no pull request adding it could be opened: {outcome.failure}",
-                details,
-                installed,
+            self.user_steps.append(
+                self.workflow_commit(
+                    self.proposal_repository(details), details.default_branch
+                )
+                .write_replacing(installed)
+                .manual_step
             )
-            return
+        else:
+            self.report_open_proposal(description, details, outcome, change)
+        if details.parent is not None:
+            self.user_steps.append(SyncFork(self.workflow_repository))
+
+    def report_open_proposal(
+        self,
+        description: str,
+        details: RepositoryDetails,
+        outcome: ProposalOutcome,
+        change: str,
+    ) -> None:
+        """
+        Record the open pull request proposing the workflow, whose merge is left.
+
+        :param description: What installing sets up.
+        :param details: The workflow repository.
+        :param outcome: The proposal, with its pull request.
+        :param change: What the pull request does, as a phrase.
+        """
         url = outcome.pull_request.page_url
         found = "opened" if outcome.opened_now else "already open"
         stacked = (
@@ -448,59 +366,9 @@ class MarkViewedSetup(TemplatePage):
                 "this step",
             )
         )
-        self.user_steps.append(
-            UserStep(
-                f"merge the pull request adding {name}",
-                (f"Open {url}.", "Review it, then merge it."),
-            )
-        )
+        self.user_steps.append(MergePullRequest(url, change))
 
-    def leave_installation(
-        self,
-        description: str,
-        reason: str,
-        details: RepositoryDetails,
-        installed: RepositoryFile | None,
-    ) -> None:
-        """
-        Record the workflow's installation as left to the user, with a page that adds
-        it, filled in, or, where another version is there, the file to paste.
-
-        :param description: What installing sets up.
-        :param reason: Why it is left to the user.
-        :param details: The workflow repository.
-        :param installed: The version of the workflow on the default branch, ``None``
-            when there is none.
-        """
-        self.steps.append(SetupStep(description, SetupState.LEFT_TO_USER, reason))
-        location = WorkflowLocation.MARK_VIEWED.as_posix()
-        branch = details.default_branch
-        target = f"{location} on {self.workflow_repository.full_name}'s {branch}"
-        if installed is None:
-            self.user_steps.append(
-                UserStep(
-                    f"add {target}",
-                    (
-                        f"Open {self.workflow_proposal(details).new_file_page} - the "
-                        "file's path and content are filled in.",
-                        "Click Commit changes; where the branch is protected, choose "
-                        "to create a new branch and start a pull request.",
-                    ),
-                )
-            )
-            return
-        self.user_steps.append(
-            UserStep(
-                f"replace {target}",
-                (
-                    f"Open {self.workflow_repository.url}/edit/{branch}/{location}.",
-                    "Paste the workflow below as its whole content.",
-                    "Click Commit changes; where the branch is protected, choose to "
-                    "create a new branch and start a pull request.",
-                ),
-                text=self.caller_workflow,
-            )
-        )
+    # %% the repository's settings
 
     def enable_actions(
         self, client: GitHubAttemptClient, details: RepositoryDetails
@@ -513,50 +381,28 @@ class MarkViewedSetup(TemplatePage):
         :param details: The workflow repository.
         """
         description = f"Actions on {self.workflow_repository.full_name}"
-        permissions = client.attempt_get(
-            f"{self.workflow_repository.api_path}/actions/permissions"
-        )
-        if permissions.failure is not None:
+        permissions = ActionsPermissionsRead(self.workflow_repository).attempt(client)
+        if permissions.resource is None:
             self.steps.append(
                 SetupStep(
                     description,
                     SetupState.UNREADABLE,
-                    permissions.failure.error_message(),
+                    permissions.response.failure.error_message(),
                 )
             )
-            self.user_steps.append(self.actions_step(checked=False))
+            self.user_steps.append(
+                AllowActions(self.workflow_repository, known_off=False)
+            )
             return
-        if ActionsPermissions.from_json(permissions.body).enabled:
+        if permissions.resource.enabled:
             self.steps.append(SetupStep(description, SetupState.ALREADY_DONE))
             return
-        if not details.is_fork:
-            self.steps.append(
-                SetupStep(
-                    description,
-                    SetupState.LEFT_TO_USER,
-                    "they are off, and only a fork's settings are changed for you",
-                )
-            )
-            self.user_steps.append(self.actions_step(checked=True))
-            return
-        enabled = client.attempt_send(ActionsEnabling(self.workflow_repository))
-        self.record(description, enabled)
-        if enabled.failure is not None:
-            self.user_steps.append(self.actions_step(checked=True))
-
-    def actions_step(self, checked: bool) -> UserStep:
-        """
-        :param checked: Whether Actions are known to be off.
-        :return: Allowing Actions on the workflow repository.
-        """
-        allow = "Choose Allow all actions and reusable workflows, then click Save."
-        if not checked:
-            allow = f"If Actions are disabled there: {allow[0].lower()}{allow[1:]}"
-        return UserStep(
-            f"check that {self.workflow_repository.full_name} allows Actions"
-            if not checked
-            else f"allow Actions on {self.workflow_repository.full_name}",
-            (f"Open {self.workflow_repository.settings_url}/actions.", allow),
+        self.change_setting(
+            client,
+            details,
+            description,
+            ActionsEnabling(self.workflow_repository),
+            "they are off, and only a fork's settings are changed for you",
         )
 
     def enable_workflow(
@@ -570,42 +416,64 @@ class MarkViewedSetup(TemplatePage):
         :param details: The workflow repository.
         """
         description = f"the {WorkflowLocation.MARK_VIEWED.name} workflow enabled"
-        listed = client.attempt_get(
-            WorkflowEnabling.workflow_path(
-                self.workflow_repository, WorkflowLocation.MARK_VIEWED
-            )
-        )
-        if listed.failure is not None:
+        listed = WorkflowRead(
+            self.workflow_repository, WorkflowLocation.MARK_VIEWED
+        ).attempt(client)
+        if listed.resource is None:
             self.steps.append(
                 SetupStep(
-                    description, SetupState.UNREADABLE, listed.failure.error_message()
+                    description,
+                    SetupState.UNREADABLE,
+                    listed.response.failure.error_message(),
                 )
             )
             return
-        if WorkflowDetails.from_json(listed.body).state == WorkflowState.ACTIVE:
+        if listed.resource.state == WorkflowState.ACTIVE:
             self.steps.append(SetupStep(description, SetupState.ALREADY_DONE))
             return
+        self.change_setting(
+            client,
+            details,
+            description,
+            WorkflowEnabling(self.workflow_repository, WorkflowLocation.MARK_VIEWED),
+            "it is disabled",
+        )
+
+    def change_setting(
+        self,
+        client: GitHubAttemptClient,
+        details: RepositoryDetails,
+        description: str,
+        write: SettingWrite,
+        reason_left: str,
+    ) -> None:
+        """
+        Change a fork's setting, leaving its manual step to the user where GitHub
+        refuses; leave any other repository's setting to the user unchanged.
+
+        :param client: Writes the workflow repository.
+        :param details: The workflow repository.
+        :param description: What the setting sets up.
+        :param write: The change.
+        :param reason_left: Why the change is left to the user on a repository that
+            is no fork.
+        """
         if not details.is_fork:
             self.steps.append(
-                SetupStep(description, SetupState.LEFT_TO_USER, "it is disabled")
+                SetupStep(description, SetupState.LEFT_TO_USER, reason_left)
             )
-            self.user_steps.append(
-                UserStep(
-                    f"enable the {WorkflowLocation.MARK_VIEWED.name} workflow",
-                    (
-                        f"Open {self.workflow_repository.url}/actions/workflows/"
-                        f"{WorkflowLocation.MARK_VIEWED.name}.",
-                        "Click Enable workflow.",
-                    ),
-                )
-            )
+            self.user_steps.append(write.manual_step)
             return
-        self.record(
-            description,
-            client.attempt_send(
-                WorkflowEnabling(self.workflow_repository, WorkflowLocation.MARK_VIEWED)
-            ),
+        answer = client.attempt_send(write)
+        if answer.failure is None:
+            self.steps.append(SetupStep(description, SetupState.DONE))
+            return
+        self.steps.append(
+            SetupStep(description, SetupState.REFUSED, answer.failure.error_message())
         )
+        self.user_steps.append(write.manual_step)
+
+    # %% the token
 
     def check_secret(
         self, client: GitHubAttemptClient, details: RepositoryDetails
@@ -617,23 +485,24 @@ class MarkViewedSetup(TemplatePage):
         :param client: Reads the workflow repository.
         :param details: The workflow repository.
         """
-        secret = ReviewTriageSecret.VIEWER_TOKEN
         description = self.secret_description
-        stored = client.attempt_get(
-            f"{self.workflow_repository.api_path}/actions/secrets/{secret}"
-        )
-        if stored.failure is None:
+        stored = ActionsSecretRead(
+            self.workflow_repository, ReviewTriageSecret.VIEWER_TOKEN
+        ).attempt(client)
+        if stored.resource is not None:
             self.steps.append(SetupStep(description, SetupState.ALREADY_DONE))
             return
         self.steps.append(
             SetupStep(description, SetupState.LEFT_TO_USER, "only you can create it")
-            if stored.is_not_found
+            if stored.response.is_not_found
             else SetupStep(
-                description, SetupState.UNREADABLE, stored.failure.error_message()
+                description,
+                SetupState.UNREADABLE,
+                stored.response.failure.error_message(),
             )
         )
         self.user_steps.extend(
-            self.token_steps(details, unread=not stored.is_not_found)
+            self.token_steps(details, may_be_done=not stored.response.is_not_found)
         )
 
     @property
@@ -675,45 +544,19 @@ class MarkViewedSetup(TemplatePage):
         )
 
     def token_steps(
-        self, details: RepositoryDetails, unread: bool = False
-    ) -> tuple[UserStep, UserStep]:
+        self, details: RepositoryDetails, may_be_done: bool = False
+    ) -> tuple[CreateToken, StoreToken]:
         """
         :param details: The workflow repository.
-        :param unread: Whether the secret could not be read, so it may be stored
+        :param may_be_done: Whether the secret could not be read, so it may be stored
             already.
         :return: Creating the token, for every job of :attr:`shared_uses` it can share,
             and storing it as each of their secrets.
         """
-        token = SharedToken.joining(
-            "basstler", self.token_use(details), self.shared_uses
+        token = SharedToken.from_requested_use(
+            BasstlerProject.name, self.token_use(details), self.shared_uses
         )
-        condition = "unless it is stored already, " if unread else ""
-        stored = " and ".join(
-            f"{entry.secret} on {entry.repository.full_name}" for entry in token.secrets
-        )
-        return (
-            UserStep(
-                f"{condition}create one token that "
-                + " and ".join(use.purpose for use in token.uses),
-                (
-                    f"Open {token.form.url} - its name, owner and permissions are "
-                    "filled in.",
-                    "Under Repository access, choose Only select repositories and "
-                    f"select {token.selection} alone.",
-                    "Give it an expiry, click Generate token and copy it; GitHub shows "
-                    "it once.",
-                ),
-            ),
-            UserStep(
-                f"{condition}store the token as {stored}",
-                tuple(
-                    f"Open {entry.repository.new_actions_secret_url}, set the name to "
-                    f"{entry.secret}, paste the token, then click Add secret."
-                    for entry in token.secrets
-                ),
-                command=token.store_command,
-            ),
-        )
+        return CreateToken(token, may_be_done), StoreToken(token, may_be_done)
 
     def target_repository(self, details: RepositoryDetails) -> Repository:
         """
@@ -723,19 +566,5 @@ class MarkViewedSetup(TemplatePage):
         if self.pull_request_repository is not None:
             return self.pull_request_repository
         if details.parent is not None:
-            return Repository.parse(details.parent.full_name)
+            return details.parent.repository
         return self.workflow_repository
-
-    def record(self, description: str, answer: GitHubResponse) -> None:
-        """
-        Record a step whose write was sent.
-
-        :param description: What the step sets up.
-        :param answer: GitHub's answer to the write.
-        """
-        if answer.failure is None:
-            self.steps.append(SetupStep(description, SetupState.DONE))
-            return
-        self.steps.append(
-            SetupStep(description, SetupState.REFUSED, answer.failure.error_message())
-        )

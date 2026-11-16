@@ -322,7 +322,7 @@ class RestPullRequestReader(PullRequestSource):
             page_url=pull_request.page_url,
             reviews=self._reviews(pull_request_number),
             threads=self._threads(pull_request_number),
-            checks=self._checks(pull_request.head.sha),
+            checks=self._checks(pull_request.head.object_hash),
         )
 
     def _reviews(self, pull_request_number: int) -> list[Review]:

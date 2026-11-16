@@ -89,6 +89,12 @@ class PackageLocation(PathEnumeration):
     The templates the plan site's pages are rendered from.
     """
 
+    GITHUB_REPOSITORY_MODULE = DIRECTORY / "github" / "repository.py"
+    """
+    The module whose :class:`basstler.github.repository.Repository` builds every
+    address within a repository.
+    """
+
     PACKAGE_MAP = DIRECTORY / "package_map.py"
     """
     The module declaring which distribution ships each of the package's modules.

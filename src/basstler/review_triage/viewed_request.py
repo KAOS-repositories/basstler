@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from basstler.github.actions_secret import ActionsSecret
 from basstler.github.client import GitHubAttemptClient
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import WorkflowLocation
@@ -24,7 +25,7 @@ from basstler.review_triage.triage import TriageOutcome
 # %% names the workflow reads
 
 
-class ReviewTriageSecret(StrEnum):
+class ReviewTriageSecret(ActionsSecret):
     """
     The Actions secrets the review triage's workflows read.
     """
@@ -53,6 +54,14 @@ class MarkViewedInputs(ValidatedJSONModel):
     """
     The repository the pull request is opened on, as ``owner/name``.
     """
+
+    @classmethod
+    def from_pull_request(cls, pull_request: PullRequestReference) -> MarkViewedInputs:
+        """
+        :param pull_request: The pull request whose files are marked.
+        :return: The inputs naming it, as text like every dispatched input.
+        """
+        return cls(str(pull_request.number), pull_request.repository.full_name)
 
 
 class MarkViewedDispatch(WorkflowDispatch):
@@ -89,30 +98,29 @@ class MarkViewedRequest:
         :return: The page listing the workflow's runs, where this one's outcome shows.
         :raises MarkViewedWorkflowRefused: If GitHub refuses either call.
         """
-        refusal = self.refusal(client)
+        refusal = self.start_workflow_and_return_refusal(client)
         if refusal is not None:
             raise MarkViewedWorkflowRefused(self.workflow_repository, refusal)
         return self.runs_page
 
-    def refusal(self, client: GitHubAttemptClient) -> str | None:
+    def start_workflow_and_return_refusal(
+        self, client: GitHubAttemptClient
+    ) -> str | None:
         """
         Start the workflow.
 
         :param client: Reads the workflow repository and sends the dispatch.
         :return: What GitHub refused either call with, ``None`` once it started.
         """
-        details = client.attempt_get(self.workflow_repository.api_path)
-        if details.failure is not None:
-            return details.failure.error_message()
+        details = RepositoryDetailsRead(self.workflow_repository).attempt(client)
+        if details.resource is None:
+            return details.response.failure.error_message()
         dispatch = client.attempt_send(
             MarkViewedDispatch(
                 self.workflow_repository,
                 WorkflowLocation.MARK_VIEWED,
-                RepositoryDetails.from_json(details.body).default_branch,
-                MarkViewedInputs(
-                    str(self.pull_request.number),
-                    self.pull_request.repository.full_name,
-                ),
+                details.resource.default_branch,
+                MarkViewedInputs.from_pull_request(self.pull_request),
             )
         )
         if dispatch.failure is not None:
@@ -124,21 +132,24 @@ class MarkViewedRequest:
         """
         The page listing the workflow's runs.
         """
-        return (
-            f"{self.workflow_repository.url}/actions/workflows/"
-            f"{WorkflowLocation.MARK_VIEWED.name}"
-        )
+        return self.workflow_repository.workflow_page_url(WorkflowLocation.MARK_VIEWED)
 
 
 # %% marking by whichever route works
 
-CLOUD_SESSION_REFUSAL = (
-    "not tried, since GitHub's GraphQL API is not reachable from Claude Code cloud "
-    "sessions"
-)
-"""
-Why a cloud session does not mark files viewed itself.
-"""
+
+class DirectMarkingRefusal(StrEnum):
+    """
+    Why marking files viewed directly was not even tried.
+    """
+
+    IN_CLOUD_SESSION = (
+        "not tried, since GitHub's GraphQL API is not reachable from Claude Code cloud "
+        "sessions"
+    )
+    """
+    The session runs in a Claude Code cloud container, whose proxy refuses GraphQL.
+    """
 
 
 @dataclass(frozen=True)
@@ -181,7 +192,7 @@ class ViewedMarkingRoutes:
         :raises FilesNotMarkedViewed: If neither route marks them.
         """
         if self.in_cloud_session:
-            direct_refusal = CLOUD_SESSION_REFUSAL
+            direct_refusal = DirectMarkingRefusal.IN_CLOUD_SESSION
         else:
             direct_refusal = "; ".join(self.marking.refusals(outcome))
         pull_request = self.request.pull_request
@@ -192,7 +203,7 @@ class ViewedMarkingRoutes:
             )
         if self.directly:
             raise GraphQLErrorsReturned((direct_refusal,))
-        workflow_refusal = self.request.refusal(self.client)
+        workflow_refusal = self.request.start_workflow_and_return_refusal(self.client)
         if workflow_refusal is not None:
             raise FilesNotMarkedViewed(
                 pull_request,

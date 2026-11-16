@@ -4,24 +4,23 @@ GitHub's form for a new fine-grained personal access token, filled in from its a
 
 from __future__ import annotations
 
+from abc import ABC
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from urllib.parse import urlencode
 
 from basstler.class_property import classproperty
+from basstler.github.actions_secret import ActionsSecret
+from basstler.github.repository import GitHubAccountPage, Repository
+from basstler.github.user_steps import UserStep
+from basstler.github.web_form import PrefilledForm, UrlQueryParameter
 from basstler.locations import GitHubTemplate
 from basstler.render_common import TemplatePage
-from basstler.github.repository import GitHubAddress, Repository
-
-FINE_GRAINED_TOKEN_PAGE = f"{GitHubAddress.WEB}/settings/personal-access-tokens/new"
-"""
-Where a fine-grained token is created.
-"""
 
 # %% the form's parameters
 
 
-class TokenFormParameter(StrEnum):
+class TokenFormParameter(UrlQueryParameter):
     """
     The query parameters GitHub fills the form's fields from, other than permissions.
     """
@@ -42,7 +41,7 @@ class TokenFormParameter(StrEnum):
     """
 
 
-class RepositoryPermission(StrEnum):
+class RepositoryPermission(UrlQueryParameter):
     """
     The repository permissions the form takes as query parameters.
     """
@@ -91,7 +90,7 @@ class PermissionLevel(StrEnum):
 
 
 @dataclass(frozen=True)
-class FineGrainedTokenForm:
+class FineGrainedTokenForm(PrefilledForm):
     """
     The form with a token's name, description, owner and permissions filled in; the
     repositories it reaches the form cannot be given.
@@ -120,19 +119,17 @@ class FineGrainedTokenForm:
     """
 
     @property
-    def url(self) -> str:
-        """
-        The form's address with every field filled in.
-        """
-        query = urlencode(
-            {
-                TokenFormParameter.NAME: self.name,
-                TokenFormParameter.DESCRIPTION: self.description,
-                TokenFormParameter.RESOURCE_OWNER: self.resource_owner,
-                **self.permissions,
-            }
-        )
-        return f"{FINE_GRAINED_TOKEN_PAGE}?{query}"
+    def page_url(self) -> str:
+        return GitHubAccountPage.NEW_FINE_GRAINED_TOKEN.url
+
+    @property
+    def filled_fields(self) -> Mapping[UrlQueryParameter, str]:
+        return {
+            TokenFormParameter.NAME: self.name,
+            TokenFormParameter.DESCRIPTION: self.description,
+            TokenFormParameter.RESOURCE_OWNER: self.resource_owner,
+            **self.permissions,
+        }
 
 
 # %% one token for several jobs
@@ -159,7 +156,7 @@ class TokenUse:
     The access the job needs on each permission.
     """
 
-    secret: str
+    secret: ActionsSecret
     """
     The Actions secret the job's workflows read the token from.
     """
@@ -183,7 +180,7 @@ class StoredSecret:
     One Actions secret a token is stored as, on one repository.
     """
 
-    secret: str
+    secret: ActionsSecret
     """
     The secret's name.
     """
@@ -211,20 +208,28 @@ class SharedToken(TemplatePage):
     """
 
     @classmethod
-    def joining(
-        cls, name: str, first: TokenUse, others: tuple[TokenUse, ...]
+    def from_requested_use(
+        cls,
+        name: str,
+        requested_use: TokenUse,
+        candidate_uses: tuple[TokenUse, ...] = (),
     ) -> SharedToken:
         """
         :param name: The token's name.
-        :param first: The job the token is asked for.
-        :param others: Further jobs, joined where they reach the same owner.
-        :return: The token doing *first* and every other job one token can do with it.
+        :param requested_use: The job the token is asked for.
+        :param candidate_uses: Further jobs, joined where they reach the same owner.
+        :return: The token doing *requested_use* and every candidate one token can do
+            with it.
         """
         return cls(
             name,
             (
-                first,
-                *(use for use in others if use.resource_owner == first.resource_owner),
+                requested_use,
+                *(
+                    use
+                    for use in candidate_uses
+                    if use.resource_owner == requested_use.resource_owner
+                ),
             ),
         )
 
@@ -306,3 +311,79 @@ class SharedToken(TemplatePage):
             (stored,) = self.secrets
             return f"gh secret set {stored.secret} --repo {stored.repository.full_name}"
         return self.render_template(secrets=self.secrets).strip()
+
+
+# %% the steps only the user can take
+
+
+@dataclass(frozen=True)
+class TokenStep(UserStep, ABC):
+    """
+    A step of creating or storing a shared token, which may have been taken before.
+    """
+
+    token: SharedToken
+    """
+    The token.
+    """
+
+    may_be_done: bool = False
+    """
+    Whether the step may have been taken already, as when its secret could not be read.
+    """
+
+    @property
+    def condition(self) -> str:
+        """
+        The clause leading :attr:`description`, empty when the step is known to be left.
+        """
+        return "unless it is stored already, " if self.may_be_done else ""
+
+
+@dataclass(frozen=True)
+class CreateToken(TokenStep):
+    """
+    Creating the token from its filled-in form.
+    """
+
+    @property
+    def description(self) -> str:
+        purposes = " and ".join(use.purpose for use in self.token.uses)
+        return f"{self.condition}create one token that {purposes}"
+
+    @property
+    def browser_steps(self) -> tuple[str, ...]:
+        return (
+            f"Open {self.token.form.url} - its name, owner and permissions are filled "
+            "in.",
+            "Under Repository access, choose Only select repositories and select "
+            f"{self.token.selection} alone.",
+            "Give it an expiry, click Generate token and copy it; GitHub shows it once.",
+        )
+
+
+@dataclass(frozen=True)
+class StoreToken(TokenStep):
+    """
+    Storing the token as every secret its jobs read.
+    """
+
+    @property
+    def description(self) -> str:
+        stored = " and ".join(
+            f"{entry.secret} on {entry.repository.full_name}"
+            for entry in self.token.secrets
+        )
+        return f"{self.condition}store the token as {stored}"
+
+    @property
+    def browser_steps(self) -> tuple[str, ...]:
+        return tuple(
+            f"Open {entry.repository.new_actions_secret_url}, set the name to "
+            f"{entry.secret}, paste the token, then click Add secret."
+            for entry in self.token.secrets
+        )
+
+    @property
+    def command(self) -> str | None:
+        return self.token.store_command

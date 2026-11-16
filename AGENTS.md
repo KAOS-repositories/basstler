@@ -89,6 +89,8 @@
 - Make interfaces hard to misuse
 - Model the relationship between related concepts in the source, never only in a test that checks two separate definitions agree: derive one from the other, or unify them into one concept when that is the cleaner design by SOLID and the domain's semantics
 - Before writing a new class, look for an existing class it can hold as a field or subclass, and use it; when related classes share fields or behaviour, give them a common base
+- A model of an external resource or payload is bound to the concept it describes, so every representation of one concept can be found from it: a repository setting's model, the read that parses it and the write that changes it are generic over that setting or hold it as a field, and the step a user takes when the write is refused belongs to the write. Never a free-standing copy of a concept another class already models
+- Every address of an external service - a REST path, a web page - is built by a method of the class of what it addresses (`Repository` for one within a repository), never appended to that class's address by hand where it is used (checked by `basstler code-rules check`)
 
 ### Methods
 <!-- from MethodsRules in basstler/code_rules/rules/code_quality.py -->

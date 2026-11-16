@@ -1,7 +1,7 @@
 ## Plan
-- Experiment sandbox for goal-paths (#232, never merged): seven parts, one commit series each, built straight through; ask only on real design decisions.
+- Experiment sandbox for goal-paths on experiment/goal-paths, draft #235 (replaces #232, closed at the branch rename; never merged): seven parts, one commit series each, built straight through; ask only on real design decisions.
 - After every push that changes what the plan site shows, start the site build (basstler.plan_site.build_start).
-- stack-board's plan-site.yml builds from this branch during the experiment; set basstler_branch_or_tag back to main at accept or drop.
+- stack-board's plan-site.yml builds from this branch during the experiment; now builds from experiment/goal-paths; set basstler_branch_or_tag back to main at accept or drop.
 - Keep the sandbox merged with main while the experiment runs.
 
 ## Done

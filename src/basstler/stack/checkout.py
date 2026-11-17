@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from basstler.exceptions import UnresolvableReferenceError
+from basstler.git.commands import GitCommandRunner
 
 if TYPE_CHECKING:
     from basstler.stack.settings import Configuration
@@ -139,6 +140,21 @@ class GitArgument(StrEnum):
     The namespace holding every remote's tracking references.
     """
 
+    LIST_REMOTE = "ls-remote"
+    """
+    Lists the references a remote has, without fetching anything.
+    """
+
+    HEADS = "--heads"
+    """
+    Makes :attr:`LIST_REMOTE` list only branches.
+    """
+
+    BRANCH_REFERENCES = "refs/heads"
+    """
+    The namespace holding every branch's reference.
+    """
+
 
 class MergeTreeStatus(IntEnum):
     """
@@ -224,20 +240,54 @@ class CurrentCheckout:
         """
         Refresh the references the stack names, so drift and landed branches are current.
 
+        A branch the fork no longer has is left out, so it cannot stop the others being
+        fetched.
+
         :param configuration: The static configuration.
         :param branches: The fork branch names to fetch.
+        :raises GitCommandFailed: If a remote cannot be read or a fetch fails.
         """
-        cls.output(
-            GitArgument.FETCH,
-            GitArgument.QUIET,
+        git = GitCommandRunner(working_directory=Path.cwd())
+        git.fetch_branch(
             configuration.upstream_location,
-            f"+refs/heads/{configuration.upstream_base}:"
-            f"{GitArgument.REMOTE_REFERENCES}/{configuration.upstream_remote}/"
-            f"{configuration.upstream_base}",
+            configuration.upstream_base,
+            configuration.upstream_remote,
+        ).raise_if_failed()
+        published = cls.published_branches(
+            git=git, remote=configuration.fork_remote, branches=branches
         )
-        cls.output(
-            GitArgument.FETCH, configuration.fork_remote, GitArgument.QUIET, *branches
+        if published:
+            git.fetch(configuration.fork_remote, *published)
+
+    @classmethod
+    def published_branches(
+        cls, *, git: GitCommandRunner, remote: str, branches: list[str]
+    ) -> list[str]:
+        """
+        :param git: The runner to ask through.
+        :param remote: The remote to ask.
+        :param branches: Branch names.
+        :return: The ones the remote has, in the order given.
+        :raises GitCommandFailed: If the remote cannot be read.
+        """
+        if not branches:
+            return []
+        listing = (
+            git.attempt(
+                GitArgument.LIST_REMOTE,
+                GitArgument.HEADS,
+                remote,
+                *(f"{GitArgument.BRANCH_REFERENCES}/{branch}" for branch in branches),
+            )
+            .raise_if_failed()
+            .output
         )
+        published = {line.split("\t", maxsplit=1)[1] for line in listing.splitlines()}
+        return [
+            branch
+            for branch in branches
+            if f"{GitArgument.BRANCH_REFERENCES}/{branch}" in published
+        ]
 
     @classmethod
     def ancestry_predicate(
@@ -323,8 +373,10 @@ class LandedBranches:
         :param configuration: The resolved configuration naming the fork remote and the
             upstream base.
         :return: The fork branches the current checkout's upstream base contains now.
+        :raises GitCommandFailed: If the question cannot be answered, such as when the
+            upstream base was never fetched, so it is never read as none having landed.
         """
-        listed = CurrentCheckout.output(
+        listed = GitCommandRunner(working_directory=Path.cwd()).run(
             GitArgument.FOR_EACH_REFERENCE,
             f"{GitArgument.MERGED}={configuration.upstream_remote}/{configuration.upstream_base}",
             GitArgument.REFERENCE_NAME_FORMAT,

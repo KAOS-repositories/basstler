@@ -26,6 +26,7 @@ from basstler.github.pull_request_record import (
 )
 from basstler.github.repository_access import ForkPullRequests, PullRequestWriter
 from basstler.github.tooling_labels import GitHubLabel
+from basstler.stack.branch_pull_request import BranchPullRequest
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.model import BranchStatus, Stack
 from basstler.stack.promotion_link import PromotionLink
@@ -141,19 +142,9 @@ class PromotionSummaries:
 
 
 @dataclass(frozen=True)
-class Promotion:
+class Promotion(BranchPullRequest):
     """
     One branch's compare-and-create link, and where it was recorded.
-    """
-
-    branch: str
-    """
-    The branch promoted.
-    """
-
-    pull_request_number: int
-    """
-    Its fork pull request.
     """
 
     url: str

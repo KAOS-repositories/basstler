@@ -15,9 +15,10 @@ from basstler.github.pull_request_description import (
 from basstler.github.pull_request_record import (
     PullRequestField,
 )
-from basstler.github.repository_access import ForkPullRequests
+from basstler.maintenance.fork_pull_request_action import ForkPullRequestAction
+from basstler.stack.branch_pull_request import BranchPullRequest
 from basstler.stack.label_write import LabelWrite
-from basstler.stack.model import BranchStatus, Stack, StackBranch
+from basstler.stack.model import BranchStatus, StackBranch
 
 
 class UpstreamPullRequestSynchronizationAction(StrEnum):
@@ -51,19 +52,9 @@ class UpstreamPullRequestSynchronizationAction(StrEnum):
 
 
 @dataclass(frozen=True)
-class UpstreamPullRequestSynchronizationChange:
+class UpstreamPullRequestSynchronizationChange(BranchPullRequest):
     """
     One write bringing a fork pull request's record of its upstream review in step.
-    """
-
-    branch: str
-    """
-    The branch whose pull request was written.
-    """
-
-    pull_request_number: int
-    """
-    Its fork pull request.
     """
 
     action: UpstreamPullRequestSynchronizationAction
@@ -73,20 +64,10 @@ class UpstreamPullRequestSynchronizationChange:
 
 
 @dataclass(frozen=True)
-class UpstreamPullRequestSynchronization:
+class UpstreamPullRequestSynchronization(ForkPullRequestAction):
     """
     The in-review label and the upstream pull request link on each fork pull request,
     kept in step with the open upstream pull request opened from its branch.
-    """
-
-    stack: Stack
-    """
-    The derived stack, whose board snapshot names each branch's upstream pull request.
-    """
-
-    fork: ForkPullRequests
-    """
-    The fork to read pull requests from and write them back to.
     """
 
     def synchronize(self) -> list[UpstreamPullRequestSynchronizationChange]:

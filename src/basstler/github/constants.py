@@ -137,6 +137,16 @@ class MaintenanceNotice(StrEnum):
     The project is not a fork, so the pass leaves out every step that needs an upstream.
     """
 
+    LANDED_BRANCH_UNREADABLE = (
+        "`{branch}` is in the upstream base but its commits cannot be counted, because "
+        "`{base}` or `{head}` is not in this clone: its pull request was not closed. "
+        "Fetch the fork and run the pass again."
+    )
+    """
+    A landed branch was left open because the fork's copy of it or of its base is
+    missing, with the branch and the two references to fill in.
+    """
+
 
 class MergeableState(StrEnum):
     """

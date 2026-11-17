@@ -7,27 +7,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from basstler.github.constants import MaintenanceText
-from basstler.github.repository_access import ForkPullRequests
+from basstler.github.constants import MaintenanceNotice
+from basstler.maintenance.fork_pull_request_action import ForkPullRequestAction
+from basstler.stack.branch_pull_request import BranchPullRequest
 from basstler.stack.checkout import CurrentCheckout
-from basstler.stack.model import Stack, StackBranch
+from basstler.stack.model import StackBranch
+from basstler.standard_streams import StandardStreamHandler
+
+logger = StandardStreamHandler.logger_for(__name__)
+"""
+This module's logger, which is also what its command prints through.
+"""
 
 # %% what was closed
 
 
 @dataclass(frozen=True)
-class ClosedAsLanded:
+class ClosedAsLanded(BranchPullRequest):
     """
     One fork pull request closed because its work had landed upstream.
-    """
-
-    branch: str
-    """
-    The pull request's head branch.
-    """
-
-    pull_request_number: int
-    """
-    The fork pull request that was closed.
     """
 
 
@@ -35,7 +33,7 @@ class ClosedAsLanded:
 
 
 @dataclass(frozen=True)
-class LandedPullRequestClosing:
+class LandedPullRequestClosing(ForkPullRequestAction):
     """
     Closes every open fork pull request whose commits are all in the upstream base.
 
@@ -43,22 +41,13 @@ class LandedPullRequestClosing:
     so it stays open until it is closed.
     """
 
-    stack: Stack
-    """
-    The derived stack, which says which branches have landed.
-    """
-
-    fork: ForkPullRequests
-    """
-    The fork to read pull requests from and write them back to.
-    """
-
     def close(self) -> tuple[ClosedAsLanded, ...]:
         """
         Close each landed pull request and say why.
 
         A branch with no commit beyond its base is left open: it is an ancestor of the
-        upstream base as a landed branch is, but nothing of it landed.
+        upstream base as a landed branch is, but nothing of it landed. A branch whose
+        commits cannot be counted is left open and warned about.
 
         :return: One entry per pull request closed, parent before child.
         """
@@ -88,11 +77,17 @@ class LandedPullRequestClosing:
         """
         :param branch: A landed branch of the stack.
         :return: Whether the fork's copy of it has a commit its base lacks; ``False``
-            when either cannot be read.
+            when either cannot be read, which is warned about.
         """
         configuration = self.stack.configuration
-        ahead = CurrentCheckout.commit_count(
-            f"{configuration.reference_on_fork(branch.parent)}"
-            f"..{configuration.reference_on_fork(branch.name)}"
-        )
-        return ahead is not None and ahead > 0
+        base = configuration.reference_on_fork(branch.parent)
+        head = configuration.reference_on_fork(branch.name)
+        ahead = CurrentCheckout.commit_count(f"{base}..{head}")
+        if ahead is None:
+            logger.warning(
+                MaintenanceNotice.LANDED_BRANCH_UNREADABLE.format(
+                    branch=branch.name, base=base, head=head
+                )
+            )
+            return False
+        return ahead > 0

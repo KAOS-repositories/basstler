@@ -140,8 +140,8 @@ def test_a_branch_with_no_commits_of_its_own_is_left_open(
     assert fork.closed == []
 
 
-def test_a_pull_request_whose_base_the_fork_no_longer_has_is_left_open(
-    parent_landed: ForkCheckout,
+def test_a_pull_request_whose_base_the_fork_no_longer_has_is_left_open_and_warned_about(
+    parent_landed: ForkCheckout, capsys: pytest.CaptureFixture[str]
 ):
     parent_landed.run_git(
         "update-ref", "-d", f"refs/remotes/{RemoteName.ORIGIN}/{StackBranch.PARENT}"
@@ -153,6 +153,8 @@ def test_a_pull_request_whose_base_the_fork_no_longer_has_is_left_open(
     closed = LandedPullRequestClosing(stack, fork).close()
 
     assert closed == ()
+    assert fork.closed == []
+    assert StackBranch.CHILD in capsys.readouterr().err
 
 
 # %% what the pass does with them

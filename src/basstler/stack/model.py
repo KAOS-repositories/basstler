@@ -22,6 +22,7 @@ from basstler.git.branch import Branch
 from basstler.github.repository import Repository
 from basstler.github.states import CombinedCheckState
 from basstler.github.tooling_labels import GitHubLabel
+from basstler.stack.branch_pull_request import BranchPullRequest
 from basstler.stack.branch_status import BranchStatus
 from basstler.stack.checkout import CurrentCheckout, LandedBranches
 from basstler.stack.exceptions import BaseBranchScopeError, BoardUnavailable
@@ -258,18 +259,12 @@ class SkippedPullRequest:
 
 
 @dataclass(frozen=True)
-class Reparent:
+class Reparent(BranchPullRequest):
     """A pull request whose base has landed and must be retargeted at the upstream base.
 
     A child left on a landed base cannot reach the upstream, and is closed outright the
     moment that base branch is deleted.
     """
-
-    branch: str
-    """The child branch that has to move."""
-
-    pull_request_number: int
-    """The child's fork pull request."""
 
     current_base: str
     """The landed branch it is still targeting."""

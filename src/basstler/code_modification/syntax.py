@@ -1,9 +1,6 @@
 """
 What an expression or a call says, read from its concrete syntax tree without running
 it, and calls changed to pass other arguments.
-
-Modelled on krrood's node factory and name reading :cite:`krrood`, which were never
-released.
 """
 
 from __future__ import annotations

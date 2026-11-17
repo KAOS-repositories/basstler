@@ -180,10 +180,9 @@ class MemberRenameDetection(RenameSource):
         if len(base_modules.module_files.get(module, ())) != 1:
             return
         head_module = head_modules.module_path(change.path)
-        added = head.defined_names - base.defined_names
-        for old in sorted(base.defined_names - head.defined_names):
-            news = candidates.replacements.get(old, set()) & added
-            if len(news) == 1:
-                yield MemberRename(
-                    f"{module}.{old}", f"{head_module}.{news.pop()}", self
-                )
+        pairs = candidates.dominant_pairs(
+            base.defined_names - head.defined_names,
+            head.defined_names - base.defined_names,
+        )
+        for old, new in sorted(pairs.items()):
+            yield MemberRename(f"{module}.{old}", f"{head_module}.{new}", self)

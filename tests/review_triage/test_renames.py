@@ -5,8 +5,14 @@ Combining the renames of several sources and applying them to identifiers and pr
 from __future__ import annotations
 
 from basstler.review_triage.declaration import DescriptionDeclaration
-from basstler.review_triage.detection import RenameDetection
-from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
+from basstler.review_triage.detection import MemberRenameDetection, RenameDetection
+from basstler.review_triage.renames import (
+    MemberRename,
+    Rename,
+    RenameCandidates,
+    RenameDecisions,
+    RenameMap,
+)
 
 # %% combining sources
 
@@ -48,6 +54,90 @@ def test_a_rejection_drops_an_earlier_source_rename():
         ]
     )
     assert renames.renames == (OTHER,)
+
+
+MEMBER = MemberRename(
+    "package.module.old_name", "package.module.new_name", MemberRenameDetection()
+)
+"""
+A rename of a module member whose old name an earlier source also renames.
+"""
+
+
+def test_rejecting_a_name_drops_the_rename_of_a_member_of_that_name():
+    """
+    A rejection of an old identifier removes the renames of module members it names.
+    """
+    renames = RenameMap.from_decisions(
+        [
+            RenameDecisions((MEMBER, OTHER)),
+            RenameDecisions(rejected=frozenset({"old_name"})),
+        ]
+    )
+    assert renames.renames == (OTHER,)
+
+
+def test_a_member_rename_the_word_rename_makes_everywhere_is_dropped():
+    """
+    A member rename to the name its old name is renamed to everywhere adds nothing.
+    """
+    renames = RenameMap.from_decisions([RenameDecisions((DETECTED, MEMBER))])
+    assert renames.renames == (DETECTED,)
+
+
+def test_a_member_rename_to_another_name_than_the_word_rename_is_kept():
+    """
+    A member rename is kept when the word rename gives its old name another name.
+    """
+    renames = RenameMap.from_decisions([RenameDecisions((DECLARED, MEMBER))])
+    assert renames.renames == (DECLARED, MEMBER)
+
+
+# %% pairing old and new names by the diff
+
+
+def substitutions(*pairs: tuple[str, str, int]) -> RenameCandidates:
+    """
+    :param pairs: Each old identifier, its replacement and how often it was seen.
+    :return: The substitutions seen.
+    """
+    candidates = RenameCandidates()
+    for old, new, count in pairs:
+        for _ in range(count):
+            candidates.add(old, new)
+    return candidates
+
+
+def test_a_stray_substitution_does_not_hide_the_dominant_one():
+    """
+    An old name replaced once by another new name is still paired with the new name
+    that replaces it most often.
+    """
+    candidates = substitutions(("Pose", "PoseRenamed", 3), ("Pose", "Line", 1))
+    assert candidates.dominant_pairs(
+        frozenset({"Pose"}), frozenset({"PoseRenamed", "Line"})
+    ) == {"Pose": "PoseRenamed"}
+
+
+def test_a_new_name_more_often_replacing_another_old_name_is_not_paired():
+    """
+    An old name is not paired with a new name that more often replaces another old name.
+    """
+    candidates = substitutions(("Resolver", "Renamed", 4), ("Value", "Renamed", 1))
+    assert candidates.dominant_pairs(
+        frozenset({"Resolver", "Value"}), frozenset({"Renamed"})
+    ) == {"Resolver": "Renamed"}
+
+
+def test_an_old_name_replaced_equally_often_by_two_new_names_is_not_paired():
+    """
+    A tie between two new names leaves the old name unpaired.
+    """
+    candidates = substitutions(("Pose", "First", 2), ("Pose", "Second", 2))
+    assert (
+        candidates.dominant_pairs(frozenset({"Pose"}), frozenset({"First", "Second"}))
+        == {}
+    )
 
 
 # %% applying renames

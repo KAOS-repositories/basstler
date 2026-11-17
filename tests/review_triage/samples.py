@@ -236,6 +236,9 @@ class BindingRenameSample(SampleTrees):
 
     @classproperty
     def directory_name(cls) -> str:
+        """
+        The directory holding the binding-rename sample.
+        """
         return "binding-rename"
 
 

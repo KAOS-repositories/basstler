@@ -6,6 +6,7 @@ prose.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -42,6 +43,20 @@ class Rename:
     """
     Whether both sides are file paths, which never occur inside code.
     """
+
+    def is_rejected_by(self, rejected: str) -> bool:
+        """
+        :param rejected: An old identifier a rename source rejects.
+        :return: Whether that rejects this rename.
+        """
+        return self.old == rejected
+
+    def is_repeated_in(self, renames: dict[str, Rename]) -> bool:
+        """
+        :param renames: The renames applied together, by their old identifier.
+        :return: Whether another of them already makes this one.
+        """
+        return False
 
 
 @dataclass(frozen=True)
@@ -83,6 +98,20 @@ class MemberRename(Rename):
         The name the head commit gives the definition.
         """
         return self.new.rpartition(DOTTED_NAME_SEPARATOR)[2]
+
+    def is_rejected_by(self, rejected: str) -> bool:
+        """
+        :meth:`Rename.is_rejected_by`, also when the member's old name is rejected.
+        """
+        return rejected in (self.old, self.member.member_name)
+
+    def is_repeated_in(self, renames: dict[str, Rename]) -> bool:
+        """
+        :meth:`Rename.is_repeated_in`: whether the member's old name is renamed to its
+        new name everywhere.
+        """
+        word = renames.get(self.member.member_name)
+        return word is not None and word.new == self.new_member_name
 
 
 @dataclass(frozen=True)
@@ -139,10 +168,20 @@ class RenameMap:
         """
         renames: dict[str, Rename] = {}
         for decision in decisions:
-            for old in decision.rejected:
-                renames.pop(old, None)
+            for rejected in decision.rejected:
+                renames = {
+                    old: rename
+                    for old, rename in renames.items()
+                    if not rename.is_rejected_by(rejected)
+                }
             renames |= {rename.old: rename for rename in decision.accepted}
-        return cls(tuple(renames[old] for old in sorted(renames)))
+        return cls(
+            tuple(
+                renames[old]
+                for old in sorted(renames)
+                if not renames[old].is_repeated_in(renames)
+            )
+        )
 
     @cached_property
     def identifier_renames(self) -> tuple[Rename, ...]:
@@ -280,13 +319,12 @@ class RenameMap:
 @dataclass
 class RenameCandidates:
     """
-    Identifier substitutions seen in a pull request's diff, kept only while every one
-    of them replaces an identifier by the same new identifier.
+    Identifier substitutions seen in a pull request's diff, with how often each was seen.
     """
 
-    replacements: dict[str, set[str]] = field(default_factory=dict)
+    replacements: dict[str, Counter[str]] = field(default_factory=dict)
     """
-    Every new identifier each old identifier was seen replaced by.
+    How often each old identifier was seen replaced by each new identifier.
     """
 
     def add(self, old: str, new: str) -> None:
@@ -296,7 +334,7 @@ class RenameCandidates:
         :param old: The identifier in the base version.
         :param new: The identifier in its place in the head version.
         """
-        self.replacements.setdefault(old, set()).add(new)
+        self.replacements.setdefault(old, Counter())[new] += 1
 
     def consistent(self) -> dict[str, str]:
         """
@@ -307,3 +345,46 @@ class RenameCandidates:
             for old, news in self.replacements.items()
             if len(news) == 1
         }
+
+    def dominant_pairs(
+        self, olds: frozenset[str], news: frozenset[str]
+    ) -> dict[str, str]:
+        """
+        :param olds: Old identifiers.
+        :param news: New identifiers.
+        :return: The new identifier of each old one, where of these each is the
+            other's most frequent counterpart and no other ties with it.
+        """
+        counts = {
+            (old, new): count
+            for old in olds
+            for new, count in self.replacements.get(old, Counter()).items()
+            if new in news
+        }
+        best_news = self.most_frequent(
+            {
+                old: {new: k for (o, new), k in counts.items() if o == old}
+                for old in olds
+            }
+        )
+        best_olds = self.most_frequent(
+            {
+                new: {old: k for (old, n), k in counts.items() if n == new}
+                for new in news
+            }
+        )
+        return {old: new for old, new in best_news.items() if best_olds.get(new) == old}
+
+    @staticmethod
+    def most_frequent(counterparts: dict[str, dict[str, int]]) -> dict[str, str]:
+        """
+        :param counterparts: How often each identifier was paired with each other.
+        :return: The counterpart each identifier was paired with more often than with
+            any other.
+        """
+        found = {}
+        for identifier, counts in counterparts.items():
+            ranked = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+            if ranked and (len(ranked) == 1 or ranked[0][1] > ranked[1][1]):
+                found[identifier] = ranked[0][0]
+        return found

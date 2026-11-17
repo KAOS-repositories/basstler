@@ -16,6 +16,7 @@ from basstler.maintenance.restack_steps import BranchOutcome, RestackOutcome
 from basstler.maintenance.upstream_pull_request_synchronization import (
     UpstreamPullRequestSynchronizationChange,
 )
+from basstler.stack.checkout import ForkRefresh
 from basstler.stack.model import Reparent, SkippedPullRequest, Stack
 from basstler.standard_streams import StandardStreamHandler
 
@@ -107,10 +108,9 @@ class MaintenanceReport:
     The pull requests whose head is not on the fork, which the pass left alone.
     """
 
-    missing_on_fork: tuple[str, ...] = ()
+    fork_refresh: ForkRefresh = ForkRefresh()
     """
-    The branches the board names that the fork does not have, which the pass could not
-    refresh and so read as they were.
+    What refreshing the fork's references left out, which the pass read as it was.
     """
 
     @classmethod
@@ -150,7 +150,7 @@ class MaintenanceReport:
             landed=tuple(branch.name for branch in stack.landed_branches()),
             promotable=tuple(branch.name for branch in stack.promotion_order()),
             skipped=tuple(stack.skipped_pull_requests()),
-            missing_on_fork=stack.missing_on_fork,
+            fork_refresh=stack.fork_refresh,
         )
 
     def as_json(self) -> str:
@@ -275,7 +275,7 @@ class MaintenanceReport:
         """
         Warn about each branch the board names that the fork does not have.
         """
-        for branch in self.missing_on_fork:
+        for branch in self.fork_refresh.missing_branches:
             logger.warning(
                 f"{branch}: the board names it but the fork does not have it, so it "
                 f"was not refreshed and its state may be stale"

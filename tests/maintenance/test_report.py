@@ -34,6 +34,7 @@ from basstler.maintenance.restack_steps import (
     BranchOutcome,
     RestackOutcome,
 )
+from basstler.stack.checkout import ForkRefresh
 from basstler.stack.model import PullRequest, SkippedPullRequest, SkipReason, Stack
 from basstler.git.commands import IntegrationStrategy
 from basstler.stack.settings import Configuration
@@ -244,7 +245,9 @@ def test_loading_the_stack_names_a_base_the_fork_does_not_have(
 
     stack = Stack.load(board)
 
-    assert stack.missing_on_fork == (StackBranch.LONG_LIVED_BASE,)
+    assert stack.fork_refresh == ForkRefresh(
+        missing_branches=(StackBranch.LONG_LIVED_BASE,)
+    )
 
 
 def test_the_report_carries_the_branches_the_fork_does_not_have():
@@ -253,18 +256,20 @@ def test_the_report_carries_the_branches_the_fork_does_not_have():
         [],
         lambda branch: False,
         lambda candidate, container: False,
-        missing_on_fork=(StackBranch.LONG_LIVED_BASE,),
+        fork_refresh=ForkRefresh(missing_branches=(StackBranch.LONG_LIVED_BASE,)),
     )
 
     report = MaintenanceReport.of_pass(stack, None, [])
 
-    assert report.missing_on_fork == (StackBranch.LONG_LIVED_BASE,)
+    assert report.fork_refresh == stack.fork_refresh
 
 
 def test_the_summary_warns_about_each_branch_the_fork_does_not_have(
     caplog: pytest.LogCaptureFixture,
 ):
-    report = MaintenanceReport(missing_on_fork=(StackBranch.LONG_LIVED_BASE,))
+    report = MaintenanceReport(
+        fork_refresh=ForkRefresh(missing_branches=(StackBranch.LONG_LIVED_BASE,))
+    )
 
     report.print_summary()
 

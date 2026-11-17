@@ -11,7 +11,7 @@ import pytest
 
 from basstler.exceptions import UnresolvableReferenceError
 from basstler.git.commands import GitCommandFailed
-from basstler.stack.checkout import CurrentCheckout, LandedBranches
+from basstler.stack.checkout import CurrentCheckout, ForkRefresh, LandedBranches
 
 from ..constants.stack import RemoteName, StackBranch
 from ..maintenance.fork import UPSTREAM_BASE, ForkCheckout, make_configuration
@@ -164,7 +164,7 @@ def test_refreshing_names_the_branches_the_fork_does_not_have(
         make_configuration(), [StackBranch.PARENT, StackBranch.CHILD]
     )
 
-    assert missing == (StackBranch.CHILD,)
+    assert missing == ForkRefresh(missing_branches=(StackBranch.CHILD,))
 
 
 def test_refreshing_names_no_branch_when_the_fork_has_them_all(
@@ -172,7 +172,7 @@ def test_refreshing_names_no_branch_when_the_fork_has_them_all(
 ):
     missing = CurrentCheckout.fetch(make_configuration(), [StackBranch.PARENT])
 
-    assert missing == ()
+    assert missing == ForkRefresh()
 
 
 def test_refreshing_fails_when_the_fork_cannot_be_reached(

@@ -172,6 +172,21 @@ class MergeTreeStatus(IntEnum):
     """
 
 
+# %% what a refresh found
+
+
+@dataclass(frozen=True)
+class ForkRefresh:
+    """
+    What refreshing the fork's references left out.
+    """
+
+    missing_branches: tuple[str, ...] = ()
+    """
+    The branches the board names that the fork does not have, so their state is unknown.
+    """
+
+
 # %% the checkout
 
 
@@ -236,9 +251,7 @@ class CurrentCheckout:
         return int(counted) if counted.isdigit() else None
 
     @classmethod
-    def fetch(
-        cls, configuration: Configuration, branches: list[str]
-    ) -> tuple[str, ...]:
+    def fetch(cls, configuration: Configuration, branches: list[str]) -> ForkRefresh:
         """
         Refresh the references the stack names, so drift and landed branches are current.
 
@@ -247,7 +260,7 @@ class CurrentCheckout:
 
         :param configuration: The static configuration.
         :param branches: The fork branch names to fetch.
-        :return: The ones the fork does not have, in the order given.
+        :return: The branches the fork does not have, in the order given.
         :raises GitCommandFailed: If a remote cannot be read or a fetch fails.
         """
         git = GitCommandRunner(working_directory=Path.cwd())
@@ -261,7 +274,11 @@ class CurrentCheckout:
         )
         if published:
             git.fetch(configuration.fork_remote, *published)
-        return tuple(branch for branch in branches if branch not in published)
+        return ForkRefresh(
+            missing_branches=tuple(
+                branch for branch in branches if branch not in published
+            )
+        )
 
     @classmethod
     def published_branches(

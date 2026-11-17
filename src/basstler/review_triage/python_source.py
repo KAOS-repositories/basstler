@@ -268,14 +268,24 @@ class PythonSource:
         if renames in self.code_trees:
             return self.code_trees[renames]
         tree = self.renamed_tree(renames)
+        self.strip_to_code(tree)
+        self.code_trees[renames] = tree
+        return tree
+
+    @staticmethod
+    def strip_to_code(tree: ast.AST) -> None:
+        """
+        Remove, in place, the imports of *tree* other than those of ``__future__``, and
+        empty every documentation string it holds.
+
+        :param tree: A syntax tree.
+        """
         for node in list(ast.walk(tree)):
             for field_name, value in ast.iter_fields(node):
                 if isinstance(value, list) and all(
                     isinstance(item, ast.stmt) for item in value
                 ):
-                    setattr(node, field_name, list(self.code_statements(value)))
-        self.code_trees[renames] = tree
-        return tree
+                    setattr(node, field_name, list(PythonSource.code_statements(value)))
 
     def code(self, renames: RenameMap) -> str:
         """

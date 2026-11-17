@@ -28,6 +28,14 @@ class RenameSource(ABC):
         What a report says found a rename this source accepts.
         """
 
+    @classproperty
+    def finds_moves(cls) -> bool:
+        """
+        Whether the renames this source accepts move code to another place, which leaves
+        no name for a reviewer to judge.
+        """
+        return False
+
     @abstractmethod
     def decisions(self, changes: PullRequestChanges) -> RenameDecisions:
         """

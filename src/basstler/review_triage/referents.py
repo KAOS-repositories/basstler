@@ -1,6 +1,6 @@
 """
-What the names and attributes of one commit's code are proven to refer to, read from
-its source alone.
+What the names and attributes of one commit's code are proven to refer to, read from its
+source alone.
 """
 
 from __future__ import annotations
@@ -65,8 +65,8 @@ class StandardLibraryMember:
     @cached_property
     def value(self) -> object:
         """
-        The member itself, ``None`` when the module does not bind it or is not
-        installed on this platform.
+        The member itself, ``None`` when the module does not bind it or is not installed
+        on this platform.
         """
         root = self.module.partition(DOTTED_NAME_SEPARATOR)[0]
         if importlib.util.find_spec(root) is None:
@@ -77,8 +77,8 @@ class StandardLibraryMember:
 @dataclass(frozen=True)
 class ClassInstance:
     """
-    The receiver of a method of a module's top-level class: an instance of the class,
-    or the class itself in a class method.
+    The receiver of a method of a module's top-level class: an instance of the class, or
+    the class itself in a class method.
     """
 
     owner: ModuleMember
@@ -163,6 +163,27 @@ class ModuleNames:
         package = components if is_package else components[:-1]
         return cls(module, PythonSource(text, package))
 
+    def overrides_star_imports(self, name: str) -> bool:
+        """
+        :param name: A name the module's top level binds.
+        :return: Whether its one binding is a top-level import following every star
+            import, with nothing but imports running before it, so that every use of
+            the name sees that import.
+        """
+        bindings = self.scope.bindings.get(name, ())
+        if len(bindings) != 1 or not isinstance(bindings[0], ImportedMember):
+            return False
+        body = self.source.tree.body
+        statement = bindings[0].statement
+        if statement not in body:
+            return False
+        preceding = body[: body.index(statement)]
+        return all(star in preceding for star in self.scope.star_imports) and all(
+            isinstance(node, (ast.Import, ast.ImportFrom))
+            or PythonSource.is_documentation(node)
+            for node in preceding
+        )
+
     @cached_property
     def scope(self) -> NameScope:
         """
@@ -225,8 +246,8 @@ def base_words(definition: ast.ClassDef) -> frozenset[str]:
 class MemberResolver:
     """
     Proves what the names and attributes of one commit's modules refer to, following
-    imports from module to module and attributes through class hierarchies, each
-    module read once.
+    imports from module to module and attributes through class hierarchies, each module
+    read once.
     """
 
     modules: CommitModules
@@ -318,7 +339,7 @@ class MemberResolver:
         submodule = f"{names.module}{DOTTED_NAME_SEPARATOR}{name}"
         is_submodule = submodule in self.modules.module_files
         bindings = scope.bindings.get(name, ())
-        if scope.imports_everything:
+        if scope.imports_everything and not names.overrides_star_imports(name):
             return None
         if not bindings:
             if is_submodule:

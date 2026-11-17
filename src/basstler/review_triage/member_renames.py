@@ -19,7 +19,6 @@ from basstler.review_triage.name_scopes import (
     NameScope,
     UnknownValue,
 )
-from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.referents import (
     PROPERTY_ACCESSORS,
     RECEIVING_DECORATORS,
@@ -33,6 +32,8 @@ from basstler.review_triage.renames import (
     BindingRename,
     ClassAttribute,
     ModuleMember,
+    Rename,
+    RenameMap,
 )
 
 DEFINITION_KEYWORDS = re.compile(r"(?:async\s+)?(?:def|class)\s+")
@@ -455,6 +456,25 @@ class OccurrenceSearch(ast.NodeVisitor):
 
 
 @dataclass(frozen=True)
+class RenamedBase:
+    """
+    A file's base version with the occurrences in its code proven to refer to a renamed
+    member renamed.
+    """
+
+    text: str
+    """
+    The base version, renamed.
+    """
+
+    prose_renames: RenameMap = RenameMap()
+    """
+    The old names its docstrings and comments may keep or rename: those every
+    occurrence of which in its code is proven to refer to one renamed member.
+    """
+
+
+@dataclass(frozen=True)
 class MemberRenamer:
     """
     Renames, in a file's base version, every occurrence of a renamed module or class
@@ -471,12 +491,11 @@ class MemberRenamer:
     What the base commit's names refer to.
     """
 
-    def renamed_base(self, change: FileVersions) -> str:
+    def renamed_base(self, change: FileVersions) -> RenamedBase:
         """
         :param change: A Python file the pull request changes, present in the base
             commit.
-        :return: Its base version with the proven occurrences renamed; the occurrences
-            in docstrings and comments too when every occurrence in its code is proven.
+        :return: Its base version with the proven occurrences renamed.
         """
         text = change.base_text
         mentioned = [
@@ -485,7 +504,7 @@ class MemberRenamer:
             if re.search(rf"\b{re.escape(rename.old_name)}\b", text)
         ]
         if not mentioned:
-            return text
+            return RenamedBase(text)
         path = change.previous_path or change.path
         names = ModuleNames.from_text(
             self.resolver.modules.module_path(path),
@@ -493,7 +512,7 @@ class MemberRenamer:
             path.name == PACKAGE_INITIALIZER,
         )
         if not names.source.parses:
-            return text
+            return RenamedBase(text)
         tokens = tuple(tokenize.generate_tokens(io.StringIO(text).readline))
         used_names = {token.string for token in tokens if token.type == tokenize.NAME}
         renames: dict[str, tuple[BindingRename, ...]] = {}
@@ -502,27 +521,29 @@ class MemberRenamer:
                 old = rename.old_name
                 renames[old] = (*renames.get(old, ()), rename)
         if not renames:
-            return text
+            return RenamedBase(text)
         positions = SourcePositions(text)
         edits = OccurrenceSearch(self.resolver, names, renames, positions).search()
-        edits += self.prose_edits(names.source, tokens, positions, edits)
-        return self.edited(text, edits)
+        return RenamedBase(
+            self.edited(text, edits),
+            self.prose_renames(tokens, positions, edits, renames),
+        )
 
     @staticmethod
-    def prose_edits(
-        source: PythonSource,
+    def prose_renames(
         tokens: tuple[tokenize.TokenInfo, ...],
         positions: SourcePositions,
         code_edits: list[TextEdit],
-    ) -> list[TextEdit]:
+        renames: dict[str, tuple[BindingRename, ...]],
+    ) -> RenameMap:
         """
-        :param source: The file.
-        :param tokens: Its tokens.
+        :param tokens: The file's tokens.
         :param positions: Its positions.
         :param code_edits: The occurrences in its code proven to refer to a renamed
             member.
-        :return: The renames of the docstrings and comments, for each old name every
-            occurrence of which in the code is proven to refer to one member.
+        :param renames: The renames applied to it, by their old name.
+        :return: The renames of the old names every occurrence of which in the code is
+            proven to refer to one member.
         """
         renamed = {edit.start: edit for edit in code_edits}
         replacements: dict[str, str] = {}
@@ -537,35 +558,21 @@ class MemberRenamer:
                 excluded.add(token.string)
             else:
                 replacements[token.string] = edit.replacement
-        replacements = {
-            old: new for old, new in replacements.items() if old not in excluded
-        }
-        if not replacements:
-            return []
-        documentation = {
-            positions.node_offset(node.value.lineno, node.value.col_offset)
-            for node in ast.walk(source.tree)
-            if isinstance(node, ast.stmt) and PythonSource.is_documentation(node)
-        }
-        pattern = re.compile(rf"\b(?:{'|'.join(map(re.escape, replacements))})\b")
-        prose = (
-            token
-            for token in tokens
-            if token.type == tokenize.COMMENT
-            or (
-                token.type == tokenize.STRING
-                and positions.token_offset(token.start) in documentation
+        return RenameMap(
+            tuple(
+                Rename(
+                    old,
+                    new,
+                    next(
+                        rename.found_by
+                        for rename in renames[old]
+                        if rename.new_name == new
+                    ),
+                )
+                for old, new in sorted(replacements.items())
+                if old not in excluded
             )
         )
-        return [
-            TextEdit(
-                positions.token_offset(token.start),
-                positions.token_offset(token.end),
-                pattern.sub(lambda match: replacements[match.group()], token.string),
-            )
-            for token in prose
-            if pattern.search(token.string)
-        ]
 
     @staticmethod
     def edited(text: str, edits: list[TextEdit]) -> str:

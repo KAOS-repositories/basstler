@@ -158,10 +158,17 @@ class NameScope:
     Whether it is a class body, whose names the scopes nested in it do not see.
     """
 
-    imports_everything: bool = False
+    star_imports: tuple[ast.ImportFrom, ...] = ()
     """
-    Whether a ``from module import *`` may bind names it does not list.
+    Its ``from module import *`` statements, which may bind names they do not list.
     """
+
+    @property
+    def imports_everything(self) -> bool:
+        """
+        Whether a star import may bind names the scope does not list.
+        """
+        return bool(self.star_imports)
 
     @classmethod
     def opened_by(cls, node: ast.AST) -> NameScope:
@@ -179,7 +186,7 @@ class NameScope:
         return cls(
             reader.bindings_by_name(),
             class_body=isinstance(node, ast.ClassDef),
-            imports_everything=reader.imports_everything,
+            star_imports=tuple(reader.star_imports),
         )
 
     @classmethod
@@ -192,9 +199,7 @@ class NameScope:
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 reader.bindings.extend(reader.named_bindings(node))
-        return cls(
-            reader.bindings_by_name(), imports_everything=reader.imports_everything
-        )
+        return cls(reader.bindings_by_name(), star_imports=tuple(reader.star_imports))
 
 
 @dataclass
@@ -208,9 +213,9 @@ class ScopeReader:
     Each name bound so far, with how.
     """
 
-    imports_everything: bool = False
+    star_imports: list[ast.ImportFrom] = field(default_factory=list)
     """
-    Whether a ``from module import *`` was found.
+    The ``from module import *`` statements found so far.
     """
 
     def bindings_by_name(self) -> dict[str, tuple[NameBinding, ...]]:
@@ -348,7 +353,7 @@ class ScopeReader:
         elif isinstance(node, ast.ImportFrom):
             for alias in node.names:
                 if alias.name == STAR_IMPORT:
-                    self.imports_everything = True
+                    self.star_imports.append(node)
                     continue
                 yield alias.asname or alias.name, ImportedMember(alias.name, node)
         elif isinstance(node, ast.Import):

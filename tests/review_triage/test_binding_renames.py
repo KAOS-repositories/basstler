@@ -70,9 +70,10 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
     binding_rename_triage: TriageOutcome,
 ):
     """
-    The defining module, a re-export, imports under an alias and through a module, a
-    function's own class left alone and qualified references in documentation change
-    only by the rename.
+    The defining module, a re-export, imports under an alias and through a module, an
+    import following a star import, a function's own class left alone, a docstring
+    keeping the old word and qualified references in documentation change only by the
+    rename.
     """
     assert {
         file.change.path: file.kinds for file in binding_rename_triage.mechanical_files
@@ -84,7 +85,9 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
         (
             PurePosixPath("app/module_alias.py"),
             PurePosixPath("app/planner.py"),
+            PurePosixPath("app/prose_kept.py"),
             PurePosixPath("app/shadowed_kept.py"),
+            PurePosixPath("app/star_imported.py"),
             PurePosixPath("app/via_api.py"),
             PurePosixPath("geometry/api.py"),
             PurePosixPath("geometry/spatial.py"),
@@ -100,6 +103,9 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
         pytest.param(PurePosixPath("app/shadowed.py"), id="function-own-class"),
         pytest.param(PurePosixPath("app/ros.py"), id="external-class"),
         pytest.param(PurePosixPath("app/conditional.py"), id="ambiguous-binding"),
+        pytest.param(
+            PurePosixPath("app/star_imported_last.py"), id="star-import-after-binding"
+        ),
         pytest.param(PurePosixPath("app/captured.py"), id="new-name-captured"),
         pytest.param(PurePosixPath("app/string_literal.py"), id="string-literal"),
         pytest.param(PurePosixPath("CHANGELOG.md"), id="unqualified-prose"),

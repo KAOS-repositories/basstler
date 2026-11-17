@@ -235,6 +235,12 @@ class JudgmentContext:
     proven to refer to them; ``None`` when it renames none.
     """
 
+    optional_prose_renames: RenameMap = RenameMap()
+    """
+    Renames the prose of the file being judged may make or leave out, each docstring
+    and the comments on their own.
+    """
+
     review_reasons: list[ReviewReason] = field(
         default_factory=list, compare=False, hash=False, repr=False, kw_only=True
     )
@@ -338,11 +344,16 @@ class ProseComparison(ContentComparison):
         if base_text == head_text:
             return ChangeKind.no_change
         renamed = context.renames.renamed_prose(base_text)
-        if renamed == head_text:
+        candidates = tuple(
+            dict.fromkeys(
+                (renamed, context.optional_prose_renames.renamed_prose(renamed))
+            )
+        )
+        if head_text in candidates:
             return frozenset({MechanicalChange.RENAME})
         if base_text.split() == head_text.split():
             return frozenset({MechanicalChange.FORMATTING})
-        if renamed.split() == head_text.split():
+        if head_text.split() in [candidate.split() for candidate in candidates]:
             return frozenset({MechanicalChange.RENAME, MechanicalChange.FORMATTING})
         return None
 
@@ -554,11 +565,15 @@ class FileTriager:
         if renamer is None or not PythonComparison().applies_to(change):
             return None
         renamed = renamer.renamed_base(change)
-        if renamed == change.base_text:
+        if renamed.text == change.base_text:
             return None
         kinds = self.judged_changes(
-            replace(change, base_text=renamed),
-            replace(self.context, review_reasons=[]),
+            replace(change, base_text=renamed.text),
+            replace(
+                self.context,
+                optional_prose_renames=renamed.prose_renames,
+                review_reasons=[],
+            ),
         )
         return None if kinds is None else kinds | {MechanicalChange.RENAME}
 

@@ -14,6 +14,7 @@ from basstler.github.states import CombinedCheckState
 from basstler.maintenance.promotion import PromotionSummary
 from basstler.plan.model import ItemStatus
 from basstler.plan.structure import Item, Plan, Track, Wave
+from basstler.plan_site.cards import PromotionAttribute
 from basstler.plan_site.plan_page import PlanPage
 from basstler.github.pull_request_state import (
     ForkLineage,
@@ -217,6 +218,25 @@ def test_the_reason_a_button_is_disabled_is_visible_without_hovering():
     page = a_page(a_ready_record(draft=True))
     reason = escape(PromotionBlocker.DRAFT.value)
     assert f'<span class="promote-reason">{reason}</span>' in page.render().html
+
+
+# %% overriding failed checks
+
+
+OVERRIDE_CHECKBOX = f'<input type="checkbox" {PromotionAttribute.CHECKS_OVERRIDE}'
+"""
+The start of the checkbox overriding failed checks, as the card renders it.
+"""
+
+
+def test_a_button_held_back_by_failed_checks_offers_the_override():
+    page = a_page(a_ready_record(check_state=CombinedCheckState.FAILURE))
+    assert OVERRIDE_CHECKBOX in page.render().html
+
+
+def test_a_button_with_passing_checks_offers_no_override():
+    page = a_page(a_ready_record(draft=True))
+    assert OVERRIDE_CHECKBOX not in page.render().html
 
 
 # %% no button

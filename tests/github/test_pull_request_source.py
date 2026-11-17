@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from basstler.github.comparison import ComparisonStatus
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import (
     PullRequestField,
@@ -248,6 +249,135 @@ def test_github_source_reports_a_repository_it_cannot_read(
 def test_github_source_answers_no_issue_url_on_a_repository_it_cannot_read():
     source = GitHubPullRequestSource(RecordedGitHubClient(refusal=HTTPStatus.FORBIDDEN))
     assert source.issue_url(PLAN_REPOSITORY, FIRST_PLAN.tracking_issue) is None
+
+
+# %% whether an open pull request's commits are already in the upstream
+
+
+def landing_source(
+    answers: dict[str, Any], state: PullRequestState = PullRequestState.OPEN
+) -> GitHubPullRequestSource:
+    """
+    :param answers: What GitHub answers each comparison read with, by its path.
+    :param state: Whether the pull request is open or closed.
+    :return: A source over the first plan's repository as a fork, whose one pull request
+        is at :attr:`SiteSampleText.HEAD_COMMIT` and based on ``main``.
+    """
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    return GitHubPullRequestSource(
+        RecordedGitHubClient(
+            responses={f"/{PLAN_REPOSITORY.api_path}": fork, **answers},
+            pages={
+                listing_path(OPEN_PULL_REQUEST.repository): [
+                    [api_pull_request_at_head(state)]
+                ],
+            },
+        ),
+        reads_check_states=False,
+    )
+
+
+def comparison_path(base: str) -> str:
+    """
+    :param base: What the head is compared with: a branch, or ``owner:branch``.
+    :return: The path the comparison of that with the pull request's head is read from.
+    """
+    return (
+        f"/{OPEN_PULL_REQUEST.repository.compare_path(base)}"
+        f"...{SiteSampleText.HEAD_COMMIT}"
+    )
+
+
+def upstream_base() -> str:
+    """
+    :return: The fork's upstream default branch, as a comparison names it.
+    """
+    parent = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())["parent"]
+    owner = Repository.parse(parent["full_name"]).owner
+    return f"{owner}:{parent['default_branch']}"
+
+
+def a_comparison(status: ComparisonStatus, ahead_by: int, behind_by: int = 0) -> dict:
+    """
+    :param status: How the head relates to what it is compared with.
+    :param ahead_by: How many commits the head has that the base lacks.
+    :param behind_by: How many commits the base has that the head lacks.
+    :return: The comparison as GitHub answers it.
+    """
+    return {"status": status.value, "ahead_by": ahead_by, "behind_by": behind_by}
+
+
+def test_a_pull_request_whose_commits_are_in_the_upstream_is_read_as_landed():
+    source = landing_source(
+        {
+            comparison_path(upstream_base()): a_comparison(
+                ComparisonStatus.BEHIND, ahead_by=0, behind_by=5
+            ),
+            comparison_path("main"): a_comparison(ComparisonStatus.AHEAD, ahead_by=2),
+        }
+    )
+
+    assert source.pull_request(OPEN_PULL_REQUEST).landed_upstream is True
+
+
+def test_a_pull_request_with_commits_the_upstream_lacks_is_read_as_not_landed():
+    source = landing_source(
+        {
+            comparison_path(upstream_base()): a_comparison(
+                ComparisonStatus.DIVERGED, ahead_by=1, behind_by=5
+            )
+        }
+    )
+
+    assert source.pull_request(OPEN_PULL_REQUEST).landed_upstream is False
+
+
+def test_a_pull_request_with_no_commits_beyond_its_own_base_is_read_as_not_landed():
+    source = landing_source(
+        {
+            comparison_path(upstream_base()): a_comparison(
+                ComparisonStatus.IDENTICAL, ahead_by=0
+            ),
+            comparison_path("main"): a_comparison(
+                ComparisonStatus.IDENTICAL, ahead_by=0
+            ),
+        }
+    )
+
+    assert source.pull_request(OPEN_PULL_REQUEST).landed_upstream is False
+
+
+def test_a_comparison_that_cannot_be_read_leaves_the_pull_request_unread_and_says_so(
+    capsys: pytest.CaptureFixture[str],
+):
+    source = landing_source({})
+
+    record = source.pull_request(OPEN_PULL_REQUEST)
+
+    assert record.landed_upstream is None
+    assert comparison_path(upstream_base()) in capsys.readouterr().err
+
+
+def test_a_closed_pull_request_is_not_compared():
+    source = landing_source({}, PullRequestState.CLOSED)
+
+    assert source.pull_request(OPEN_PULL_REQUEST).landed_upstream is None
+
+
+def test_a_pull_request_of_a_repository_that_is_not_a_fork_is_not_compared():
+    source = GitHubPullRequestSource(
+        RecordedGitHubClient(
+            responses=details_of(OPEN_PULL_REQUEST.repository),
+            pages={
+                listing_path(OPEN_PULL_REQUEST.repository): [
+                    [api_pull_request_at_head(PullRequestState.OPEN)]
+                ],
+            },
+        ),
+        reads_check_states=False,
+    )
+
+    assert source.pull_request(OPEN_PULL_REQUEST).landed_upstream is None
 
 
 # %% reading a fork's upstream

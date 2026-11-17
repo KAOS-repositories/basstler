@@ -24,7 +24,7 @@ from basstler.github.states import CombinedCheckState
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.github.branch_pull_request import BranchPullRequest
 from basstler.stack.branch_status import BranchStatus
-from basstler.stack.checkout import CurrentCheckout, LandedBranches
+from basstler.stack.checkout import CurrentCheckout, ForkRefresh, LandedBranches
 from basstler.stack.exceptions import BaseBranchScopeError, BoardUnavailable
 from basstler.stack.promotability import PromotionReadiness
 from basstler.stack.settings import Configuration
@@ -318,6 +318,9 @@ class Stack:
     is_contained_by: Callable[[str, str], bool]
     """Maps a pair of branch names to whether the first's commits are in the second."""
 
+    fork_refresh: ForkRefresh = ForkRefresh()
+    """What refreshing the fork's references left out."""
+
     @classmethod
     def build(
         cls,
@@ -325,6 +328,7 @@ class Stack:
         pull_requests: list[PullRequest],
         is_merged: Callable[[str], bool],
         is_contained_by: Callable[[str, str], bool],
+        fork_refresh: ForkRefresh | None = None,
     ) -> Stack:
         """Assemble the stack from the pull request export and the two git facts it needs.
 
@@ -334,6 +338,8 @@ class Stack:
             the pure assembly logic can be tested without git.
         :param is_contained_by: Maps a pair of branch names to whether the first's commits
             are in the second, injected for the same reason.
+        :param fork_refresh: What refreshing the fork's references left out, nothing when
+            omitted.
         :return: The assembled stack.
         """
         return cls(
@@ -344,6 +350,7 @@ class Stack:
             ],
             is_merged=is_merged,
             is_contained_by=is_contained_by,
+            fork_refresh=fork_refresh or ForkRefresh(),
         )
 
     @classmethod
@@ -367,12 +374,15 @@ class Stack:
             if pull_request.skip_reason(configuration.fork_repository) is None
         }
         bases = {pull_request.base for pull_request in pull_requests}
-        CurrentCheckout.fetch(configuration, sorted(heads_on_fork | bases))
+        fork_refresh = CurrentCheckout.fetch(
+            configuration, sorted(heads_on_fork | bases)
+        )
         return cls.build(
             configuration,
             pull_requests,
             LandedBranches.from_checkout(configuration).contains,
             CurrentCheckout.containment_predicate(configuration),
+            fork_refresh,
         )
 
     def maintained_branches(self) -> list[StackBranch]:

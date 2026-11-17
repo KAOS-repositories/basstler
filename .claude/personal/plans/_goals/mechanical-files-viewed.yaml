@@ -2,6 +2,6 @@ id: mechanical-files-viewed
 title: 'The mechanical files of #220 and #223 are marked viewed'
 targets:
 - review-triage/mark-220-viewed
-- review-triage/mark-223-viewed
+- code-rule-fixes/mark-223-viewed
 - review-triage/actions-marking
-- review-triage/reduced-review-diff
+- code-rule-fixes/reduced-review-diff

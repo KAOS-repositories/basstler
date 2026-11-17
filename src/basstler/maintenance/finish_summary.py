@@ -100,6 +100,11 @@ class FinishSummaryHeading(StrEnum):
     The pull requests whose head the pass cannot maintain.
     """
 
+    NOT_ON_THE_FORK = "Not on the fork, so not refreshed"
+    """
+    The branches the board names that the fork does not have, whose state may be stale.
+    """
+
 
 class PassCount(StrEnum):
     """
@@ -250,6 +255,9 @@ class FinishSummary:
                 self.upstream_pull_request_synchronization_changes()
             ),
             FinishSummaryHeading.SKIPPED: self.capped(self.skipped()),
+            FinishSummaryHeading.NOT_ON_THE_FORK: self.code_list(
+                self.report.fork_refresh.missing_branches
+            ),
         }
         lines = [
             f"**Maintenance pass:** {self.report.exit_code.name_for_a_caller}",

@@ -5,7 +5,6 @@ rest as prose.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
 from basstler.class_property import classproperty
@@ -19,17 +18,10 @@ from basstler.review_triage.comparison import (
     PythonComparison,
 )
 from basstler.review_triage.keyword_arguments import KeywordArgumentComparison
+from basstler.review_triage.markdown_document import CODE_BLOCK
 from basstler.review_triage.python_source import PythonSource
 
 # %% splitting a document
-
-CODE_BLOCK = re.compile(
-    r"^(?P<fence>`{3,})python[^\n]*\n(?P<code>.*?)^(?P=fence)[ \t]*$",
-    re.DOTALL | re.MULTILINE,
-)
-"""
-A fenced code block tagged ``python``, up to the fence closing it.
-"""
 
 CODE_BLOCK_PLACEHOLDER = "\0code block\0"
 """

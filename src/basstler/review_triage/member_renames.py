@@ -14,6 +14,7 @@ from functools import cached_property
 
 from basstler.git.commit_range import FileVersions
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
+from basstler.review_triage.markdown_document import MarkdownCode
 from basstler.review_triage.name_scopes import (
     COMPREHENSION_TYPES,
     NameScope,
@@ -497,23 +498,45 @@ class MemberRenamer:
             commit.
         :return: Its base version with the proven occurrences renamed.
         """
+        path = change.previous_path or change.path
+        return self.renamed_code(
+            change.base_text,
+            change.base_text,
+            self.resolver.modules.module_path(path),
+            path.name == PACKAGE_INITIALIZER,
+        )
+
+    def renamed_documentation(self, change: FileVersions) -> RenamedBase:
+        """
+        :param change: A Markdown file the pull request changes, present in the base
+            commit.
+        :return: Its base version with the proven occurrences in its python code
+            blocks renamed, the blocks read as one module run in order.
+        """
         text = change.base_text
+        return self.renamed_code(text, MarkdownCode(text).module_text, "", False)
+
+    def renamed_code(
+        self, text: str, code: str, module: str, is_package: bool
+    ) -> RenamedBase:
+        """
+        :param text: A file's base version.
+        :param code: Its Python code, each character at its offset in *text*.
+        :param module: The dotted path of the module the code is.
+        :param is_package: Whether the module is a package initializer.
+        :return: *text* with the proven occurrences in *code* renamed.
+        """
         mentioned = [
             rename
             for rename in self.renames
-            if re.search(rf"\b{re.escape(rename.old_name)}\b", text)
+            if re.search(rf"\b{re.escape(rename.old_name)}\b", code)
         ]
         if not mentioned:
             return RenamedBase(text)
-        path = change.previous_path or change.path
-        names = ModuleNames.from_text(
-            self.resolver.modules.module_path(path),
-            text,
-            path.name == PACKAGE_INITIALIZER,
-        )
+        names = ModuleNames.from_text(module, code, is_package)
         if not names.source.parses:
             return RenamedBase(text)
-        tokens = tuple(tokenize.generate_tokens(io.StringIO(text).readline))
+        tokens = tuple(tokenize.generate_tokens(io.StringIO(code).readline))
         used_names = {token.string for token in tokens if token.type == tokenize.NAME}
         renames: dict[str, tuple[BindingRename, ...]] = {}
         for rename in mentioned:
@@ -522,7 +545,7 @@ class MemberRenamer:
                 renames[old] = (*renames.get(old, ()), rename)
         if not renames:
             return RenamedBase(text)
-        positions = SourcePositions(text)
+        positions = SourcePositions(code)
         edits = OccurrenceSearch(self.resolver, names, renames, positions).search()
         return RenamedBase(
             self.edited(text, edits),

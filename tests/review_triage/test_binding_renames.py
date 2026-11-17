@@ -72,23 +72,21 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
     """
     The defining module, a re-export, imports under an alias and through a module, an
     import following a star import, a function's own class left alone, a docstring
-    keeping the old word and qualified references in documentation change only by the
-    rename.
+    keeping the old word, qualified references in documentation and a documentation code
+    block using a class an earlier block imports change only by the rename.
     """
     assert {
         file.change.path: file.kinds for file in binding_rename_triage.mechanical_files
-    } == {
-        PurePosixPath("README.md"): frozenset(
-            {MechanicalChange.RENAME, MechanicalChange.IMPORTS}
-        ),
-    } | dict.fromkeys(
+    } == dict.fromkeys(
         (
+            PurePosixPath("README.md"),
             PurePosixPath("app/module_alias.py"),
             PurePosixPath("app/planner.py"),
             PurePosixPath("app/prose_kept.py"),
             PurePosixPath("app/shadowed_kept.py"),
             PurePosixPath("app/star_imported.py"),
             PurePosixPath("app/via_api.py"),
+            PurePosixPath("docs/usage.md"),
             PurePosixPath("geometry/api.py"),
             PurePosixPath("geometry/spatial.py"),
         ),
@@ -102,6 +100,9 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
         pytest.param(PurePosixPath("app/robot_pose_swapped.py"), id="unrelated-class"),
         pytest.param(PurePosixPath("app/shadowed.py"), id="function-own-class"),
         pytest.param(PurePosixPath("app/ros.py"), id="external-class"),
+        pytest.param(
+            PurePosixPath("docs/ros_usage.md"), id="external-class-in-documentation"
+        ),
         pytest.param(PurePosixPath("app/conditional.py"), id="ambiguous-binding"),
         pytest.param(
             PurePosixPath("app/star_imported_last.py"), id="star-import-after-binding"

@@ -179,10 +179,12 @@ class LocaleEncodingChecker(FixableChecker[CallLackingKeywordArgument]):
     @staticmethod
     def opens_a_file(call: CallSyntax) -> bool:
         """
-        :return: Whether *call*, an :data:`TextFunction.OPEN`, opens a file: a call of
+        :return: Whether *call* is a :data:`TextFunction.OPEN` that opens a file: a call of
             :func:`open`, or a method call given nothing but constants, as
             :meth:`pathlib.Path.open` is, unlike an opener handed a request.
         """
+        if ExpressionSyntax(call.call.func).final_name != TextFunction.OPEN:
+            return False
         if isinstance(call.call.func, libcst.Name):
             return True
         return all(
@@ -193,10 +195,12 @@ class LocaleEncodingChecker(FixableChecker[CallLackingKeywordArgument]):
     @staticmethod
     def opens_bytes(call: CallSyntax) -> bool:
         """
-        :return: Whether *call*, an :data:`TextFunction.OPEN`, names a binary mode: by
+        :return: Whether *call* is a :data:`TextFunction.OPEN` that names a binary mode: by
             keyword, as the second argument of :func:`open` or the first of
             :meth:`pathlib.Path.open`.
         """
+        if ExpressionSyntax(call.call.func).final_name != TextFunction.OPEN:
+            return False
         mode_position = 0 if isinstance(call.call.func, libcst.Attribute) else 1
         positional = call.positional_arguments
         mode_argument = call.keyword_arguments.get(TextKeyword.MODE)

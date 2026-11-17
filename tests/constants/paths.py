@@ -945,6 +945,12 @@ class LocaleEncodingSnippet(PathEnumeration):
     request opened, which is no file.
     """
 
+    OTHER_CALLS = DIRECTORY / "other-calls.py"
+    """
+    A function and a method that are not :func:`open`, given a file name and a binary
+    mode.
+    """
+
 
 class TreeRemovalSnippet(PathEnumeration):
     """

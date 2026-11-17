@@ -41,6 +41,7 @@ items:
   depends_on: []
   status: not started
   performed_by: owner
+  decision: experiment-verdict
   notes: 'Yours whenever you have used it enough. Tell a session one of: accept (it splits
     #235 into the seven items as stacked draft pull requests and closes #235), drop (it closes
     #235 and deletes the branch), or keep iterating (say what to change). On accept or drop

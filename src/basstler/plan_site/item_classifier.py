@@ -16,16 +16,14 @@ from basstler.github.pull_request_state import (
 )
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.plan.dependencies import DependencyResolver
+from basstler.plan.item_action import ItemAction, StartNowAction
 from basstler.plan.model import ItemStatus
 from basstler.maintenance.promotion import PromotionSummary
 from basstler.plan.structure import Item, Plan
 from basstler.plan_site.cards import (
     DependencyChip,
-    ItemAction,
     ItemCard,
     PromotionButton,
-    ResolveAction,
-    StartNowAction,
 )
 from basstler.plan_site.workflows import PlanSiteSecret
 from basstler.stack.branch_status import BranchStatus
@@ -93,7 +91,9 @@ class ItemClassifier:
                     DependencyChip.of(dependency, self.locate_plan_page)
                     for dependency in self.dependencies.dependencies_of(item)
                 ],
-                action=self._action_for(item),
+                action=ItemAction.from_item_state(
+                    self.plan.id, item, self.dependencies.dependencies_are_ready(item)
+                ),
                 promotion=self._promotion_for(item),
             )
             card.pending_start_action = self._pending_start_action_for(card)
@@ -164,7 +164,7 @@ class ItemClassifier:
             ),
             parent_landed=self._base_has_landed(record, lineage),
             withheld=self.needs_resolution_label in record.labels,
-            checks_failed=record.check_state is not None and record.check_state.failed,
+            checks_failed=record.has_failed_checks,
         )
 
     def _base_has_landed(self, record: PullRequestRecord, lineage: ForkLineage) -> bool:
@@ -191,49 +191,8 @@ class ItemClassifier:
         One item's live pull request, or ``None`` if it has none or GitHub returned
         none.
         """
-        if item.pull_request_number is None:
-            return None
-        repository_pull_requests = (
-            self.live_pull_requests.pull_requests_by_repository.get(
-                self._repository_of(item), {}
-            )
-        )
-        return repository_pull_requests.get(str(item.pull_request_number))
-
-    def _action_for(self, item: Item) -> ItemAction | None:
-        """
-        One item's action button: none for a done item, or for a not-started item until
-        its dependencies are ready to build on.
-        """
-        match item.status:
-            case ItemStatus.DONE:
-                return None
-            case ItemStatus.NOT_STARTED:
-                if not self.dependencies.dependencies_are_ready(item):
-                    return None
-                return self._start_action_for(item)
-            case ItemStatus.BLOCKED:
-                label = "Resolve"
-            case ItemStatus.IN_PROGRESS:
-                label = "Resume"
-            case ItemStatus.DEFERRED:
-                label = "Reconsider"
-        return ResolveAction(
-            label=label,
-            plan_id=self.plan.id,
-            item_identifier=item.identifier,
-            recommended_model=item.recommended_model,
-        )
-
-    def _start_action_for(self, item: Item) -> StartNowAction:
-        """
-        Build the action that starts one not-started item.
-        """
-        return StartNowAction(
-            label="Start now",
-            plan_id=self.plan.id,
-            item_identifier=item.identifier,
-            recommended_model=item.recommended_model,
+        return self.live_pull_requests.record_of(
+            self._repository_of(item), item.pull_request_number
         )
 
     def _pending_start_action_for(self, card: ItemCard) -> StartNowAction | None:
@@ -251,7 +210,7 @@ class ItemClassifier:
             for chip in card.dependency_chips
         ):
             return None
-        return self._start_action_for(card.item)
+        return StartNowAction.starting(self.plan.id, card.item)
 
     @staticmethod
     def access_warning_of(repository: Repository, refusal: GitHubRequestFailed) -> str:

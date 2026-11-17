@@ -64,6 +64,16 @@ siteRecheckWhenShown(siteRecountProgress);
 {% endmacro %}
 
 {# The action group is hidden, marked for the page's script to reveal, when hidden is true. #}
+{% macro command_list(commands) %}
+        {% if commands %}
+        <ol class="owner-commands">
+          {% for command in commands %}
+          <li><code>{{ command }}</code></li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+{% endmacro %}
+
 {% macro action_button(action, hidden=False) %}
 {% if action %}
 <span class="action-group"{% if hidden %} hidden {{ vocabulary.draft_recheck_attribute.START_ACTION }}{% endif %}>

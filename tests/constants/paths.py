@@ -345,6 +345,24 @@ class DatasetLocation(PathEnumeration):
     per fixture plan.
     """
 
+    GOAL_PLANS = DIRECTORY / "goal-plans"
+    """
+    A plans directory copied from the plans a real goal spans, with that goal under its
+    goals directory.
+    """
+
+    OWNER_STEP_PLANS = DIRECTORY / "owner-step-plans"
+    """
+    A plans directory whose one plan holds a step its owner performs, with a goal behind
+    that step.
+    """
+
+    SESSION_CLOSE = DIRECTORY / "session-close"
+    """
+    The hook inputs Claude Code sends when a session is about to stop and after the user
+    decided something.
+    """
+
     STUBS = DIRECTORY / "stubs"
     """
     Executables copied onto a scratch ``PATH`` to stand in for a real ``gh``, ``curl`` or

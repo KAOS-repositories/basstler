@@ -12,6 +12,17 @@
 
   {{ health_banner(repository.skipped_pages) }}
 
+  {% if goals %}
+  <section class="goal-list">
+    <h2>Goals</h2>
+    <ul>
+    {% for goal in goals %}
+      <li><a href="{{ goal.page_url }}">{{ goal.title }}</a> <span class="goal-progress mono">{{ goal.finished_step_count }} / {{ goal.step_count }} steps</span>{% if goal.next_move %} <code>{{ goal.next_move }}</code>{% endif %}</li>
+    {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   <div class="card-list">
   {% for plan in repository.plans %}
     {{ progress_card(plan, plan.title, url=plan.page_url, description=plan.description) }}

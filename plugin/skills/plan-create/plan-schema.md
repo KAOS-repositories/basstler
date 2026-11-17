@@ -79,12 +79,22 @@ items:                         # the actual trackable units of work - flat,
     depends_on: [<item-id>, ...]  # structural/stacking dependency - a bare id for
                                    # an item of this plan, <plan-id>/<item-id> for
                                    # one in another plan (see below)
+    depends_on_merged: [<entry>, ...]  # optional: the depends_on entries that must be merged,
+                                   # not only out of draft, before this item starts
+    depends_on_pushes_done: [<entry>, ...]  # optional: the depends_on entries whose pushes must be
+                                   # done, though still drafts; never also under depends_on_merged
+    pushes_done_at: <commit>       # optional: the full commit id this item's pull request takes
+                                   # no more pushes after; see "Needing a dependency's pushes done"
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
     recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
                                                # difficulty; see "Choosing the recommended model"
     session: <url or omitted>
     notes: "short, freeform"
     blockers: ["freeform reasons", ...]   # optional, defaults to []
+    performed_by: session | owner  # optional, defaults to session; see "Steps the owner performs"
+    commands: ["<command>", ...]   # optional: what the owner runs for an owner's step, in order
+    done_when: ["<argument>", ...] # optional: the arguments of the basstler command whose
+                                   # success proves the item done; see "Done checks"
 ```
 
 Validation is not documentation-only: `plan/validation.py` enforces this
@@ -128,6 +138,39 @@ The page shows a merged item as `done` whatever its `status` says; the manifest
 follows at the next session start, which records every plan's merged items done
 and drops them.
 
+### Needing a dependency merged
+
+A `depends_on` entry is satisfied once its item is done, merged, or has a pull request out of
+draft: enough to stack a branch on. Where the item must not start before the dependency has
+*merged* - it reads what the merge publishes, or runs on the default branch - list that entry
+under `depends_on_merged` too, spelled as in `depends_on`.
+
+### Needing a dependency's pushes done
+
+Some steps act on a dependency's pull request while it is still a draft and are undone by
+its next push: marking its files viewed, for one. List that entry under
+`depends_on_pushes_done`. The dependency releases it once its session, after its last push,
+records `basstler goal pushes-done <plan-id>/<item-id> "$(git rev-parse HEAD)"`, and only
+while the pull request's head is still that commit: a later push makes the dependent wait
+again until a new last push is recorded.
+
+### Steps the owner performs
+
+Some steps no session's credential can take: storing a secret, running a command on the
+owner's own computer. Such a step is an item with `performed_by: owner`. It has no branch,
+pull request or `recommended_model`, and its `commands` list what the owner runs, in order.
+No "Start now" is offered for it: the plan page and a goal's path show it as the owner's,
+with its commands. Items that depend on it wait until its `status` is `done`.
+
+### Done checks
+
+An item whose completion a command can prove carries that command's arguments as `done_when`:
+what follows `basstler` on the command line, one list entry per argument. `basstler goal check
+<goal-id>` runs the check of every step of the goal's path that has one and waits for nothing,
+and sets each step whose check exits 0 to `done`. Only basstler's own commands run, never a
+shell line, and the plan site's build never runs one. An owner's step without a check is
+recorded with `basstler goal mark-done <plan-id>/<item-id>`.
+
 ### Depending on an item in another plan
 
 A `depends_on` entry is a bare `<item-id>` when it names an item of the same
@@ -157,6 +200,11 @@ Four rules, each rejected outright rather than passed over:
   manifest carrying one is refused when the tooling was given no directory
   (`--plans-dir`, see [`SKILL.md`](./SKILL.md)). Accepting it unchecked is how
   an unresolvable dependency used to count as *ready*.
+
+A save also refuses removing an item that another plan's item or a goal still
+names. To move items into another plan, save them there first, then every plan
+and goal that names them with their new `<plan-id>/<item-id>`, and only then the
+plan they leave. A finished item is marked done instead of removed.
 
 The cycle check runs over the resulting union graph, so a loop that closes
 through another plan is caught even though neither manifest can see it alone.
@@ -211,9 +259,10 @@ Every session that loads a plan pays for every line of it, so the plan holds
 only what a future session needs to act. `save-plan.sh` enforces this with
 the limits `src/basstler/plan/size_limits.py` names (`Measure`):
 
-- **Landed items are dropped on save**, along with every `depends_on` edge to
+- **Landed items are dropped on save**, along with every `depends_on`,
+  `depends_on_merged` and `depends_on_pushes_done` entry and goal target naming
   them: the work is in the code and its history in git. A plan left with no
-  items is removed.
+  items is removed, and so is a goal left with no targets.
 - **Fields are bounded**: items per plan, characters of the description,
   characters of each item's `notes`, blockers per item and characters of each.
   `notes` hold the item's scope and the decisions that bind it, not a log of

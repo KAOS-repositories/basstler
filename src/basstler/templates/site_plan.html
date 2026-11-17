@@ -1,5 +1,5 @@
 {% extends "site_layout.html" %}
-{% from "site_parts.html" import dependency_chip, action_button, promotion_button with context %}
+{% from "site_parts.html" import dependency_chip, action_button, command_list, promotion_button with context %}
 {% block title %}{{ plan.title }}{% endblock %}
 {% block page_class %}hide-done{% endblock %}
 {% block page_id %}plan-page{% endblock %}
@@ -37,6 +37,10 @@
         {% endif %}
         {% if item.drift_description %}
         <div class="drift">⚠ {{ item.drift_description }}</div>
+        {% endif %}
+        {% if item.is_performed_by_owner %}
+        <div class="owner-move"><strong>You:</strong> the plan's owner performs this step</div>
+        {{ command_list(item.commands) }}
         {% endif %}
         {% for blocker in item.blockers %}
         <div class="blocker">▸ {{ blocker }}</div>

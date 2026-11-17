@@ -11,7 +11,9 @@ from cyclopts import App
 
 from basstler.code_rules.command_line import code_rules_app
 from basstler.locations import PackageLocation
+from basstler.plan.goal_command import goal_app
 from basstler.plan.repository_rules_command import repository_rules_app
+from basstler.plan.session_close_command import session_close_app
 from basstler.review_triage.command_line import review_triage_app
 
 app = App(
@@ -24,8 +26,10 @@ The command tree; a v3 command is added with ``@app.command``.
 """
 
 app.command(code_rules_app)
+app.command(goal_app)
 app.command(repository_rules_app)
 app.command(review_triage_app)
+app.command(session_close_app)
 
 if __name__ == "__main__":
     app()

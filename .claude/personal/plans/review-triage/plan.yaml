@@ -36,18 +36,15 @@ items:
   track: triage
   blockers:
     - >-
-      83 unresolved threads in the owner's review of 1c54d6ff: local fixes, questions, and a call to
-      remodel GitHub settings, readers/writers, tokens, secrets, forms and user steps codebase-wide.
-      That remodel's scope and order versus the local fixes await the user.
-    - >-
-      Owner rejects committing the workflow to a fork's default branch (viewed_setup.py:323,
-      setup-review-triage SKILL.md:112). Clean with main at 73801cd6 (head 7f6928a5); CI there still
-      running when read.
+      Owner's review of 3be60760: 15 new threads asking to unify repeated fields and duplicated
+      classes (branch, head/base, repository+branch, workflow path, token pages), type branches as
+      Branch, and add two rules (shared field in one mixin; most specific type). Resolving on the
+      branch.
   depends_on: []
-  status: blocked
+  status: in progress
   recommended_model: sonnet
   branch: ccr-37402cb7-cls5ht-viewed-workflow
-  session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
+  session: https://claude.ai/code/session_018wfiv8tMgn3AnHYP1h7jn7
   pull_request_number: 215
   notes: >
     Draft #215, now on main (#213 merged): set-up-mark-viewed installs the workflow (on every pull

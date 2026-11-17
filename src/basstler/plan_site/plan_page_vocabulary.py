@@ -11,10 +11,12 @@ from basstler.plan_site.cards import (
     DraftRecheckAttribute,
     LiveStateAttribute,
     PlanTimeAttribute,
+    PromotionAttribute,
     RefreshSource,
 )
 from basstler.plan_site.chip_tone import ChipTone
 from basstler.plan_site.site_vocabulary import LiveStateVocabulary
+from basstler.stack.promotability import PromotionBlocker
 
 # %% the vocabulary
 
@@ -56,4 +58,19 @@ class PlanPageVocabulary(LiveStateVocabulary):
     refresh_source: type[RefreshSource] = field(default=RefreshSource, init=False)
     """
     Where the page's refresh time came from.
+    """
+
+    promotion_attribute: type[PromotionAttribute] = field(
+        default=PromotionAttribute, init=False
+    )
+    """
+    The attributes that mark a Contribute button the script re-evaluates.
+    """
+
+    promotion_blocker: type[PromotionBlocker] = field(
+        default=PromotionBlocker, init=False
+    )
+    """
+    The reasons a pull request may not be promoted, which the script words its
+    button with.
     """

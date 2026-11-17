@@ -28,6 +28,7 @@ from basstler.maintenance.upstream_pull_request_synchronization import (
     UpstreamPullRequestSynchronizationAction,
     UpstreamPullRequestSynchronizationChange,
 )
+from basstler.stack.checkout import ForkRefresh
 from basstler.stack.model import (
     PullRequest,
     Reparent,
@@ -405,6 +406,19 @@ def test_a_skipped_pull_request_names_its_reason_and_where_its_head_lives():
 
     assert SkipReason.HEAD_ON_ANOTHER_FORK in entry
     assert other_fork in entry
+
+
+def test_the_summary_names_the_branches_the_fork_does_not_have():
+    report = MaintenanceReport(
+        fork_refresh=ForkRefresh(missing_branches=(StackBranch.LONG_LIVED_BASE,))
+    )
+
+    (entry,) = section_of(
+        FinishSummary(report, a_titled_stack()).as_markdown(),
+        FinishSummaryHeading.NOT_ON_THE_FORK,
+    )
+
+    assert entry == f"`{StackBranch.LONG_LIVED_BASE}`"
 
 
 def test_a_refused_fast_forward_is_explained():

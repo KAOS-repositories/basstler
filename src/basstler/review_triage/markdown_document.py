@@ -9,11 +9,13 @@ from dataclasses import dataclass
 from functools import cached_property
 
 CODE_BLOCK = re.compile(
-    r"^(?P<fence>`{3,})python[^\n]*\n(?P<code>.*?)^(?P=fence)[ \t]*$",
+    r"^(?P<fence>`{3,})(?:python|\{code-cell\}[ \t]+i?python3?\b)[^\n]*\n"
+    r"(?P<code>.*?)^(?P=fence)[ \t]*$",
     re.DOTALL | re.MULTILINE,
 )
 """
-A fenced code block tagged ``python``, up to the fence closing it.
+A fenced code block tagged ``python``, or a MyST notebook cell running Python, up to
+the fence closing it.
 """
 
 

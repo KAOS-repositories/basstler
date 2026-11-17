@@ -195,6 +195,24 @@ def test_a_pull_request_that_may_not_be_promoted_gets_a_disabled_button(
     assert f'title="{escape(blocker.value)}"' in page.render().html
 
 
+def test_a_branch_with_an_open_upstream_pull_request_is_in_review_without_a_link():
+    page = a_page(a_ready_record())
+    page.live_pull_requests.upstream_pull_requests[str(FORK)] = {"a": 7}
+    assert promotion_of_first_item(page).blockers == [PromotionBlocker.IN_REVIEW]
+
+
+def test_a_branch_in_review_shows_no_other_blocker():
+    page = a_page(
+        a_ready_record(
+            check_state=CombinedCheckState.FAILURE,
+            labels=[StackLabel.NEEDS_RESOLUTION.value],
+            base=PARENT_BRANCH,
+        )
+    )
+    page.live_pull_requests.upstream_pull_requests[str(FORK)] = {"a": 7}
+    assert promotion_of_first_item(page).blockers == [PromotionBlocker.IN_REVIEW]
+
+
 def test_the_reason_a_button_is_disabled_is_visible_without_hovering():
     page = a_page(a_ready_record(draft=True))
     reason = escape(PromotionBlocker.DRAFT.value)

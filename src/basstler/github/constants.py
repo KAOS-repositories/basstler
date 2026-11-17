@@ -94,6 +94,17 @@ class MaintenanceText(StrEnum):
     parent, with the parent's name to fill in.
     """
 
+    LANDED_COMMENT = (
+        "Closed by a maintenance pass: every commit of `{branch}` is in `{base}`, so "
+        "its work has landed. GitHub records no merge for a pull request that is not "
+        "based on the branch it landed in, so this one is labelled `merged`, which the "
+        "plan site reads."
+    )
+    """
+    What a pull request is told when it is closed because its work landed, with its
+    branch and the upstream base to fill in.
+    """
+
     PROMOTION_HEADING = "## Promote"
     """
     Heading the compare-and-create link is written under, in the fork pull request's own

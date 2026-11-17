@@ -57,9 +57,21 @@ class FinishSummaryHeading(StrEnum):
     What became of the fork's base branch.
     """
 
+    CLOSED_AS_LANDED = "Closed as landed"
+    """
+    The pull requests this pass closed and labelled merged, because their commits are
+    already in the upstream base.
+    """
+
+    PLAN_SITE_BUILD = "Plan site"
+    """
+    What became of starting the plan site's build after closing pull requests.
+    """
+
     LANDED = "Landed but still open"
     """
-    The pull requests whose commits are already in the upstream base.
+    The pull requests whose commits are already in the upstream base and that this pass
+    did not close.
     """
 
     RESTACKED = "Restacked"
@@ -238,6 +250,8 @@ class FinishSummary:
             FinishSummaryHeading.REPORTED: self.capped(self.reported()),
             FinishSummaryHeading.REPARENTS: self.capped(self.reparents()),
             FinishSummaryHeading.FORK_BASE: self.fork_base(),
+            FinishSummaryHeading.CLOSED_AS_LANDED: self.capped(self.closed_as_landed()),
+            FinishSummaryHeading.PLAN_SITE_BUILD: self.plan_site_build(),
             FinishSummaryHeading.LANDED: self.capped(self.landed()),
             FinishSummaryHeading.RESTACKED: self.restacked(),
             FinishSummaryHeading.UNPUBLISHED: self.capped(self.unpublished()),
@@ -370,6 +384,24 @@ class FinishSummary:
             return []
         lines = [f"`{report.fork_reference}`: {report.outcome} at `{report.commit}`"]
         return lines + ([report.explanation] if report.explanation else [])
+
+    def closed_as_landed(self) -> list[str]:
+        """
+        :return: One entry per pull request closed because its work had landed.
+        """
+        return [
+            f"- {self.pull_request_link(closed.pull_request_number)} `{closed.branch}`"
+            for closed in self.report.closed_as_landed
+        ]
+
+    def plan_site_build(self) -> list[str]:
+        """
+        :return: What became of starting the plan site's build, empty when it was not
+            attempted.
+        """
+        if self.report.plan_site_build is None:
+            return []
+        return [self.report.plan_site_build]
 
     def landed(self) -> list[str]:
         """

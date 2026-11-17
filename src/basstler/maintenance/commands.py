@@ -29,7 +29,8 @@ from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import GitHubRestClient
 from basstler.github.constants import MaintenanceNotice
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
-from basstler.locations import RepositoryStateLocation
+from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
+from basstler.plan_site.build_start import BuildStart, recorded_site
 from basstler.maintenance.board import BoardExport
 from basstler.upstream_reviews.action.open_pull_requests import (
     OpenPullRequestsAnswer,
@@ -38,6 +39,7 @@ from basstler.upstream_reviews.action.open_pull_requests import (
 )
 from basstler.maintenance.check_overview import CheckOverview
 from basstler.maintenance.fast_forward import fast_forward
+from basstler.maintenance.landed_closing import LandedPullRequestClosing
 from basstler.maintenance.finish_summary import FinishSummary
 from basstler.maintenance.promotion import (
     PromotionSummaries,
@@ -144,6 +146,20 @@ class MaintenancePass:
         upstream_pull_requests = self.upstream_pull_requests()
         return BoardExport.from_api_records(
             fork.open_pull_requests(), upstream_pull_requests, fork
+        )
+
+    def start_plan_site_build(self) -> str | None:
+        """
+        Start the build of the plan site that lists this repository, so it shows what the
+        pass just wrote.
+
+        :return: What became of it, ``None`` when no plan site lists the repository.
+        """
+        site = recorded_site()
+        if site is None:
+            return None
+        return BuildStart.attempt(site, GitHubRestClient()).describe(
+            ClaudeCodeVariable.REMOTE.is_true()
         )
 
     def fresh_stack(self) -> Stack:
@@ -553,13 +569,20 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
         stack = maintenance.fresh_stack().scoped_to(stacked_on)
         fork = maintenance.fork()
         fast_forward_report = fast_forward(stack.configuration, maintenance.git)
+        restacked = restack(stack, maintenance.git, fork)
+        promoted = promote(stack, fork, summaries)
+        labels_cleared = clear_spent_promotion_labels(stack, fork)
+        synchronization = UpstreamPullRequestSynchronization(stack, fork).synchronize()
+        closed_as_landed = LandedPullRequestClosing(stack, fork).close()
         report = MaintenanceReport.of_pass(
             stack,
             fast_forward_report,
-            restack(stack, maintenance.git, fork),
-            promote(stack, fork, summaries),
-            clear_spent_promotion_labels(stack, fork),
-            UpstreamPullRequestSynchronization(stack, fork).synchronize(),
+            restacked,
+            promoted,
+            labels_cleared,
+            synchronization,
+            closed_as_landed,
+            maintenance.start_plan_site_build() if closed_as_landed else None,
         )
         maintenance.board.unlink(missing_ok=True)
         maintenance.full_report.write_text(report.as_json() + "\n")

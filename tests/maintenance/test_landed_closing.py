@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import pytest
 
-from basstler.github.tooling_labels import GitHubLabel
 from basstler.maintenance.commands import RunReportCommand
 from basstler.maintenance.finish_summary import FinishSummary, FinishSummaryHeading
 from basstler.maintenance.promotion import PromotionSummaries
@@ -29,7 +28,6 @@ from .test_finish_summary import section_of
 from .recorded_fork import (
     AlreadyResolvedPass,
     PlanSiteBuildNote,
-    RecordedLabelWrite,
     RecordingPullRequests,
 )
 
@@ -87,21 +85,13 @@ def test_a_landed_pull_request_is_closed(parent_landed: ForkCheckout):
     assert fork.closed == [StackPullRequestNumber.PARENT]
 
 
-def test_a_landed_pull_request_is_labelled_merged_keeping_its_labels(
-    parent_landed: ForkCheckout,
-):
-    fork = RecordingPullRequests(
-        labels={StackPullRequestNumber.PARENT: [GitHubLabel.BUG]}
-    )
+def test_a_landed_pull_request_is_not_labelled(parent_landed: ForkCheckout):
+    fork = RecordingPullRequests()
     stack = a_stack(parent_landed, the_board())
 
     LandedPullRequestClosing(stack, fork).close()
 
-    assert fork.label_writes == [
-        RecordedLabelWrite(
-            StackPullRequestNumber.PARENT, (GitHubLabel.BUG, GitHubLabel.MERGED)
-        )
-    ]
+    assert fork.label_writes == []
 
 
 def test_a_landed_pull_request_is_commented_on_with_its_branch_and_the_base(

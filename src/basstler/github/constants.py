@@ -97,8 +97,7 @@ class MaintenanceText(StrEnum):
     LANDED_COMMENT = (
         "Closed by a maintenance pass: every commit of `{branch}` is in `{base}`, so "
         "its work has landed. GitHub records no merge for a pull request that is not "
-        "based on the branch it landed in, so this one is labelled `merged`, which the "
-        "plan site reads."
+        "based on the branch it landed in, so it stayed open."
     )
     """
     What a pull request is told when it is closed because its work landed, with its

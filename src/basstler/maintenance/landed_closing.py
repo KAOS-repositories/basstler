@@ -7,11 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from basstler.github.constants import MaintenanceText
-from basstler.github.pull_request_record import PullRequestField
 from basstler.github.repository_access import ForkPullRequests
-from basstler.github.tooling_labels import GitHubLabel
 from basstler.stack.checkout import CurrentCheckout
-from basstler.stack.label_write import LabelWrite
 from basstler.stack.model import Stack, StackBranch
 
 # %% what was closed
@@ -43,8 +40,7 @@ class LandedPullRequestClosing:
     Closes every open fork pull request whose commits are all in the upstream base.
 
     GitHub records no merge for such a pull request when it is based on another branch,
-    so it stays open, and the plan site reads it as unfinished, until it is closed and
-    labelled.
+    so it stays open until it is closed.
     """
 
     stack: Stack
@@ -59,7 +55,7 @@ class LandedPullRequestClosing:
 
     def close(self) -> tuple[ClosedAsLanded, ...]:
         """
-        Label each landed pull request as merged, close it and say why.
+        Close each landed pull request and say why.
 
         A branch with no commit beyond its base is left open: it is an ancestor of the
         upstream base as a landed branch is, but nothing of it landed.
@@ -70,7 +66,6 @@ class LandedPullRequestClosing:
         for branch in self.stack.landed_branches():
             if not self.has_commits_of_its_own(branch):
                 continue
-            self.label_merged(branch)
             self.fork.close_pull_request(branch.pull_request_number)
             self.fork.add_comment(
                 branch.pull_request_number,
@@ -101,15 +96,3 @@ class LandedPullRequestClosing:
             f"..{configuration.reference_on_fork(branch.name)}"
         )
         return ahead is not None and ahead > 0
-
-    def label_merged(self, branch: StackBranch) -> None:
-        """
-        Add the merged label to what the pull request carries now.
-
-        :param branch: The landed branch whose pull request is labelled.
-        """
-        number = branch.pull_request_number
-        labels = PullRequestField.LABELS.read(self.fork.pull_request(number), number)
-        self.fork.replace_labels(
-            number, LabelWrite.replacing(labels, added=[GitHubLabel.MERGED]).labels
-        )

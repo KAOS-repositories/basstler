@@ -17,9 +17,9 @@ the reasoning behind them, for whoever changes the skill or the executor. The wo
 - A branch whose checks failed is not promoted; the export records the verdict over each head's
   checks.
 - A branch that is an ancestor of the upstream base has landed. The pass closes the open fork pull
-  request of a landed branch that has a commit its own base lacks, labels it `merged` and says why
-  in a comment, then starts the plan site's build; GitHub records no merge for a pull request
-  stacked on another branch, so the site reads the label. A landed branch with no commit of its
+  request of a landed branch that has a commit its own base lacks and says why in a comment, then
+  starts the plan site's build; GitHub records no merge for a pull request stacked on another
+  branch, so it would stay open, and the site reads GitHub's comparison with the upstream. A landed branch with no commit of its
   own is left open, since nothing of it landed.
 
 ## Why the pass never touches code or reviews

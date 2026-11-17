@@ -8,9 +8,11 @@
 - All seven parts; a path numbers its steps and says whose move each is; the goal page shows its refresh time and re-reads pull requests (f3b9f9a0).
 - Real owner steps mark-220-viewed and mark-223-viewed in review-triage; goal-paths/verdict and the goal goal-paths-decided.
 - Merged main at 66d52e2c (f140f3b0, 1560 passed, probe clean). pushes-done: depends_on_pushes_done, pushes_done_at, goal pushes-done; mark-220/223-viewed wait on it.
+- Bug fix draft #244 (claude/refuse-removing-named-items, off main): a save refuses removing an item another plan names; sandbox cc8067a0 extends it to goals and landed release lists.
 - Experiment-mode feedback is in the experiments plan (sandbox-ownership, running-stage-rules, sandbox-site, feedback-intake widened to every plan), linked from #192.
 
 ## Next
+- Report the wide suites of cc8067a0 and #244 (b086c8bb).
 - Write the two further goals with the user (mark-viewed pip installable; first basstler-service items).
 - The owner's verdict; then stack-board back to main, feedback comment on #192, split into pull requests.
 - Unverified: whether plugin Stop/PostToolUse hooks fire in cloud sessions.

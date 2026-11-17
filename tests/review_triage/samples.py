@@ -242,6 +242,24 @@ class BindingRenameSample(SampleTrees):
         return "binding-rename"
 
 
+class AttributeRenameSample(SampleTrees):
+    """
+    A pull request renaming methods and attributes of classes, with the same names on
+    unrelated objects, an override left behind and a standard library override changed
+    alike.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        """
+        The directory holding the attribute-rename sample.
+        """
+        return "attribute-rename"
+
+
 # %% the base branch merged after a review
 
 

@@ -6,6 +6,7 @@ prose.
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -77,41 +78,118 @@ class ModuleMember:
 
 
 @dataclass(frozen=True)
-class MemberRename(Rename):
+class ClassAttribute:
     """
-    A module's top-level definition given a new name, by its qualified path: it renames
-    only the occurrences proven to refer to that definition, never its old name as a
-    word.
+    A method or attribute a module's top-level class defines.
+    """
+
+    owner: ModuleMember
+    """
+    The class defining it.
+    """
+
+    attribute_name: str
+    """
+    The attribute's name.
+    """
+
+
+@dataclass(frozen=True)
+class BindingRename(Rename, ABC):
+    """
+    A definition given a new name, by its qualified path: it renames only the
+    occurrences proven to refer to that definition, never its old name as a word.
     """
 
     @property
-    def member(self) -> ModuleMember:
+    @abstractmethod
+    def definition(self) -> ModuleMember | ClassAttribute:
         """
         The definition renamed, as the base commit names it.
         """
-        module, _, member_name = self.old.rpartition(DOTTED_NAME_SEPARATOR)
-        return ModuleMember(module, member_name)
 
     @property
-    def new_member_name(self) -> str:
+    def old_name(self) -> str:
         """
-        The name the head commit gives the definition.
+        The unqualified name the base commit gives the definition.
+        """
+        return self.old.rpartition(DOTTED_NAME_SEPARATOR)[2]
+
+    @property
+    def new_name(self) -> str:
+        """
+        The unqualified name the head commit gives the definition.
         """
         return self.new.rpartition(DOTTED_NAME_SEPARATOR)[2]
 
     def is_rejected_by(self, rejected: str) -> bool:
         """
-        :meth:`Rename.is_rejected_by`, also when the member's old name is rejected.
+        :meth:`Rename.is_rejected_by`, also when the definition's old name is rejected.
         """
-        return rejected in (self.old, self.member.member_name)
+        return rejected in (self.old, self.old_name)
 
     def is_repeated_in(self, renames: dict[str, Rename]) -> bool:
         """
-        :meth:`Rename.is_repeated_in`: whether the member's old name is renamed to its
-        new name everywhere.
+        :meth:`Rename.is_repeated_in`: whether the definition's old name is renamed to
+        its new name everywhere.
         """
-        word = renames.get(self.member.member_name)
-        return word is not None and word.new == self.new_member_name
+        word = renames.get(self.old_name)
+        return word is not None and word.new == self.new_name
+
+
+@dataclass(frozen=True)
+class MemberRename(BindingRename):
+    """
+    A module's top-level definition given a new name.
+    """
+
+    @property
+    def definition(self) -> ModuleMember:
+        module, _, member_name = self.old.rpartition(DOTTED_NAME_SEPARATOR)
+        return ModuleMember(module, member_name)
+
+
+@dataclass(frozen=True)
+class AttributeRename(BindingRename):
+    """
+    A method or attribute of a module's top-level class given a new name.
+    """
+
+    attribute: ClassAttribute = field(kw_only=True)
+    """
+    The attribute renamed, as the base commit names it.
+    """
+
+    @classmethod
+    def from_attribute(
+        cls,
+        attribute: ClassAttribute,
+        new_owner: ModuleMember,
+        new_name: str,
+        found_by: RenameSource,
+    ) -> AttributeRename:
+        """
+        :param attribute: The attribute the base commit defines.
+        :param new_owner: Its class, as the head commit names it.
+        :param new_name: The name the head commit gives the attribute.
+        :param found_by: The rename source finding it.
+        :return: The rename of the attribute.
+        """
+        owner = attribute.owner
+        return cls(
+            DOTTED_NAME_SEPARATOR.join(
+                (owner.module, owner.member_name, attribute.attribute_name)
+            ),
+            DOTTED_NAME_SEPARATOR.join(
+                (new_owner.module, new_owner.member_name, new_name)
+            ),
+            found_by,
+            attribute=attribute,
+        )
+
+    @property
+    def definition(self) -> ClassAttribute:
+        return self.attribute
 
 
 @dataclass(frozen=True)
@@ -191,12 +269,12 @@ class RenameMap:
         return tuple(rename for rename in self.renames if not rename.is_file_path)
 
     @cached_property
-    def member_renames(self) -> tuple[MemberRename, ...]:
+    def binding_renames(self) -> tuple[BindingRename, ...]:
         """
-        The renames of module members, which rename only what refers to them.
+        The renames of definitions, which rename only what refers to them.
         """
         return tuple(
-            rename for rename in self.renames if isinstance(rename, MemberRename)
+            rename for rename in self.renames if isinstance(rename, BindingRename)
         )
 
     @cached_property

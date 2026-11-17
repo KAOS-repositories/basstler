@@ -34,7 +34,8 @@ from basstler.review_triage.definition_moves import (
 )
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.markdown import MarkdownComparison
-from basstler.review_triage.member_renames import MemberRenamer, MemberResolver
+from basstler.review_triage.member_renames import MemberRenamer
+from basstler.review_triage.referents import MemberResolver
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
@@ -145,7 +146,7 @@ class PullRequestTriager:
                     [SubclassSubstitutionDetection().decisions(own_changes)]
                 ),
                 self.rules,
-                MemberRenamer(renames.member_renames, MemberResolver(base_modules)),
+                MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
             ),
             self.judgments,
         )

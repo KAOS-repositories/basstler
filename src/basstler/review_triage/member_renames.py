@@ -1,6 +1,6 @@
 """
-Renaming, in a file's base version, only the occurrences of a renamed module member's
-old name that are proven to refer to that member.
+Renaming, in a file's base version, only the occurrences of a renamed definition's old
+name that are proven to refer to that definition.
 """
 
 from __future__ import annotations
@@ -13,198 +13,32 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from basstler.git.commit_range import FileVersions
-from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER, CommitModules
+from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
 from basstler.review_triage.name_scopes import (
     COMPREHENSION_TYPES,
-    AssignedValue,
-    DeclaredType,
-    ImportedMember,
-    ImportedModule,
-    LocalDefinition,
-    NameBinding,
     NameScope,
     UnknownValue,
 )
 from basstler.review_triage.python_source import PythonSource
+from basstler.review_triage.referents import (
+    PROPERTY_ACCESSORS,
+    RECEIVING_DECORATORS,
+    SUPER,
+    ClassInstance,
+    MemberResolver,
+    ModuleNames,
+    Referent,
+)
 from basstler.review_triage.renames import (
-    DOTTED_NAME_SEPARATOR,
-    MemberRename,
+    BindingRename,
+    ClassAttribute,
     ModuleMember,
 )
-
-# %% what a name refers to
-
-
-@dataclass(frozen=True)
-class ModuleObject:
-    """
-    A module, as a name or an attribute refers to it.
-    """
-
-    module: str
-    """
-    The module's dotted path.
-    """
-
-
-Referent = ModuleMember | ModuleObject
-"""
-What a name or an attribute is proven to refer to.
-"""
-
-OWN_MEMBER_BINDINGS = (LocalDefinition, AssignedValue, DeclaredType)
-"""
-The bindings that make a module's top-level name a member the module itself defines.
-"""
 
 DEFINITION_KEYWORDS = re.compile(r"(?:async\s+)?(?:def|class)\s+")
 """
 Matches the keywords of a function or class definition up to its name.
 """
-
-# %% a module's top-level names
-
-
-@dataclass(frozen=True)
-class ModuleNames:
-    """
-    One version of a module, read for the names it binds.
-    """
-
-    module: str
-    """
-    The module's dotted path.
-    """
-
-    source: PythonSource
-    """
-    Its source, its relative imports resolved against its package.
-    """
-
-    @classmethod
-    def from_text(cls, module: str, text: str, is_package: bool) -> ModuleNames:
-        """
-        :param module: The module's dotted path.
-        :param text: Its source.
-        :param is_package: Whether it is a package initializer.
-        :return: The module.
-        """
-        components = tuple(module.split(DOTTED_NAME_SEPARATOR)) if module else ()
-        package = components if is_package else components[:-1]
-        return cls(module, PythonSource(text, package))
-
-    @cached_property
-    def scope(self) -> NameScope:
-        """
-        The names its top level binds.
-        """
-        return NameScope.opened_by(self.source.tree)
-
-
-# %% resolving names across the commit
-
-
-@dataclass
-class MemberResolver:
-    """
-    Proves what the top-level names of one commit's modules refer to, following imports
-    from module to module, each module read once.
-    """
-
-    modules: CommitModules
-    """
-    The commit's modules.
-    """
-
-    read_modules: dict[str, ModuleNames | None] = field(default_factory=dict)
-    """
-    Each module read so far, ``None`` when no single parsable file is that module.
-    """
-
-    def names_of(self, module: str) -> ModuleNames | None:
-        """
-        :param module: A dotted module path.
-        :return: The module, ``None`` when no single parsable file of the commit is it.
-        """
-        if module not in self.read_modules:
-            keys = self.modules.module_files.get(module, ())
-            names = None
-            if len(keys) == 1:
-                text = self.modules.texts_of(keys)[keys[0]]
-                is_package = keys[0].endswith(PACKAGE_INITIALIZER)
-                names = ModuleNames.from_text(module, text, is_package)
-            if names is not None and not names.source.parses:
-                names = None
-            self.read_modules[module] = names
-        return self.read_modules[module]
-
-    def member_referent(
-        self,
-        module: str,
-        member_name: str,
-        followed: frozenset[ModuleMember] = frozenset(),
-    ) -> Referent | None:
-        """
-        :param module: A dotted module path.
-        :param member_name: A name the module may bind at its top level.
-        :param followed: The members whose imports are being followed.
-        :return: What the name refers to, ``None`` when it is not proven.
-        """
-        member = ModuleMember(module, member_name)
-        names = self.names_of(module)
-        if names is None or member in followed:
-            return None
-        return self.top_level_referent(names, member_name, followed | {member})
-
-    def top_level_referent(
-        self,
-        names: ModuleNames,
-        name: str,
-        followed: frozenset[ModuleMember] = frozenset(),
-    ) -> Referent | None:
-        """
-        :param names: A module.
-        :param name: A name its top level may bind.
-        :param followed: The members whose imports are being followed.
-        :return: What the name refers to, ``None`` when it is not proven: bound more
-            than once, possibly by a star import, or also a submodule's name.
-        """
-        scope = names.scope
-        submodule = f"{names.module}{DOTTED_NAME_SEPARATOR}{name}"
-        is_submodule = submodule in self.modules.module_files
-        bindings = scope.bindings.get(name, ())
-        if scope.imports_everything:
-            return None
-        if not bindings:
-            return ModuleObject(submodule) if is_submodule else None
-        if len(bindings) != 1 or is_submodule:
-            return None
-        if isinstance(bindings[0], OWN_MEMBER_BINDINGS):
-            return ModuleMember(names.module, name)
-        return self.imported_referent(names, bindings[0], followed)
-
-    def imported_referent(
-        self,
-        names: ModuleNames,
-        binding: NameBinding,
-        followed: frozenset[ModuleMember] = frozenset(),
-    ) -> Referent | None:
-        """
-        :param names: The module holding the binding.
-        :param binding: How one of its scopes binds a name.
-        :param followed: The members whose imports are being followed.
-        :return: What the import binds the name to, ``None`` for any other binding.
-        """
-        if isinstance(binding, ImportedModule):
-            return ModuleObject(binding.module)
-        if isinstance(binding, ImportedMember):
-            return self.member_referent(
-                names.source.imported_module(binding.statement),
-                binding.defined_name,
-                followed,
-            )
-        return None
-
 
 # %% positions in a file's text
 
@@ -296,11 +130,30 @@ class SourcePositions:
 # %% finding the occurrences of one file
 
 
+@dataclass(frozen=True)
+class MethodReceiver:
+    """
+    The parameter a method of a module's top-level class receives its instance or its
+    class by.
+    """
+
+    parameter_name: str
+    """
+    The parameter's name.
+    """
+
+    owner: ModuleMember
+    """
+    The class defining the method.
+    """
+
+
 @dataclass
 class OccurrenceSearch(ast.NodeVisitor):
     """
-    Finds the occurrences of renamed members' old names in one file that are proven to
-    refer to those members, following the file's scopes.
+    Finds the occurrences of renamed definitions' old names in one file that are proven
+    to refer to those definitions, following the file's scopes, its classes and the
+    receivers of their methods.
     """
 
     resolver: MemberResolver
@@ -313,9 +166,9 @@ class OccurrenceSearch(ast.NodeVisitor):
     The file searched.
     """
 
-    renames: dict[str, tuple[MemberRename, ...]]
+    renames: dict[str, tuple[BindingRename, ...]]
     """
-    The renames searched for, by the member's old name.
+    The renames searched for, by the definition's old name.
     """
 
     positions: SourcePositions
@@ -328,6 +181,18 @@ class OccurrenceSearch(ast.NodeVisitor):
     The scopes enclosing the node visited, outermost first.
     """
 
+    class_bodies: dict[int, ModuleMember] = field(default_factory=dict)
+    """
+    The class of each class body among :attr:`scopes`, by the scope's identity, for
+    the module's top-level classes.
+    """
+
+    receivers: dict[int, MethodReceiver] = field(default_factory=dict)
+    """
+    The receiver of each method among :attr:`scopes`, by the scope's identity, for the
+    methods of :attr:`class_bodies`.
+    """
+
     edits: list[TextEdit] = field(default_factory=list)
     """
     The occurrences found, each with its new name.
@@ -335,8 +200,8 @@ class OccurrenceSearch(ast.NodeVisitor):
 
     def search(self) -> list[TextEdit]:
         """
-        :return: The occurrences proven to refer to a renamed member, each with its new
-            name.
+        :return: The occurrences proven to refer to a renamed definition, each with its
+            new name.
         """
         self.scopes = [self.names.scope]
         for statement in self.names.source.tree.body:
@@ -355,7 +220,11 @@ class OccurrenceSearch(ast.NodeVisitor):
         outer = [*node.decorator_list, node.args]
         if node.returns is not None:
             outer.append(node.returns)
-        self.visit_definition(node, outer)
+        body = NameScope.opened_by(node)
+        receiver = self.method_receiver(node)
+        if receiver is not None:
+            self.receivers[id(body)] = receiver
+        self.visit_definition(node, outer, body)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """
@@ -364,16 +233,24 @@ class OccurrenceSearch(ast.NodeVisitor):
 
         :param node: The class.
         """
-        self.visit_definition(node, [*node.decorator_list, *node.bases, *node.keywords])
+        body = NameScope.opened_by(node)
+        owner = ModuleMember(self.names.module, node.name)
+        if len(self.scopes) == 1 and self.resolver.class_definition(owner) is not None:
+            self.class_bodies[id(body)] = owner
+        self.visit_definition(
+            node, [*node.decorator_list, *node.bases, *node.keywords], body
+        )
 
     def visit_definition(
         self,
         node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
         outer: list[ast.AST],
+        body: NameScope,
     ) -> None:
         """
         :param node: A function or class.
         :param outer: Its parts evaluated outside its body.
+        :param body: The scope of its body.
         """
         self.found(node.name, self.positions.definition_name_offset(node))
         type_parameters = NameScope(
@@ -382,10 +259,12 @@ class OccurrenceSearch(ast.NodeVisitor):
         self.scopes.append(type_parameters)
         for part in outer:
             self.visit(part)
-        self.scopes.append(NameScope.opened_by(node))
+        self.scopes.append(body)
         for statement in node.body:
             self.visit(statement)
         del self.scopes[-2:]
+        self.class_bodies.pop(id(body), None)
+        self.receivers.pop(id(body), None)
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         """
@@ -415,6 +294,29 @@ class OccurrenceSearch(ast.NodeVisitor):
         super().generic_visit(node)
         self.scopes.pop()
 
+    def method_receiver(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> MethodReceiver | None:
+        """
+        :param node: A function defined in the current scope.
+        :return: Its receiver, when it is a method of a top-level class whose
+            decorators all leave its first parameter the instance or the class.
+        """
+        owner = self.class_bodies.get(id(self.scopes[-1]))
+        parameters = (*node.args.posonlyargs, *node.args.args)
+        if owner is None or not parameters:
+            return None
+        for decorator in node.decorator_list:
+            is_accessor = (
+                isinstance(decorator, ast.Attribute)
+                and decorator.attr in PROPERTY_ACCESSORS
+            )
+            if not is_accessor and (
+                self.expression_referent(decorator) not in RECEIVING_DECORATORS
+            ):
+                return None
+        return MethodReceiver(parameters[0].arg, owner)
+
     # %%% occurrences
 
     def visit_Name(self, node: ast.Name) -> None:
@@ -425,21 +327,15 @@ class OccurrenceSearch(ast.NodeVisitor):
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """
-        :param node: An attribute, which refers to a renamed member when it is read
-            from that member's module.
+        :param node: An attribute, which refers to a renamed definition when it is read
+            from that definition's module, its class, an instance of the class as a
+            method receives it, or ``super()`` in a method of a subclass.
         """
         self.visit(node.value)
         if node.attr not in self.renames:
             return
-        module = self.expression_referent(node.value)
-        if not isinstance(module, ModuleObject):
-            return
         end = self.positions.node_offset(node.end_lineno, node.end_col_offset)
-        self.record(
-            node.attr,
-            end - len(node.attr),
-            self.resolver.member_referent(module.module, node.attr),
-        )
+        self.record(node.attr, end - len(node.attr), self.attribute_referent(node))
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         """
@@ -470,18 +366,18 @@ class OccurrenceSearch(ast.NodeVisitor):
 
     def record(self, name: str, offset: int, referent: Referent | None) -> None:
         """
-        :param name: An old name of a renamed member.
+        :param name: An old name of a renamed definition.
         :param offset: Where it occurs.
         :param referent: What the occurrence refers to.
         """
         rename = next(
-            (rename for rename in self.renames[name] if rename.member == referent),
+            (rename for rename in self.renames[name] if rename.definition == referent),
             None,
         )
         if rename is not None and self.positions.text[offset:].startswith(name):
-            self.edits.append(
-                TextEdit(offset, offset + len(name), rename.new_member_name)
-            )
+            self.edits.append(TextEdit(offset, offset + len(name), rename.new_name))
+
+    # %%% referents
 
     def name_referent(self, name: str) -> Referent | None:
         """
@@ -492,26 +388,67 @@ class OccurrenceSearch(ast.NodeVisitor):
             if (scope.class_body and depth > 0) or name not in scope.bindings:
                 continue
             if scope is self.scopes[0]:
-                return self.resolver.top_level_referent(self.names, name)
+                break
+            if id(scope) in self.class_bodies:
+                return self.class_body_referent(self.class_bodies[id(scope)], name)
             bindings = scope.bindings[name]
+            receiver = self.receivers.get(id(scope))
             if len(bindings) != 1:
                 return None
+            if receiver is not None and receiver.parameter_name == name:
+                return ClassInstance(receiver.owner)
             return self.resolver.imported_referent(self.names, bindings[0])
-        return None
+        return self.resolver.top_level_referent(self.names, name)
+
+    def class_body_referent(self, owner: ModuleMember, name: str) -> Referent | None:
+        """
+        :param owner: A top-level class of the file.
+        :param name: A name its body binds.
+        :return: The class's attribute, ``None`` when the module binds the name too,
+            so that its body may read the module's before binding its own.
+        """
+        if self.names.scope.imports_everything or name in self.names.scope.bindings:
+            return None
+        return ClassAttribute(owner, name)
 
     def expression_referent(self, expression: ast.expr) -> Referent | None:
         """
-        :param expression: A name or a chain of attributes.
+        :param expression: A name or a chain of attributes, a call looked through.
         :return: What it refers to, ``None`` when it is not proven.
         """
+        if isinstance(expression, ast.Call):
+            return self.expression_referent(expression.func)
         if isinstance(expression, ast.Name):
             return self.name_referent(expression.id)
         if not isinstance(expression, ast.Attribute):
             return None
-        module = self.expression_referent(expression.value)
-        if not isinstance(module, ModuleObject):
+        return self.attribute_referent(expression)
+
+    def attribute_referent(self, node: ast.Attribute) -> Referent | None:
+        """
+        :param node: An attribute.
+        :return: What it refers to, ``None`` when it is not proven.
+        """
+        receiver = self.receivers.get(id(self.scopes[-1]))
+        if receiver is not None and self.is_super_call(node.value):
+            return self.resolver.inherited_attribute_owner(receiver.owner, node.attr)
+        if isinstance(node.value, ast.Call):
             return None
-        return self.resolver.member_referent(module.module, expression.attr)
+        return self.resolver.attribute_referent(
+            self.expression_referent(node.value), node.attr
+        )
+
+    def is_super_call(self, expression: ast.expr) -> bool:
+        """
+        :param expression: An expression of the current scope.
+        :return: Whether it calls the builtin ``super`` without arguments.
+        """
+        return (
+            isinstance(expression, ast.Call)
+            and not expression.args
+            and not expression.keywords
+            and self.expression_referent(expression.func) == SUPER
+        )
 
 
 # %% renaming a file's base version
@@ -520,13 +457,13 @@ class OccurrenceSearch(ast.NodeVisitor):
 @dataclass(frozen=True)
 class MemberRenamer:
     """
-    Renames, in a file's base version, every occurrence of a renamed member's old name
-    proven to refer to that member, and nothing else.
+    Renames, in a file's base version, every occurrence of a renamed module or class
+    member's old name proven to refer to that member, and nothing else.
     """
 
-    renames: tuple[MemberRename, ...]
+    renames: tuple[BindingRename, ...]
     """
-    The members the pull request renames.
+    The module and class members the pull request renames.
     """
 
     resolver: MemberResolver
@@ -545,7 +482,7 @@ class MemberRenamer:
         mentioned = [
             rename
             for rename in self.renames
-            if re.search(rf"\b{re.escape(rename.member.member_name)}\b", text)
+            if re.search(rf"\b{re.escape(rename.old_name)}\b", text)
         ]
         if not mentioned:
             return text
@@ -559,10 +496,10 @@ class MemberRenamer:
             return text
         tokens = tuple(tokenize.generate_tokens(io.StringIO(text).readline))
         used_names = {token.string for token in tokens if token.type == tokenize.NAME}
-        renames: dict[str, tuple[MemberRename, ...]] = {}
+        renames: dict[str, tuple[BindingRename, ...]] = {}
         for rename in mentioned:
-            if rename.new_member_name not in used_names:
-                old = rename.member.member_name
+            if rename.new_name not in used_names:
+                old = rename.old_name
                 renames[old] = (*renames.get(old, ()), rename)
         if not renames:
             return text

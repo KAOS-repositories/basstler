@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from basstler.github.repository_access import ForkPullRequests
-from basstler.stack.branch_pull_request import BranchPullRequest
+from basstler.github.branch_pull_request import BranchPullRequest
 from basstler.stack.model import Stack
 
 

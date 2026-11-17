@@ -16,7 +16,7 @@ from basstler.github.pull_request_record import (
     PullRequestField,
 )
 from basstler.maintenance.fork_pull_request_action import ForkPullRequestAction
-from basstler.stack.branch_pull_request import BranchPullRequest
+from basstler.github.branch_pull_request import BranchPullRequest
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.model import BranchStatus, StackBranch
 

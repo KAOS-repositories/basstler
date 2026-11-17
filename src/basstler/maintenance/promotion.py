@@ -26,7 +26,7 @@ from basstler.github.pull_request_record import (
 )
 from basstler.github.repository_access import ForkPullRequests, PullRequestWriter
 from basstler.github.tooling_labels import GitHubLabel
-from basstler.stack.branch_pull_request import BranchPullRequest
+from basstler.github.branch_pull_request import BranchPullRequest
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.model import BranchStatus, Stack
 from basstler.stack.promotion_link import PromotionLink

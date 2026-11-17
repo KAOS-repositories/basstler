@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from basstler.github.constants import MaintenanceText
 from basstler.github.constants import MaintenanceNotice
 from basstler.maintenance.fork_pull_request_action import ForkPullRequestAction
-from basstler.stack.branch_pull_request import BranchPullRequest
+from basstler.github.branch_pull_request import BranchPullRequest
 from basstler.stack.checkout import CurrentCheckout
 from basstler.stack.model import StackBranch
 from basstler.standard_streams import StandardStreamHandler

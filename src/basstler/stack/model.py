@@ -22,7 +22,7 @@ from basstler.git.branch import Branch
 from basstler.github.repository import Repository
 from basstler.github.states import CombinedCheckState
 from basstler.github.tooling_labels import GitHubLabel
-from basstler.stack.branch_pull_request import BranchPullRequest
+from basstler.github.branch_pull_request import BranchPullRequest
 from basstler.stack.branch_status import BranchStatus
 from basstler.stack.checkout import CurrentCheckout, LandedBranches
 from basstler.stack.exceptions import BaseBranchScopeError, BoardUnavailable

@@ -12,7 +12,7 @@
 - Experiment-mode feedback is in the experiments plan (sandbox-ownership, running-stage-rules, sandbox-site, feedback-intake widened to every plan), linked from #192.
 
 ## Next
-- Report the wide suites of cc8067a0 and #244 (b086c8bb).
+- #244 waits for review and merge; 1402 passed at b086c8bb. Sandbox cc8067a0: 1567 passed.
 - Write the two further goals with the user (mark-viewed pip installable; first basstler-service items).
 - The owner's verdict; then stack-board back to main, feedback comment on #192, split into pull requests.
 - Unverified: whether plugin Stop/PostToolUse hooks fire in cloud sessions.

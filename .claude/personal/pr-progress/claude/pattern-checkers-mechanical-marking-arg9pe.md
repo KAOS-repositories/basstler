@@ -1,14 +1,11 @@
-Plan:
-- Wait for the owner on the 7 open review threads of #222, among them whether the remaining modules move onto TextFile.
+Plan
+- Resolve the three review threads of 11-17 on #222, then record the item.
 
-Done:
-- TextFile (core) and PythonSourceFile; SourceFixer.fix_module(source_file); specifications_of_module.
-- basstler.code_modification.syntax: ConstantName, ExpressionSyntax, CallSyntax, after krracker's LibCSTNodeFactory.
-- KeywordArgumentFix and CallLackingKeywordArgument; UTF8EncodingFix subclasses it.
-- Fixed the UTF-8 violation the main merge brought onto #220 (afbd09d8) and merged it in.
-- 2865 passed, 1 skipped at 59f12519; pushed; replies posted; description updated.
-- Carried into claude/loving-maxwell-s1y58z (pushed) and claude/kind-bohr-db512e (d8a64776, renames adopted, 2897 passed).
+Done
+- opens_a_file and opens_bytes check TextFunction.OPEN (28b85d9e, test first).
+- krrood citation dropped from syntax.py as the owner chose (d7373151).
+- Threads answered and resolved; blockers and description updated.
 
-Next:
-- Act on the owner's answers to the open threads.
-- #223 (ccr-6ee4aeab-7j9mi2) still conflicts; where text_file, syntax and source_file land in packages/ is its owner's call (text_file belongs in core).
+Next
+- #220 (base) conflicts with main in personal_notes.py: /plan-item-resolve 220, then run the maintenance pass again.
+- Read the checks of d7373151; the rest of the suite was still running.

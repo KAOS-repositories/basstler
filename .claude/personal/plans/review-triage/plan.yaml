@@ -156,11 +156,12 @@ items:
   - keyword-argument-triage
   status: in progress
   recommended_model: opus
-  notes: 'Draft #253 on #214 (4d13d564 merged in). Module-level members done: detection pairs
-    old and new top-level names by mutual dominance in the diff; each base occurrence is resolved
-    through scopes, imports, re-exports and module attributes, and only proven ones are
-    rewritten; capture and unproven bindings leave the file for review. CRAM 527 from the merge
-    base: 333 to 90 of 335 files need review. CI not read. Next: methods and attributes through
-    self/cls and receivers, keyword parameters, business_consulting #125 evaluation.py check.'
+  notes: 'Draft #253 on #214, pushed at 71621817. Module-level members and class methods/attributes
+    (class body, self, cls, the class name, subclasses, super(); refused when an override or
+    a standard-library base keeps the old name) are proven by resolution; other receivers stay
+    in review. scripts/review-triage.sh triages any repository from anywhere; run on CRAM 527
+    with --mark-viewed: 90 of 335 need review, 245 marked viewed. CI not read. Next: unresolved
+    receivers, keyword parameters, word-level renames accepting an overridden stdlib method,
+    business_consulting #125 evaluation.py check.'
 
 landed_item_count: 1

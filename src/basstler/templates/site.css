@@ -227,6 +227,7 @@ a.chip:hover { border-color: currentColor; }
 }
 .promote-button-disabled { border-style: dashed; opacity: 0.6; cursor: not-allowed; }
 .promote-reason { font-size: 0.75rem; color: var(--text-muted); }
+.promote-override { font-size: 0.75rem; font-weight: 600; color: var(--bad); cursor: pointer; }
 .item-links { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: 0.78rem; }
 .dependencies { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: 0.75rem; color: var(--text-muted); }
 .drift, .access-warning { color: var(--warn); font-size: 0.8rem; }

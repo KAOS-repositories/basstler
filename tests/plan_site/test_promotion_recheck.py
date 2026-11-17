@@ -1,6 +1,6 @@
 """
 Tests for the plan page's re-check of the Contribute button: what its pull request's
-draft state shows once GitHub answers in the browser.
+draft state, and an override of its failed checks, show in the browser.
 """
 
 from __future__ import annotations
@@ -13,14 +13,17 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from basstler.github.pull_request_record import PullRequestField
+from basstler.github.states import CombinedCheckState
 from basstler.github.pull_request_state import (
     ForkLineage,
     PullRequestRecord,
     PullRequestState,
 )
 from basstler.plan_site.__main__ import RepositorySite
+from basstler.plan_site.cards import PromotionAttribute
 from basstler.stack.promotability import PromotionBlocker
 
+from ..constants.stack import StackLabel
 from ..github.pull_request_api import api_pull_request
 from ..recorded_pull_requests import RecordedPullRequestSource
 from .first_plan import OPEN_PULL_REQUEST, PLAN_REPOSITORY
@@ -45,6 +48,11 @@ The Contribute button on an item's card.
 PROMOTION_REASON = ".promote-reason"
 """
 The text saying why the Contribute button is disabled.
+"""
+
+CHECKS_OVERRIDE = f"[{PromotionAttribute.CHECKS_OVERRIDE}]"
+"""
+The checkbox declaring an item ready despite its failed checks.
 """
 
 
@@ -119,3 +127,117 @@ def test_a_pull_request_turned_back_into_a_draft_disables_its_button(
     expect(open_item_card(browser_page).locator(PROMOTION_REASON)).to_have_text(
         PromotionBlocker.DRAFT.value
     )
+
+
+# %% overriding failed checks
+
+
+@pytest.fixture
+def a_failing_fork_source(
+    a_fork_source: RecordedPullRequestSource,
+) -> RecordedPullRequestSource:
+    """
+    The fork's open pull request out of draft, its checks failed.
+    """
+    a_fork_source.records[OPEN_PULL_REQUEST] = PullRequestRecord(
+        state=PullRequestState.OPEN,
+        draft=False,
+        base=LINEAGE.fork_default_branch,
+        check_state=CombinedCheckState.FAILURE,
+    )
+    return a_fork_source
+
+
+def open_failing_item_card(browser_page: Page, output: Path):
+    """
+    :param browser_page: The browser page to open the built site in.
+    :param output: The built site's root directory.
+    :return: The open item's card, its pull request answered as out of draft.
+    """
+    ready = api_pull_request(OPEN_PULL_REQUEST, {PullRequestField.DRAFT: False})
+    open_first_plan_page(browser_page, output, answers_with((HTTPStatus.OK, ready)))
+    return open_item_card(browser_page)
+
+
+def test_overriding_failed_checks_enables_the_button(
+    a_failing_fork_source: RecordedPullRequestSource,
+    site: RepositorySite,
+    browser_page: Page,
+    tmp_path: Path,
+):
+    site.build(tmp_path)
+    card = open_failing_item_card(browser_page, tmp_path)
+
+    card.locator(CHECKS_OVERRIDE).check()
+
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", re.compile(".+"))
+    expect(card.locator(PROMOTION_REASON)).to_have_text("")
+
+
+def test_withdrawing_the_override_disables_the_button_again(
+    a_failing_fork_source: RecordedPullRequestSource,
+    site: RepositorySite,
+    browser_page: Page,
+    tmp_path: Path,
+):
+    site.build(tmp_path)
+    card = open_failing_item_card(browser_page, tmp_path)
+
+    card.locator(CHECKS_OVERRIDE).check()
+    card.locator(CHECKS_OVERRIDE).uncheck()
+
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", re.compile(".*"))
+    expect(card.locator(PROMOTION_REASON)).to_have_text(
+        PromotionBlocker.CHECKS_FAILED.value
+    )
+
+
+def test_overriding_failed_checks_leaves_every_other_blocker(
+    a_failing_fork_source: RecordedPullRequestSource,
+    site: RepositorySite,
+    browser_page: Page,
+    tmp_path: Path,
+):
+    a_failing_fork_source.records[OPEN_PULL_REQUEST].labels.append(
+        StackLabel.NEEDS_RESOLUTION.value
+    )
+    site.build(tmp_path)
+    card = open_failing_item_card(browser_page, tmp_path)
+
+    card.locator(CHECKS_OVERRIDE).check()
+
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", re.compile(".*"))
+    expect(card.locator(PROMOTION_REASON)).to_have_text(PromotionBlocker.WITHHELD.value)
+
+
+def test_overriding_failed_checks_keeps_a_draft_disabled(
+    a_failing_fork_source: RecordedPullRequestSource,
+    site: RepositorySite,
+    browser_page: Page,
+    tmp_path: Path,
+):
+    site.build(tmp_path)
+    draft = api_pull_request(OPEN_PULL_REQUEST, {PullRequestField.DRAFT: True})
+    open_first_plan_page(browser_page, tmp_path, answers_with((HTTPStatus.OK, draft)))
+    card = open_item_card(browser_page)
+
+    card.locator(CHECKS_OVERRIDE).check()
+
+    expect(card.locator(PROMOTION_REASON)).to_have_text(PromotionBlocker.DRAFT.value)
+
+
+def test_overriding_failed_checks_works_when_github_refuses_the_recheck(
+    a_failing_fork_source: RecordedPullRequestSource,
+    site: RepositorySite,
+    browser_page: Page,
+    tmp_path: Path,
+):
+    site.build(tmp_path)
+    open_first_plan_page(
+        browser_page, tmp_path, answers_with((HTTPStatus.NOT_FOUND, {}))
+    )
+    card = open_item_card(browser_page)
+
+    card.locator(CHECKS_OVERRIDE).check()
+
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", re.compile(".+"))

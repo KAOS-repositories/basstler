@@ -18,6 +18,7 @@ from basstler.github.client import (
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import (
     PullRequestField,
+    PullRequestHead,
 )
 from basstler.github.pull_request_state import (
     ForkLineage,
@@ -127,6 +128,17 @@ class PullRequestSource(ABC):
         """
         return None
 
+    def upstream_pull_requests_of(
+        self, fork: Repository, lineage: ForkLineage
+    ) -> dict[str, int]:
+        """
+        :param fork: A repository that can be read and is a fork.
+        :param lineage: What it was forked from.
+        :return: The number of the open upstream pull request opened from each of its
+            branches; none when the source cannot tell.
+        """
+        return {}
+
     def live_pull_requests_of(
         self, references: Iterable[PullRequestReference]
     ) -> LivePullRequests:
@@ -141,9 +153,16 @@ class PullRequestSource(ABC):
             if failure is not None:
                 live_pull_requests.read_failures[reference.repository] = failure
                 continue
+            repository = str(reference.repository)
             lineage = self.fork_lineage_of(reference.repository)
-            if lineage is not None:
-                live_pull_requests.fork_lineages[str(reference.repository)] = lineage
+            if (
+                lineage is not None
+                and repository not in live_pull_requests.fork_lineages
+            ):
+                live_pull_requests.fork_lineages[repository] = lineage
+                live_pull_requests.upstream_pull_requests[repository] = (
+                    self.upstream_pull_requests_of(reference.repository, lineage)
+                )
             record = self.pull_request(reference)
             if record is not None:
                 live_pull_requests.pull_requests_by_repository.setdefault(
@@ -238,6 +257,14 @@ class GitHubPullRequestSource(PullRequestSource):
         return RepositoryDetails.from_json(
             self.repository_details[repository].body
         ).lineage
+
+    def upstream_pull_requests_of(
+        self, fork: Repository, lineage: ForkLineage
+    ) -> dict[str, int]:
+        return PullRequestHead.numbers_by_branch(
+            self.client_for(lineage.upstream_repository).open_pull_requests(),
+            fork.full_name,
+        )
 
     def pull_request(self, reference: PullRequestReference) -> PullRequestRecord | None:
         record = self.listed_or_read(reference)

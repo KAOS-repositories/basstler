@@ -396,3 +396,9 @@ class LivePullRequests:
     """
     The upstream of each readable repository that is a fork, by ``"owner/repo"``.
     """
+
+    upstream_pull_requests: dict[str, dict[str, int]] = field(default_factory=dict)
+    """
+    The number of the open upstream pull request opened from each branch, by the
+    ``"owner/repo"`` of the fork the branch is in.
+    """

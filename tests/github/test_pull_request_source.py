@@ -22,11 +22,12 @@ from basstler.github.pull_request_state import (
     PullRequestRecord,
     PullRequestState,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.repository_access import (
     CommitReport,
     GitHubRepository,
     GitHubRepositoryPath,
+    PullRequestListState,
 )
 from basstler.github.states import CombinedCheckState
 from basstler.plan.dependencies import DependencyResolver
@@ -276,7 +277,13 @@ def test_github_source_records_the_upstream_of_each_fork_it_read_pull_requests_o
     source = GitHubPullRequestSource(
         RecordedGitHubClient(
             responses={f"/{PLAN_REPOSITORY.api_path}": fork},
-            pages={listing_path(PLAN_REPOSITORY): [[]]},
+            pages={
+                listing_path(PLAN_REPOSITORY): [[]],
+                listing_path(
+                    Repository.parse(fork["parent"]["full_name"]),
+                    PullRequestListState.OPEN,
+                ): [[]],
+            },
         )
     )
     live_pull_requests = source.live_pull_requests_of(
@@ -284,4 +291,61 @@ def test_github_source_records_the_upstream_of_each_fork_it_read_pull_requests_o
     )
     assert live_pull_requests.fork_lineages == {
         str(PLAN_REPOSITORY): source.fork_lineage_of(PLAN_REPOSITORY)
+    }
+
+
+# %% reading the upstream pull requests opened from a fork
+
+
+def an_upstream_pull_request(
+    upstream: Repository, number: int, head_repository: Repository, branch: str
+) -> dict[str, Any]:
+    """
+    :param upstream: The repository the pull request is opened on.
+    :param number: Its number.
+    :param head_repository: The repository its head branch lives in.
+    :param branch: Its head branch.
+    :return: The open pull request, as the pulls API lists it.
+    """
+    return api_pull_request(
+        PullRequestReference(upstream, number),
+        {
+            PullRequestField.HEAD: {
+                PullRequestHeadKey.REFERENCE: branch,
+                PullRequestHeadKey.HEAD_REPOSITORY: {
+                    PullRequestHeadKey.FULL_NAME: head_repository.full_name
+                },
+                PullRequestHeadKey.COMMIT: SiteSampleText.HEAD_COMMIT.value,
+            }
+        },
+    )
+
+
+def test_github_source_records_the_upstream_pull_request_of_each_fork_branch():
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    upstream = Repository.parse(fork["parent"]["full_name"])
+    elsewhere = Repository("another-owner", "another-fork")
+    source = GitHubPullRequestSource(
+        RecordedGitHubClient(
+            responses={f"/{PLAN_REPOSITORY.api_path}": fork},
+            pages={
+                listing_path(PLAN_REPOSITORY): [[]],
+                listing_path(upstream, PullRequestListState.OPEN): [
+                    [
+                        an_upstream_pull_request(
+                            upstream, 7, PLAN_REPOSITORY, "a-branch"
+                        ),
+                        an_upstream_pull_request(
+                            upstream, 8, elsewhere, "a-branch-of-another-fork"
+                        ),
+                    ]
+                ],
+            },
+        )
+    )
+    live_pull_requests = source.live_pull_requests_of(
+        DependencyResolver(FIRST_PLAN).pull_request_references
+    )
+    assert live_pull_requests.upstream_pull_requests == {
+        str(PLAN_REPOSITORY): {"a-branch": 7}
     }

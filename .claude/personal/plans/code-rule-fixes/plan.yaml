@@ -23,8 +23,10 @@ items:
   pull_request_number: 222
   blockers:
     - >-
-      Review of #222 answered at 59f12519: 11 threads done and resolved, 7 answered and left open
-      for the owner, one asking whether to move the other modules onto TextFile.
+      Base #220 conflicts with main in src/basstler/setup/personal_notes.py, so the maintenance pass
+      leaves #222 unpublished; resolve #220 first. Open threads on #222 are answered questions
+      awaiting the owner, among them whether to move the other modules onto TextFile. Checks of head
+      d7373151 not read.
   notes: 'Draft #222, stacked on #220. basstler.code_modification (specifications, NodeReplacement
     with exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
     SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107 of #220''s 129 .py files;

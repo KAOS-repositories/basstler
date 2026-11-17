@@ -12,9 +12,6 @@ tracks:
 - id: triage
   name: Classify, report and mark viewed
   wave: triage
-- id: pattern-fixes
-  name: Rule fixes applied and proven mechanical
-  wave: triage
 - id: windows
   name: The Windows fixes the triage is proven on
   wave: triage
@@ -29,15 +26,11 @@ items:
   branch: ccr-37402cb7-cls5ht-keyword-arguments
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 214
-  notes: 'Draft #214, stacked on #213: signature-checked keyword-argument judgment, and rename
-    sources for module moves, definitions moved between modules and moved file paths in prose;
-    relative imports resolved per file, templates and empty package initializers judged. CRAM
-    #967: 123 of 154 files mechanical; #210: 233 of 246.
-
-
-    Split: the moves and the general triage go to move-triage; #214 is restacked onto it and
-    keeps keyword_arguments, calls, signatures and tree_matching with their tests and datasets,
-    supplying KeywordArgumentComparison.'
+  notes: 'Draft #214, stacked on #226 and restacked onto it by merge at f7d1e807 (175 triage
+    and git tests, ruff and code-rules pass on Windows; CI not read). Keeps keyword_arguments,
+    calls, signatures and tree_matching, supplying KeywordArgumentComparison and the call
+    resolution binding-renames builds on. CRAM #967: 123 of 154 files mechanical; #210: 233
+    of 246.'
 - id: viewed-marking-workflow
   title: Mark files viewed on every pull request, from Actions or your own computer
   track: triage
@@ -64,60 +57,6 @@ items:
 
     #221 merges only after #215: #221's mark-viewed.yml calls #215's reusable
     review-triage-mark-viewed.yml.
-- id: rule-fixes
-  title: Declare reversible fixes on code rules and apply them with code-rules fix
-  track: pattern-fixes
-  status: in progress
-  recommended_model: opus
-  branch: claude/pattern-checkers-mechanical-marking-arg9pe
-  session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
-  pull_request_number: 222
-  blockers:
-    - >-
-      Review of #222 answered at 59f12519: 11 threads done and resolved, 7 answered and left open
-      for the owner, one asking whether to move the other modules onto TextFile.
-  notes: 'Draft #222, stacked on #220. basstler.code_modification (specifications, NodeReplacement
-    with exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
-    SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107 of #220''s 129 .py files;
-    examples under tests/dataset/rule-fixes tested automatically.
-
-    '
-- id: directory-and-bash-fixes
-  title: Fixes for directory removal and bash started by name
-  track: pattern-fixes
-  branch: claude/kind-bohr-db512e
-  pull_request_number: 227
-  session: https://claude.ai/code/session_018wfiv9JCt7E3PATWtKuv68
-  depends_on:
-  - rule-fixes
-  status: in progress
-  recommended_model: sonnet
-  notes: rmtree(x) becomes DirectoryTree(x).remove(); with ignore_errors=True the fix keeps
-    ignoring errors through a declared DirectoryTree option, unless the rule wants it to raise,
-    and declares that. Bash.locate fix only where an environment is in scope.
-- id: rule-fix-triage
-  title: Prove a file mechanical when recomputing a rule's fix on the base reproduces the head
-  track: pattern-fixes
-  depends_on:
-  - move-triage
-  - rule-fixes
-  status: not started
-  recommended_model: opus
-  notes: 'Done when #220''s rule-fix files (107 of 129 from the UTF-8 fix) are marked mechanical,
-    run from this item''s branch. basstler-review-triage depends on basstler-rules; a new
-    change kind names the rule. Mark #220 only once windows-suite stops pushing. Stack on the
-    highest pushed pattern-fixes branch (#227 or #228, else #222). Check: basstler review-triage
-    report 220, run from this branch, lists those files as mechanical.'
-- id: reduced-review-diff
-  title: Show a reviewer only what is left once rule fixes are reversed
-  track: pattern-fixes
-  depends_on:
-  - rule-fix-triage
-  status: not started
-  recommended_model: sonnet
-  notes: For a file mixing a rule fix and a real change, reverse the fix's actions on the
-    head and show the remaining diff against the base in the report.
-
 - id: move-triage
   title: Prove module, definition and file moves mechanical
   track: triage
@@ -145,22 +84,6 @@ items:
     regenerating it from the head's sources reproduces the head's file. Each generated file
     and its generator are declared once, not hardcoded in the triage.
 
-- id: portability-fixes
-  title: Fixes for file URLs and paths written into git and shell text
-  track: pattern-fixes
-  branch: claude/loving-maxwell-s1y58z
-  pull_request_number: 228
-  session: https://claude.ai/code/session_018wfiv7tGSxnxF2wRvV9Fa4
-  depends_on:
-  - rule-fixes
-  status: in progress
-  recommended_model: opus
-  notes: 'Two patterns #220 applied by hand: a file:// URL built from a path becomes Path.as_uri();
-    str(path) in git or shell command text becomes as_posix(), only if a checker can tell
-    reliably that it sits in command text, otherwise that half is dropped and the item says
-    so. Done when code-rules fix reproduces #220''s hand edits and rule-fix-triage marks those
-    files mechanical.'
-
 - id: windows-suite
   title: Make the suite pass on Windows
   track: windows
@@ -176,19 +99,6 @@ items:
     win32, naming the limit. Push only through basstler.sh maintenance push; a push restacks #222 and
     clears Viewed. Update these notes per push; after this order''s last push, run goal pushes-done
     on this item.'
-- id: action-plan-triage
-  title: Prove a file mechanical when replaying a recorded code modification plan reproduces
-    the head
-  track: pattern-fixes
-  depends_on:
-  - rule-fix-triage
-  - basstler-packages/uv-workspace
-  status: not started
-  recommended_model: opus
-  notes: 'Done when #223''s moved files are marked mechanical. A new change kind names the
-    plan. Next: decide how a commit records the plan it applied; nothing stores #223''s
-    relocation plan replayably yet. uv-workspace supplies the file actions it replays.'
-
 - id: actions-marking
   title: Install the mark-viewed workflow in this repository
   track: triage
@@ -207,9 +117,6 @@ items:
   track: windows
   depends_on:
   - windows-suite
-  - rule-fix-triage
-  depends_on_merged:
-  - rule-fix-triage
   depends_on_pushes_done:
   - windows-suite
   status: not started
@@ -221,24 +128,6 @@ items:
     review #220: it shrinks that review''s diff. It waits for windows-suite''s last push to be recorded
     (goal pushes-done), and waits again if #220 is pushed after it, since every push clears Viewed.
     The report lists what will be marked; read it before marking.'
-- id: mark-223-viewed
-  title: 'Mark #223''s mechanical files viewed'
-  track: pattern-fixes
-  depends_on:
-  - action-plan-triage
-  - basstler-packages/uv-workspace
-  depends_on_pushes_done:
-  - basstler-packages/uv-workspace
-  status: not started
-  performed_by: owner
-  commands:
-  - basstler review-triage report 223
-  - basstler review-triage mark-viewed 223
-  notes: 'Run on your own computer from action-plan-triage''s branch, which carries the proof that #223''s
-    moved files are mechanical, and before you review #223. It waits for uv-workspace''s last push to
-    be recorded (goal pushes-done), and again after any later push to #223. The report lists what will
-    be marked; read it before marking.'
-
 - id: move-split
   title: Split every proven mechanical change out of a pull request, and leave one sample
     per rename unviewed
@@ -247,11 +136,26 @@ items:
   pull_request_number: 241
   depends_on:
   - move-triage
+  - binding-renames
   status: in progress
   recommended_model: opus
   notes: 'Draft #241 at 15dee971, on #226. split-mechanical: statement-level mechanical
     commit proven with the PR''s renames, head tree after, summary in the description.
     Samples: one unviewed file per rename. Local splits: CRAM 609 3435 to 1455 lines,
-    business_consulting 125 2757 to 2084. CI not read. Retarget to main once #226 lands.'
+    business_consulting 125 2757 to 2084. CI not read. Next: restack onto binding-renames
+    once it is built, adapting SourceRenaming, the samples and the summary to binding renames.'
 
+- id: binding-renames
+  title: Prove a rename of one class, function, attribute, parameter or variable mechanical
+  track: triage
+  depends_on:
+  - keyword-argument-triage
+  status: not started
+  recommended_model: opus
+  notes: 'Stacked on #214; #241 restacks onto it. A rename belongs to a binding, not a word:
+    each old token resolves to its binding (symtable, DefinitionIndex for self/cls, #214''s
+    call resolution for keywords), accepted when every occurrence changes alike without
+    capture. An unresolved receiver''s attribute passes only when every repository class with
+    that member renames it alike; prose only in the binding''s scope or qualified references.
+    Done when business_consulting #125''s evaluation.py shows only its models change.'
 landed_item_count: 1

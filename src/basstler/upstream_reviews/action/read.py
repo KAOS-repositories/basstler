@@ -19,7 +19,7 @@ from basstler.upstream_reviews.action.exchange import (
     ActionAnswer,
     ActionRequest,
 )
-from basstler.upstream_reviews.action.recording import ActionResult
+from basstler.upstream_reviews.action.recording import ActionJSONKey, ActionResult
 from basstler.upstream_reviews.exceptions import (
     ActionNotInstalled,
     ActionResultMissing,
@@ -128,12 +128,17 @@ class ActionRead[AnswerType: ActionAnswer]:
 
     def collect(self) -> AnswerType | None:
         """
-        :return: The result on :attr:`request_branch`, ``None`` until its run commits one.
+        :return: The result on :attr:`request_branch` that answers this request, ``None``
+            until its run commits one. A result of another request, such as one the
+            Action branch carried when the request branch was cut from it, is not it.
         """
         text = self.request_branch.read_latest(ActionFile.RESULT)
         if text is None:
             return None
-        return self.answer_type.from_json(json.loads(text))
+        data = json.loads(text)
+        if data[ActionJSONKey.REQUEST_IDENTIFIER] != self.request.identifier:
+            return None
+        return self.answer_type.from_json(data)
 
     def discard_request_branch(self) -> None:
         """

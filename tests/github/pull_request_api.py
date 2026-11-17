@@ -54,13 +54,16 @@ def api_pull_request(
 # %% paths and answers
 
 
-def listing_path(repository: Repository) -> str:
+def listing_path(
+    repository: Repository, state: PullRequestListState = PullRequestListState.ALL
+) -> str:
     """
     :param repository: The repository whose pull requests are listed.
-    :return: The path every pull request of it is listed from.
+    :param state: Which of its pull requests are listed.
+    :return: The path they are listed from.
     """
     return (
-        f"/{repository.api_path}/pulls?state={PullRequestListState.ALL.query}"
+        f"/{repository.api_path}/pulls?state={state.query}"
         f"&per_page={GitHubRepository.page_size}"
     )
 

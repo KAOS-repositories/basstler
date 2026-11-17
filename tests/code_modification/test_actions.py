@@ -8,7 +8,11 @@ from __future__ import annotations
 import libcst
 import pytest
 
-from basstler.code_modification.actions import ActionPlan, NodeReplacement
+from basstler.code_modification.actions import (
+    ActionPlan,
+    ImportInsertion,
+    NodeReplacement,
+)
 from basstler.code_modification.exceptions import ActionTargetMissingError
 from basstler.code_modification.positions import PositionedModule
 
@@ -93,3 +97,69 @@ def test_a_plan_is_undone_in_the_reverse_order_it_was_applied(two_calls):
     applied = plan.apply(two_calls.module)
 
     assert applied.inverse.apply(applied.module).module.code == two_calls.module.code
+
+
+# %% inserting an import
+
+
+@pytest.fixture
+def text_file_import() -> libcst.SimpleStatementLine:
+    """
+    :return: The statement importing :class:`~basstler.text_file.TextFile`.
+    """
+    return libcst.parse_statement("from basstler.text_file import TextFile\n")
+
+
+@pytest.fixture
+def imports() -> libcst.Module:
+    """
+    :return: The module that imports :mod:`os`.
+    """
+    return libcst.parse_module(
+        CodeModificationSnippet.IMPORTS.read_text(encoding="utf-8")
+    )
+
+
+def test_an_import_follows_the_last_import_of_the_module(imports, text_file_import):
+    """
+    The statement is inserted right after the module's last import.
+    """
+    applied = ImportInsertion(text_file_import).apply(imports)
+
+    assert applied.module.code == (
+        CodeModificationSnippet.IMPORTS_WITH_TEXT_FILE.read_text(encoding="utf-8")
+    )
+
+
+def test_an_import_the_module_already_has_is_not_inserted_again(
+    imports, text_file_import
+):
+    """
+    Inserting an import twice changes the module once.
+    """
+    once = ImportInsertion(text_file_import).apply(imports).module
+
+    assert ImportInsertion(text_file_import).apply(once).module.code == once.code
+
+
+def test_the_inverse_of_an_import_restores_the_module_exactly(
+    imports, text_file_import
+):
+    """
+    Undoing the insertion gives back the source it was applied to.
+    """
+    applied = ImportInsertion(text_file_import).apply(imports)
+
+    assert applied.inverse.apply(applied.module).module.code == imports.code
+
+
+def test_the_inverse_of_an_import_already_there_changes_nothing(
+    imports, text_file_import
+):
+    """
+    An insertion that changed nothing is undone by changing nothing.
+    """
+    once = ImportInsertion(text_file_import).apply(imports).module
+    applied = ImportInsertion(text_file_import).apply(once)
+
+    assert applied.inverse.apply(applied.module).module.code == once.code

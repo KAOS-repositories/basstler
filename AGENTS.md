@@ -171,6 +171,7 @@
 ## Portability
 <!-- from PortabilityRules in basstler/code_rules/rules/project.py -->
 - Start bash through `basstler.bash.Bash`, never by its name: Windows resolves a bare `bash` to WSL's launcher instead of Git Bash (checked by `basstler code-rules check`)
+- Read and write text through `basstler.text_file.TextFile`, never with a path's `read_text` and `write_text`: it is always UTF-8, so no caller spells the encoding (checked by `basstler code-rules check`)
 - Read and write text as UTF-8: pass `encoding="utf-8"` to every `read_text`, `write_text`, text-mode `open` and `subprocess` call that decodes its output, never `text=True`. Windows falls back to a code page that cannot encode most of Unicode (checked by `basstler code-rules check`)
 - Remove a directory through `basstler.directory_tree.DirectoryTree`, never with `shutil.rmtree`: Windows refuses to delete the read-only object files git leaves in a clone (checked by `basstler code-rules check`)
 

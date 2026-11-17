@@ -90,6 +90,102 @@ class NodeReplacement(Action):
         )
 
 
+# %% statements
+
+
+@dataclass(frozen=True)
+class StatementRemoval(Action):
+    """
+    Removes a statement from the top level of a module.
+    """
+
+    statement: libcst.SimpleStatementLine
+    """
+    The statement removed, which the module must hold at its top level.
+    """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        index = next(
+            (
+                position
+                for position, candidate in enumerate(module.body)
+                if candidate.deep_equals(self.statement)
+            ),
+            None,
+        )
+        if index is None:
+            raise ActionTargetMissingError(
+                PositionedModule(module).positions[module.body[0]],
+                type(self.statement).__name__,
+            )
+        body = [*module.body[:index], *module.body[index + 1 :]]
+        return AppliedAction(
+            module.with_changes(body=body), StatementInsertion(index, self.statement)
+        )
+
+
+@dataclass(frozen=True)
+class StatementInsertion(Action):
+    """
+    Puts a statement at one position of a module's top level.
+    """
+
+    index: int
+    """
+    The position of the statement among the module's top-level statements.
+    """
+
+    statement: libcst.SimpleStatementLine
+    """
+    The statement inserted.
+    """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        body = [*module.body[: self.index], self.statement, *module.body[self.index :]]
+        return AppliedAction(
+            module.with_changes(body=body), StatementRemoval(self.statement)
+        )
+
+
+@dataclass(frozen=True)
+class ImportInsertion(Action):
+    """
+    Imports a name in a module that does not import it yet, after the module's last
+    import.
+    """
+
+    statement: libcst.SimpleStatementLine
+    """
+    The import statement.
+    """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        if any(candidate.deep_equals(self.statement) for candidate in module.body):
+            return AppliedAction(module, ActionPlan())
+        return StatementInsertion(self.insertion_index(module), self.statement).apply(
+            module
+        )
+
+    @staticmethod
+    def insertion_index(module: libcst.Module) -> int:
+        """
+        :return: The position after the module's last import, or after its docstring
+            where it imports nothing.
+        """
+        last_import = max(
+            (
+                position
+                for position, candidate in enumerate(module.body)
+                if isinstance(candidate, libcst.SimpleStatementLine)
+                and isinstance(candidate.body[0], libcst.Import | libcst.ImportFrom)
+            ),
+            default=None,
+        )
+        if last_import is not None:
+            return last_import + 1
+        return 1 if module.get_docstring(clean=False) is not None else 0
+
+
 # %% plans
 
 

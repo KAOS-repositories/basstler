@@ -847,6 +847,17 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
     """
 
+    IMPORTS = DIRECTORY / "imports.py.txt"
+    """
+    A module that imports :mod:`os` and calls nothing from it but :data:`os.name`.
+    """
+
+    IMPORTS_WITH_TEXT_FILE = DIRECTORY / "imports-with-text-file.py.txt"
+    """
+    :attr:`IMPORTS` with :class:`~basstler.text_file.TextFile` imported after
+    :mod:`os`.
+    """
+
     NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
     """
     A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`
@@ -920,6 +931,29 @@ class RuleFixExampleFile(StrEnum):
     AFTER = "after.py"
     """
     The same code once fixed, exactly as the fix writes it.
+    """
+
+
+class TextFileUsageSnippet(PathEnumeration):
+    """
+    Source files the check for text read or written without a text file reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "text-file-usage"
+    """
+    The directory holding them.
+    """
+
+    PATH_TEXT_CALLS = DIRECTORY / "path-text-calls.py"
+    """
+    Four reads and writes of a path's text, one per line from line 10: each as UTF-8
+    and in the locale encoding.
+    """
+
+    KEPT_CALLS = DIRECTORY / "kept-calls.py"
+    """
+    Reads and writes a text file cannot do: another encoding, error handling and
+    newline translation, and a read of bytes.
     """
 
 

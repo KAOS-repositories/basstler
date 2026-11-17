@@ -18,6 +18,7 @@ from basstler.code_modification.actions import (
     Action,
     ActionPlan,
     AppliedAction,
+    ImportInsertion,
     NodeReplacement,
 )
 from basstler.code_modification.positions import PositionedModule
@@ -78,6 +79,13 @@ class CodeFix[SpecificationType: Specification](ABC):
         """
         How the fixed code behaves compared with the code it replaces.
         """
+
+    @classproperty
+    def required_import(cls) -> libcst.SimpleStatementLine | None:
+        """
+        The import statement the replacement needs in the module, if any.
+        """
+        return None
 
     @abstractmethod
     def replacement(self, specification: SpecificationType) -> libcst.CSTNode:
@@ -225,9 +233,15 @@ class SourceFixer:
             places breaking a rule as there were before it.
         """
         inverses: list[Action] = []
+        imports: list[libcst.SimpleStatementLine] = []
         module = source_file.parse()
         places = self.places(module)
         while places:
+            imports.extend(
+                place.fix.required_import
+                for place in places
+                if place.fix.required_import is not None
+            )
             applied = self.round_of_fixes(places).apply(module)
             module = applied.module
             inverses.append(applied.inverse)
@@ -239,6 +253,10 @@ class SourceFixer:
                     )
                 )
             places = remaining
+        for statement in imports:
+            applied = ImportInsertion(statement).apply(module)
+            module = applied.module
+            inverses.append(applied.inverse)
         return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))
 
     def places(self, module: libcst.Module) -> list[FixablePlace]:

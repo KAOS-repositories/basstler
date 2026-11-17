@@ -150,3 +150,19 @@ items:
     not a read by eye), then sort each: announcement, an item''s notes, or a structural change asked
     first. The last handled comment is recorded on the plan; session start counts the unhandled ones.
     Today skills read comments only as context for their item, and nothing records what was handled.'
+
+- id: verdict-actions
+  title: An owner's verdict step offers Accept & split, Keep iterating and Drop as copyable skill commands
+  branch: ccr-a67cc403-e7bqv8
+  pull_request_number: null
+  track: finishing
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet
+  session: https://claude.ai/code/session_018wfiv9k6sCx5uYKVxX4fgM
+  notes: 'Feedback from using the goal-paths verdict step: its card only said what to tell a session. An
+    owner item with decision: experiment-verdict now shows a button per answer on the plan and goal
+    pages, each copying /plan-experiment-verdict <plan>/<item> accept|iterate|drop, with the owner''s
+    request appended; iterate refuses to copy without one. Built on experiment/goal-paths, no PR yet.
+    The options are fixed in code today; they should come from experiment-record''s declared stage
+    moves, as the hub''s links will. goal-paths/verdict does not declare the decision yet.'

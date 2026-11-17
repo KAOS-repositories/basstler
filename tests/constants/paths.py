@@ -847,6 +847,16 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
     """
 
+    RENAMED_SYMBOL_BEFORE = DIRECTORY / "renamed-symbol-before.py"
+    """
+    A class and every kind of place that names it, some of which are only text.
+    """
+
+    RENAMED_SYMBOL_AFTER = DIRECTORY / "renamed-symbol-after.py"
+    """
+    :attr:`RENAMED_SYMBOL_BEFORE` once the class is renamed.
+    """
+
     NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
     """
     A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`

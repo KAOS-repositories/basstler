@@ -11,6 +11,7 @@ from enum import StrEnum
 
 from basstler.exit_codes import StackExitCode
 from basstler.maintenance.fast_forward import FastForwardOutcome, FastForwardReport
+from basstler.maintenance.landed_closing import ClosedAsLanded
 from basstler.maintenance.promotion import Promotion
 from basstler.maintenance.restack_steps import BranchOutcome, RestackOutcome
 from basstler.maintenance.upstream_pull_request_synchronization import (
@@ -95,7 +96,18 @@ class MaintenanceReport:
 
     landed: tuple[str, ...] = ()
     """
-    The branches whose own commits are already in the upstream base.
+    The branches whose own commits are already in the upstream base and whose pull
+    request this pass did not close.
+    """
+
+    closed_as_landed: tuple[ClosedAsLanded, ...] = ()
+    """
+    The pull requests this pass closed because their work had landed upstream.
+    """
+
+    closing_follow_ups: tuple[str, ...] = ()
+    """
+    What became of each follow-up to those closings that had something to do.
     """
 
     promotable: tuple[str, ...] = ()
@@ -124,6 +136,8 @@ class MaintenanceReport:
         upstream_pull_request_synchronization_changes: Sequence[
             UpstreamPullRequestSynchronizationChange
         ] = (),
+        closed_as_landed: Sequence[ClosedAsLanded] = (),
+        closing_follow_ups: Sequence[str] = (),
     ) -> MaintenanceReport:
         """
         Assemble one pass's outcomes and its leftovers into a single report.
@@ -136,6 +150,8 @@ class MaintenanceReport:
             removed.
         :param upstream_pull_request_synchronization_changes: The writes bringing each pull request's in-review
             label and upstream link in step.
+        :param closed_as_landed: The pull requests closed because their work landed.
+        :param closing_follow_ups: What became of each follow-up to those closings.
         :return: The report.
         """
         return cls(
@@ -147,7 +163,13 @@ class MaintenanceReport:
                 upstream_pull_request_synchronization_changes
             ),
             reparents=tuple(stack.reparents()),
-            landed=tuple(branch.name for branch in stack.landed_branches()),
+            landed=tuple(
+                branch.name
+                for branch in stack.landed_branches()
+                if branch.name not in {closed.branch for closed in closed_as_landed}
+            ),
+            closed_as_landed=tuple(closed_as_landed),
+            closing_follow_ups=tuple(closing_follow_ups),
             promotable=tuple(branch.name for branch in stack.promotion_order()),
             skipped=tuple(stack.skipped_pull_requests()),
             fork_refresh=stack.fork_refresh,

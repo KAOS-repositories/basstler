@@ -151,9 +151,12 @@ items:
 - id: binding-renames
   title: Prove a rename of one class, function, attribute, parameter or variable mechanical
   track: triage
+  branch: review-triage-binding-renames
+  pull_request_number: 253
+  session: local_d7fe7b54-32e5-46ac-b1a1-e8cac12d7aa6
   depends_on:
   - keyword-argument-triage
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'Stacked on #214; #241 restacks onto it. A rename belongs to a binding, not a word:
     each old token resolves to its binding (symtable, DefinitionIndex for self/cls, #214''s

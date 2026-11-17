@@ -292,6 +292,14 @@ notes settings, without asking. Any other repository, and any other tool, gets n
 asks as before. Whether Claude Code's permission classifier still has the last word over a hook's `allow` is
 Claude Code's own behaviour, not something the hook controls.
 
+## Running the fast-forward without a prompt
+
+A second `PreToolUse` hook, on `Bash` ([`basstler.plan_site.maintenance_approval`](../../src/basstler/plan_site/maintenance_approval.py)),
+allows exactly `basstler.sh maintenance fast-forward` without asking, however the skill spells the plugin
+root. Any other command, including this one with an extra argument or anything chained to it, gets no
+answer, so Claude Code asks as before. As with the attach hook, Claude Code's own permission
+classifier may still have the last word.
+
 ## Safety
 
 - Does nothing until you create the notes branch: `git fetch` finds nothing, so `CLAUDE.local.md` is

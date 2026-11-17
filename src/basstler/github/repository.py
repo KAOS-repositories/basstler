@@ -365,6 +365,14 @@ class Repository:
         """
         return f"{self.pull_requests_path}/{number}"
 
+    def compare_path(self, base: str) -> str:
+        """
+        :param base: What the head is compared with: a branch, or ``owner:branch`` for
+            one in another repository of the same network.
+        :return: The REST path of the comparison, which the head follows after ``...``.
+        """
+        return f"{self.api_path}/compare/{base}"
+
     def workflow_run_path(self, run: int) -> str:
         """
         :param run: The Actions workflow run's own number.

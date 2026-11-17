@@ -77,8 +77,11 @@ class PromotionReadiness:
     @property
     def blockers(self) -> list[PromotionBlocker]:
         """
-        :return: Every reason the branch may not be promoted, empty when it may.
+        :return: Every reason the branch may not be promoted, empty when it may; an
+            open upstream pull request is the only one given, as it makes the rest moot.
         """
+        if self.status is BranchStatus.IN_REVIEW:
+            return [PromotionBlocker.IN_REVIEW]
         return [
             blocker
             for blocker, applies in (

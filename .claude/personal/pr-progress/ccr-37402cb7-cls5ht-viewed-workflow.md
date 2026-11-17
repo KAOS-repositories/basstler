@@ -1,16 +1,12 @@
 ## Plan
-
-Resolve the owner's review of 1c54d6ff inside this PR (remodel here; on a fork, propose upstream).
+- Resolve the owner's review of 3be60760 (15 new threads, 2026-11-17):
+  - Rules: a field shared by several classes lives in one mixin; a field takes the most specific correct type.
+  - One concept per thing: `RepositoryBranch(Branch)`; `PullRequestEnds` (base, head) for the form, the file proposal, the merge-workflow proposal and `NewPullRequest`; `PullRequestEnd(GitObject, Branch)` replacing `RestPullRequestHead`; one base for `BranchReference`/`NewBranch`; `BranchFile` for `FileCommit`/`NewFileForm`; listing filters from the ends.
+  - `workflow` -> `workflow_path` (one mixin); `GitHubAccountPage` -> `NewTokenPage`, used by the plan site too.
+  - Answer the questions (ValidatedJSONModel is a dataclass, why the secret read binds metadata, why file and fork steps fall to the user, per-reviewer marking).
 
 ## Done
-
-- 7ec5fc52: addresses on Repository, BasstlerProject, PrefilledForm/UrlQueryParameter, GitObject/EncodedContent/FileCommit, RepositoryRead/SettingWrite, user_steps, ActionsSecret, fork proposal upstream, tests strengthened.
-- 3be60760: two new code rules (+ HandBuiltAddressChecker), Repository.actions_secret_path with path_on on top (user's choice), Repository.from_name_or_remote, docs/skill for the fork contract.
-- Replied to all 83 threads; 71 resolved, 12 open for the owner.
-- Description updated; clean with main at 66d52e2c.
+- main merged by the maintenance pass (head e05ec18b, clean against main d576e5a9).
 
 ## Next
-
-- Read CI's pytest jobs on 3be60760.
-- Owner's answers on the 12 open threads (Specification design, wider remodel, per-reviewer marking plan item, recommending the setup step).
-- Carry the fix into #219 (GitHubAccountPage, from_requested_use, SiteRepository token pages).
+- Tests first, then the refactor; full suite, ruff, code-rules check; push; restack #221; reply to every thread.

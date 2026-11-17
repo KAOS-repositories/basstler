@@ -159,10 +159,11 @@ items:
   - keyword-argument-triage
   status: in progress
   recommended_model: opus
-  notes: 'Stacked on #214; #241 restacks onto it. A rename belongs to a binding, not a word:
-    each old token resolves to its binding (symtable, DefinitionIndex for self/cls, #214''s
-    call resolution for keywords), accepted when every occurrence changes alike without
-    capture. An unresolved receiver''s attribute passes only when every repository class with
-    that member renames it alike; prose only in the binding''s scope or qualified references.
-    Done when business_consulting #125''s evaluation.py shows only its models change.'
+  notes: 'Draft #253 on #214 (4d13d564 merged in). Module-level members done: detection pairs
+    old and new top-level names by mutual dominance in the diff; each base occurrence is resolved
+    through scopes, imports, re-exports and module attributes, and only proven ones are
+    rewritten; capture and unproven bindings leave the file for review. CRAM 527 from the merge
+    base: 333 to 90 of 335 files need review. CI not read. Next: methods and attributes through
+    self/cls and receivers, keyword parameters, business_consulting #125 evaluation.py check.'
+
 landed_item_count: 1

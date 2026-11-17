@@ -37,7 +37,7 @@ items:
   pull_request_number: 223
   session: https://claude.ai/code/session_01JxHGiNXmsDWbDmd81sWCfP
   depends_on:
-  - review-triage/rule-fixes
+  - code-rule-fixes/rule-fixes
   status: in progress
   recommended_model: sonnet
   notes: >
@@ -46,7 +46,7 @@ items:
     at 297ef48f, as notes' does. Next: restack onto #222, which now carries #213; move
     basstler.review_triage and #213's other new files into packages/ as its own distribution with
     a replayable code_modification action plan, committing its script for
-    review-triage/action-plan-triage; then read CI. Open: shared test helpers pull the stack into
+    code-rule-fixes/action-plan-triage; then read CI. Open: shared test helpers pull the stack into
     lower distributions' dev groups; no file is marked viewed yet.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing

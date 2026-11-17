@@ -121,3 +121,30 @@ class CheckSetupFailedError(CommandFailure, DataclassException, RuntimeError):
 
     def suggest_correction(self) -> str:
         return "fix what its standard error names, then run the setup again"
+
+
+@dataclass
+class UnknownSkillError(CommandFailure, DataclassException, LookupError):
+    """
+    Raised when the setup gate is asked for a skill it does not gate.
+    """
+
+    @classproperty
+    def exit_code(cls) -> PersonalNotesSetupExitCode:
+        """:return: The status this kind of error ends a command with."""
+        return PersonalNotesSetupExitCode.USAGE
+
+    skill_name: str
+    """
+    The name asked for.
+    """
+    gated_skill_names: list[str]
+    """
+    The names of the skills the gate knows.
+    """
+
+    def error_message(self) -> str:
+        return f"no gated skill is named '{self.skill_name}'"
+
+    def suggest_correction(self) -> str:
+        return f"name one of: {', '.join(self.gated_skill_names)}"

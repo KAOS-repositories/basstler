@@ -33,9 +33,9 @@ class Rename:
     The identifier the head commit uses in its place.
     """
 
-    found_by: RenameSource
+    found_by: RenameSource = field(compare=False)
     """
-    The rename source that found it.
+    The rename source that found it; renames that differ only in it are equal.
     """
 
     is_file_path: bool = False

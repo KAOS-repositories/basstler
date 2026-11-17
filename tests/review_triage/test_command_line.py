@@ -10,6 +10,7 @@ from cyclopts import CycloptsError
 from basstler.github.pull_request_changes import (
     CommitStart,
     LastCommitsStart,
+    LastReviewStart,
     MergeBaseStart,
 )
 from basstler.review_triage.command_line import (
@@ -23,16 +24,19 @@ from basstler.review_triage.declaration import TriageDeclaration
 
 
 @pytest.mark.parametrize(
-    ("since", "last", "start"),
+    ("since", "last", "from_merge_base", "start"),
     [
-        ("abc123", None, CommitStart("abc123")),
-        (None, 3, LastCommitsStart(3)),
-        (None, None, MergeBaseStart()),
+        ("abc123", None, False, CommitStart("abc123")),
+        (None, 3, False, LastCommitsStart(3)),
+        (None, None, True, MergeBaseStart()),
+        (None, None, False, LastReviewStart()),
     ],
 )
-def test_the_options_choose_where_the_triage_starts(since, last, start):
+def test_the_options_choose_where_the_triage_starts(
+    since, last, from_merge_base, start
+):
     publication = TriagePublication.from_arguments(
-        7, None, TriageDeclaration(), since, last
+        7, None, TriageDeclaration(), since, last, from_merge_base=from_merge_base
     )
     assert publication.start == start
 
@@ -44,6 +48,7 @@ def test_the_options_choose_where_the_triage_starts(since, last, start):
     "options",
     [
         ("--since", "abc123", "--last", "2"),
+        ("--since", "abc123", "--from-merge-base"),
         ("--last", "0"),
     ],
 )

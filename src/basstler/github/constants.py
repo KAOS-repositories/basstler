@@ -94,6 +94,16 @@ class MaintenanceText(StrEnum):
     parent, with the parent's name to fill in.
     """
 
+    LANDED_COMMENT = (
+        "Closed by a maintenance pass: every commit of `{branch}` is in `{base}`, so "
+        "its work has landed. GitHub records no merge for a pull request that is not "
+        "based on the branch it landed in, so it stayed open."
+    )
+    """
+    What a pull request is told when it is closed because its work landed, with its
+    branch and the upstream base to fill in.
+    """
+
     PROMOTION_HEADING = "## Promote"
     """
     Heading the compare-and-create link is written under, in the fork pull request's own
@@ -125,6 +135,16 @@ class MaintenanceNotice(StrEnum):
     )
     """
     The project is not a fork, so the pass leaves out every step that needs an upstream.
+    """
+
+    LANDED_BRANCH_UNREADABLE = (
+        "`{branch}` is in the upstream base but its commits cannot be counted, because "
+        "`{base}` or `{head}` is not in this clone: its pull request was not closed. "
+        "Fetch the fork and run the pass again."
+    )
+    """
+    A landed branch was left open because the fork's copy of it or of its base is
+    missing, with the branch and the two references to fill in.
     """
 
 

@@ -71,9 +71,9 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
 ):
     """
     The defining module, a re-export, imports under an alias and through a module, an
-    import following a star import, a function's own class left alone, a docstring
-    keeping the old word and qualified references in documentation change only by the
-    rename.
+    import following a star import and code not using the name, a fallback importing the
+    class twice, a function's own class left alone, a docstring keeping the old word and
+    qualified references in documentation change only by the rename.
     """
     assert {
         file.change.path: file.kinds for file in binding_rename_triage.mechanical_files
@@ -83,11 +83,13 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
         ),
     } | dict.fromkeys(
         (
+            PurePosixPath("app/import_fallback.py"),
             PurePosixPath("app/module_alias.py"),
             PurePosixPath("app/planner.py"),
             PurePosixPath("app/prose_kept.py"),
             PurePosixPath("app/shadowed_kept.py"),
             PurePosixPath("app/star_imported.py"),
+            PurePosixPath("app/star_imported_after_code.py"),
             PurePosixPath("app/via_api.py"),
             PurePosixPath("geometry/api.py"),
             PurePosixPath("geometry/spatial.py"),
@@ -105,6 +107,9 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
         pytest.param(PurePosixPath("app/conditional.py"), id="ambiguous-binding"),
         pytest.param(
             PurePosixPath("app/star_imported_last.py"), id="star-import-after-binding"
+        ),
+        pytest.param(
+            PurePosixPath("app/used_before_import.py"), id="used-before-binding"
         ),
         pytest.param(PurePosixPath("app/captured.py"), id="new-name-captured"),
         pytest.param(PurePosixPath("app/string_literal.py"), id="string-literal"),

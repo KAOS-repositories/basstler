@@ -27,13 +27,14 @@ from basstler.review_triage.comparison import (
     RenamedTextComparison,
 )
 from basstler.review_triage.declaration import DescriptionDeclaration
-from basstler.review_triage.detection import RenameDetection
+from basstler.review_triage.detection import MemberRenameDetection, RenameDetection
 from basstler.review_triage.definition_moves import (
     DefinitionMoveComparison,
     DefinitionMoveDetection,
 )
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.markdown import MarkdownComparison
+from basstler.review_triage.member_renames import MemberRenamer, MemberResolver
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
@@ -96,6 +97,7 @@ class PullRequestTriager:
 
     rename_sources: tuple[RenameSource, ...] = (
         RenameDetection(),
+        MemberRenameDetection(),
         ModuleMoveDetection(),
         DefinitionMoveDetection(),
         FileMoveDetection(),
@@ -132,7 +134,8 @@ class PullRequestTriager:
         renames = RenameMap.from_decisions(
             source.decisions(own_changes) for source in self.rename_sources
         )
-        base_definitions = DefinitionIndex(CommitModules(own_changes.commits.base_tree))
+        base_modules = CommitModules(own_changes.commits.base_tree)
+        base_definitions = DefinitionIndex(base_modules)
         triager = FileTriager(
             JudgmentContext(
                 renames,
@@ -142,6 +145,7 @@ class PullRequestTriager:
                     [SubclassSubstitutionDetection().decisions(own_changes)]
                 ),
                 self.rules,
+                MemberRenamer(renames.member_renames, MemberResolver(base_modules)),
             ),
             self.judgments,
         )

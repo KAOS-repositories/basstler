@@ -224,6 +224,21 @@ class SubclassSubstitutionSample(SampleTrees):
         return "subclass-substitution"
 
 
+class BindingRenameSample(SampleTrees):
+    """
+    A pull request renaming a module's class, and every spelling of its old name with
+    it: the class's own uses, an unrelated class of the same name, an external one and
+    a string literal.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "binding-rename"
+
+
 # %% the base branch merged after a review
 
 

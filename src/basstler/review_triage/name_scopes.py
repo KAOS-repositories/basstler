@@ -101,6 +101,30 @@ class ImportedDefinition(DefinitionReference):
 
 
 @dataclass(frozen=True)
+class ImportedMember(ImportedDefinition):
+    """
+    ``from module import member``: the name refers to that member of that module.
+    """
+
+    statement: ast.ImportFrom
+    """
+    The import statement binding it, whose module may be relative.
+    """
+
+
+@dataclass(frozen=True)
+class ImportedModule(NameBinding):
+    """
+    ``import module``: the name refers to a module.
+    """
+
+    module: str
+    """
+    The dotted path of the module the name refers to.
+    """
+
+
+@dataclass(frozen=True)
 class LocalDefinition(DefinitionReference):
     """
     A ``class`` or ``def`` statement: the name refers to a definition of the file
@@ -326,11 +350,14 @@ class ScopeReader:
                 if alias.name == STAR_IMPORT:
                     self.imports_everything = True
                     continue
-                yield alias.asname or alias.name, ImportedDefinition(alias.name)
+                yield alias.asname or alias.name, ImportedMember(alias.name, node)
         elif isinstance(node, ast.Import):
             for alias in node.names:
-                bound = alias.asname or alias.name.split(DOTTED_NAME_SEPARATOR)[0]
-                yield bound, UnknownValue()
+                if alias.asname is not None:
+                    yield alias.asname, ImportedModule(alias.name)
+                    continue
+                top_level = alias.name.split(DOTTED_NAME_SEPARATOR)[0]
+                yield top_level, ImportedModule(top_level)
         elif isinstance(node, ast.ExceptHandler) and node.name is not None:
             caught = node.type
             yield (

@@ -45,6 +45,47 @@ class Rename:
 
 
 @dataclass(frozen=True)
+class ModuleMember:
+    """
+    A name a module binds at its top level, such as a class it defines.
+    """
+
+    module: str
+    """
+    The module's dotted path.
+    """
+
+    member_name: str
+    """
+    The name the module binds.
+    """
+
+
+@dataclass(frozen=True)
+class MemberRename(Rename):
+    """
+    A module's top-level definition given a new name, by its qualified path: it renames
+    only the occurrences proven to refer to that definition, never its old name as a
+    word.
+    """
+
+    @property
+    def member(self) -> ModuleMember:
+        """
+        The definition renamed, as the base commit names it.
+        """
+        module, _, member_name = self.old.rpartition(DOTTED_NAME_SEPARATOR)
+        return ModuleMember(module, member_name)
+
+    @property
+    def new_member_name(self) -> str:
+        """
+        The name the head commit gives the definition.
+        """
+        return self.new.rpartition(DOTTED_NAME_SEPARATOR)[2]
+
+
+@dataclass(frozen=True)
 class RenameDecisions:
     """
     What one rename source decides: renames it accepts and old identifiers it rejects.
@@ -109,6 +150,15 @@ class RenameMap:
         The renames of identifiers and module paths, those of file paths left out.
         """
         return tuple(rename for rename in self.renames if not rename.is_file_path)
+
+    @cached_property
+    def member_renames(self) -> tuple[MemberRename, ...]:
+        """
+        The renames of module members, which rename only what refers to them.
+        """
+        return tuple(
+            rename for rename in self.renames if isinstance(rename, MemberRename)
+        )
 
     @cached_property
     def replacements(self) -> dict[str, str]:

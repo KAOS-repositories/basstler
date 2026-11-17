@@ -13,6 +13,7 @@ from functools import cached_property
 from basstler.class_property import classproperty
 from basstler.git.commit_range import FileVersions
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
+from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameDecisions, RenameMap
@@ -226,6 +227,12 @@ class JudgmentContext:
     rules: frozenset[TriageRule] = frozenset()
     """
     The opt-in rules in force.
+    """
+
+    member_renamer: MemberRenamer | None = None
+    """
+    Renames the occurrences of the module members the pull request renames that are
+    proven to refer to them; ``None`` when it renames none.
     """
 
     review_reasons: list[ReviewReason] = field(
@@ -523,7 +530,9 @@ class FileTriager:
         :return: Whether a reviewer has to read it.
         """
         context = replace(self.context, review_reasons=[])
-        kinds = self.judged_changes(change, context)
+        kinds = self.member_renamed_changes(change)
+        if kinds is None:
+            kinds = self.judged_changes(change, context)
         if change.previous_path is not None and kinds is not None:
             kinds |= {MechanicalChange.MOVE}
         if not kinds:
@@ -531,6 +540,27 @@ class FileTriager:
                 change, tuple(dict.fromkeys(context.review_reasons))
             )
         return MechanicalFile(change, kinds)
+
+    def member_renamed_changes(
+        self, change: FileVersions
+    ) -> frozenset[ChangeKind] | None:
+        """
+        :param change: A file the pull request changes.
+        :return: What its content change consists of once the occurrences proven to
+            refer to a renamed module member are renamed in its base version, ``None``
+            when none is or the change is not then provably mechanical.
+        """
+        renamer = self.context.member_renamer
+        if renamer is None or not PythonComparison().applies_to(change):
+            return None
+        renamed = renamer.renamed_base(change)
+        if renamed == change.base_text:
+            return None
+        kinds = self.judged_changes(
+            replace(change, base_text=renamed),
+            replace(self.context, review_reasons=[]),
+        )
+        return None if kinds is None else kinds | {MechanicalChange.RENAME}
 
     def judged_changes(
         self, change: FileVersions, context: JudgmentContext

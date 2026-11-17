@@ -183,7 +183,9 @@ item is already underway rather than being started:
 - **The record is an update, not a first draft.** Rewrite the item's
   `blockers`, `notes` and `status` to say what is true now - replacing a
   blocker whose recorded cause turned out to be wrong rather than adding to
-  it - and refresh the PR-progress note (`save-pr-progress.sh --branch <the
+  it. Set `status: blocked` when a session must act next; leave it `in progress` when
+  the item waits on its owner, since a blocker alone never makes it a session's move.
+  Refresh the PR-progress note (`save-pr-progress.sh --branch <the
   item's branch> --source <file>`, as kickoff writes it) and the pull request
   description the same way. What the resolution was, and why, belongs in the pull request,
   not in `roadmap.md`; add a roadmap entry only for a rule every later item

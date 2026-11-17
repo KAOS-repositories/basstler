@@ -188,14 +188,9 @@ plan, and `<plan-id>/<item-id>` when it names one in another plan. Neither
 kebab-case id can contain a `/`, so the two forms never collide, and a plan
 that depends on nothing outside itself never has to know the form exists.
 
-A precondition that lives in another plan used to have nowhere to go but a
-freeform `blockers` sentence, which nothing resolves, re-checks or renders. A
-reference is checked and shown like any other dependency: the plan site
-resolves it against the referenced plan's own manifest, renders it as a chip
-that opens that item's card on its plan's page of the plan site in a new tab,
-and reads the foreign item's live pull request state from its own plan's
-`default_repository`. A chip naming an item of this plan scrolls to that item's
-card on the same page.
+A precondition in another plan is such a reference, never a `blockers` sentence:
+it is checked like any dependency, shown as a chip opening that item's card, and
+its live pull request state is read from its own plan's `default_repository`.
 
 Four rules, each rejected outright rather than passed over:
 
@@ -211,10 +206,9 @@ Four rules, each rejected outright rather than passed over:
   (`--plans-dir`, see [`SKILL.md`](./SKILL.md)). Accepting it unchecked is how
   an unresolvable dependency used to count as *ready*.
 
-A save also refuses removing an item that another plan's item or a goal still
-names. To move items into another plan, save them there first, then every plan
-and goal that names them with their new `<plan-id>/<item-id>`, and only then the
-plan they leave. A finished item is marked done instead of removed.
+A save refuses removing an item another plan or a goal still names: to move
+items, save them in their new plan, then everything naming them, then the plan
+they leave. A finished item is marked done, not removed.
 
 The cycle check runs over the resulting union graph, so a loop that closes
 through another plan is caught even though neither manifest can see it alone.
@@ -269,10 +263,9 @@ Every session that loads a plan pays for every line of it, so the plan holds
 only what a future session needs to act. `save-plan.sh` enforces this with
 the limits `src/basstler/plan/size_limits.py` names (`Measure`):
 
-- **Landed items are dropped on save**, along with every `depends_on`,
-  `depends_on_merged` and `depends_on_pushes_done` entry and goal target naming
-  them: the work is in the code and its history in git. A plan left with no
-  items is removed, and so is a goal left with no targets.
+- **Landed items are dropped on save**, with every dependency entry and goal
+  target naming them. A plan left with no items is removed, as is a goal left
+  with no targets.
 - **Fields are bounded**: items per plan, characters of the description,
   characters of each item's `notes`, blockers per item and characters of each.
   `notes` hold the item's scope and the decisions that bind it, not a log of

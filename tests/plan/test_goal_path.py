@@ -586,19 +586,20 @@ class TestWhoseTurnAStepIs:
         assert not step.needs_a_session
         assert step.next_move == OWNER_PREFIX + step.owner_move.description
 
-    def test_a_recorded_blocker_leaves_the_step_to_a_session(
+    def test_a_recorded_blocker_on_an_in_progress_draft_leaves_it_to_its_owner(
         self, plan_directory: PlanDirectory
     ):
         """
-        A draft whose plan records a blocker is resolved by a session first.
+        A blocker is shown, not read: an in-progress draft with passing checks waits on its
+        owner's review whatever its blockers say.
         """
         path = path_with(plan_directory, recorded_pull_requests(draft=True))
         step = step_of(path, reference_of(StepId.IN_PROGRESS_WITH_BLOCKER))
 
         assert step.item.blockers
-        assert step.needs_a_session
-        assert not step.is_owners_turn
-        assert step.next_move == step.action.command
+        assert not step.needs_a_session
+        assert step.is_owners_turn
+        assert step.next_move == OWNER_PREFIX + step.owner_move.description
 
     def test_failed_checks_leave_the_step_to_a_session(
         self, plan_directory: PlanDirectory
@@ -649,10 +650,6 @@ class TestWhoseTurnAStepIs:
 
         assert path.owner_steps == tuple(
             step for step in path.steps if step.is_owners_turn
-        )
-        assert (
-            step_of(path, reference_of(StepId.IN_PROGRESS_WITH_BLOCKER))
-            not in path.owner_steps
         )
 
     def test_the_report_numbers_each_step_and_names_its_move(

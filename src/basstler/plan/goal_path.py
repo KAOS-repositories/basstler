@@ -475,8 +475,8 @@ class PathStep:
     def needs_a_session(self) -> bool:
         """
         Whether a session works on the step before its owner does: it can be started, or
-        its plan records a blocker or a status other than in progress, or its pull
-        request's checks failed.
+        its plan records a status other than in progress, or its pull request's checks
+        failed. A recorded blocker alone never decides it.
         """
         if self.action is None:
             return False
@@ -484,7 +484,6 @@ class PathStep:
             return True
         return (
             self.item.status is not ItemStatus.IN_PROGRESS
-            or bool(self.item.blockers)
             or self.item.has_failed_checks
         )
 

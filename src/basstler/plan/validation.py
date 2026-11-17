@@ -33,6 +33,7 @@ from basstler.plan.exceptions import (
     RemovedItemStillNamed,
     SelfPlanReference,
     SharedBranch,
+    UnknownDecision,
     UnknownDependency,
     UnknownDependencyPlan,
     UnknownPerformer,
@@ -48,6 +49,7 @@ from basstler.plan.dependencies import (
     PlanDirectory,
     ResolvedDependency,
 )
+from basstler.plan.decision import Decision
 from basstler.plan.goal import Goal
 from basstler.plan.model import ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
@@ -460,6 +462,9 @@ class PlanValidator:
         performed_by = item.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)
         if performed_by not in list(Performer):
             problems.append(UnknownPerformer(item_identifier, performed_by))
+        decision = item.get(ManifestKey.DECISION.key)
+        if decision is not None and decision not in list(Decision):
+            problems.append(UnknownDecision(item_identifier, decision))
         for command_key in (ManifestKey.COMMANDS.key, ManifestKey.DONE_WHEN.key):
             commands = item.get(command_key) or []
             if not isinstance(commands, list) or not all(

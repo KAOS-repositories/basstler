@@ -357,6 +357,12 @@ class DatasetLocation(PathEnumeration):
     that step.
     """
 
+    DECISION_PLANS = DIRECTORY / "decision-plans"
+    """
+    A plans directory whose one plan holds an owner's step that asks for a verdict, with
+    a goal behind that step.
+    """
+
     SESSION_CLOSE = DIRECTORY / "session-close"
     """
     The hook inputs Claude Code sends when a session is about to stop and after the user

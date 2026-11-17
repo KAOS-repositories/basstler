@@ -12,6 +12,7 @@ from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, ManifestToolsExitCode
 from basstler.github.repository import Repository
+from basstler.plan.decision import Decision
 from basstler.plan.model import Performer
 
 if TYPE_CHECKING:
@@ -611,6 +612,29 @@ class UnknownPerformer(ValidationProblem):
 
     def suggest_correction(self) -> str:
         return "set performed_by to one of: " + ", ".join(Performer)
+
+
+@dataclass
+class UnknownDecision(ValidationProblem):
+    """
+    An item's ``decision`` isn't one of :class:`Decision`'s values.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    decision: Any
+    """
+    Whatever ``decision`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return f"item {self.item_identifier!r} has unknown decision {self.decision!r}"
+
+    def suggest_correction(self) -> str:
+        return "set decision to one of: " + ", ".join(Decision)
 
 
 @dataclass

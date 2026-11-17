@@ -12,6 +12,7 @@ from typing import Any
 
 from basstler.github.pull_request_state import LiveState, PullRequestRecord
 from basstler.github.repository import GitHubAddress, PullRequestReference
+from basstler.plan.decision import Decision
 from basstler.plan.model import DependencyRelease, ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
 from basstler.render_common import sanitize_http_url
@@ -214,6 +215,11 @@ class Item:
     when nothing checks it.
     """
 
+    decision: Decision | None = None
+    """
+    What this item asks its owner to decide, or ``None`` when it asks none.
+    """
+
     live_state: LiveState = field(default=LiveState.NO_PULL_REQUEST, init=False)
     """
     This item's live GitHub state.
@@ -354,6 +360,7 @@ class Item:
         is well-formed."""
         notes = data.get(ManifestKey.NOTES.key)
         recommended_model = data.get(ManifestKey.RECOMMENDED_MODEL.key)
+        decision = data.get(ManifestKey.DECISION.key)
         return cls(
             title=data[ManifestKey.TITLE.key],
             branch=data.get(ManifestKey.BRANCH.key),
@@ -379,6 +386,7 @@ class Item:
             ),
             commands=list(data.get(ManifestKey.COMMANDS.key) or []),
             done_when=list(data.get(ManifestKey.DONE_WHEN.key) or []),
+            decision=Decision(decision) if decision else None,
         )
 
     def release_needed_from(self, entry: str) -> DependencyRelease:

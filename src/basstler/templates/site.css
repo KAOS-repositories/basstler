@@ -247,6 +247,13 @@ a.chip:hover { border-color: currentColor; }
 .model-picker.model-picker-open .model-picker-list { display: block; }
 .model-picker-list li { padding: var(--space-1) var(--space-3); cursor: pointer; font-size: 0.8rem; }
 .model-picker-list li:hover, .model-picker-option-selected { background: var(--accent-tint); }
+.decision { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
+.decision-options { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.decision-request {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 0.85rem; padding: var(--space-2);
+  color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-small);
+}
+.decision-request-missing { border-color: var(--bad); }
 .action-button-copied { border-color: var(--good); color: var(--good); }
 .action-button-failed { border-color: var(--bad); color: var(--bad); }
 

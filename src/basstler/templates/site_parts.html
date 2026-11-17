@@ -74,6 +74,20 @@ siteRecheckWhenShown(siteRecountProgress);
         {% endif %}
 {% endmacro %}
 
+{# The buttons answering an item's decision, each copying its skill command and, when written, the owner's request. #}
+{% macro decision_buttons(plan_id, item) %}
+{% if item.decision %}
+<div class="decision">
+  <textarea class="decision-request" rows="2" placeholder="Your request - needed to keep iterating, optional otherwise" aria-label="Your request for {{ item.title }}"></textarea>
+  <span class="decision-options">
+    {% for option in item.decision.options %}
+    <button type="button" class="action-button" data-decision-prompt="{{ option.invocation(plan_id, item.identifier) }}" {% if option.asks_for_request %}data-asks-for-request{% endif %} onclick="planPageCopyDecision(this)">▸ {{ option.label }}</button>
+    {% endfor %}
+  </span>
+</div>
+{% endif %}
+{% endmacro %}
+
 {% macro action_button(action, hidden=False) %}
 {% if action %}
 <span class="action-group"{% if hidden %} hidden {{ vocabulary.draft_recheck_attribute.START_ACTION }}{% endif %}>

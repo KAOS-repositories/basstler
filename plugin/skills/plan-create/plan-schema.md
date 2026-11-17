@@ -93,6 +93,7 @@ items:                         # the actual trackable units of work - flat,
     blockers: ["freeform reasons", ...]   # optional, defaults to []
     performed_by: session | owner  # optional, defaults to session; see "Steps the owner performs"
     commands: ["<command>", ...]   # optional: what the owner runs for an owner's step, in order
+    decision: experiment-verdict   # optional: what an owner's step asks its owner to decide; see "Decisions the owner makes"
     done_when: ["<argument>", ...] # optional: the arguments of the basstler command whose
                                    # success proves the item done; see "Done checks"
 ```
@@ -161,6 +162,15 @@ owner's own computer. Such a step is an item with `performed_by: owner`. It has 
 pull request or `recommended_model`, and its `commands` list what the owner runs, in order.
 No "Start now" is offered for it: the plan page and a goal's path show it as the owner's,
 with its commands. Items that depend on it wait until its `status` is `done`.
+
+### Decisions the owner makes
+
+An owner's step may carry `decision: experiment-verdict`: it asks its owner how an
+experiment ends. The plan and goal pages then show a button per answer - *Accept & split*,
+*Keep iterating*, *Drop* - each copying `/plan-experiment-verdict <plan-id>/<item-id>
+<verdict>` for a session. A text box above the buttons holds the owner's request, which
+follows the command; *Keep iterating* will not copy without one. The step's `notes` say what
+each verdict involves for that experiment.
 
 ### Done checks
 

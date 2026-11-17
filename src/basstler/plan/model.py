@@ -439,6 +439,11 @@ class ManifestKey(KeySpecification, Enum):
     The arguments of the basstler command whose success means the item is done.
     """
 
+    DECISION = ("decision",)
+    """
+    What the item asks its owner to decide - see :class:`~basstler.plan.decision.Decision`.
+    """
+
     ITEMS = ("items",)
     """
     The manifest's top-level list of items.

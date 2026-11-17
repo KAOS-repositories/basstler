@@ -1,10 +1,4 @@
-function planPageCopyActionCommand(button) {
-  var baseCommand = button.getAttribute("data-action-command");
-  var modelPicker = button.previousElementSibling;
-  var model = modelPicker && modelPicker.classList.contains("model-picker")
-    ? modelPicker.getAttribute("data-model")
-    : "";
-  var command = baseCommand;
+function planPageCopyText(button, text, copiedLabel) {
   var originalLabel = button.textContent;
   var resetTimeoutMilliseconds = 1800;
 
@@ -19,7 +13,7 @@ function planPageCopyActionCommand(button) {
   }
 
   function onCopySucceeded() {
-    showResult("action-button-copied", model ? "Copied - run /model " + model + " first" : "Copied!");
+    showResult("action-button-copied", copiedLabel);
   }
 
   function onCopyFailed() {
@@ -28,7 +22,7 @@ function planPageCopyActionCommand(button) {
 
   function copyViaTemporaryTextarea() {
     var textarea = document.createElement("textarea");
-    textarea.value = command;
+    textarea.value = text;
     textarea.style.position = "fixed";
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
@@ -49,10 +43,42 @@ function planPageCopyActionCommand(button) {
   }
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(command).then(onCopySucceeded, copyViaTemporaryTextarea);
+    navigator.clipboard.writeText(text).then(onCopySucceeded, copyViaTemporaryTextarea);
   } else {
     copyViaTemporaryTextarea();
   }
+}
+
+function planPageCopyActionCommand(button) {
+  var modelPicker = button.previousElementSibling;
+  var model = modelPicker && modelPicker.classList.contains("model-picker")
+    ? modelPicker.getAttribute("data-model")
+    : "";
+  planPageCopyText(
+    button,
+    button.getAttribute("data-action-command"),
+    model ? "Copied - run /model " + model + " first" : "Copied!"
+  );
+}
+
+function planPageCopyDecision(button) {
+  var decision = button.closest(".decision");
+  var requestField = decision.querySelector(".decision-request");
+  var request = requestField.value.trim();
+  var originalLabel = button.textContent;
+  var missingRequestMilliseconds = 1800;
+  if (button.hasAttribute("data-asks-for-request") && !request) {
+    requestField.classList.add("decision-request-missing");
+    requestField.focus();
+    button.textContent = "Write your request first";
+    setTimeout(function () {
+      requestField.classList.remove("decision-request-missing");
+      button.textContent = originalLabel;
+    }, missingRequestMilliseconds);
+    return;
+  }
+  var prompt = button.getAttribute("data-decision-prompt");
+  planPageCopyText(button, request ? prompt + "\n\n" + request : prompt, "Copied!");
 }
 
 function planPageRevealItem(target) {

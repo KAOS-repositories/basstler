@@ -18,7 +18,7 @@ from enum import Enum, StrEnum
 from typing import Any
 
 from basstler.github.client import GitHubClient, GitHubRestClient
-from basstler.github.issue import IssueComment
+from basstler.github.issue import ClosingReason, IssueClosing, IssueComment
 from basstler.github.label import LabelReplacement, NewLabel, RepositoryLabel
 from basstler.github.pull_request import PullRequestDescription
 from basstler.github.pull_request_models import CheckStatus
@@ -62,7 +62,7 @@ class PullRequestReader(ABC):
 @dataclass(frozen=True)
 class PullRequestWriter(ABC):
     """
-    The three writes a pass makes, each one probed against the live API first.
+    The writes a pass makes, each one probed against the live API first.
 
     Every one of them is available to the credential a session carries; a pull request's
     *base branch* is the single write that is not, which is why reparenting is the
@@ -84,6 +84,10 @@ class PullRequestWriter(ABC):
     def set_description(self, number: int, body: str) -> None:
         """:param number: The pull request to write.
         :param body: The new description."""
+
+    @abstractmethod
+    def close_pull_request(self, number: int) -> None:
+        """:param number: The pull request to close, as completed."""
 
 
 @dataclass(frozen=True)
@@ -401,3 +405,7 @@ class GitHubRepository(
         :param body: The new description.
         """
         self.client.send(PullRequestDescription(self.repository, number, body))
+
+    def close_pull_request(self, number: int) -> None:
+        """:param number: The pull request to close, as completed."""
+        self.client.send(IssueClosing(self.repository, number, ClosingReason.COMPLETED))

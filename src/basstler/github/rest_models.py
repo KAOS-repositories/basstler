@@ -133,6 +133,12 @@ class RestReview(RestResponse, ValidatedJSONModel):
     When the review was submitted, as an ISO 8601 timestamp.
     """
 
+    commit: Annotated[str | None, Field(alias="commit_id")] = None
+    """
+    The head commit the review was submitted against, ``None`` where GitHub no longer
+    knows it.
+    """
+
     @property
     def review(self) -> Review:
         """:return: The review, as the report reads it."""

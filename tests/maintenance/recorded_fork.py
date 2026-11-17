@@ -22,6 +22,8 @@ from basstler.maintenance.commands import (
     MaintenanceCommand,
     MaintenancePass,
 )
+from basstler.maintenance.landed_closing import ClosedAsLanded
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUp
 from basstler.stack.model import (
     PullRequest,
     Stack,
@@ -139,6 +141,11 @@ class RecordingPullRequests(ForkPullRequests):
     Every description written, in order.
     """
 
+    closed: list[int] = dataclasses_field(default_factory=list)
+    """
+    The number of every pull request closed, in order.
+    """
+
     def open_pull_requests(self) -> list[dict]:
         """
         :return: Every pull request this stand-in has been given state for, in number
@@ -186,6 +193,12 @@ class RecordingPullRequests(ForkPullRequests):
         """
         self.description_writes.append(RecordedDescription(number, body))
         self.descriptions[number] = body
+
+    def close_pull_request(self, number: int) -> None:
+        """
+        :param number: The pull request to close.
+        """
+        self.closed.append(number)
 
 
 @dataclass(frozen=True)
@@ -243,6 +256,30 @@ class PullRequestsRefusingToReport(RecordingPullRequests):
         :raises ReportingRefused: Always.
         """
         raise ReportingRefused
+
+
+# %% following up on closed pull requests
+
+
+@dataclass(frozen=True)
+class RecordingFollowUp(LandedClosingFollowUp):
+    """
+    A follow-up to closing that records each call instead of doing any work.
+    """
+
+    outcome: str = "Followed up on the closed pull requests."
+    """
+    What each call reports for the finish summary.
+    """
+
+    calls: list[tuple[ClosedAsLanded, ...]] = dataclasses_field(default_factory=list)
+    """
+    The pull requests each call was given, in call order.
+    """
+
+    def respond_to_closing(self, closed: Sequence[ClosedAsLanded]) -> str | None:
+        self.calls.append(tuple(closed))
+        return self.outcome
 
 
 # %% the command line a caller acts on the exit status of

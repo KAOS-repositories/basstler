@@ -274,6 +274,21 @@ class Repository:
         """
         return f"{self.pull_requests_path}/{number}"
 
+    def pull_request_reviews_path(self, number: int) -> str:
+        """
+        :param number: The pull request's number.
+        :return: The REST path listing that pull request's reviews, oldest first.
+        """
+        return f"{self.pull_request_path(number)}/reviews"
+
+    def compare_path(self, base: str) -> str:
+        """
+        :param base: What the head is compared with: a branch, or ``owner:branch`` for
+            one in another repository of the same network.
+        :return: The REST path of the comparison, which the head follows after ``...``.
+        """
+        return f"{self.api_path}/compare/{base}"
+
     def workflow_run_path(self, run: int) -> str:
         """
         :param run: The Actions workflow run's own number.

@@ -44,6 +44,10 @@ from basstler.upstream_reviews.action.branch import (
     InstallationState,
 )
 from basstler.upstream_reviews.action.exchange import ActionAnswer
+from basstler.upstream_reviews.action.open_pull_requests import (
+    OpenPullRequestsAnswer,
+    UpstreamPullRequests,
+)
 from basstler.upstream_reviews.action.read import ActionRead
 from basstler.upstream_reviews.action.recording import (
     ActionResult,
@@ -547,6 +551,23 @@ def test_a_result_answering_another_request_is_not_collected(fork):
 
     assert f"{FORK.url}/actions" in str(raised.value)
     assert "disabled" in str(raised.value)
+
+
+def test_a_result_left_on_the_action_branch_is_not_collected_for_a_new_request(fork):
+    ActionInstallation(BRANCH_OR_TAG).install(fork.branch)
+    fork.branch.write(
+        {
+            ActionFile.RESULT: OpenPullRequestsAnswer(
+                OTHER_REQUEST_IDENTIFIER, UpstreamPullRequests(FORK, {})
+            )
+        },
+        ActionBranch.request_commit_message("Answer", OTHER_REQUEST_IDENTIFIER),
+    )
+    read = ActionRead(fork.branch, request())
+    read.send()
+
+    with pytest.raises(ActionResultMissing):
+        read.wait(timeout=0)
 
 
 @dataclass

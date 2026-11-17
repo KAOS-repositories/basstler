@@ -12,6 +12,12 @@ from typing import Any
 
 import rustworkx
 
+from basstler.github.repository import Repository
+from basstler.plan.dependencies import (
+    DependencyReference,
+    PlanDirectory,
+    ResolvedDependency,
+)
 from basstler.plan.exceptions import (
     DependencyCycle,
     DuplicateItemId,
@@ -34,12 +40,6 @@ from basstler.plan.exceptions import (
     UnknownTrack,
     UnknownWave,
     ValidationProblem,
-)
-from basstler.github.repository import Repository
-from basstler.plan.dependencies import (
-    DependencyReference,
-    PlanDirectory,
-    ResolvedDependency,
 )
 from basstler.plan.model import ItemStatus, ManifestKey
 from basstler.plan.model_alias import ModelAlias

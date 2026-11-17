@@ -11,11 +11,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
 
-from basstler.directory_tree import DirectoryTree
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.directory_tree import DirectoryTree
 from basstler.git.commands import GitCommandRunner
 from basstler.locations import PackageLocation
 from basstler.package_map import PACKAGE_MAP, PackageMap
+from basstler.text_file import TextFile
 
 # %% imports
 
@@ -239,7 +240,7 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :param path: A Python source file.
         :return: Every import in it of a module of the package.
         """
-        for statement in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for statement in ast.walk(ast.parse(TextFile(path).read())):
             if isinstance(statement, ast.Import):
                 for alias in statement.names:
                     root, _, module = alias.name.partition(".")

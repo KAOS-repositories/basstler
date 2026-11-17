@@ -13,6 +13,7 @@ from typing import override
 
 from basstler.bash import Bash, LocatedProgram
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.text_file import TextFile
 
 # %% the check
 
@@ -26,7 +27,7 @@ class BashByNameChecker(CodeRuleChecker):
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = ast.parse(path.read_text(encoding="utf-8"))
+        module = ast.parse(TextFile(path).read())
         for node in ast.walk(module):
             command = self.command_line(node)
             if command is None or not self.starts_bash_by_name(command):

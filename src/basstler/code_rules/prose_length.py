@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import override
 
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.text_file import TextFile
 
 # %% what is measured
 
@@ -196,7 +197,7 @@ class ProseLengthChecker(CodeRuleChecker):
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        for block in SourceProse(path.read_text(encoding="utf-8")).blocks:
+        for block in SourceProse(TextFile(path).read()).blocks:
             limit = self.limit_for(block.kind)
             if block.prose_lines <= limit:
                 continue

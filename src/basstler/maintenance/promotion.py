@@ -29,6 +29,7 @@ from basstler.github.tooling_labels import GitHubLabel
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.model import BranchStatus, Stack
 from basstler.stack.promotion_link import PromotionLink
+from basstler.text_file import TextFile
 
 # %% the summaries a caller writes
 
@@ -114,7 +115,7 @@ class PromotionSummaries:
         """
         if path is None:
             return cls()
-        return cls.from_json(json.loads(path.read_text(encoding="utf-8")))
+        return cls.from_json(json.loads(TextFile(path).read()))
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> PromotionSummaries:

@@ -25,6 +25,7 @@ from basstler.plan.manifest_tools import BranchIndex
 from basstler.plan.merged_items.plan_items import MergedItems
 from basstler.plan.model import PlanDocument, PlanManifest
 from basstler.plan.size_limits import PlanFiles
+from basstler.text_file import TextFile
 
 # %% every plan on a notes branch
 
@@ -136,9 +137,8 @@ class MergedItemsInEveryPlan(NotesEdit):
             self.save_without_landed_items(manifest_path.parent)
         index = root / ProjectLocation.PLAN_BRANCH_INDEX
         index.parent.mkdir(parents=True, exist_ok=True)
-        index.write_text(
-            BranchIndex(root, ProjectLocation.PLANS, PlanDocument.MANIFEST).render(),
-            encoding="utf-8",
+        TextFile(index).write(
+            BranchIndex(root, ProjectLocation.PLANS, PlanDocument.MANIFEST).render()
         )
 
     @staticmethod
@@ -160,11 +160,10 @@ class MergedItemsInEveryPlan(NotesEdit):
                 Path(copy_directory) / PlanDocument.ROADMAP,
             )
             shutil.copyfile(destination.manifest, copy.manifest)
-            copy.roadmap.write_text(
-                destination.roadmap.read_text(encoding="utf-8")
+            TextFile(copy.roadmap).write(
+                TextFile(destination.roadmap).read()
                 if destination.roadmap.exists()
-                else "",
-                encoding="utf-8",
+                else ""
             )
             copy.stage(destination)
 

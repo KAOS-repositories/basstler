@@ -15,9 +15,13 @@ from basstler.github.pull_request_state import (
     PullRequestRecord,
 )
 from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.stack_configuration import (
+    CommittedStackConfiguration,
+    StackSetting,
+)
+from basstler.maintenance.promotion import PromotionSummary
 from basstler.plan.dependencies import DependencyResolver
 from basstler.plan.model import ItemStatus
-from basstler.maintenance.promotion import PromotionSummary
 from basstler.plan.structure import Item, Plan
 from basstler.plan_site.cards import (
     DependencyChip,
@@ -29,10 +33,6 @@ from basstler.plan_site.cards import (
 )
 from basstler.plan_site.workflows import PlanSiteSecret
 from basstler.stack.branch_status import BranchStatus
-from basstler.github.stack_configuration import (
-    CommittedStackConfiguration,
-    StackSetting,
-)
 from basstler.stack.promotability import PromotionReadiness
 from basstler.stack.promotion_link import PromotionLink, PromotionTarget
 

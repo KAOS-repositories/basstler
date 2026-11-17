@@ -36,15 +36,14 @@ import argparse
 import sys
 from pathlib import Path
 
-from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.exit_codes import CommandFailure, ExitCode, StackExitCode
 from basstler.git.commands import GitCommandRunner
+from basstler.github.exceptions import GraphQLErrorsReturned, UpstreamReadError
 from basstler.locations import RepositoryStateLocation
 from basstler.maintenance.commands import MaintenanceCommand, MaintenancePass
 from basstler.maintenance.upstream_read_route import UpstreamReadRoute
 from basstler.stack.settings import Configuration
 from basstler.standard_streams import StandardStreamHandler
-from basstler.github.exceptions import UpstreamReadError
 
 logger = StandardStreamHandler.logger_for(__name__)
 """

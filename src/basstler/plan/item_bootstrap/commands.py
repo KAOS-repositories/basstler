@@ -18,11 +18,12 @@ from basstler.plan.item_bootstrap.opening import WorkOpener, WorkOpenRequest
 from basstler.plan.item_bootstrap.record import ItemRecordRequest
 from basstler.plan.item_bootstrap.report import BootstrapReport, OperationReport
 from basstler.plan.item_bootstrap.update import ItemUpdateRequest
-from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemStatus,
     ManifestKey,
 )
+from basstler.plan.model_alias import ModelAlias
+from basstler.text_file import TextFile
 
 # %% commands
 
@@ -132,7 +133,7 @@ class OpenCommand(BootstrapCommand):
                 session_url=arguments.session,
                 pull_request_title=arguments.pull_request_title,
                 pull_request_body=(
-                    arguments.pull_request_body.read_text(encoding="utf-8")
+                    TextFile(arguments.pull_request_body).read()
                     if arguments.pull_request_body
                     else None
                 ),
@@ -188,20 +189,17 @@ class UpdateCommand(BootstrapCommand):
             if value is not None
         }
         if arguments.notes:
-            values_by_key[ManifestKey.NOTES] = arguments.notes.read_text(
-                encoding="utf-8"
-            )
+            values_by_key[ManifestKey.NOTES] = TextFile(arguments.notes).read()
         if arguments.blockers:
             values_by_key[ManifestKey.BLOCKERS] = [
-                blocker.read_text(encoding="utf-8").strip()
-                for blocker in arguments.blockers
+                TextFile(blocker).read().strip() for blocker in arguments.blockers
             ]
         return ItemUpdateRequest(
             plan_identifier=arguments.plan,
             item_identifier=arguments.item,
             values_by_key=values_by_key,
             notes_to_append=(
-                arguments.append_notes.read_text(encoding="utf-8")
+                TextFile(arguments.append_notes).read()
                 if arguments.append_notes
                 else None
             ),
@@ -272,7 +270,7 @@ class BlockCommand(BootstrapCommand):
         return OwnedBlocker(
             branch=arguments.branch,
             owner=arguments.owner,
-            reason=arguments.reason.read_text(encoding="utf-8").strip(),
+            reason=TextFile(arguments.reason).read().strip(),
         ).write(project_root)
 
 

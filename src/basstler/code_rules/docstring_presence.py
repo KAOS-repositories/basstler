@@ -18,6 +18,7 @@ from typing import override
 
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.code_rules.prose_length import SourceProse
+from basstler.text_file import TextFile
 
 # %% what is documented
 
@@ -126,7 +127,7 @@ class MissingDocstringChecker(CodeRuleChecker):
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = ast.parse(path.read_text(encoding="utf-8"))
+        module = ast.parse(TextFile(path).read())
         if module.body and ast.get_docstring(module) is None:
             yield self.violation(
                 path, DocumentedKind.MODULE, 1, module.body[-1].end_lineno

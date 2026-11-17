@@ -18,6 +18,7 @@ import yaml
 
 from basstler.class_property import classproperty
 from basstler.locations import PackageLocation, ProjectLocation
+from basstler.text_file import TextFile
 
 # %% vocabulary
 
@@ -437,7 +438,7 @@ class Workflow:
         :param path: The workflow file.
         :return: The workflow.
         """
-        declared = yaml.safe_load(path.read_text(encoding="utf-8"))
+        declared = yaml.safe_load(TextFile(path).read())
         # YAML 1.1 reads a bare ``on`` key as the boolean true.
         triggers = declared.get(True, declared.get(WorkflowKey.TRIGGERS))
         if isinstance(triggers, str):

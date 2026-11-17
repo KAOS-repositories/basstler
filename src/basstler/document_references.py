@@ -21,6 +21,7 @@ from cyclopts import App
 from basstler.locations import PackageLocation
 from basstler.package_layout import package_modules
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -287,9 +288,7 @@ def report_stale_references(*documents: Path) -> int:
     """
     shipped = ShippedModules.installed()
     for document in documents:
-        for reference in CitedNames.in_text(document.read_text(encoding="utf-8")).stale(
-            shipped
-        ):
+        for reference in CitedNames.in_text(TextFile(document).read()).stale(shipped):
             logger.info(reference.as_line())
     return 0
 

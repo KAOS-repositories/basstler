@@ -20,6 +20,7 @@ import yaml
 
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
+from basstler.text_file import TextFile
 
 
 class ItemStatus(StrEnum):
@@ -643,7 +644,7 @@ class PlanManifest:
         :param path: A ``plan.yaml`` file.
         :return: The manifest it holds.
         """
-        return cls.from_yaml(path.read_text(encoding="utf-8"))
+        return cls.from_yaml(TextFile(path).read())
 
     @classmethod
     def from_yaml(cls, text: str) -> PlanManifest:
@@ -659,9 +660,8 @@ class PlanManifest:
 
         :param path: Where to write it.
         """
-        path.write_text(
-            yaml.safe_dump(self.content, sort_keys=False, allow_unicode=True, width=88),
-            encoding="utf-8",
+        TextFile(path).write(
+            yaml.safe_dump(self.content, sort_keys=False, allow_unicode=True, width=88)
         )
 
     @property

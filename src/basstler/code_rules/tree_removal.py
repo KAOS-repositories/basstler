@@ -15,6 +15,7 @@ from typing import override
 from basstler import directory_tree
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.directory_tree import DirectoryTree
+from basstler.text_file import TextFile
 
 # %% the check
 
@@ -30,7 +31,7 @@ class TreeRemovalChecker(CodeRuleChecker):
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         if path.resolve() == Path(directory_tree.__file__).resolve():
             return
-        module = ast.parse(path.read_text(encoding="utf-8"))
+        module = ast.parse(TextFile(path).read())
         for node in ast.walk(module):
             if not self.calls_rmtree(node):
                 continue

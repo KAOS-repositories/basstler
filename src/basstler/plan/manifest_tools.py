@@ -29,14 +29,15 @@ from typing import Any
 
 import yaml
 
-from basstler.plan.exceptions import OriginNamesNoRepository, PlanValidationError
 from basstler.exit_codes import CommandFailure, ManifestToolsExitCode
 from basstler.github.repository import Repository
 from basstler.plan import model
 from basstler.plan.dependencies import PlanDirectory
+from basstler.plan.exceptions import OriginNamesNoRepository, PlanValidationError
 from basstler.plan.merge import PlanMerge, PlanVersion
 from basstler.plan.validation import PlanValidator
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -466,7 +467,7 @@ class ManifestToolsCommandLine:
             index = BranchIndex(
                 arguments.scratch_dir, arguments.plans_dir, arguments.manifest_filename
             )
-            arguments.output.write_text(index.render(), encoding="utf-8")
+            TextFile(arguments.output).write(index.render())
         elif arguments.subcommand == ManifestToolsCommand.UNMODELLED_ITEMS:
             manifest = model.PlanManifest.from_file(arguments.manifest_path)
             logger.info(

@@ -158,6 +158,11 @@ Four rules, each rejected outright rather than passed over:
   (`--plans-dir`, see [`SKILL.md`](./SKILL.md)). Accepting it unchecked is how
   an unresolvable dependency used to count as *ready*.
 
+A save also refuses removing an item that another plan's item still names. To
+move items into another plan, save them there first, then every plan that names
+them with their new `<plan-id>/<item-id>`, and only then the plan they leave. A
+finished item is marked done instead of removed.
+
 The cycle check runs over the resulting union graph, so a loop that closes
 through another plan is caught even though neither manifest can see it alone.
 Indentation is unaffected: an item's indent level is its depth in the

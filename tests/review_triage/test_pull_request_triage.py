@@ -25,7 +25,7 @@ from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.outputs import MarkdownReport, ViewedFile, ViewedMarking
-from basstler.review_triage.renames import Rename, RenameDecisions
+from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from ..scratch_repository import ScratchRepository
@@ -129,6 +129,23 @@ def test_a_rename_rejected_by_argument_is_not_applied(
     assert mechanical_kinds(triager.triage(sample_changes)) == {
         PurePosixPath("package/constants.py"): frozenset({MechanicalChange.MOVE})
     }
+
+
+def test_a_rename_declared_by_argument_is_applied(
+    sample_changes: PullRequestChanges, old_name_renamed: RenameMap
+):
+    """
+    A rename given as an argument is applied, as the detected one is.
+    """
+    default = PullRequestTriager()
+    triager = replace(
+        default,
+        rename_sources=(
+            *default.rename_sources,
+            ArgumentDeclaration(TriageDeclaration(old_name_renamed.replacements)),
+        ),
+    )
+    assert mechanical_kinds(triager.triage(sample_changes)) == MECHANICAL_KINDS
 
 
 # %% outputs

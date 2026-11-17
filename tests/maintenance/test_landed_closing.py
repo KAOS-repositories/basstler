@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 
+from basstler.github.constants import MaintenanceText
 from basstler.maintenance.commands import RunReportCommand
 from basstler.maintenance.finish_summary import FinishSummary, FinishSummaryHeading
 from basstler.maintenance.promotion import PromotionSummaries
@@ -27,7 +28,6 @@ from .fork import (
 from .test_finish_summary import section_of
 from .recorded_fork import (
     AlreadyResolvedPass,
-    PlanSiteBuildNote,
     RecordingPullRequests,
 )
 
@@ -174,7 +174,7 @@ def child_landed(fork_checkout: ForkCheckout) -> ForkCheckout:
     return fork_checkout
 
 
-def test_a_whole_pass_closes_the_landed_pull_request_and_starts_the_plan_site_build(
+def test_a_whole_pass_closes_the_landed_pull_request(
     child_landed: ForkCheckout,
 ):
     maintenance = AlreadyResolvedPass.over(child_landed, the_board()[1:])
@@ -187,11 +187,9 @@ def test_a_whole_pass_closes_the_landed_pull_request_and_starts_the_plan_site_bu
         ClosedAsLanded(StackBranch.CHILD, StackPullRequestNumber.CHILD),
     )
     assert report.landed == ()
-    assert report.plan_site_build == PlanSiteBuildNote.STARTED
-    assert maintenance.plan_site_builds_started == [PlanSiteBuildNote.STARTED]
 
 
-def test_a_whole_pass_that_closes_nothing_does_not_start_the_plan_site_build(
+def test_the_summary_of_a_pass_that_closes_nothing_has_no_plan_site_section(
     fork_checkout: ForkCheckout,
 ):
     a_parent_and_child(fork_checkout)
@@ -200,13 +198,13 @@ def test_a_whole_pass_that_closes_nothing_does_not_start_the_plan_site_build(
     report = RunReportCommand().perform(
         maintenance, as_json=True, summaries=PromotionSummaries()
     )
+    summary = FinishSummary(report, maintenance.resolved_stack).as_markdown()
 
     assert report.closed_as_landed == ()
-    assert report.plan_site_build is None
-    assert maintenance.plan_site_builds_started == []
+    assert section_of(summary, FinishSummaryHeading.PLAN_SITE) == []
 
 
-def test_the_summary_lists_what_was_closed_and_what_became_of_the_build(
+def test_the_summary_lists_what_was_closed_and_asks_for_the_plan_site_rebuild(
     child_landed: ForkCheckout,
 ):
     maintenance = AlreadyResolvedPass.over(child_landed, the_board()[1:])
@@ -218,6 +216,6 @@ def test_the_summary_lists_what_was_closed_and_what_became_of_the_build(
 
     (entry,) = section_of(summary, FinishSummaryHeading.CLOSED_AS_LANDED)
     assert f"`{StackBranch.CHILD}`" in entry
-    assert section_of(summary, FinishSummaryHeading.PLAN_SITE_BUILD) == [
-        PlanSiteBuildNote.STARTED
+    assert section_of(summary, FinishSummaryHeading.PLAN_SITE) == [
+        MaintenanceText.REBUILD_PLAN_SITE
     ]

@@ -29,8 +29,7 @@ from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import GitHubRestClient
 from basstler.github.constants import MaintenanceNotice
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
-from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
-from basstler.plan_site.build_start import BuildStart, recorded_site
+from basstler.locations import RepositoryStateLocation
 from basstler.maintenance.board import BoardExport
 from basstler.upstream_reviews.action.open_pull_requests import (
     OpenPullRequestsAnswer,
@@ -146,20 +145,6 @@ class MaintenancePass:
         upstream_pull_requests = self.upstream_pull_requests()
         return BoardExport.from_api_records(
             fork.open_pull_requests(), upstream_pull_requests, fork
-        )
-
-    def start_plan_site_build(self) -> str | None:
-        """
-        Start the build of the plan site that lists this repository, so it shows what the
-        pass just wrote.
-
-        :return: What became of it, ``None`` when no plan site lists the repository.
-        """
-        site = recorded_site()
-        if site is None:
-            return None
-        return BuildStart.attempt(site, GitHubRestClient()).describe(
-            ClaudeCodeVariable.REMOTE.is_true()
         )
 
     def fresh_stack(self) -> Stack:
@@ -582,7 +567,6 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
             labels_cleared,
             synchronization,
             closed_as_landed,
-            maintenance.start_plan_site_build() if closed_as_landed else None,
         )
         maintenance.board.unlink(missing_ok=True)
         maintenance.full_report.write_text(report.as_json() + "\n")

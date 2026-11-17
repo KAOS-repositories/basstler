@@ -59,13 +59,13 @@ class FinishSummaryHeading(StrEnum):
 
     CLOSED_AS_LANDED = "Closed as landed"
     """
-    The pull requests this pass closed and labelled merged, because their commits are
-    already in the upstream base.
+    The pull requests this pass closed, because their commits are already in the
+    upstream base.
     """
 
-    PLAN_SITE_BUILD = "Plan site"
+    PLAN_SITE = "Plan site"
     """
-    What became of starting the plan site's build after closing pull requests.
+    What the caller does about the plan site after pull requests were closed.
     """
 
     LANDED = "Landed but still open"
@@ -251,7 +251,7 @@ class FinishSummary:
             FinishSummaryHeading.REPARENTS: self.capped(self.reparents()),
             FinishSummaryHeading.FORK_BASE: self.fork_base(),
             FinishSummaryHeading.CLOSED_AS_LANDED: self.capped(self.closed_as_landed()),
-            FinishSummaryHeading.PLAN_SITE_BUILD: self.plan_site_build(),
+            FinishSummaryHeading.PLAN_SITE: self.plan_site(),
             FinishSummaryHeading.LANDED: self.capped(self.landed()),
             FinishSummaryHeading.RESTACKED: self.restacked(),
             FinishSummaryHeading.UNPUBLISHED: self.capped(self.unpublished()),
@@ -394,14 +394,14 @@ class FinishSummary:
             for closed in self.report.closed_as_landed
         ]
 
-    def plan_site_build(self) -> list[str]:
+    def plan_site(self) -> list[str]:
         """
-        :return: What became of starting the plan site's build, empty when it was not
-            attempted.
+        :return: The command that rebuilds the plan site, empty when no pull request was
+            closed.
         """
-        if self.report.plan_site_build is None:
+        if not self.report.closed_as_landed:
             return []
-        return [self.report.plan_site_build]
+        return [MaintenanceText.REBUILD_PLAN_SITE]
 
     def landed(self) -> list[str]:
         """

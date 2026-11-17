@@ -259,17 +259,6 @@ class PullRequestsRefusingToReport(RecordingPullRequests):
 # %% the command line a caller acts on the exit status of
 
 
-class PlanSiteBuildNote(StrEnum):
-    """
-    What a pass over the stand-in says about the plan site's build.
-    """
-
-    STARTED = "started the plan site build"
-    """
-    The line the stand-in answers a build start with.
-    """
-
-
 @dataclass(frozen=True)
 class AlreadyResolvedPass(MaintenancePass):
     """
@@ -317,20 +306,6 @@ class AlreadyResolvedPass(MaintenancePass):
         :return: The stand-in that records writes instead of making them.
         """
         return self.recorded_fork
-
-    plan_site_builds_started: list[PlanSiteBuildNote] = dataclasses_field(
-        default_factory=list
-    )
-    """
-    One entry per time the pass started the plan site's build.
-    """
-
-    def start_plan_site_build(self) -> str | None:
-        """
-        :return: What the stand-in says, after recording that the build was started.
-        """
-        self.plan_site_builds_started.append(PlanSiteBuildNote.STARTED)
-        return PlanSiteBuildNote.STARTED
 
 
 class LoggedOutCommandLine(StrEnum):

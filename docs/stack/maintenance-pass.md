@@ -18,7 +18,7 @@ the reasoning behind them, for whoever changes the skill or the executor. The wo
   checks.
 - A branch that is an ancestor of the upstream base has landed. The pass closes the open fork pull
   request of a landed branch that has a commit its own base lacks and says why in a comment, then
-  starts the plan site's build; GitHub records no merge for a pull request stacked on another
+  tells the session to rebuild the plan site; GitHub records no merge for a pull request stacked on another
   branch, so it would stay open, and the site reads GitHub's comparison with the upstream. A landed branch with no commit of its
   own is left open, since nothing of it landed.
 

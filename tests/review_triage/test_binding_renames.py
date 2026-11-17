@@ -70,11 +70,10 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
     binding_rename_triage: TriageOutcome,
 ):
     """
-    The defining module, a re-export, imports under an alias and through a module, an
-    import following a star import and code not using the name, a fallback importing the
-    class twice, a function's own class left alone, a docstring keeping the old word,
-    qualified references in documentation and a documentation code block or notebook
-    cell using a class an earlier one imports change only by the rename.
+    The defining module, a re-export, aliased, module and fallback imports, imports
+    after star imports not binding the name, a function's own class left alone, a
+    docstring keeping the old word, qualified documentation references and code blocks
+    or notebook cells using a class an earlier one imports change only by the rename.
     """
     assert {
         file.change.path: file.kinds for file in binding_rename_triage.mechanical_files
@@ -88,6 +87,7 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
             PurePosixPath("app/shadowed_kept.py"),
             PurePosixPath("app/star_imported.py"),
             PurePosixPath("app/star_imported_after_code.py"),
+            PurePosixPath("app/star_imported_unrelated_last.py"),
             PurePosixPath("app/via_api.py"),
             PurePosixPath("docs/notebook.md"),
             PurePosixPath("docs/usage.md"),

@@ -319,7 +319,7 @@ class PromotionButton:
         """
         :return: The text of the checkbox overriding failed checks.
         """
-        return "It's ready (overrides rules)"
+        return "Ignore failed checks (bypass rules)"
 
     @property
     def enabled_title(self) -> str:

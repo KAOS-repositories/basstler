@@ -163,11 +163,14 @@ class ModuleNames:
         package = components if is_package else components[:-1]
         return cls(module, PythonSource(text, package))
 
-    def overrides_star_imports(self, name: str) -> bool:
+    def overrides_star_imports(
+        self, name: str, star_imports: tuple[ast.ImportFrom, ...]
+    ) -> bool:
         """
         :param name: A name the module's top level binds.
-        :return: Whether its one binding is a top-level import following every star
-            import, the name used nowhere before it, so that every use sees that import.
+        :param star_imports: The module's star imports that may bind the name.
+        :return: Whether its one binding is a top-level import following each of those
+            star imports, the name used nowhere before it, so that every use sees it.
         """
         bindings = self.scope.bindings.get(name, ())
         if len(bindings) != 1 or not isinstance(bindings[0], ImportedMember):
@@ -175,9 +178,7 @@ class ModuleNames:
         statement = bindings[0].statement
         if statement not in self.source.tree.body:
             return False
-        return all(
-            star.lineno < statement.lineno for star in self.scope.star_imports
-        ) and not any(
+        return all(star.lineno < statement.lineno for star in star_imports) and not any(
             isinstance(node, ast.Name)
             and node.id == name
             and node.lineno < statement.lineno
@@ -339,7 +340,14 @@ class MemberResolver:
         submodule = f"{names.module}{DOTTED_NAME_SEPARATOR}{name}"
         is_submodule = submodule in self.modules.module_files
         bindings = scope.bindings.get(name, ())
-        if scope.imports_everything and not names.overrides_star_imports(name):
+        star_imports = tuple(
+            star
+            for star in scope.star_imports
+            if self.star_import_may_bind(
+                names.source.imported_module(star), name, frozenset({names.module})
+            )
+        )
+        if star_imports and not names.overrides_star_imports(name, star_imports):
             return None
         if not bindings:
             if is_submodule:
@@ -355,6 +363,29 @@ class MemberResolver:
             self.imported_referent(names, binding, followed) for binding in bindings
         }
         return referents.pop() if len(referents) == 1 else None
+
+    def star_import_may_bind(
+        self, module: str, name: str, visited: frozenset[str]
+    ) -> bool:
+        """
+        :param module: A dotted module path a star import imports from.
+        :param name: A name.
+        :param visited: The modules whose star imports are being followed.
+        :return: Whether the star import may bind the name: ``False`` only when the
+            module is the commit's and neither it, its star imports nor its submodules
+            bind it.
+        """
+        names = None if module in visited else self.names_of(module)
+        if names is None or name in names.scope.bindings:
+            return True
+        if f"{module}{DOTTED_NAME_SEPARATOR}{name}" in self.modules.module_files:
+            return True
+        return any(
+            self.star_import_may_bind(
+                names.source.imported_module(star), name, visited | {module}
+            )
+            for star in names.scope.star_imports
+        )
 
     def imported_referent(
         self,

@@ -71,9 +71,10 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
 ):
     """
     The defining module, a re-export, imports under an alias and through a module, an
-    import following a star import and code not using the name, a fallback importing the
-    class twice, a function's own class left alone, a docstring keeping the old word and
-    qualified references in documentation change only by the rename.
+    import following a star import and code not using the name, a star import binding no
+    such name, a fallback importing the class twice, a function's own class left alone,
+    a docstring keeping the old word and qualified references in documentation change
+    only by the rename.
     """
     assert {
         file.change.path: file.kinds for file in binding_rename_triage.mechanical_files
@@ -90,6 +91,7 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
             PurePosixPath("app/shadowed_kept.py"),
             PurePosixPath("app/star_imported.py"),
             PurePosixPath("app/star_imported_after_code.py"),
+            PurePosixPath("app/star_imported_unrelated_last.py"),
             PurePosixPath("app/via_api.py"),
             PurePosixPath("geometry/api.py"),
             PurePosixPath("geometry/spatial.py"),

@@ -117,6 +117,9 @@ items:
   track: windows
   depends_on:
   - windows-suite
+  - code-rule-fixes/rule-fix-triage
+  depends_on_merged:
+  - code-rule-fixes/rule-fix-triage
   depends_on_pushes_done:
   - windows-suite
   status: not started

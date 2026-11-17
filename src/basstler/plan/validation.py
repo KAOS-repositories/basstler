@@ -30,6 +30,7 @@ from basstler.plan.exceptions import (
     MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
+    RemovedItemStillNamed,
     SelfPlanReference,
     SharedBranch,
     UnknownDependency,
@@ -47,6 +48,7 @@ from basstler.plan.dependencies import (
     PlanDirectory,
     ResolvedDependency,
 )
+from basstler.plan.goal import Goal
 from basstler.plan.model import ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
 
@@ -291,6 +293,7 @@ class PlanValidator:
             *self.landed_item_count_problems(),
             *self.duplicate_identifier_problems(),
             *self.shared_branch_problems(),
+            *self.removed_item_problems(),
             *(problem for item in self.items for problem in self.item_problems(item)),
             *self.cycle_problems(),
             *self.wave_problems(),
@@ -405,6 +408,27 @@ class PlanValidator:
                 problems.append(
                     SharedBranch(branch, [*identifiers, *other_plans_items])
                 )
+        return problems
+
+    def removed_item_problems(self) -> list[ValidationProblem]:
+        """
+        :return: A problem for each item the save removes that another plan's item or
+            a goal still names; none when no save is being checked.
+        """
+        if self.saved_item_identifiers is None or self.plan_directory is None:
+            return []
+        goals = Goal.every_goal_in(self.plan_directory.directory)
+        problems: list[ValidationProblem] = []
+        for identifier in sorted(
+            self.saved_item_identifiers - set(self.item_identifiers)
+        ):
+            reference = DependencyReference(identifier, self.plan_id).text
+            named_by = [
+                *self.plan_directory.items_naming(reference),
+                *(goal.identifier for goal in goals if reference in goal.targets),
+            ]
+            if named_by:
+                problems.append(RemovedItemStillNamed(reference, named_by))
         return problems
 
     def is_new_item(self, item_identifier: str) -> bool:

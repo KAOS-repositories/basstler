@@ -201,6 +201,11 @@ Four rules, each rejected outright rather than passed over:
   (`--plans-dir`, see [`SKILL.md`](./SKILL.md)). Accepting it unchecked is how
   an unresolvable dependency used to count as *ready*.
 
+A save also refuses removing an item that another plan's item or a goal still
+names. To move items into another plan, save them there first, then every plan
+and goal that names them with their new `<plan-id>/<item-id>`, and only then the
+plan they leave. A finished item is marked done instead of removed.
+
 The cycle check runs over the resulting union graph, so a loop that closes
 through another plan is caught even though neither manifest can see it alone.
 Indentation is unaffected: an item's indent level is its depth in the
@@ -254,9 +259,10 @@ Every session that loads a plan pays for every line of it, so the plan holds
 only what a future session needs to act. `save-plan.sh` enforces this with
 the limits `src/basstler/plan/size_limits.py` names (`Measure`):
 
-- **Landed items are dropped on save**, along with every `depends_on` edge to
+- **Landed items are dropped on save**, along with every `depends_on`,
+  `depends_on_merged` and `depends_on_pushes_done` entry and goal target naming
   them: the work is in the code and its history in git. A plan left with no
-  items is removed.
+  items is removed, and so is a goal left with no targets.
 - **Fields are bounded**: items per plan, characters of the description,
   characters of each item's `notes`, blockers per item and characters of each.
   `notes` hold the item's scope and the decisions that bind it, not a log of

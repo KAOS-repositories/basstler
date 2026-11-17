@@ -562,6 +562,32 @@ class InvalidPushesDoneAt(ValidationProblem):
 
 
 @dataclass
+class RemovedItemStillNamed(ValidationProblem):
+    """
+    A save removes an item that another plan's item or a goal still names.
+    """
+
+    reference_text: str
+    """
+    The removed item, as ``<plan-id>/<item-id>``.
+    """
+
+    named_by: list[str]
+    """
+    Each other plan's item, as ``<plan-id>/<item-id>``, and each goal naming it.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.reference_text!r} is removed but still named by {self.named_by}"
+
+    def suggest_correction(self) -> str:
+        return (
+            "point each of them at the item's new <plan-id>/<item-id>, or drop it "
+            "there, and save them before removing it; mark a finished item done instead"
+        )
+
+
+@dataclass
 class UnknownPerformer(ValidationProblem):
     """
     An item's ``performed_by`` isn't one of :class:`Performer`'s values.

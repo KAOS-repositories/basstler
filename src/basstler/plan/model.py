@@ -671,16 +671,30 @@ class PlanItem:
     def without_dependencies(self, identifiers: set[str]) -> PlanItem:
         """
         :param identifiers: Item ids to stop depending on.
-        :return: This item with every dependency on *identifiers* removed.
+        :return: This item with every dependency on *identifiers* removed, from each
+            of its dependency lists.
         """
         if not identifiers & set(self.dependencies):
             return self
-        remaining = [
-            dependency
-            for dependency in self.dependencies
-            if dependency not in identifiers
-        ]
-        return PlanItem({**self.content, ManifestKey.DEPENDS_ON.key: remaining})
+        dependency_keys = (
+            ManifestKey.DEPENDS_ON,
+            ManifestKey.DEPENDS_ON_MERGED,
+            ManifestKey.DEPENDS_ON_PUSHES_DONE,
+        )
+        return PlanItem(
+            {
+                **self.content,
+                **{
+                    key.key: [
+                        dependency
+                        for dependency in self.content[key.key]
+                        if dependency not in identifiers
+                    ]
+                    for key in dependency_keys
+                    if self.content.get(key.key) is not None
+                },
+            }
+        )
 
 
 class ItemSummaryKey(StrEnum):

@@ -81,6 +81,16 @@ class Goal(ValidatedJSONModel):
         """
         return cls.from_json(yaml.safe_load(text) or {})
 
+    @staticmethod
+    def files_in(plans_directory: Path) -> list[Path]:
+        """
+        :param plans_directory: A checked-out plans directory.
+        :return: The goal files under its goals directory, in file-name order.
+        """
+        return sorted(
+            (plans_directory / ProjectLocation.PLAN_GOALS.name).glob("*.yaml")
+        )
+
     @classmethod
     def every_goal_in(cls, plans_directory: Path) -> list[Goal]:
         """
@@ -89,10 +99,7 @@ class Goal(ValidatedJSONModel):
         :return: The goals under its goals directory, in file-name order.
         """
         return [
-            cls.from_yaml(path.read_text())
-            for path in sorted(
-                (plans_directory / ProjectLocation.PLAN_GOALS.name).glob("*.yaml")
-            )
+            cls.from_yaml(path.read_text()) for path in cls.files_in(plans_directory)
         ]
 
     @property

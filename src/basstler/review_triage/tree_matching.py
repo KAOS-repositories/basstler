@@ -16,6 +16,7 @@ from basstler.review_triage.comparison import ChangeKind, ReviewReason
 from basstler.review_triage.definitions import DefinitionIndex
 from basstler.review_triage.name_scopes import SCOPED_FIELDS, NameScope
 from basstler.review_triage.python_source import ImportBindings, PythonSource
+from basstler.review_triage.receiver_probes import RevealedReceivers
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import SignatureReader
 
@@ -136,6 +137,12 @@ class TreeMatcher:
     The base version of the file being compared, ``None`` when unknown.
     """
 
+    revealed_receivers: RevealedReceivers | None = None
+    """
+    The classes a type checker reveals for the pull request's receivers, ``None``
+    without a type checker.
+    """
+
     @cached_property
     def rule_by_type(self) -> dict[type[ast.AST], DifferenceRule]:
         """
@@ -160,6 +167,7 @@ class TreeMatcher:
             imports=self.imports,
             file_definitions=self.file_definitions,
             module=self.module,
+            revealed_receivers=self.revealed_receivers,
         )
 
     def matches(self, base: object, head: object) -> bool:

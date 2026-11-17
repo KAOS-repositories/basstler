@@ -204,6 +204,26 @@ class ExternalCallFailed(DataclassException, RuntimeError):
 
 
 @dataclass
+class CommandFailed(ExternalCallFailed):
+    """
+    Raised when a program basstler runs, such as a type checker, exits with a status
+    other than those of a run that did its work.
+    """
+
+    command: tuple[str, ...]
+    """
+    The program and its arguments.
+    """
+
+    @property
+    def call(self) -> str:
+        return f"`{' '.join(self.command)}`"
+
+    def suggest_correction(self) -> str:
+        return "fix what the output names, then run it again"
+
+
+@dataclass
 class MalformedEmailAddressError(DataclassException, ValueError):
     """
     Raised when text is not an email address in ``local-part@domain`` form.

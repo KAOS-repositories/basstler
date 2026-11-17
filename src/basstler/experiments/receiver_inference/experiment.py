@@ -7,7 +7,6 @@ a type checker disputes basstler's inference.
 from __future__ import annotations
 
 import re
-import tempfile
 from collections import Counter
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -22,13 +21,11 @@ from basstler.experiments.receiver_inference.cross_check import (
 from basstler.experiments.receiver_inference.exceptions import ReceiversNotProbed
 from basstler.experiments.receiver_inference.probes import (
     AnswerRecording,
-    CombinedInference,
-    FileProbe,
     NoInference,
-    ReceiverQuestion,
-    RevealedInference,
 )
-from basstler.experiments.receiver_inference.type_checkers import TypeChecker
+from basstler.experiments.receiver_inference.type_checkers import (
+    InstalledTypeChecker,
+)
 from basstler.experiments.results import ResultRow, ResultTable
 from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubRestClient
@@ -38,12 +35,13 @@ from basstler.github.pull_request_changes import (
     PullRequestChangesReader,
 )
 from basstler.github.repository import Repository
-from basstler.locations import ExperimentLocation
 from basstler.review_triage.calls import (
     CALLEE_RESOLUTIONS,
+    DEFAULT_RECEIVER_INFERENCE,
     AnnotationInference,
     InferredReceiverMethod,
     ReceiverInference,
+    RevealedInference,
 )
 from basstler.review_triage.commit_tree import CommitModules
 from basstler.review_triage.definition_moves import DefinitionMoveComparison
@@ -54,6 +52,10 @@ from basstler.review_triage.keyword_arguments import (
     KeywordArgumentComparison,
 )
 from basstler.review_triage.markdown import MarkdownComparison
+from basstler.review_triage.receiver_probes import (
+    ReceiverQuestion,
+    RevealedReceivers,
+)
 from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
@@ -75,11 +77,6 @@ OWN_INFERENCE = "basstler"
 The name of the triage inferring receivers with :class:`AnnotationInference`.
 """
 
-PYTHON_SUFFIX = ".py"
-"""
-The suffix of the files a type checker reads.
-"""
-
 
 class CheckerUse(StrEnum):
     """
@@ -96,16 +93,15 @@ class CheckerUse(StrEnum):
     The checker answers the receivers basstler's inference leaves unanswered.
     """
 
-    def inference(self, revealed: dict[ReceiverQuestion, str]) -> ReceiverInference:
+    def inference(self) -> ReceiverInference:
         """
-        :param revealed: The class the checker revealed for each receiver.
         :return: The inference answering the triage this way.
         """
         if self is CheckerUse.ALONE:
-            return RevealedInference(revealed)
-        return CombinedInference((AnnotationInference(), RevealedInference(revealed)))
+            return RevealedInference()
+        return DEFAULT_RECEIVER_INFERENCE
 
-    def way_name(self, checker: TypeChecker) -> str:
+    def way_name(self, checker: InstalledTypeChecker) -> str:
         """
         :param checker: The type checker.
         :return: The name of this way of inferring receivers in the result tables.
@@ -229,6 +225,11 @@ class InferenceOutcome(ResultRow):
     The receivers a type checker was asked for, ``None`` without a checker.
     """
 
+    receivers_revealed: int | None
+    """
+    Those it revealed one class for, ``None`` without a checker.
+    """
+
     needing_review: int
     """
     The files left for a reviewer to read.
@@ -261,7 +262,8 @@ class InferenceOutcome(ResultRow):
 
     checker_seconds: Measurement | None
     """
-    The time of the type checker's run alone, ``None`` without a checker.
+    The time of revealing the receivers' classes, writing the base commit and running
+    the checker, ``None`` without a checker.
     """
 
 
@@ -377,6 +379,26 @@ class DisputedReceiver(ResultRow):
 
 
 @dataclass(frozen=True)
+class RevealedFirstTriager(PullRequestTriager):
+    """
+    The triager, with the receivers' classes revealed before the triage.
+    """
+
+    receivers: RevealedReceivers | None = None
+    """
+    The classes revealed, ``None`` without a type checker.
+    """
+
+    def revealed_receivers(
+        self, changes: PullRequestChanges
+    ) -> RevealedReceivers | None:
+        """
+        :meth:`PullRequestTriager.revealed_receivers`: :attr:`receivers`.
+        """
+        return self.receivers
+
+
+@dataclass(frozen=True)
 class InferringTriage:
     """
     The default triage, inferring receiver classes one given way.
@@ -385,6 +407,11 @@ class InferringTriage:
     inference: ReceiverInference
     """
     The way receivers are inferred.
+    """
+
+    receivers: RevealedReceivers | None = None
+    """
+    The classes a type checker revealed, ``None`` without one.
     """
 
     def keyword_comparison(self) -> KeywordArgumentComparison:
@@ -412,7 +439,7 @@ class InferringTriage:
         :return: The default triager, comparing Python with the inference.
         """
         keyword = self.keyword_comparison()
-        default = PullRequestTriager()
+        default = RevealedFirstTriager(receivers=self.receivers)
         return replace(
             default,
             judgments=tuple(
@@ -455,12 +482,17 @@ class TriageRun:
 
     checker_seconds: float | None = None
     """
-    The time of the type checker's run alone, ``None`` without a checker.
+    The time of revealing the receivers' classes, ``None`` without a checker.
     """
 
     receivers_probed: int | None = None
     """
     The receivers the type checker was asked for, ``None`` without a checker.
+    """
+
+    receivers_revealed: int | None = None
+    """
+    Those it revealed one class for, ``None`` without a checker.
     """
 
     @property
@@ -479,24 +511,19 @@ class RevealedAnswers:
     What one type checker revealed about the receivers of one pull request.
     """
 
-    answers: dict[ReceiverQuestion, str]
+    receivers: RevealedReceivers
     """
-    The class revealed for each receiver revealed as an instance of one.
+    The classes revealed.
     """
 
-    receivers_probed: int
+    revealed: int
     """
-    The receivers the checker was asked for.
+    The receivers revealed as instances of one class.
     """
 
     seconds: float
     """
-    The time of probing the files, running the checker and restoring them.
-    """
-
-    checker_seconds: float
-    """
-    The time of the checker's run alone.
+    The time of revealing them.
     """
 
 
@@ -516,22 +543,15 @@ class PullRequestTriages:
     Its files, in both versions.
     """
 
-    base_checkout: Path
-    """
-    A worktree of its base commit, which the checkers read.
-    """
-
-    source_roots: tuple[str, ...]
-    """
-    The glob patterns, relative to a checkout, of the directories imports resolve in.
-    """
-
-    def triage(self, recording: AnswerRecording) -> TriageRun:
+    def triage(
+        self, recording: AnswerRecording, receivers: RevealedReceivers | None = None
+    ) -> TriageRun:
         """
         :param recording: The way receivers are inferred, recording its answers.
+        :param receivers: The classes a type checker revealed, ``None`` without one.
         :return: The pull request triaged with it.
         """
-        triager = InferringTriage(recording).triager(self.case.rules)
+        triager = InferringTriage(recording, receivers).triager(self.case.rules)
         with Stopwatch() as stopwatch:
             outcome = triager.triage(self.changes)
         return TriageRun(
@@ -544,24 +564,7 @@ class PullRequestTriages:
         The path, relative to the checkout, of each changed Python file by its base
         text.
         """
-        return {
-            file.base_text: (file.previous_path or file.path).as_posix()
-            for file in self.changes.files
-            if file.base_text is not None
-            and (file.previous_path or file.path).suffix == PYTHON_SUFFIX
-        }
-
-    @cached_property
-    def receivers(self) -> frozenset[ReceiverQuestion]:
-        """
-        The receiver of every method call in the changed Python files' base versions,
-        every receiver a triage asks about among them.
-        """
-        return frozenset(
-            question
-            for module in self.base_paths
-            for question in ReceiverQuestion.from_method_calls(module)
-        )
+        return RevealedReceivers.python_paths(self.changes)
 
     @cached_property
     def base_definitions(self) -> DefinitionIndex:
@@ -570,70 +573,18 @@ class PullRequestTriages:
         """
         return DefinitionIndex(CommitModules(self.changes.commits.base_tree))
 
-    def restore(self, paths: list[str]) -> None:
-        """
-        Check the files out of the base commit again, undoing any probe written over
-        them, a probe left by an interrupted run included.
-
-        :param paths: Files relative to the base checkout.
-        """
-        if paths:
-            GitCommandRunner(self.base_checkout).run("checkout", "--", *paths)
-
-    def reveal(self, checker: TypeChecker) -> RevealedAnswers:
+    def reveal(self, checker: InstalledTypeChecker) -> RevealedAnswers:
         """
         :param checker: A type checker.
         :return: The classes it reveals for every receiver of the files it checks,
             asked for in one run before any triage.
         """
-        with Stopwatch() as whole:
-            probes = {
-                module: FileProbe.of(
-                    path,
-                    module,
-                    sorted(
-                        question.span
-                        for question in self.receivers
-                        if question.module == module
-                    ),
-                )
-                for module, path in self.base_paths.items()
-                if checker.checks(path, self.base_checkout)
-            }
-            probed = sorted(probe.path for probe in probes.values())
-            self.restore(probed)
-            for probe in probes.values():
-                (self.base_checkout / probe.path).write_text(
-                    probe.text, encoding="utf-8", newline=""
-                )
-            search_paths = [
-                path
-                for pattern in self.source_roots
-                for path in sorted(self.base_checkout.glob(pattern))
-                if path.is_dir()
-            ]
-            with tempfile.TemporaryDirectory() as workspace, Stopwatch() as running:
-                revealed = (
-                    checker.reveal(
-                        probed, search_paths, self.base_checkout, Path(workspace)
-                    )
-                    if probed
-                    else []
-                )
-            self.restore(probed)
-            answers = {
-                question: class_name
-                for module, probe in probes.items()
-                for question, class_name in probe.answers(module, revealed).items()
-            }
-        return RevealedAnswers(
-            answers,
-            sum(len(probe.arguments) for probe in probes.values()),
-            whole.seconds,
-            running.seconds,
-        )
+        receivers = RevealedReceivers.from_changes(self.changes, checker)
+        with Stopwatch() as stopwatch:
+            classes = receivers.classes
+        return RevealedAnswers(receivers, len(classes), stopwatch.seconds)
 
-    def checked(self, checker: TypeChecker) -> dict[CheckerUse, TriageRun]:
+    def checked(self, checker: InstalledTypeChecker) -> dict[CheckerUse, TriageRun]:
         """
         :param checker: The type checker asked for the receivers' classes.
         :return: The pull request triaged with the classes the checker revealed in one
@@ -644,13 +595,13 @@ class PullRequestTriages:
         revealed = self.reveal(checker)
         runs = {}
         for use in CheckerUse:
-            recording = AnswerRecording(use.inference(revealed.answers))
-            run = self.triage(recording)
+            recording = AnswerRecording(use.inference())
+            run = self.triage(recording, revealed.receivers)
             unprobed = {
                 question
                 for question in recording.asked
                 if question.module in self.base_paths
-            } - self.receivers
+            } - revealed.receivers.questions
             if unprobed:
                 raise ReceiversNotProbed(
                     str(self.case),
@@ -663,8 +614,11 @@ class PullRequestTriages:
             runs[use] = replace(
                 run,
                 seconds=revealed.seconds + run.seconds,
-                checker_seconds=revealed.checker_seconds,
-                receivers_probed=revealed.receivers_probed,
+                checker_seconds=revealed.seconds,
+                receivers_probed=sum(
+                    len(probe.arguments) for probe in revealed.receivers.probes.values()
+                ),
+                receivers_revealed=revealed.revealed,
             )
         return runs
 
@@ -734,7 +688,7 @@ class ReceiverInferenceExperiment:
     The pull requests triaged.
     """
 
-    checkers: tuple[TypeChecker, ...]
+    checkers: tuple[InstalledTypeChecker, ...]
     """
     The type checkers compared.
     """
@@ -749,29 +703,6 @@ class ReceiverInferenceExperiment:
     Whether every receiver basstler infers is compared with what each checker reveals.
     """
 
-    source_roots: tuple[str, ...] = ("src", "*/src")
-    """
-    The glob patterns, relative to a checkout, of the directories imports resolve in.
-    """
-
-    checkouts: Path = ExperimentLocation.CHECKOUTS
-    """
-    Where the worktrees of the base commits are kept.
-    """
-
-    def base_checkout(self, changes: PullRequestChanges) -> Path:
-        """
-        :param changes: A pull request's changes.
-        :return: A worktree of its base commit, added unless it exists.
-        """
-        base = changes.commits.base_commit
-        worktree = self.checkouts / base[:12]
-        if not worktree.exists():
-            GitCommandRunner(self.checkout).run(
-                "worktree", "add", "--detach", str(worktree), base
-            )
-        return worktree
-
     def triages(self, case: PullRequestCase) -> PullRequestTriages:
         """
         :param case: A pull request.
@@ -780,9 +711,7 @@ class ReceiverInferenceExperiment:
         changes = PullRequestChangesReader(
             GitCommandRunner(self.checkout), GitHubRestClient()
         ).read(case.repository, case.number, MergeBaseStart())
-        return PullRequestTriages(
-            case, changes, self.base_checkout(changes), self.source_roots
-        )
+        return PullRequestTriages(case, changes)
 
     def results(self, case: PullRequestCase) -> CaseResults:
         """
@@ -870,6 +799,7 @@ class ReceiverInferenceExperiment:
             receivers=first.receivers,
             receivers_inferred=len(first.answers),
             receivers_probed=first.receivers_probed,
+            receivers_revealed=first.receivers_revealed,
             needing_review=len(first.needing_review),
             newly_mechanical=len(unaided - first.needing_review),
             newly_needing_review=len(first.needing_review - unaided),

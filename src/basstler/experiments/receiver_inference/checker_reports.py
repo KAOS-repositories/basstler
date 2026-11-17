@@ -1,5 +1,5 @@
 """
-The JSON each type checker reports its diagnostics in, read as far as the revealed types
+The JSON mypy and pyright report their diagnostics in, read as far as the revealed types
 need.
 """
 
@@ -101,50 +101,4 @@ class PyrightReport(ValidatedJSONModel):
     ]
     """
     Every diagnostic, revealed types among them.
-    """
-
-
-# %% Pyrefly
-
-
-class PyreflyError(ValidatedJSONModel):
-    """
-    One entry of Pyrefly's ``--output-format json`` report.
-    """
-
-    path: str
-    """
-    The file, relative to where Pyrefly ran.
-    """
-
-    line: int
-    """
-    The line, counted from one.
-    """
-
-    column: int
-    """
-    The column of the parenthesis before a revealed expression, counted from one, which
-    is the expression's column counted from zero.
-    """
-
-    kind: Annotated[str, Field(alias="name")]
-    """
-    What the entry reports, ``reveal-type`` for a revealed type.
-    """
-
-    description: str
-    """
-    The entry's text, ``revealed type: ...`` for a revealed type.
-    """
-
-
-class PyreflyReport(ValidatedJSONModel):
-    """
-    Pyrefly's ``--output-format json`` report.
-    """
-
-    errors: tuple[PyreflyError, ...]
-    """
-    Every entry, revealed types among them.
     """

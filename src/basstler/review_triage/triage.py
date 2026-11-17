@@ -4,7 +4,7 @@ A whole pull request triaged: its renames and the verdict on each file it change
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
 from basstler.github.pull_request_changes import (
@@ -35,11 +35,13 @@ from basstler.review_triage.definition_moves import (
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.markdown import MarkdownComparison
 from basstler.review_triage.module_moves import ModuleMoveDetection
+from basstler.review_triage.receiver_probes import RevealedReceivers
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
+from basstler.review_triage.type_checkers import Pyrefly, TypeChecker
 
 # %% the outcome
 
@@ -121,6 +123,24 @@ class PullRequestTriager:
     The opt-in rules in force.
     """
 
+    type_checker: TypeChecker | None = field(default_factory=Pyrefly)
+    """
+    The type checker answering the receivers basstler's own inference leaves open,
+    ``None`` to leave them open.
+    """
+
+    def revealed_receivers(
+        self, changes: PullRequestChanges
+    ) -> RevealedReceivers | None:
+        """
+        :param changes: The changes the pull request makes itself.
+        :return: The classes :attr:`type_checker` reveals for their receivers, revealed
+            when first asked for; ``None`` without a type checker.
+        """
+        if self.type_checker is None:
+            return None
+        return RevealedReceivers.from_changes(changes, self.type_checker)
+
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
@@ -142,6 +162,7 @@ class PullRequestTriager:
                     [SubclassSubstitutionDetection().decisions(own_changes)]
                 ),
                 self.rules,
+                self.revealed_receivers(own_changes),
             ),
             self.judgments,
         )

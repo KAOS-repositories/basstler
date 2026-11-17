@@ -17,10 +17,10 @@ from basstler.experiments.receiver_inference.experiment import (
     ReceiverInferenceExperiment,
 )
 from basstler.experiments.receiver_inference.type_checkers import (
+    InstalledPyrefly,
+    InstalledTypeChecker,
     Mypy,
-    Pyrefly,
     Pyright,
-    TypeChecker,
 )
 from basstler.experiments.tool_installation import ToolInstallation
 from basstler.locations import ExperimentLocation
@@ -30,7 +30,7 @@ EXPERIMENT_NAME = ResultName.OUTCOMES
 The name of the experiment's command, its main table's.
 """
 
-TYPE_CHECKERS: tuple[TypeChecker, ...] = (
+TYPE_CHECKERS: tuple[InstalledTypeChecker, ...] = (
     Mypy(ToolInstallation("mypy", ExperimentLocation.TOOLS / "mypy")),
     Pyright(
         ToolInstallation(
@@ -40,7 +40,7 @@ TYPE_CHECKERS: tuple[TypeChecker, ...] = (
             downloads=(ExperimentLocation.TOOLS / "pyright" / "downloads",),
         )
     ),
-    Pyrefly(ToolInstallation("pyrefly", ExperimentLocation.TOOLS / "pyrefly")),
+    InstalledPyrefly(ToolInstallation("pyrefly", ExperimentLocation.TOOLS / "pyrefly")),
 )
 """
 The latest release of each type checker compared, with the Node.js pyright runs on.

@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from basstler.experiments.receiver_inference.probes import ReceiverQuestion
+from basstler.review_triage.receiver_probes import ReceiverQuestion
 from basstler.review_triage.definitions import DefinitionIndex
 
 

@@ -269,6 +269,40 @@ class BaseBranchMergeSample(SampleTrees):
         return "base-branch-merge"
 
 
+# %% receivers a type checker answers
+
+
+class ReceiverCheckSample(SampleTrees):
+    """
+    Pull requests passing an argument by keyword to a method of a plotter that a
+    package's factory returns, imported by a script outside the package.
+    """
+
+    BASE_TREE = "base"
+    """
+    The files before the change, the factory's return unannotated.
+    """
+
+    HEAD_TREE = "head"
+    """
+    The files once the script passes the argument by keyword.
+    """
+
+    ANSWERED_BASE_TREE = "answered-base"
+    """
+    The files before the change, the script calling the annotated factory.
+    """
+
+    ANSWERED_HEAD_TREE = "answered-head"
+    """
+    Those files once the script passes the argument by keyword.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "receiver-type-checked"
+
+
 SECTIONED_BOARD = DatasetLocation.REVIEW_TRIAGE / "definition-move-sectioned"
 """
 Versions of the definition-move sample's board module that hold section headers.

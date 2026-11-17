@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from dataclasses import asdict
 
 import pytest
@@ -221,6 +222,58 @@ def test_loading_the_stack_fetches_a_base_no_open_pull_request_has_as_its_head(
         fork_checkout.published_commit(RemoteName.ORIGIN, StackBranch.LONG_LIVED_BASE)
         == published
     )
+
+
+def test_loading_the_stack_names_a_base_the_fork_does_not_have(
+    fork_checkout: ForkCheckout, monkeypatch: pytest.MonkeyPatch
+):
+    fork_checkout.branch_from(StackBranch.PARENT, UPSTREAM_BASE)
+    board = BoardExport(
+        (
+            PullRequest(
+                number=StackPullRequestNumber.PARENT,
+                head=StackBranch.PARENT,
+                base=StackBranch.LONG_LIVED_BASE,
+                draft=False,
+                head_repository=PullRequestHeadRepository.FORK.value.full_name,
+            ),
+        )
+    ).write(fork_checkout.project_root / RepositoryStateLocation.BOARD.name)
+    monkeypatch.setattr(Configuration, "load", make_configuration)
+    monkeypatch.chdir(fork_checkout.project_root)
+
+    stack = Stack.load(board)
+
+    assert stack.missing_on_fork == (StackBranch.LONG_LIVED_BASE,)
+
+
+def test_the_report_carries_the_branches_the_fork_does_not_have():
+    stack = Stack.build(
+        make_configuration(),
+        [],
+        lambda branch: False,
+        lambda candidate, container: False,
+        missing_on_fork=(StackBranch.LONG_LIVED_BASE,),
+    )
+
+    report = MaintenanceReport.of_pass(stack, None, [])
+
+    assert report.missing_on_fork == (StackBranch.LONG_LIVED_BASE,)
+
+
+def test_the_summary_warns_about_each_branch_the_fork_does_not_have(
+    caplog: pytest.LogCaptureFixture,
+):
+    report = MaintenanceReport(missing_on_fork=(StackBranch.LONG_LIVED_BASE,))
+
+    report.print_summary()
+
+    warnings = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING
+    ]
+    assert [StackBranch.LONG_LIVED_BASE in message for message in warnings] == [True]
 
 
 def test_comparing_against_a_reference_git_cannot_resolve_names_that_reference(

@@ -236,15 +236,18 @@ class CurrentCheckout:
         return int(counted) if counted.isdigit() else None
 
     @classmethod
-    def fetch(cls, configuration: Configuration, branches: list[str]) -> None:
+    def fetch(
+        cls, configuration: Configuration, branches: list[str]
+    ) -> tuple[str, ...]:
         """
         Refresh the references the stack names, so drift and landed branches are current.
 
-        A branch the fork no longer has is left out, so it cannot stop the others being
+        A branch the fork does not have is left out, so it cannot stop the others being
         fetched.
 
         :param configuration: The static configuration.
         :param branches: The fork branch names to fetch.
+        :return: The ones the fork does not have, in the order given.
         :raises GitCommandFailed: If a remote cannot be read or a fetch fails.
         """
         git = GitCommandRunner(working_directory=Path.cwd())
@@ -258,6 +261,7 @@ class CurrentCheckout:
         )
         if published:
             git.fetch(configuration.fork_remote, *published)
+        return tuple(branch for branch in branches if branch not in published)
 
     @classmethod
     def published_branches(

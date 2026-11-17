@@ -323,6 +323,9 @@ class Stack:
     is_contained_by: Callable[[str, str], bool]
     """Maps a pair of branch names to whether the first's commits are in the second."""
 
+    missing_on_fork: tuple[str, ...] = ()
+    """The branches the board names that the fork does not have, so their state is unknown."""
+
     @classmethod
     def build(
         cls,
@@ -330,6 +333,7 @@ class Stack:
         pull_requests: list[PullRequest],
         is_merged: Callable[[str], bool],
         is_contained_by: Callable[[str, str], bool],
+        missing_on_fork: tuple[str, ...] = (),
     ) -> Stack:
         """Assemble the stack from the pull request export and the two git facts it needs.
 
@@ -339,6 +343,7 @@ class Stack:
             the pure assembly logic can be tested without git.
         :param is_contained_by: Maps a pair of branch names to whether the first's commits
             are in the second, injected for the same reason.
+        :param missing_on_fork: The branches the fork does not have.
         :return: The assembled stack.
         """
         return cls(
@@ -349,6 +354,7 @@ class Stack:
             ],
             is_merged=is_merged,
             is_contained_by=is_contained_by,
+            missing_on_fork=missing_on_fork,
         )
 
     @classmethod
@@ -372,12 +378,15 @@ class Stack:
             if pull_request.skip_reason(configuration.fork_repository) is None
         }
         bases = {pull_request.base for pull_request in pull_requests}
-        CurrentCheckout.fetch(configuration, sorted(heads_on_fork | bases))
+        missing_on_fork = CurrentCheckout.fetch(
+            configuration, sorted(heads_on_fork | bases)
+        )
         return cls.build(
             configuration,
             pull_requests,
             LandedBranches.from_checkout(configuration).contains,
             CurrentCheckout.containment_predicate(configuration),
+            missing_on_fork,
         )
 
     def maintained_branches(self) -> list[StackBranch]:

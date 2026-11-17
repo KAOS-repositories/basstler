@@ -107,6 +107,12 @@ class MaintenanceReport:
     The pull requests whose head is not on the fork, which the pass left alone.
     """
 
+    missing_on_fork: tuple[str, ...] = ()
+    """
+    The branches the board names that the fork does not have, which the pass could not
+    refresh and so read as they were.
+    """
+
     @classmethod
     def of_pass(
         cls,
@@ -144,6 +150,7 @@ class MaintenanceReport:
             landed=tuple(branch.name for branch in stack.landed_branches()),
             promotable=tuple(branch.name for branch in stack.promotion_order()),
             skipped=tuple(stack.skipped_pull_requests()),
+            missing_on_fork=stack.missing_on_fork,
         )
 
     def as_json(self) -> str:
@@ -201,6 +208,7 @@ class MaintenanceReport:
         self.print_promotions()
         self.print_upstream_pull_request_synchronization_changes()
         self.print_skipped()
+        self.print_missing_on_fork()
 
     def print_fast_forward(self) -> None:
         """
@@ -261,4 +269,14 @@ class MaintenanceReport:
             logger.info(
                 f"{pull_request.head}\t#{pull_request.number}\t{skipped.reason}"
                 f"\t{pull_request.head_repository or ''}"
+            )
+
+    def print_missing_on_fork(self) -> None:
+        """
+        Warn about each branch the board names that the fork does not have.
+        """
+        for branch in self.missing_on_fork:
+            logger.warning(
+                f"{branch}: the board names it but the fork does not have it, so it "
+                f"was not refreshed and its state may be stale"
             )

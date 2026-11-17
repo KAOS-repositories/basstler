@@ -157,6 +157,24 @@ def test_a_landed_branch_is_found_though_the_board_also_names_a_branch_the_fork_
     assert LandedBranches.from_checkout(configuration).contains(StackBranch.PARENT)
 
 
+def test_refreshing_names_the_branches_the_fork_does_not_have(
+    fork_with_a_branch: ForkCheckout,
+):
+    missing = CurrentCheckout.fetch(
+        make_configuration(), [StackBranch.PARENT, StackBranch.CHILD]
+    )
+
+    assert missing == (StackBranch.CHILD,)
+
+
+def test_refreshing_names_no_branch_when_the_fork_has_them_all(
+    fork_with_a_branch: ForkCheckout,
+):
+    missing = CurrentCheckout.fetch(make_configuration(), [StackBranch.PARENT])
+
+    assert missing == ()
+
+
 def test_refreshing_fails_when_the_fork_cannot_be_reached(
     fork_with_a_branch: ForkCheckout, tmp_path: Path
 ):

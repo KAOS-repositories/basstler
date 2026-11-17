@@ -31,6 +31,7 @@ from basstler.github.constants import MaintenanceNotice
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
 from basstler.locations import RepositoryStateLocation
 from basstler.maintenance.board import BoardExport
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.upstream_reviews.action.open_pull_requests import (
     OpenPullRequestsAnswer,
     OpenPullRequestsRequest,
@@ -97,6 +98,11 @@ class MaintenancePass:
     action_timeout: float = 480
     """
     How many seconds a read through the fork's Action waits for its run.
+    """
+
+    closing_follow_ups: LandedClosingFollowUps = LandedClosingFollowUps()
+    """
+    What a whole pass runs after closing pull requests whose work landed.
     """
 
     @property
@@ -559,6 +565,9 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
         labels_cleared = clear_spent_promotion_labels(stack, fork)
         synchronization = UpstreamPullRequestSynchronization(stack, fork).apply()
         closed_as_landed = LandedPullRequestClosing(stack, fork).apply()
+        closing_follow_ups = maintenance.closing_follow_ups.respond_to_closing(
+            closed_as_landed
+        )
         report = MaintenanceReport.of_pass(
             stack,
             fast_forward_report,
@@ -567,6 +576,7 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
             labels_cleared,
             synchronization,
             closed_as_landed,
+            closing_follow_ups,
         )
         maintenance.board.unlink(missing_ok=True)
         maintenance.full_report.write_text(report.as_json() + "\n")

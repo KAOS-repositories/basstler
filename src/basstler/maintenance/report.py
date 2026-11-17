@@ -105,6 +105,11 @@ class MaintenanceReport:
     The pull requests this pass closed because their work had landed upstream.
     """
 
+    closing_follow_ups: tuple[str, ...] = ()
+    """
+    What became of each follow-up to those closings that had something to do.
+    """
+
     promotable: tuple[str, ...] = ()
     """
     The branches approved and unblocked, whether or not a link was built this pass.
@@ -132,6 +137,7 @@ class MaintenanceReport:
             UpstreamPullRequestSynchronizationChange
         ] = (),
         closed_as_landed: Sequence[ClosedAsLanded] = (),
+        closing_follow_ups: Sequence[str] = (),
     ) -> MaintenanceReport:
         """
         Assemble one pass's outcomes and its leftovers into a single report.
@@ -145,6 +151,7 @@ class MaintenanceReport:
         :param upstream_pull_request_synchronization_changes: The writes bringing each pull request's in-review
             label and upstream link in step.
         :param closed_as_landed: The pull requests closed because their work landed.
+        :param closing_follow_ups: What became of each follow-up to those closings.
         :return: The report.
         """
         return cls(
@@ -162,6 +169,7 @@ class MaintenanceReport:
                 if branch.name not in {closed.branch for closed in closed_as_landed}
             ),
             closed_as_landed=tuple(closed_as_landed),
+            closing_follow_ups=tuple(closing_follow_ups),
             promotable=tuple(branch.name for branch in stack.promotion_order()),
             skipped=tuple(stack.skipped_pull_requests()),
             fork_refresh=stack.fork_refresh,

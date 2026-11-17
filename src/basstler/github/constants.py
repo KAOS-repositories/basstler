@@ -104,16 +104,6 @@ class MaintenanceText(StrEnum):
     branch and the upstream base to fill in.
     """
 
-    REBUILD_PLAN_SITE = (
-        "Closing these changes what the plan site shows. Run "
-        "`python -m basstler.plan_site.build_start` to rebuild it."
-    )
-    """
-    What the finish summary asks of the caller after pull requests were closed: the plan
-    site sits above the maintenance pass, so the pass names its build rather than
-    starting it.
-    """
-
     PROMOTION_HEADING = "## Promote"
     """
     Heading the compare-and-create link is written under, in the fork pull request's own

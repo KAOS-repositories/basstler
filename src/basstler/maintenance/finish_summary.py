@@ -63,9 +63,9 @@ class FinishSummaryHeading(StrEnum):
     upstream base.
     """
 
-    PLAN_SITE = "Plan site"
+    CLOSING_FOLLOW_UPS = "After closing"
     """
-    What the caller does about the plan site after pull requests were closed.
+    What became of the work other distributions do once pull requests were closed.
     """
 
     LANDED = "Landed but still open"
@@ -256,7 +256,9 @@ class FinishSummary:
             FinishSummaryHeading.REPARENTS: self.capped(self.reparents()),
             FinishSummaryHeading.FORK_BASE: self.fork_base(),
             FinishSummaryHeading.CLOSED_AS_LANDED: self.capped(self.closed_as_landed()),
-            FinishSummaryHeading.PLAN_SITE: self.plan_site(),
+            FinishSummaryHeading.CLOSING_FOLLOW_UPS: list(
+                self.report.closing_follow_ups
+            ),
             FinishSummaryHeading.LANDED: self.capped(self.landed()),
             FinishSummaryHeading.RESTACKED: self.restacked(),
             FinishSummaryHeading.UNPUBLISHED: self.capped(self.unpublished()),
@@ -401,15 +403,6 @@ class FinishSummary:
             f"- {self.pull_request_link(closed.pull_request_number)} `{closed.branch}`"
             for closed in self.report.closed_as_landed
         ]
-
-    def plan_site(self) -> list[str]:
-        """
-        :return: The command that rebuilds the plan site, empty when no pull request was
-            closed.
-        """
-        if not self.report.closed_as_landed:
-            return []
-        return [MaintenanceText.REBUILD_PLAN_SITE]
 
     def landed(self) -> list[str]:
         """

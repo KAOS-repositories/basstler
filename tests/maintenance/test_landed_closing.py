@@ -5,9 +5,10 @@ against a real scratch fork.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
-from basstler.github.constants import MaintenanceText
 from basstler.maintenance.commands import RunReportCommand
 from basstler.maintenance.finish_summary import FinishSummary, FinishSummaryHeading
 from basstler.maintenance.promotion import PromotionSummaries
@@ -15,6 +16,7 @@ from basstler.maintenance.landed_closing import (
     ClosedAsLanded,
     LandedPullRequestClosing,
 )
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 
 from ..constants.stack import RemoteName, StackBranch
 from .fork import (
@@ -28,6 +30,7 @@ from .fork import (
 from .test_finish_summary import section_of
 from .recorded_fork import (
     AlreadyResolvedPass,
+    RecordingFollowUp,
     RecordingPullRequests,
 )
 
@@ -189,25 +192,49 @@ def test_a_whole_pass_closes_the_landed_pull_request(
     assert report.landed == ()
 
 
-def test_the_summary_of_a_pass_that_closes_nothing_has_no_plan_site_section(
+def test_a_pass_that_closes_nothing_runs_no_follow_up(
     fork_checkout: ForkCheckout,
 ):
     a_parent_and_child(fork_checkout)
-    maintenance = AlreadyResolvedPass.over(fork_checkout, the_board())
+    follow_up = RecordingFollowUp()
+    maintenance = replace(
+        AlreadyResolvedPass.over(fork_checkout, the_board()),
+        closing_follow_ups=LandedClosingFollowUps((follow_up,)),
+    )
 
     report = RunReportCommand().perform(
         maintenance, as_json=True, summaries=PromotionSummaries()
     )
-    summary = FinishSummary(report, maintenance.resolved_stack).as_markdown()
 
-    assert report.closed_as_landed == ()
-    assert section_of(summary, FinishSummaryHeading.PLAN_SITE) == []
+    assert follow_up.calls == []
+    assert report.closing_follow_ups == ()
 
 
-def test_the_summary_lists_what_was_closed_and_asks_for_the_plan_site_rebuild(
+def test_a_pass_runs_each_follow_up_with_what_it_closed(
     child_landed: ForkCheckout,
 ):
-    maintenance = AlreadyResolvedPass.over(child_landed, the_board()[1:])
+    follow_up = RecordingFollowUp()
+    maintenance = replace(
+        AlreadyResolvedPass.over(child_landed, the_board()[1:]),
+        closing_follow_ups=LandedClosingFollowUps((follow_up,)),
+    )
+
+    report = RunReportCommand().perform(
+        maintenance, as_json=True, summaries=PromotionSummaries()
+    )
+
+    assert follow_up.calls == [report.closed_as_landed]
+    assert report.closing_follow_ups == (follow_up.outcome,)
+
+
+def test_the_summary_lists_what_was_closed_and_what_each_follow_up_did(
+    child_landed: ForkCheckout,
+):
+    follow_up = RecordingFollowUp()
+    maintenance = replace(
+        AlreadyResolvedPass.over(child_landed, the_board()[1:]),
+        closing_follow_ups=LandedClosingFollowUps((follow_up,)),
+    )
     report = RunReportCommand().perform(
         maintenance, as_json=True, summaries=PromotionSummaries()
     )
@@ -216,6 +243,6 @@ def test_the_summary_lists_what_was_closed_and_asks_for_the_plan_site_rebuild(
 
     (entry,) = section_of(summary, FinishSummaryHeading.CLOSED_AS_LANDED)
     assert f"`{StackBranch.CHILD}`" in entry
-    assert section_of(summary, FinishSummaryHeading.PLAN_SITE) == [
-        MaintenanceText.REBUILD_PLAN_SITE
+    assert section_of(summary, FinishSummaryHeading.CLOSING_FOLLOW_UPS) == [
+        follow_up.outcome
     ]

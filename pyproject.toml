@@ -138,5 +138,6 @@ ban-relative-imports = "all"
 "tests/upstream_reviews/test_open_pull_requests_action.py" = ["F401", "F811"]
 # libcst calls a visitor's methods by the name of the node, visit_<NodeClass>.
 "src/basstler/code_modification/renames.py" = ["N802"]
+"src/basstler/code_modification/relocations.py" = ["N802"]
 # Lower case like the builtin property it stands beside.
 "src/basstler/class_property.py" = ["N801"]

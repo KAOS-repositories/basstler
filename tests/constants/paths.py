@@ -864,6 +864,16 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`RENAMED_SYMBOL_BEFORE` once the class and the text mentioning it are renamed.
     """
 
+    RELOCATED_IMPORT_BEFORE = DIRECTORY / "relocated-import-before.py"
+    """
+    Imports of a name from the module it moves out of, beside imports of other names.
+    """
+
+    RELOCATED_IMPORT_AFTER = DIRECTORY / "relocated-import-after.py"
+    """
+    :attr:`RELOCATED_IMPORT_BEFORE` once the name is imported from where it moved to.
+    """
+
     NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
     """
     A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`

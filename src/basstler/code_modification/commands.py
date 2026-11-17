@@ -21,3 +21,8 @@ class CodeModificationCommand(StrEnum):
     """
     Rename a symbol in every Python file given.
     """
+
+    RELOCATE_IMPORT = "relocate-import"
+    """
+    Import a name from the module it moved to in every Python file given.
+    """

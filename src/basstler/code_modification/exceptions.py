@@ -40,3 +40,26 @@ class ActionTargetMissingError(DataclassException, LookupError):
             "Apply the action to the module it was made for, or to the module the "
             "action before it in its plan produced."
         )
+
+
+@dataclass
+class ImportRelocationUnsupportedError(DataclassException, ValueError):
+    """
+    Raised when an import statement names the moved name beside other names, which one
+    statement cannot import from two modules.
+    """
+
+    location: CodeRange
+    """
+    Where the statement is.
+    """
+
+    def error_message(self) -> str:
+        start = self.location.start
+        return (
+            f"the import at line {start.line} names the moved name beside others, so "
+            "it cannot come from a different module in one statement"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Split the statement so the moved name is imported on its own, then relocate it."

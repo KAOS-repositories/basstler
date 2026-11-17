@@ -1,3 +1,3 @@
-**Plan:** Bash PreToolUse hook allowing `basstler.sh` commands that chain nothing.
-**Done:** review round 1 (all basstler commands, SessionTool enum, class properties) pushed as c6ffd709; 3 threads resolved.
-**Next:** thread on config dataclass vs class properties awaits the reviewer.
+**Plan:** the Bash hook approves an expanded entry point path only under this plugin's root.
+**Done:** `EntryPointInvocation` bound to `PluginRoot`, tests, README, draft follow-up PR to #250.
+**Next:** nothing until review or CI comes in.

@@ -25,8 +25,8 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(*basstler.sh*maintenance fast-forward*)",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.maintenance_approval"
+            "if": "Bash(*basstler.sh*)",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.entry_point_approval"
           }
         ]
       }

@@ -26,8 +26,8 @@ items:
   branch: ccr-37402cb7-cls5ht-keyword-arguments
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 214
-  notes: 'Draft #214, stacked on #226 and restacked onto it by merge at f7d1e807 (175 triage
-    and git tests, ruff and code-rules pass on Windows; CI not read). Keeps keyword_arguments,
+  notes: 'Draft #214, stacked on #226 and restacked onto its 8f01b9a9 at 4d13d564 (CI not
+    read). Keeps keyword_arguments,
     calls, signatures and tree_matching, supplying KeywordArgumentComparison and the call
     resolution binding-renames builds on. CRAM #967: 123 of 154 files mechanical; #210: 233
     of 246.'
@@ -68,9 +68,10 @@ items:
   recommended_model: sonnet
   notes: 'The general part of #214 (moves, triage since a commit, opt-in rules), split out
     by moving files. report and mark-viewed now default to the viewer''s last submitted
-    review, else the merge base; --from-merge-base asks for the whole change. Next: read CI;
-    restack #214 onto it, which lacks ee81557b. Exempt from the basstler-packages freeze
-    on github.'
+    review, else the merge base; --from-merge-base asks for the whole change. --rename no
+    longer crashes (c5473e82, Rename.found_by out of equality). main merged at 8f01b9a9, one
+    conflict in github/repository.py kept both methods; #214, #241 and #238 restacked onto it.
+    Next: read CI. Exempt from the basstler-packages freeze on github.'
 
 - id: generated-file-triage
   title: Prove a generated file mechanical by regenerating it
@@ -142,7 +143,7 @@ items:
   - binding-renames
   status: in progress
   recommended_model: opus
-  notes: 'Draft #241 at 15dee971, on #226. split-mechanical: statement-level mechanical
+  notes: 'Draft #241 at 157be7bc, restacked on #226''s 8f01b9a9. split-mechanical: statement-level mechanical
     commit proven with the PR''s renames, head tree after, summary in the description.
     Samples: one unviewed file per rename. Local splits: CRAM 609 3435 to 1455 lines,
     business_consulting 125 2757 to 2084. CI not read. Next: restack onto binding-renames

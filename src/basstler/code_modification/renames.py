@@ -4,6 +4,7 @@ Renaming a symbol everywhere a module names it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import libcst
@@ -34,6 +35,18 @@ class NameOccurrence(Specification):
     """
 
 
+@dataclass(frozen=True)
+class MentionOccurrence(Specification):
+    """
+    One comment or string that mentions the symbol being renamed as a whole word.
+    """
+
+    node: libcst.Comment | libcst.SimpleString
+    """
+    The comment, or the string literal such as a docstring, holding the mention.
+    """
+
+
 class NameCollector(libcst.CSTVisitor):
     """
     Collects the names of a module that spell one identifier.
@@ -49,6 +62,27 @@ class NameCollector(libcst.CSTVisitor):
     def visit_Name(self, node: libcst.Name) -> None:
         if node.value == self.identifier:
             self.names.append(node)
+
+
+class MentionCollector(libcst.CSTVisitor):
+    """
+    Collects the comments and strings of a module that mention one identifier.
+    """
+
+    def __init__(self, pattern: re.Pattern[str]) -> None:
+        """
+        :param pattern: What a mention looks like.
+        """
+        self.pattern = pattern
+        self.nodes: list[libcst.Comment | libcst.SimpleString] = []
+
+    def visit_Comment(self, node: libcst.Comment) -> None:
+        if self.pattern.search(node.value):
+            self.nodes.append(node)
+
+    def visit_SimpleString(self, node: libcst.SimpleString) -> None:
+        if self.pattern.search(node.value):
+            self.nodes.append(node)
 
 
 # %% the rename
@@ -71,6 +105,12 @@ class SymbolRename(Action):
     The identifier that replaces it.
     """
 
+    include_mentions: bool = False
+    """
+    Whether a comment or a string that mentions :attr:`old_name` as a whole word, such
+    as a docstring, names :attr:`new_name` too.
+    """
+
     def occurrences(self, *, module: PositionedModule) -> list[NameOccurrence]:
         """
         :param module: The module to search.
@@ -89,15 +129,56 @@ class SymbolRename(Action):
             )
         ]
 
+    @property
+    def mention_pattern(self) -> re.Pattern[str]:
+        """
+        :return: What a mention of :attr:`old_name` looks like: the identifier, not
+            part of a longer one.
+        """
+        return re.compile(
+            rf"(?<![A-Za-z0-9_]){re.escape(self.old_name)}(?![A-Za-z0-9_])"
+        )
+
+    def mentions(self, *, module: PositionedModule) -> list[MentionOccurrence]:
+        """
+        :param module: The module to search.
+        :return: Every comment and string of *module* that mentions :attr:`old_name`.
+        """
+        collector = MentionCollector(self.mention_pattern)
+        module.module.visit(collector)
+        return [
+            MentionOccurrence(location=module.positions[node], node=node)
+            for node in collector.nodes
+        ]
+
     def apply(self, module: libcst.Module) -> AppliedAction:
+        positioned = PositionedModule(module)
         replacements = [
             NodeReplacement(
                 occurrence.location,
                 occurrence.node,
                 occurrence.node.with_changes(value=self.new_name),
             )
-            for occurrence in reversed(
-                self.occurrences(module=PositionedModule(module))
-            )
+            for occurrence in self.occurrences(module=positioned)
         ]
+        if self.include_mentions:
+            replacements += [
+                NodeReplacement(
+                    mention.location,
+                    mention.node,
+                    mention.node.with_changes(
+                        value=self.mention_pattern.sub(
+                            self.new_name, mention.node.value
+                        )
+                    ),
+                )
+                for mention in self.mentions(module=positioned)
+            ]
+        replacements.sort(
+            key=lambda replacement: (
+                replacement.location.start.line,
+                replacement.location.start.column,
+            ),
+            reverse=True,
+        )
         return ActionPlan(tuple(replacements)).apply(module)

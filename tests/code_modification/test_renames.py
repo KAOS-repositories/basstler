@@ -64,6 +64,33 @@ def test_every_place_naming_the_symbol_is_renamed_and_nothing_else(before, renam
     )
 
 
+def test_mentions_in_docstrings_comments_and_strings_are_renamed_when_asked(before):
+    """
+    With mentions included the docstring, the comment and the string name the new
+    symbol too, and the inverse still restores the module exactly.
+    """
+    rename = SymbolRename(old_name=OLD_NAME, new_name=NEW_NAME, include_mentions=True)
+
+    applied = rename.apply(before)
+
+    assert applied.module.code == (
+        CodeModificationSnippet.RENAMED_SYMBOL_AND_MENTIONS_AFTER.read_text(
+            encoding="utf-8"
+        )
+    )
+    assert applied.inverse.apply(applied.module).module.code == before.code
+
+
+def test_a_longer_name_containing_the_symbol_is_not_a_mention(rename):
+    """
+    ``SerializerKind`` is a different name, in code and in text alike.
+    """
+    module = libcst.parse_module('"""SerializerKind."""\n')
+    renaming = SymbolRename(old_name=OLD_NAME, new_name=NEW_NAME, include_mentions=True)
+
+    assert renaming.apply(module).module.code == module.code
+
+
 def test_an_import_alias_keeps_the_name_it_binds(before, rename):
     """
     ``import Serializer as Writer`` imports the renamed class under the same alias.
@@ -146,3 +173,22 @@ def test_the_command_leaves_a_file_without_the_symbol_alone(tmp_path):
 
     assert status == CodeModificationExitCode.SUCCESS
     assert source.read_text(encoding="utf-8") == "value = 1\n"
+
+
+def test_the_command_renames_mentions_when_asked(tmp_path):
+    """
+    With ``include_mentions`` the docstring, the comment and the string are renamed.
+    """
+    source = tmp_path / "module.py"
+    source.write_text(
+        CodeModificationSnippet.RENAMED_SYMBOL_BEFORE.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    rename_symbol(OLD_NAME, NEW_NAME, [source], include_mentions=True)
+
+    assert source.read_text(encoding="utf-8") == (
+        CodeModificationSnippet.RENAMED_SYMBOL_AND_MENTIONS_AFTER.read_text(
+            encoding="utf-8"
+        )
+    )

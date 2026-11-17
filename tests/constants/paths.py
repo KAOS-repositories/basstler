@@ -857,6 +857,13 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`RENAMED_SYMBOL_BEFORE` once the class is renamed.
     """
 
+    RENAMED_SYMBOL_AND_MENTIONS_AFTER = (
+        DIRECTORY / "renamed-symbol-and-mentions-after.py"
+    )
+    """
+    :attr:`RENAMED_SYMBOL_BEFORE` once the class and the text mentioning it are renamed.
+    """
+
     NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
     """
     A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`

@@ -47,7 +47,11 @@ The ``code-modification`` command group.
 
 @code_modification_app.command(name=CodeModificationCommand.RENAME)
 def rename(
-    old_name: str, new_name: str, paths: list[Path] | None = None
+    old_name: str,
+    new_name: str,
+    paths: list[Path] | None = None,
+    *,
+    include_mentions: bool = False,
 ) -> CodeModificationExitCode:
     """
     Rename a symbol in each Python file in *paths* wherever it is named; a file is
@@ -56,8 +60,12 @@ def rename(
     :param old_name: The identifier to replace.
     :param new_name: The identifier that replaces it.
     :param paths: The Python files to rename in.
+    :param include_mentions: Whether comments and strings that mention the old name
+        name the new one too.
     """
-    symbol_rename = SymbolRename(old_name=old_name, new_name=new_name)
+    symbol_rename = SymbolRename(
+        old_name=old_name, new_name=new_name, include_mentions=include_mentions
+    )
     renamed_sources = {
         source_file: symbol_rename.apply(source_file.parse()).module.code
         for source_file in map(PythonSourceFile, paths or [])

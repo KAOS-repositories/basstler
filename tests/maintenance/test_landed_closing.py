@@ -77,7 +77,7 @@ def test_a_landed_pull_request_is_closed(parent_landed: ForkCheckout):
     fork = RecordingPullRequests()
     stack = a_stack(parent_landed, the_board())
 
-    closed = LandedPullRequestClosing(stack, fork).close()
+    closed = LandedPullRequestClosing(stack, fork).apply()
 
     assert closed == (
         ClosedAsLanded(StackBranch.PARENT, StackPullRequestNumber.PARENT),
@@ -89,7 +89,7 @@ def test_a_landed_pull_request_is_not_labelled(parent_landed: ForkCheckout):
     fork = RecordingPullRequests()
     stack = a_stack(parent_landed, the_board())
 
-    LandedPullRequestClosing(stack, fork).close()
+    LandedPullRequestClosing(stack, fork).apply()
 
     assert fork.label_writes == []
 
@@ -100,7 +100,7 @@ def test_a_landed_pull_request_is_commented_on_with_its_branch_and_the_base(
     fork = RecordingPullRequests()
     stack = a_stack(parent_landed, the_board())
 
-    LandedPullRequestClosing(stack, fork).close()
+    LandedPullRequestClosing(stack, fork).apply()
 
     (comment,) = fork.comments
     assert comment.pull_request_number == StackPullRequestNumber.PARENT
@@ -113,7 +113,7 @@ def test_a_pull_request_that_has_not_landed_is_left_open(fork_checkout: ForkChec
     fork = RecordingPullRequests()
     stack = a_stack(fork_checkout, the_board())
 
-    closed = LandedPullRequestClosing(stack, fork).close()
+    closed = LandedPullRequestClosing(stack, fork).apply()
 
     assert closed == ()
     assert fork.closed == []
@@ -134,7 +134,7 @@ def test_a_branch_with_no_commits_of_its_own_is_left_open(
     fork = RecordingPullRequests()
     stack = a_stack(fork_checkout, the_board()[:1])
 
-    closed = LandedPullRequestClosing(stack, fork).close()
+    closed = LandedPullRequestClosing(stack, fork).apply()
 
     assert closed == ()
     assert fork.closed == []
@@ -150,7 +150,7 @@ def test_a_pull_request_whose_base_the_fork_no_longer_has_is_left_open_and_warne
     fork = RecordingPullRequests()
     stack = a_stack(parent_landed, the_board()[1:])
 
-    closed = LandedPullRequestClosing(stack, fork).close()
+    closed = LandedPullRequestClosing(stack, fork).apply()
 
     assert closed == ()
     assert fork.closed == []

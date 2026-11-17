@@ -38,19 +38,11 @@ class LandedPullRequestClosing(ForkPullRequestAction):
     Closes every open fork pull request whose commits are all in the upstream base.
 
     GitHub records no merge for such a pull request when it is based on another branch,
-    so it stays open until it is closed.
+    so it stays open until it is closed. A branch with no commit beyond its base, or whose
+    commits cannot be counted (which is warned about), is left open.
     """
 
-    def close(self) -> tuple[ClosedAsLanded, ...]:
-        """
-        Close each landed pull request and say why.
-
-        A branch with no commit beyond its base is left open: it is an ancestor of the
-        upstream base as a landed branch is, but nothing of it landed. A branch whose
-        commits cannot be counted is left open and warned about.
-
-        :return: One entry per pull request closed, parent before child.
-        """
+    def apply(self) -> tuple[ClosedAsLanded, ...]:
         closed = []
         for branch in self.stack.landed_branches():
             if not self.has_commits_of_its_own(branch):

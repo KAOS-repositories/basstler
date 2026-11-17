@@ -466,7 +466,7 @@ class PromoteCommand(MaintenanceCommand):
             ),
             promotion_labels_cleared=tuple(clear_spent_promotion_labels(stack, fork)),
             upstream_pull_request_synchronization_changes=tuple(
-                UpstreamPullRequestSynchronization(stack, fork).synchronize()
+                UpstreamPullRequestSynchronization(stack, fork).apply()
             ),
         )
         report.print_summary()
@@ -572,8 +572,8 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
         restacked = restack(stack, maintenance.git, fork)
         promoted = promote(stack, fork, summaries)
         labels_cleared = clear_spent_promotion_labels(stack, fork)
-        synchronization = UpstreamPullRequestSynchronization(stack, fork).synchronize()
-        closed_as_landed = LandedPullRequestClosing(stack, fork).close()
+        synchronization = UpstreamPullRequestSynchronization(stack, fork).apply()
+        closed_as_landed = LandedPullRequestClosing(stack, fork).apply()
         report = MaintenanceReport.of_pass(
             stack,
             fast_forward_report,

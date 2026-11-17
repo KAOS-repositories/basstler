@@ -70,16 +70,7 @@ class UpstreamPullRequestSynchronization(ForkPullRequestAction):
     kept in step with the open upstream pull request opened from its branch.
     """
 
-    def synchronize(self) -> list[UpstreamPullRequestSynchronizationChange]:
-        """
-        Bring the label and the link of every branch not yet landed in step with its
-        upstream pull request.
-
-        Each write keeps what the pull request carries *now*, not what the board was
-        exported with.
-
-        :return: One entry per write, in dependency order.
-        """
+    def apply(self) -> list[UpstreamPullRequestSynchronizationChange]:
         changes: list[UpstreamPullRequestSynchronizationChange] = []
         for branch in self.stack.maintained_branches():
             if branch.status is BranchStatus.MERGED:

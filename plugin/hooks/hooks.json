@@ -19,6 +19,16 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.attach_approval"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(*basstler.sh*maintenance fast-forward*)",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.maintenance_approval"
+          }
+        ]
       }
     ]
   }

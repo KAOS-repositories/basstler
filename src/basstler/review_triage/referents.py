@@ -167,21 +167,21 @@ class ModuleNames:
         """
         :param name: A name the module's top level binds.
         :return: Whether its one binding is a top-level import following every star
-            import, with nothing but imports running before it, so that every use of
-            the name sees that import.
+            import, the name used nowhere before it, so that every use sees that import.
         """
         bindings = self.scope.bindings.get(name, ())
         if len(bindings) != 1 or not isinstance(bindings[0], ImportedMember):
             return False
-        body = self.source.tree.body
         statement = bindings[0].statement
-        if statement not in body:
+        if statement not in self.source.tree.body:
             return False
-        preceding = body[: body.index(statement)]
-        return all(star in preceding for star in self.scope.star_imports) and all(
-            isinstance(node, (ast.Import, ast.ImportFrom))
-            or PythonSource.is_documentation(node)
-            for node in preceding
+        return all(
+            star.lineno < statement.lineno for star in self.scope.star_imports
+        ) and not any(
+            isinstance(node, ast.Name)
+            and node.id == name
+            and node.lineno < statement.lineno
+            for node in ast.walk(self.source.tree)
         )
 
     @cached_property
@@ -332,8 +332,8 @@ class MemberResolver:
         :param name: A name its top level may bind.
         :param followed: The members whose imports are being followed.
         :return: What the name refers to, a builtin when the module binds it nowhere,
-            ``None`` when it is not proven: bound more than once, possibly by a star
-            import, or also a submodule's name.
+            ``None`` when it is not proven: bound to more than one thing, possibly by a
+            star import, or also a submodule's name.
         """
         scope = names.scope
         submodule = f"{names.module}{DOTTED_NAME_SEPARATOR}{name}"
@@ -347,11 +347,14 @@ class MemberResolver:
             if hasattr(builtins, name):
                 return StandardLibraryMember(BUILTINS_MODULE, name)
             return None
-        if len(bindings) != 1 or is_submodule:
+        if is_submodule:
             return None
-        if isinstance(bindings[0], OWN_MEMBER_BINDINGS):
+        if len(bindings) == 1 and isinstance(bindings[0], OWN_MEMBER_BINDINGS):
             return ModuleMember(names.module, name)
-        return self.imported_referent(names, bindings[0], followed)
+        referents = {
+            self.imported_referent(names, binding, followed) for binding in bindings
+        }
+        return referents.pop() if len(referents) == 1 else None
 
     def imported_referent(
         self,

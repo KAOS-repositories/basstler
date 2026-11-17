@@ -9,6 +9,13 @@
 # Usage:
 #   review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]
 #
+#   or, without downloading it first:
+#   curl -fsSL https://raw.githubusercontent.com/KAOS-repositories/basstler/main/scripts/review-triage.sh \
+#       | bash -s -- <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]
+#
+#   To run an unmerged basstler branch, put its name in place of main in the URL and
+#   set BASSTLER_REF to it.
+#
 #   <pull request number>  triage only this pull request; every open one when left out
 #   --mark-viewed          also mark the mechanical files viewed for your GitHub account
 #   -- <option>...         passed on to `basstler review-triage`, such as --from-merge-base,

@@ -141,6 +141,8 @@ ban-relative-imports = "all"
 ]
 "tests/dataset/**" = [
     "F403",     # a triage sample star-imports to test how the triage resolves names
+    "F405",     # and uses a name a star import may bind
+    "E402",     # a triage sample imports after code, as notebook-style documents do
 ]
 # Imports a fixture from a sibling test module, which pytest finds by its parameter name.
 "tests/upstream_reviews/test_open_pull_requests_action.py" = ["F401", "F811"]

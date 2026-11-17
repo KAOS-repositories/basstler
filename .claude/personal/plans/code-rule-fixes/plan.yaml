@@ -1,0 +1,113 @@
+schema_version: 1
+id: code-rule-fixes
+title: 'Code rule fixes: applied automatically and proven mechanical'
+description: Code rules declare reversible fixes that code-rules fix applies, and the review
+  triage marks a file mechanical when recomputing a rule's fix, or replaying a recorded
+  modification plan, on the base reproduces the head.
+default_repository: KAOS-repositories/basstler
+waves:
+- id: fixes
+  name: Fixes
+tracks:
+- id: pattern-fixes
+  name: Rule fixes applied and proven mechanical
+  wave: fixes
+items:
+- id: rule-fixes
+  title: Declare reversible fixes on code rules and apply them with code-rules fix
+  track: pattern-fixes
+  status: in progress
+  recommended_model: opus
+  branch: claude/pattern-checkers-mechanical-marking-arg9pe
+  session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
+  pull_request_number: 222
+  blockers:
+    - >-
+      Review of #222 answered at 59f12519: 11 threads done and resolved, 7 answered and left open
+      for the owner, one asking whether to move the other modules onto TextFile.
+  notes: 'Draft #222, stacked on #220. basstler.code_modification (specifications, NodeReplacement
+    with exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
+    SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107 of #220''s 129 .py files;
+    examples under tests/dataset/rule-fixes tested automatically.
+
+    '
+- id: directory-and-bash-fixes
+  title: Fixes for directory removal and bash started by name
+  track: pattern-fixes
+  branch: claude/kind-bohr-db512e
+  pull_request_number: 227
+  session: https://claude.ai/code/session_018wfiv9JCt7E3PATWtKuv68
+  depends_on:
+  - rule-fixes
+  status: in progress
+  recommended_model: sonnet
+  notes: rmtree(x) becomes DirectoryTree(x).remove(); with ignore_errors=True the fix keeps
+    ignoring errors through a declared DirectoryTree option, unless the rule wants it to raise,
+    and declares that. Bash.locate fix only where an environment is in scope.
+- id: portability-fixes
+  title: Fixes for file URLs and paths written into git and shell text
+  track: pattern-fixes
+  branch: claude/loving-maxwell-s1y58z
+  pull_request_number: 228
+  session: https://claude.ai/code/session_018wfiv7tGSxnxF2wRvV9Fa4
+  depends_on:
+  - rule-fixes
+  status: in progress
+  recommended_model: opus
+  notes: 'Two patterns #220 applied by hand: a file:// URL built from a path becomes Path.as_uri();
+    str(path) in git or shell command text becomes as_posix(), only if a checker can tell
+    reliably that it sits in command text, otherwise that half is dropped and the item says
+    so. Done when code-rules fix reproduces #220''s hand edits and rule-fix-triage marks those
+    files mechanical.'
+- id: rule-fix-triage
+  title: Prove a file mechanical when recomputing a rule's fix on the base reproduces the head
+  track: pattern-fixes
+  depends_on:
+  - review-triage/move-triage
+  - rule-fixes
+  status: not started
+  recommended_model: opus
+  notes: 'Done when #220''s rule-fix files (107 of 129 from the UTF-8 fix) are marked mechanical,
+    run from this item''s branch. basstler-review-triage depends on basstler-rules; a new
+    change kind names the rule. Mark #220 only once windows-suite stops pushing. Stack on the
+    highest pushed pattern-fixes branch (#227 or #228, else #222). Check: basstler review-triage
+    report 220, run from this branch, lists those files as mechanical.'
+- id: reduced-review-diff
+  title: Show a reviewer only what is left once rule fixes are reversed
+  track: pattern-fixes
+  depends_on:
+  - rule-fix-triage
+  status: not started
+  recommended_model: sonnet
+  notes: For a file mixing a rule fix and a real change, reverse the fix's actions on the
+    head and show the remaining diff against the base in the report.
+- id: action-plan-triage
+  title: Prove a file mechanical when replaying a recorded code modification plan reproduces
+    the head
+  track: pattern-fixes
+  depends_on:
+  - rule-fix-triage
+  - basstler-packages/uv-workspace
+  status: not started
+  recommended_model: opus
+  notes: 'Done when #223''s moved files are marked mechanical. A new change kind names the
+    plan. Next: decide how a commit records the plan it applied; nothing stores #223''s
+    relocation plan replayably yet. uv-workspace supplies the file actions it replays.'
+- id: mark-223-viewed
+  title: 'Mark #223''s mechanical files viewed'
+  track: pattern-fixes
+  depends_on:
+  - action-plan-triage
+  - basstler-packages/uv-workspace
+  depends_on_pushes_done:
+  - basstler-packages/uv-workspace
+  status: not started
+  recommended_model: haiku
+  performed_by: owner
+  commands:
+  - basstler review-triage report 223
+  - basstler review-triage mark-viewed 223
+  notes: 'Run on your own computer from action-plan-triage''s branch, which carries the proof that #223''s
+    moved files are mechanical, and before you review #223. It waits for uv-workspace''s last push to
+    be recorded (goal pushes-done), and again after any later push to #223. The report lists what will
+    be marked; read it before marking.'

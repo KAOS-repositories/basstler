@@ -74,6 +74,16 @@ class PromotionAttribute(StrEnum):
     On the button: the reasons besides a draft that block it, as a JSON list.
     """
 
+    DRAFT = "data-promotion-draft"
+    """
+    On the button: present while its pull request is a draft.
+    """
+
+    CHECKS_OVERRIDE = "data-promotion-checks-override"
+    """
+    On the checkbox that, while ticked, stops failed checks from blocking the button.
+    """
+
 
 class LiveStateAttribute(StrEnum):
     """
@@ -272,9 +282,24 @@ class PromotionButton:
         return None if self.blockers else self.form_url
 
     @property
+    def is_draft(self) -> bool:
+        """
+        :return: Whether the pull request was a draft when the page was built.
+        """
+        return PromotionBlocker.DRAFT in self.blockers
+
+    @property
+    def checks_failed(self) -> bool:
+        """
+        :return: Whether failed checks block the promotion, so the card offers to
+            override them.
+        """
+        return PromotionBlocker.CHECKS_FAILED in self.blockers
+
+    @property
     def other_blockers(self) -> list[str]:
         """
-        :return: The reasons besides a draft, which the page's script cannot lift.
+        :return: The reasons besides a draft, which the page's script does not re-check.
         """
         return [
             blocker.value
@@ -288,6 +313,13 @@ class PromotionButton:
         :return: The button's text.
         """
         return "Contribute"
+
+    @property
+    def checks_override_label(self) -> str:
+        """
+        :return: The text of the checkbox overriding failed checks.
+        """
+        return "It's ready"
 
     @property
     def enabled_title(self) -> str:

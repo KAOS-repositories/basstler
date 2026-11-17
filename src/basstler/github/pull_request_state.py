@@ -202,6 +202,13 @@ class PullRequestRecord:
     were not read.
     """
 
+    landed_upstream: bool | None = None
+    """
+    Whether GitHub's comparison shows every commit of the head in the upstream's default
+    branch and some commit beyond the pull request's own base; ``None`` while it was not
+    read.
+    """
+
     @property
     def has_failed_checks(self) -> bool:
         """
@@ -295,11 +302,14 @@ class PullRequestRecord:
     @property
     def was_merged(self) -> bool:
         """Whether this pull request's changes actually landed - GitHub's own
-        :attr:`merged_at`, or (for an out-of-band merge GitHub never
+        :attr:`merged_at`, its commits found in the upstream by
+        :attr:`landed_upstream`, or (for an out-of-band merge GitHub never
         recorded) the manually-applied :attr:`GitHubLabel.MERGED`
         label."""
         return (
-            self.merged_at is not None or GitHubLabel.MERGED in self.identified_labels
+            self.merged_at is not None
+            or self.landed_upstream is True
+            or GitHubLabel.MERGED in self.identified_labels
         )
 
     @classmethod

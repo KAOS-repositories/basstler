@@ -15,6 +15,7 @@ from basstler.github.client import (
     GitHubResponse,
     GitHubRestClient,
 )
+from basstler.github.comparison import Comparison
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import (
     PullRequestField,
@@ -24,6 +25,7 @@ from basstler.github.pull_request_state import (
     ForkLineage,
     LivePullRequests,
     PullRequestRecord,
+    PullRequestState,
 )
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.repository_access import GitHubRepository
@@ -268,16 +270,70 @@ class GitHubPullRequestSource(PullRequestSource):
 
     def pull_request(self, reference: PullRequestReference) -> PullRequestRecord | None:
         record = self.listed_or_read(reference)
-        if (
-            record is None
-            or not self.reads_check_states
-            or not record.has_unread_checks
-        ):
-            return record
-        record.check_state = self.client_for(reference.repository).check_state(
-            record.head_commit
-        )
+        if record is None:
+            return None
+        if self.reads_check_states and record.has_unread_checks:
+            record.check_state = self.client_for(reference.repository).check_state(
+                record.head_commit
+            )
+        if record.landed_upstream is None:
+            record.landed_upstream = self.landed_upstream(reference.repository, record)
         return record
+
+    def landed_upstream(
+        self, repository: Repository, record: PullRequestRecord
+    ) -> bool | None:
+        """
+        Ask GitHub whether an open pull request's work is already in the upstream.
+
+        :param repository: The repository the pull request is opened on.
+        :param record: The pull request.
+        :return: Whether every commit of its head is in the upstream's default branch
+            and it has a commit beyond its own base, which a branch with nothing of its
+            own does not; ``None`` when that is not asked of it, or GitHub cannot say.
+        """
+        lineage = self.fork_lineage_of(repository)
+        if (
+            lineage is None
+            or record.state is not PullRequestState.OPEN
+            or record.head_commit is None
+            or record.base is None
+        ):
+            return None
+        in_upstream = self.comparison(
+            repository,
+            f"{lineage.upstream_repository.owner}:{lineage.upstream_default_branch}",
+            record.head_commit,
+        )
+        if in_upstream is None:
+            return None
+        if not in_upstream.head_is_contained_in_base:
+            return False
+        beyond_base = self.comparison(repository, record.base, record.head_commit)
+        if beyond_base is None:
+            return None
+        return beyond_base.ahead_by > 0
+
+    def comparison(
+        self, repository: Repository, base: str, head: str
+    ) -> Comparison | None:
+        """
+        :param repository: The repository holding the head.
+        :param base: What the head is compared with.
+        :param head: The commit compared.
+        :return: GitHub's comparison, ``None`` when it cannot be read, which is
+            reported.
+        """
+        path = f"/{repository.compare_path(base)}...{head}"
+        answer = self.client.attempt_get(path)
+        if answer.failure is not None:
+            logger.warning(
+                f"cannot compare {head} with {base} in {repository} ({path}), so it "
+                f"is not known whether its pull request has landed: "
+                f"{answer.failure.error_message()}"
+            )
+            return None
+        return Comparison.from_json(answer.body)
 
     def listed_or_read(
         self, reference: PullRequestReference

@@ -27,8 +27,20 @@ function planPageShowPromotion(card, pullRequest) {
   if (!button || pullRequest["{{ vocabulary.pull_request_field.STATE.key }}"] !== "{{ vocabulary.pull_request_state.OPEN.value }}") {
     return;
   }
+  button.toggleAttribute("{{ vocabulary.promotion_attribute.DRAFT }}", Boolean(pullRequest["{{ vocabulary.pull_request_field.DRAFT.key }}"]));
+  planPageApplyPromotion(card);
+}
+
+function planPageApplyPromotion(card) {
+  var button = card.querySelector("[{{ vocabulary.promotion_attribute.FORM_URL }}]");
   var reasons = JSON.parse(button.getAttribute("{{ vocabulary.promotion_attribute.OTHER_BLOCKERS }}"));
-  if (pullRequest["{{ vocabulary.pull_request_field.DRAFT.key }}"]) {
+  var override = card.querySelector("[{{ vocabulary.promotion_attribute.CHECKS_OVERRIDE }}]");
+  if (override && override.checked) {
+    reasons = reasons.filter(function (reason) {
+      return reason !== {{ vocabulary.promotion_blocker.CHECKS_FAILED.value | tojson }};
+    });
+  }
+  if (button.hasAttribute("{{ vocabulary.promotion_attribute.DRAFT }}")) {
     reasons.unshift({{ vocabulary.promotion_blocker.DRAFT.value | tojson }});
   }
   button.classList.toggle("promote-button-disabled", reasons.length > 0);

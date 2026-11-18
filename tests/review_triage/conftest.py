@@ -253,7 +253,21 @@ def committed_pull_request(
     :param head: The sample's head tree.
     :return: The sample pull request between the two trees, once committed.
     """
-    commits = commit_trees(scratch_repository, base.files(), head.files())
+    return pull_request_between(scratch_repository, base.files(), head.files())
+
+
+def pull_request_between(
+    scratch_repository: ScratchRepository,
+    base_files: dict[Path, str],
+    head_files: dict[Path, str],
+) -> PullRequestChanges:
+    """
+    :param scratch_repository: The repository to commit in.
+    :param base_files: The base tree's files, by path.
+    :param head_files: The head tree's files, by path.
+    :return: The sample pull request between the two trees, once committed.
+    """
+    commits = commit_trees(scratch_repository, base_files, head_files)
     payload = PullRequestSample.PAYLOAD.payload()
     payload["base"]["sha"] = commits.base_commit
     payload["head"]["sha"] = commits.head_commit

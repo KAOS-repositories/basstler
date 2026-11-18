@@ -144,7 +144,9 @@ class SubclassSubstitutionDetection(RenameSource):
         candidates = [
             candidate
             for change in changes.files
-            if change.path.suffix == MODULE_SUFFIX and change.head_text is not None
+            if change.path.suffix == MODULE_SUFFIX
+            and change.head_text is not None
+            and PythonSource.every_version_parses(change)
             for candidate in self.candidates_in(change, changes)
         ]
         if not candidates:
@@ -157,6 +159,7 @@ class SubclassSubstitutionDetection(RenameSource):
             if change.path.suffix == MODULE_SUFFIX
             and change.base_text is not None
             and change.head_text is not None
+            and PythonSource.every_version_parses(change)
         }
         renames = []
         for candidate in candidates:

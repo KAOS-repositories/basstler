@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from basstler.review_triage.declaration import DescriptionDeclaration
 from basstler.review_triage.detection import MemberRenameDetection, RenameDetection
+from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import (
     MemberRename,
     Rename,
@@ -13,6 +14,8 @@ from basstler.review_triage.renames import (
     RenameDecisions,
     RenameMap,
 )
+
+from .samples import FileSample
 
 # %% combining sources
 
@@ -138,6 +141,19 @@ def test_an_old_name_replaced_equally_often_by_two_new_names_is_not_paired():
         candidates.dominant_pairs(frozenset({"Pose"}), frozenset({"First", "Second"}))
         == {}
     )
+
+
+def test_a_file_that_does_not_parse_contributes_no_substitutions():
+    """
+    The diff of a file one version of which is not valid Python, such as one holding
+    merge conflict markers, is not searched for renamed identifiers.
+    """
+    change = FileSample.CONFLICT_MARKERS.change()
+    candidates = RenameCandidates()
+    RenameDetection.collect(
+        PythonSource(change.base_text), PythonSource(change.head_text), candidates
+    )
+    assert candidates.replacements == {}
 
 
 # %% applying renames

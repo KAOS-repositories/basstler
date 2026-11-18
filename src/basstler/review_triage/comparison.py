@@ -387,11 +387,14 @@ class PythonComparison(ContentComparison):
         """
         :meth:`ContentComparison.changes`, resolving each version's relative imports
         against the directory holding it; a name only one version imports needs review
-        unless its code uses it and both versions star-import it from one module.
+        unless its code uses it and both versions star-import it from one module, and a
+        version that is not valid Python needs review.
         """
         base_path = change.previous_path or change.path
         base = PythonSource(change.base_text, base_path.parent.parts)
         head = PythonSource(change.head_text, change.path.parent.parts)
+        if not (base.parses and head.parses):
+            return None
         kinds = self.source_changes(base, head, context)
         if kinds is None or MechanicalChange.IMPORTS not in kinds:
             return kinds

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
 from functools import cached_property
 
+from basstler.git.commit_range import FileVersions
 from basstler.review_triage.name_scopes import STAR_IMPORT
 from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
 
@@ -548,6 +549,18 @@ class PythonSource:
             return isinstance(self.tree, ast.Module)
         except SyntaxError:
             return False
+
+    @staticmethod
+    def every_version_parses(change: FileVersions) -> bool:
+        """
+        :param change: A changed file.
+        :return: Whether each version of it that exists is valid Python.
+        """
+        return all(
+            PythonSource(text).parses
+            for text in (change.base_text, change.head_text)
+            if text is not None
+        )
 
     def renamed_tree(self, renames: RenameMap) -> ast.Module:
         """

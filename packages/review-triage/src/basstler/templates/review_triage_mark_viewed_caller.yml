@@ -15,6 +15,12 @@ on:
         description: "The owner/name repository the pull request is opened on"
         required: true
         type: string
+{% if in_reviews_schedule %}
+  # On a schedule, every open pull request that asks the token's owner for a review or
+  # that it reviewed, each file from where that owner last viewed it.
+  schedule:
+    - cron: "{{ in_reviews_schedule }}"
+{% endif %}
 
 concurrency:
   group: mark-viewed-{{ '${{' }} inputs.pull_request {{ '}}' }}
@@ -29,6 +35,10 @@ jobs:
     with:
       basstler_branch_or_tag: {{ branch_or_tag }}
       pull_request: {{ '${{' }} inputs.pull_request {{ '}}' }}
+{% if in_reviews_schedule and pull_request_repository %}
+      repository: {{ '${{' }} inputs.repository || '{{ pull_request_repository.full_name }}' {{ '}}' }}
+{% else %}
       repository: {{ '${{' }} inputs.repository {{ '}}' }}
+{% endif %}
     secrets:
       viewer_token: {{ '${{' }} secrets.{{ token_secret }} {{ '}}' }}

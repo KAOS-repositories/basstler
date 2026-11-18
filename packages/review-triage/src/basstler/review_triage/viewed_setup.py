@@ -127,6 +127,12 @@ class MarkViewedSetup(TemplatePage):
     The basstler branch or tag the installed workflow runs.
     """
 
+    in_reviews_schedule: str | None = None
+    """
+    The cron schedule, in UTC, on which the workflow also marks every open pull request
+    on the pull request repository that the token's owner reviews; ``None`` for none.
+    """
+
     shared_uses: tuple[TokenUse, ...] = ()
     """
     Other jobs of basstler's the person's token may do too; those on the same owner's
@@ -158,6 +164,8 @@ class MarkViewedSetup(TemplatePage):
                 reusable_workflow=self.reusable_workflow,
                 branch_or_tag=self.branch_or_tag,
                 token_secret=ReviewTriageSecret.VIEWER_TOKEN,
+                in_reviews_schedule=self.in_reviews_schedule,
+                pull_request_repository=self.pull_request_repository,
             )
             + "\n"
         )

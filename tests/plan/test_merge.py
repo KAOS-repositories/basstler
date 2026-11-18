@@ -18,7 +18,7 @@ from basstler.plan.merge import (
     PlanVersion,
     RoadmapPart,
 )
-from basstler.plan.model import ManifestKey
+from basstler.plan.model import ItemStatus, ManifestKey
 
 from ..constants.paths import DatasetLocation
 from .concurrent_edits import (
@@ -28,6 +28,7 @@ from .concurrent_edits import (
     deferred,
     read_version,
     with_added_item,
+    with_item_fields,
     with_roadmap,
     without_item,
 )
@@ -166,6 +167,31 @@ def test_a_roadmap_edit_joins_an_item_edit():
     assert merged(session, latest) == with_roadmap(
         latest, DatasetLocation.ROADMAP_WITH_SESSION_RULE
     )
+
+
+# %% an item sharing its id with a wave and a track
+
+
+SHARED_IDENTIFIER = "experiment"
+"""
+The id of the wave, the track and the item in :attr:`DatasetLocation.SHARED_IDENTIFIER_PLAN`.
+"""
+
+
+def test_an_item_edit_sharing_its_id_with_a_wave_and_a_track_leaves_them_untouched():
+    read = PlanVersion(
+        manifest_text=DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text(
+            encoding="utf-8"
+        ),
+        roadmap_text=read_version().roadmap_text,
+    )
+    session = with_item_fields(
+        read, SHARED_IDENTIFIER, {ManifestKey.STATUS: ItemStatus.BLOCKED}
+    )
+
+    result = PlanMerge(read=read, session=session, latest=read).merged()
+
+    assert result.manifest_text == session.manifest_text
 
 
 # %% edits to the same part

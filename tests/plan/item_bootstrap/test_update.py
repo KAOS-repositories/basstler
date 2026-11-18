@@ -5,6 +5,7 @@ Tests for setting an item's recorded fields.
 from __future__ import annotations
 
 import pytest
+import yaml
 
 from basstler.plan.item_bootstrap.documents import PlanDocuments
 from basstler.plan.item_bootstrap.exceptions import (
@@ -18,6 +19,7 @@ from basstler.plan.model import (
     PlanItem,
 )
 
+from ...constants.paths import DatasetLocation
 from ...scratch_repository import ScratchRepository
 from ..concurrent_edits import FIRST_ITEM, blocked, deferred, read_version
 from .bootstrap_scenario import (
@@ -35,6 +37,11 @@ from .bootstrap_scenario import (
     published_plan,
     update_request,
 )
+
+SHARED_IDENTIFIER = "experiment"
+"""
+The id of the wave, track and item in :attr:`DatasetLocation.SHARED_IDENTIFIER_PLAN`.
+"""
 
 # %% updating an item's recorded fields
 
@@ -306,3 +313,24 @@ def test_finishing_an_item_saves_the_plan_without_it(
     )
 
     assert EXISTING_ITEM not in published_items(bootstrap_repository)
+
+
+# %% an item sharing its id with a wave and a track
+
+
+def test_updating_an_item_sharing_its_id_with_a_wave_and_a_track_leaves_them_untouched(
+    shared_identifier_plan_repository: ScratchRepository,
+):
+    update_request(
+        item_identifier=SHARED_IDENTIFIER,
+        values_by_key={ManifestKey.STATUS: ItemStatus.BLOCKED},
+    ).update(shared_identifier_plan_repository.project_root)
+
+    published = yaml.safe_load(
+        published_plan(shared_identifier_plan_repository)[PlanDocument.MANIFEST]
+    )
+    expected = yaml.safe_load(
+        DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text(encoding="utf-8")
+    )
+    expected[ManifestKey.ITEMS.key][0][ManifestKey.STATUS.key] = ItemStatus.BLOCKED
+    assert published == expected

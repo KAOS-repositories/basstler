@@ -8,7 +8,7 @@ and holding only a workflow calling basstler's reusable one and a README. Each r
 pushes a branch of its own from it, under :attr:`ActionBranch.REQUESTS`, carrying the
 request; the push starts a run, which commits its recording onto that branch and
 deletes requests no read waits for any more. The session replays the recording through
-:class:`UpstreamPullRequestReader` and deletes its branch.
+:class:`UpstreamPullRequestReader`.
 
 Commands::
 

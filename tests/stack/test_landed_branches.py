@@ -5,10 +5,13 @@ real scratch fork.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from basstler.exceptions import UnresolvableReferenceError
-from basstler.stack.checkout import CurrentCheckout, LandedBranches
+from basstler.git.commands import GitCommandFailed
+from basstler.stack.checkout import CurrentCheckout, ForkRefresh, LandedBranches
 
 from ..constants.stack import RemoteName, StackBranch
 from ..maintenance.fork import UPSTREAM_BASE, ForkCheckout, make_configuration
@@ -126,3 +129,80 @@ def test_containment_refuses_a_branch_whose_reference_does_not_resolve(
     assert refusal.value.reference == make_configuration().reference_on_fork(
         StackBranch.CHILD
     )
+
+
+# %% refreshing what the stack names
+
+
+def forget_the_fork_branch(checkout: ForkCheckout, branch: str) -> None:
+    """
+    Drop this clone's tracking reference to a branch the fork has, as if another session
+    had published it and this clone never fetched it.
+
+    :param checkout: The scratch fork.
+    :param branch: The fork branch to forget locally.
+    """
+    checkout.run_git("update-ref", "-d", f"refs/remotes/{RemoteName.ORIGIN}/{branch}")
+
+
+def test_a_landed_branch_is_found_though_the_board_also_names_a_branch_the_fork_lost(
+    fork_with_a_branch: ForkCheckout,
+):
+    land_upstream(fork_with_a_branch, StackBranch.PARENT)
+    forget_the_fork_branch(fork_with_a_branch, StackBranch.PARENT)
+    configuration = make_configuration()
+
+    CurrentCheckout.fetch(configuration, [StackBranch.PARENT, StackBranch.CHILD])
+
+    assert LandedBranches.from_checkout(configuration).contains(StackBranch.PARENT)
+
+
+def test_refreshing_names_the_branches_the_fork_does_not_have(
+    fork_with_a_branch: ForkCheckout,
+):
+    missing = CurrentCheckout.fetch(
+        make_configuration(), [StackBranch.PARENT, StackBranch.CHILD]
+    )
+
+    assert missing == ForkRefresh(missing_branches=(StackBranch.CHILD,))
+
+
+def test_refreshing_names_no_branch_when_the_fork_has_them_all(
+    fork_with_a_branch: ForkCheckout,
+):
+    missing = CurrentCheckout.fetch(make_configuration(), [StackBranch.PARENT])
+
+    assert missing == ForkRefresh()
+
+
+def test_refreshing_fails_when_the_fork_cannot_be_reached(
+    fork_with_a_branch: ForkCheckout, tmp_path: Path
+):
+    fork_with_a_branch.run_git(
+        "remote", "set-url", RemoteName.ORIGIN, (tmp_path / "gone.git").as_uri()
+    )
+
+    with pytest.raises(GitCommandFailed):
+        CurrentCheckout.fetch(make_configuration(), [StackBranch.PARENT])
+
+
+def test_refreshing_fails_when_the_upstream_cannot_be_reached(
+    fork_with_a_branch: ForkCheckout, tmp_path: Path
+):
+    fork_with_a_branch.run_git(
+        "remote", "set-url", RemoteName.UPSTREAM, (tmp_path / "gone.git").as_uri()
+    )
+
+    with pytest.raises(GitCommandFailed):
+        CurrentCheckout.fetch(make_configuration(), [StackBranch.PARENT])
+
+
+def test_listing_landed_branches_fails_when_the_upstream_base_was_never_fetched(
+    fork_with_a_branch: ForkCheckout,
+):
+    fork_with_a_branch.run_git(
+        "update-ref", "-d", f"refs/remotes/{RemoteName.UPSTREAM}/{UPSTREAM_BASE}"
+    )
+
+    with pytest.raises(GitCommandFailed):
+        LandedBranches.from_checkout(make_configuration())

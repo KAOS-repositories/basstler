@@ -1,0 +1,3 @@
+The plan site's merge workflow on the default branch is out of date. The current one is proposed:
+- merge the workflow that starts the build on every merge:
+    gh pr merge https://github.com/an-owner/a-repository/pull/9 --merge

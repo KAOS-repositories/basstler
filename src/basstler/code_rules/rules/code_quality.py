@@ -337,8 +337,9 @@ class NamingRules(Section):
 
     VERB_AND_NOUN_PHRASES = (
         "Methods are verb phrases for what they do; classes and attributes are noun"
-        " phrases for what they are. Name a field for its subject, not for the "
-        "shape of its value"
+        " phrases for what they are, except a mixin that only adds one field, which "
+        "is named `Has<Field>`, as in `HasRepository`. Name a field for its subject, "
+        "not for the shape of its value"
     )
 
     ONE_NAME_PER_OPERATION = (
@@ -424,6 +425,13 @@ class DesignPrinciplesRules(Section):
         "in a test that checks two separate definitions agree: derive one from the "
         "other, or unify them into one concept when that is the cleaner design by "
         "SOLID and the domain's semantics"
+    )
+
+    OWNER_AS_A_REQUIRED_FIELD = (
+        "A thing that always belongs to another - a branch to its repository, a pull "
+        "request to the repository it is opened on - holds its owner as a required "
+        "field of its own class: never an optional field, and never a subclass that "
+        "adds the owner to an ownerless original"
     )
 
     ASSOCIATE_OR_SUBCLASS_FIRST = (

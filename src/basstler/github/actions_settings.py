@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Annotated, Any
 
+from pydantic import Field, TypeAdapter
 
 from basstler.class_property import classproperty
 from basstler.github.workflows import RepositoryWorkflow
@@ -86,8 +88,8 @@ class WorkflowDetails(ValidatedJSONModel):
 
     state: str
     """
-    Whether it runs, :attr:`WorkflowState.ACTIVE`, or why not; a fork's workflows
-    start out disabled.
+    Whether it runs, :attr:`WorkflowState.ACTIVE`, or why not; a fork's workflows start
+    out disabled.
     """
 
 
@@ -123,24 +125,26 @@ class WorkflowEnabling(RepositoryWorkflow, SettingWrite[WorkflowDetails]):
 # %% whether one secret is stored
 
 
-class StoredSecretMetadata(ValidatedJSONModel):
+class StoredSecretMetadata[Secret: ActionsSecret](ValidatedJSONModel):
     """
     One Actions secret a repository stores, as GitHub describes it without its value.
     """
 
-    name: str
+    secret: Annotated[Secret, Field(alias="name")]
     """
-    The secret's name.
+    The secret, which GitHub names it by.
     """
 
 
 @dataclass(frozen=True)
-class ActionsSecretRead(RepositoryRead[StoredSecretMetadata]):
+class ActionsSecretRead[Secret: ActionsSecret](
+    RepositoryRead[StoredSecretMetadata[Secret]]
+):
     """
     Reads whether a repository stores one Actions secret; GitHub never serves its value.
     """
 
-    secret: ActionsSecret
+    secret: Secret
     """
     The secret.
     """
@@ -148,3 +152,11 @@ class ActionsSecretRead(RepositoryRead[StoredSecretMetadata]):
     @property
     def path(self) -> str:
         return self.secret.path_on(self.repository)
+
+    def parse(self, body: Any) -> StoredSecretMetadata[Secret]:
+        """
+        :meth:`RepositoryRead.parse`, into the metadata of :attr:`secret`'s own kind.
+        """
+        return TypeAdapter(StoredSecretMetadata[type(self.secret)]).validate_python(
+            body
+        )

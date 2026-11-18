@@ -628,6 +628,29 @@ class PlanSitePublication:
             RepositoryBranch(head.name, notes_repository),
         )
 
+    def refresh_merge_workflow(self) -> PendingStep | None:
+        """
+        Propose the current merge workflow in place of an older one the notes
+        repository's default branch holds, as :meth:`write_merge_workflow` does.
+
+        :return: The step merging the proposal, ``None`` when the default branch holds
+            no merge workflow (writing the first one is publishing's), already holds the
+            current one, or belongs to a fork.
+        """
+        notes_repository = self.dispatch_workflow.notes_repository
+        default_tip = self.default_branch_of(self.notes_remote).fetch()
+        workflow = MergeWorkflow(self.dispatch_workflow)
+        installed = default_tip and self.git.file_at(default_tip, workflow.location)
+        if not installed:
+            return None
+        notes_details = RepositoryDetails.from_json(
+            self.github.get(notes_repository.api_path)
+        )
+        proposal = self.write_merge_workflow(
+            notes_details, PublicationReport(self.dispatch_workflow.site.site_url)
+        )
+        return proposal.pending(self.github) if proposal else None
+
     def register(self, registry: Repository, report: PublicationReport) -> PlanHub:
         """
         List the notes repository in the registry's hub file, and give the notes branch
@@ -692,29 +715,19 @@ The command.
 """
 
 
-@app.default
-def publish(
-    *,
-    branch_or_tag: Annotated[
-        str, Parameter(name=PublicationOption.BRANCH_OR_TAG)
-    ] = BasstlerSource.LATEST_RELEASE.value,
-    site_repository: Annotated[
-        str | None, Parameter(name=PublicationOption.SITE_REPOSITORY)
-    ] = None,
-    mark_viewed_on: Annotated[
-        str | None, Parameter(name=PublicationOption.MARK_VIEWED_ON)
-    ] = None,
-) -> int:
+def clone_publication(
+    branch_or_tag: str,
+    site_repository: str | None = None,
+    mark_viewed_on: str | None = None,
+) -> PlanSitePublication:
     """
-    Publish this clone's notes repository on the plan site. See the module docstring.
-
     :param branch_or_tag: The basstler branch or release tag the site's build runs.
     :param site_repository: The ``owner/name`` repository that builds and serves the
         site, the one the notes branch records when not given.
     :param mark_viewed_on: The ``owner/name`` repository whose pull requests' files
         the notes repository's Actions also mark viewed, with one token for that and
         the build where the owners match.
-    :return: The status :meth:`PlanSitePublication.run` ends with.
+    :return: Publishing this clone's notes repository on its site.
     :raises NotesRepositoryUnresolvedError: If the notes remote is not on GitHub.
     """
     project_root = Path(
@@ -742,7 +755,35 @@ def publish(
         remote_root=GitHubAddress.clone_root_for(notes_branch.url),
         in_cloud_session=ClaudeCodeVariable.REMOTE.is_true(),
         mark_viewed_on=Repository.parse(mark_viewed_on) if mark_viewed_on else None,
-    ).run()
+    )
+
+
+@app.default
+def publish(
+    *,
+    branch_or_tag: Annotated[
+        str, Parameter(name=PublicationOption.BRANCH_OR_TAG)
+    ] = BasstlerSource.LATEST_RELEASE.value,
+    site_repository: Annotated[
+        str | None, Parameter(name=PublicationOption.SITE_REPOSITORY)
+    ] = None,
+    mark_viewed_on: Annotated[
+        str | None, Parameter(name=PublicationOption.MARK_VIEWED_ON)
+    ] = None,
+) -> int:
+    """
+    Publish this clone's notes repository on the plan site. See the module docstring.
+
+    :param branch_or_tag: The basstler branch or release tag the site's build runs.
+    :param site_repository: The ``owner/name`` repository that builds and serves the
+        site, the one the notes branch records when not given.
+    :param mark_viewed_on: The ``owner/name`` repository whose pull requests' files
+        the notes repository's Actions also mark viewed, with one token for that and
+        the build where the owners match.
+    :return: The status :meth:`PlanSitePublication.run` ends with.
+    :raises NotesRepositoryUnresolvedError: If the notes remote is not on GitHub.
+    """
+    return clone_publication(branch_or_tag, site_repository, mark_viewed_on).run()
 
 
 if __name__ == "__main__":

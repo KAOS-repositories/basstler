@@ -21,13 +21,18 @@ from basstler.github.actions_settings import (
 from basstler.github.basstler_project import BasstlerProject
 from basstler.github.client import GitHubAttemptClient
 from basstler.github.file_proposal import (
+    BranchReferenceRead,
     FileCommit,
     FileProposal,
     ProposalOutcome,
-    RepositoryFile,
 )
 from basstler.github.repository import Repository, RepositoryBranch
-from basstler.github.repository_details import RepositoryDetails, RepositoryDetailsRead
+from basstler.github.fork_sync import ForkFastForward
+from basstler.github.repository_details import (
+    ParentRepository,
+    RepositoryDetails,
+    RepositoryDetailsRead,
+)
 from basstler.github.repository_resources import SettingWrite
 from basstler.github.token_form import (
     CreateToken,
@@ -222,7 +227,8 @@ class MarkViewedSetup(TemplatePage):
     ) -> bool:
         """
         Check that the workflow repository's default branch holds the caller workflow,
-        else propose it through a pull request; a fork's is proposed to its parent.
+        else propose it through a pull request; a fork's is proposed to its parent, and
+        the fork is fast-forwarded once its parent holds it.
 
         :param client: Reads and writes the workflow repository and its parent.
         :param details: The workflow repository.
@@ -241,9 +247,76 @@ class MarkViewedSetup(TemplatePage):
         if installed is not None and installed.text == self.caller_workflow:
             self.steps.append(SetupStep(description, SetupState.ALREADY_DONE))
             return True
+        if details.parent is not None and self.holds_workflow(client, details.parent):
+            return self.fast_forward_fork(client, details.parent, details, description)
         outcome = self.workflow_proposal(details).propose(client)
-        self.report_proposal(description, details, outcome, installed)
+        self.report_proposal(description, details, outcome)
         return installed is not None
+
+    def holds_workflow(
+        self, client: GitHubAttemptClient, parent: ParentRepository
+    ) -> bool:
+        """
+        :param client: Reads the parent.
+        :param parent: The workflow repository's parent.
+        :return: Whether the parent's default branch holds the caller workflow.
+        """
+        held = (
+            self.workflow_commit(parent.repository, parent.default_branch)
+            .read_at(parent.default_branch.name)
+            .attempt(client)
+            .resource
+        )
+        return held is not None and held.text == self.caller_workflow
+
+    def fast_forward_fork(
+        self,
+        client: GitHubAttemptClient,
+        parent: ParentRepository,
+        details: RepositoryDetails,
+        description: str,
+    ) -> bool:
+        """
+        Move the fork's default branch forward to its parent's, which holds the caller
+        workflow, leaving the sync to the user where GitHub refuses.
+
+        :param client: Reads the parent and writes the fork.
+        :param parent: The fork's parent.
+        :param details: The fork.
+        :param description: What installing sets up.
+        :return: Whether the fork's default branch holds the workflow now.
+        """
+        head = BranchReferenceRead(parent.repository, parent.default_branch).attempt(
+            client
+        )
+        if head.resource is None:
+            self.steps.append(
+                SetupStep(
+                    description, SetupState.UNREADABLE, str(head.response.failure)
+                )
+            )
+            self.user_steps.append(SyncFork(self.workflow_repository))
+            return False
+        write = ForkFastForward(
+            repository=self.workflow_repository,
+            object_hash=head.resource.target.object_hash,
+            branch=details.default_branch,
+        )
+        answer = client.attempt_send(write)
+        if answer.failure is not None:
+            self.steps.append(
+                SetupStep(description, SetupState.REFUSED, str(answer.failure))
+            )
+            self.user_steps.append(write.manual_step)
+            return False
+        self.steps.append(
+            SetupStep(
+                description,
+                SetupState.DONE,
+                f"fast-forwarded to {parent.full_name}'s {parent.default_branch.name}",
+            )
+        )
+        return True
 
     def workflow_commit(self, repository: Repository, branch: Branch) -> FileCommit:
         """
@@ -291,18 +364,15 @@ class MarkViewedSetup(TemplatePage):
         description: str,
         details: RepositoryDetails,
         outcome: ProposalOutcome,
-        installed: RepositoryFile | None,
     ) -> None:
         """
         Record the workflow's installation as left to the user, with the step that
-        finishes it: merging the pull request, opening it from its form, or committing
-        the file by hand; a fork is then synced with its parent.
+        finishes it - merging the pull request or opening it from its form - or as
+        refused when GitHub refused both.
 
         :param description: What installing sets up.
         :param details: The workflow repository.
         :param outcome: What proposing the workflow came to.
-        :param installed: The version of the workflow on the default branch, ``None``
-            when there is none.
         """
         change = f"adding {WorkflowLocation.MARK_VIEWED.name}"
         if outcome.form_url:
@@ -319,21 +389,12 @@ class MarkViewedSetup(TemplatePage):
             self.steps.append(
                 SetupStep(
                     description,
-                    SetupState.LEFT_TO_USER,
+                    SetupState.REFUSED,
                     f"no pull request adding it could be opened: {outcome.failure}",
                 )
             )
-            self.user_steps.append(
-                self.workflow_commit(
-                    self.proposal_repository(details), details.default_branch
-                )
-                .write_replacing(installed)
-                .manual_step
-            )
         else:
             self.report_open_proposal(description, details, outcome, change)
-        if details.parent is not None:
-            self.user_steps.append(SyncFork(self.workflow_repository))
 
     def report_open_proposal(
         self,

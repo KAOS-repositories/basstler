@@ -79,22 +79,6 @@ class PullRequestPage(WebPage):
     """
 
 
-class ListedPullRequest(PullRequestPage):
-    """
-    An open pull request, as the repository's listing of them gives it.
-    """
-
-    head: PullRequestEnd
-    """
-    The branch it is opened from.
-    """
-
-    base: PullRequestEnd
-    """
-    The branch it merges into.
-    """
-
-
 class RestPullRequestSummary(RestResponse, PullRequestPage):
     """
     One pull request as REST describes it, whether listed or read on its own.
@@ -118,6 +102,11 @@ class RestPullRequestSummary(RestResponse, PullRequestPage):
     head: RestPullRequestHead
     """
     The branch it was opened from.
+    """
+
+    base: PullRequestEnd
+    """
+    The branch it merges into.
     """
 
     @property

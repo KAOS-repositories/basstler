@@ -21,6 +21,7 @@ from basstler.github.client import (
     GitHubWrite,
 )
 from basstler.github.file_proposal import FileWrite, NewBranch
+from basstler.github.fork_sync import ForkFastForward
 from basstler.github.pull_request import NewPullRequest
 from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetails
@@ -143,6 +144,14 @@ def answers(**overrides: Any) -> PathAnsweringClient:
     )
 
 
+def branch_at_base(branch: Branch) -> dict[str, Any]:
+    """
+    :param branch: A branch of the repository.
+    :return: The branch, as the git references API returns it, pointing at the base.
+    """
+    return {"ref": branch.reference, "object": {"sha": BASE_COMMIT}}
+
+
 def sent_of(client: PathAnsweringClient, kind: type[GitHubWrite]) -> list[GitHubWrite]:
     """
     :param client: The stand-in the setup ran against.
@@ -182,9 +191,9 @@ def fork_proposal_answers(**overrides: Any) -> PathAnsweringClient:
     proposal = setup.workflow_proposal(RepositoryDetails.from_json(fork_details()))
     client.answers[proposal.open_pull_requests_path] = []
     client.answers[proposal.open_from_branch_path] = []
-    client.answers[UPSTREAM.branch_reference_path(STAND_IN_DEFAULT_BRANCH)] = {
-        "object": {"sha": BASE_COMMIT}
-    }
+    client.answers[UPSTREAM.branch_reference_path(STAND_IN_DEFAULT_BRANCH)] = (
+        branch_at_base(STAND_IN_DEFAULT_BRANCH)
+    )
     client.write_answers[UPSTREAM.pull_requests_path] = {
         "number": 3,
         "html_url": UPSTREAM.pull_request_url(3),
@@ -230,16 +239,53 @@ def test_a_fork_s_proposal_branch_starts_at_its_parent_s_default_branch():
     ]
 
 
-def test_a_fork_is_synced_once_its_parent_merges_the_workflow():
+def test_a_fork_s_proposal_leaves_only_its_merge():
     setup = MarkViewedSetup(FORK)
     setup.run(fork_proposal_answers())
-    assert setup.user_steps[:2] == [
+    assert setup.user_steps == [
         MergePullRequest(
             UPSTREAM.pull_request_url(3),
             f"adding {WorkflowLocation.MARK_VIEWED.name}",
-        ),
-        SyncFork(FORK),
+        )
     ]
+
+
+def merged_upstream_answers(**overrides: Any) -> PathAnsweringClient:
+    """
+    :param overrides: Answers replacing the fork's, as for :func:`answers`.
+    :return: A fork lacking the workflow, whose parent's default branch holds it.
+    """
+    client = fork_proposal_answers(**overrides)
+    client.answers[
+        UPSTREAM.contents_path(WORKFLOW_FILE_PATH, STAND_IN_DEFAULT_BRANCH.name)
+    ] = installed_workflow(MarkViewedSetup(FORK))
+    return client
+
+
+def test_a_fork_whose_parent_holds_the_workflow_is_fast_forwarded_to_it():
+    client = merged_upstream_answers()
+    MarkViewedSetup(FORK).run(client)
+    assert sent_of(client, ForkFastForward) == [
+        ForkFastForward(
+            repository=FORK, object_hash=BASE_COMMIT, branch=STAND_IN_DEFAULT_BRANCH
+        )
+    ]
+
+
+def test_a_fast_forwarded_fork_has_its_workflow_enabled():
+    client = merged_upstream_answers(WORKFLOW={"state": "disabled_fork"})
+    MarkViewedSetup(FORK).run(client)
+    assert sent_of(client, WorkflowEnabling) == [
+        WorkflowEnabling(FORK, WorkflowLocation.MARK_VIEWED)
+    ]
+
+
+def test_a_refused_fast_forward_leaves_the_sync_to_the_user():
+    client = merged_upstream_answers()
+    client.write_refusal = HTTPStatus.UNPROCESSABLE_ENTITY
+    setup = MarkViewedSetup(FORK)
+    setup.run(client)
+    assert setup.user_steps[0] == SyncFork(FORK)
 
 
 def test_a_fork_holding_another_version_gets_it_proposed_not_replaced():
@@ -273,7 +319,7 @@ def unforked_answers(**overrides: Any) -> PathAnsweringClient:
     )
     unset_up = {
         "WORKFLOW_FILE": None,
-        "DEFAULT_BRANCH": {"object": {"sha": BASE_COMMIT}},
+        "DEFAULT_BRANCH": branch_at_base(STAND_IN_DEFAULT_BRANCH),
     }
     client = answers(**(unset_up | overrides))
     client.answers.setdefault(proposal.open_from_branch_path, [])
@@ -322,7 +368,7 @@ def test_an_open_proposal_is_not_opened_again():
         RepositoryDetails.from_json(fork_details(is_fork=False))
     )
     client = unforked_answers(
-        PROPOSAL_BRANCH={"object": {"sha": BASE_COMMIT}},
+        PROPOSAL_BRANCH=branch_at_base(WORKFLOW_PROPOSAL_BRANCH),
         PROPOSED_FILE=installed_workflow(setup),
     )
     client.answers[proposal.open_from_branch_path] = [PROPOSAL]
@@ -333,7 +379,7 @@ def test_an_open_proposal_is_not_opened_again():
 def test_a_proposal_branch_holding_another_version_is_updated():
     setup = MarkViewedSetup(FORK, on_every_pull_request=True)
     client = unforked_answers(
-        PROPOSAL_BRANCH={"object": {"sha": BASE_COMMIT}},
+        PROPOSAL_BRANCH=branch_at_base(WORKFLOW_PROPOSAL_BRANCH),
         PROPOSED_FILE=installed_workflow(MarkViewedSetup(FORK)),
     )
     setup.run(client)
@@ -343,27 +389,20 @@ def test_a_proposal_branch_holding_another_version_is_updated():
     ] == [(WORKFLOW_PROPOSAL_BRANCH.name, INSTALLED_BLOB)]
 
 
-def test_a_refused_proposal_leaves_adding_the_workflow_by_hand():
+def test_a_refused_proposal_is_reported_as_refused():
     client = unforked_answers()
     client.write_refusal = HTTPStatus.FORBIDDEN
     setup = MarkViewedSetup(FORK)
     setup.run(client)
-    by_hand = (
-        setup.workflow_commit(FORK, STAND_IN_DEFAULT_BRANCH)
-        .write_replacing(None)
-        .manual_step
-    )
-    assert setup.user_steps[0] == by_hand
+    assert setup.steps[0].state == SetupState.REFUSED
 
 
-def test_a_refused_proposal_replacing_another_version_leaves_the_file_to_paste():
+def test_a_refused_proposal_leaves_no_file_to_commit_by_hand():
     client = unforked_answers(WORKFLOW_FILE=installed_workflow(MarkViewedSetup(FORK)))
     client.write_refusal = HTTPStatus.FORBIDDEN
     setup = MarkViewedSetup(FORK, on_every_pull_request=True)
     setup.run(client)
-    assert [step.text for step in setup.user_steps if step.text] == [
-        setup.caller_workflow
-    ]
+    assert setup.user_steps == []
 
 
 def test_actions_turned_off_are_turned_on():
@@ -574,8 +613,15 @@ def carrying_pull_request(base: str) -> dict[str, Any]:
     """
     return {
         "number": 9,
+        "title": "Another pull request",
         "html_url": FORK.pull_request_url(9),
-        "head": {"ref": "another-branch", "sha": HEAD_COMMIT},
+        "state": "open",
+        "merged_at": None,
+        "head": {
+            "ref": "another-branch",
+            "sha": HEAD_COMMIT,
+            "user": {"login": FORK.owner},
+        },
         "base": {"ref": base, "sha": BASE_COMMIT},
     }
 
@@ -654,7 +700,7 @@ def test_of_two_stacked_pull_requests_carrying_the_workflow_the_lower_is_reporte
         carrying_pull_request(lower["head"]["ref"]),
         number=10,
         html_url=FORK.pull_request_url(10),
-        head={"ref": "an-upper-branch", "sha": HEAD_COMMIT},
+        head=dict(lower["head"], ref="an-upper-branch"),
     )
     proposal = setup.workflow_proposal(
         RepositoryDetails.from_json(fork_details(is_fork=False))

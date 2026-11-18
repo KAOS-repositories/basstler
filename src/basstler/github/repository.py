@@ -268,21 +268,6 @@ class Repository:
         """
         return f"{self.url}/actions/workflows/{workflow.name}"
 
-    def new_file_page_url(self, branch: Branch) -> str:
-        """
-        :param branch: The branch a file is added to.
-        :return: The page adding a file to it.
-        """
-        return f"{self.url}/new/{branch.name}"
-
-    def edit_file_url(self, branch: Branch, file_path: str) -> str:
-        """
-        :param branch: The branch holding the file.
-        :param file_path: The file's path from the repository's root.
-        :return: The page editing the file; it takes no content to fill in.
-        """
-        return f"{self.url}/edit/{branch.name}/{file_path}"
-
     def file_url(self, branch: Branch, file_path: str) -> str:
         """
         :param branch: The branch holding the file.
@@ -437,6 +422,13 @@ class Repository:
         """
         return f"{self.api_path}/git/ref/{branch.reference.removeprefix('refs/')}"
 
+    def branch_update_path(self, branch: Branch) -> str:
+        """
+        :param branch: A branch of the repository.
+        :return: The REST path that moves its git reference.
+        """
+        return f"{self.git_references_path}/{branch.reference.removeprefix('refs/')}"
+
     def git_requirement(self, distribution: str, reference: str) -> str:
         """
         A pip requirement installing a distribution straight from this repository.
@@ -453,7 +445,7 @@ class Repository:
 
 
 @dataclass(frozen=True)
-class RepositoryMember:
+class HasRepository:
     """
     Something that belongs to one GitHub repository.
     """
@@ -465,7 +457,7 @@ class RepositoryMember:
 
 
 @dataclass(frozen=True)
-class RepositoryBranch(RepositoryMember, Branch):
+class RepositoryBranch(HasRepository, Branch):
     """
     A branch of one GitHub repository.
     """
@@ -489,7 +481,7 @@ class RepositoryBranch(RepositoryMember, Branch):
 
 
 @dataclass(frozen=True)
-class PullRequestReference(RepositoryMember):
+class PullRequestReference(HasRepository):
     """
     One pull request, named by the repository it is opened on and its number.
 

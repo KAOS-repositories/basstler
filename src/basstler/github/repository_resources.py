@@ -1,6 +1,6 @@
 """
 Reading one REST resource of a repository into the model of its type, and writing a
-setting with the step that takes it by hand when GitHub refuses.
+resource or a setting with the step that takes it by hand when GitHub refuses.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Any, get_args, get_origin
 
 from basstler.class_property import classproperty
 from basstler.github.client import GitHubAttemptReader, GitHubResponse, RepositoryWrite
-from basstler.github.repository import RepositoryMember
+from basstler.github.repository import HasRepository
 from basstler.github.user_steps import UserStep
 from basstler.json_model import ValidatedJSONModel
 
@@ -62,9 +62,7 @@ class ResourceReading[ResourceType: ValidatedJSONModel]:
 
 
 @dataclass(frozen=True)
-class RepositoryRead[ResourceType: ValidatedJSONModel](
-    RepositoryMember, TypeBinding, ABC
-):
+class RepositoryRead[ResourceType: ValidatedJSONModel](HasRepository, TypeBinding, ABC):
     """
     A read of one REST resource of a repository, bound to the model the resource parses
     into.
@@ -84,6 +82,13 @@ class RepositoryRead[ResourceType: ValidatedJSONModel](
         """
         return cls.bound_type_argument(RepositoryRead)
 
+    def parse(self, body: Any) -> ResourceType:
+        """
+        :param body: GitHub's answer, served.
+        :return: The resource it describes.
+        """
+        return self.resource_type.from_json(body)
+
     def attempt(self, client: GitHubAttemptReader) -> ResourceReading[ResourceType]:
         """
         :param client: Reads the repository.
@@ -92,24 +97,33 @@ class RepositoryRead[ResourceType: ValidatedJSONModel](
         response = client.attempt_get(self.path)
         if response.failure is not None:
             return ResourceReading(response, None)
-        return ResourceReading(response, self.resource_type.from_json(response.body))
+        return ResourceReading(response, self.parse(response.body))
 
 
-# %% writing a setting
+# %% writing a resource
 
 
-class SettingWrite[ResourceType: ValidatedJSONModel](TypeBinding, RepositoryWrite, ABC):
+class ResourceWrite[ResourceType: ValidatedJSONModel](
+    TypeBinding, RepositoryWrite, ABC
+):
     """
-    A change to one setting of a repository, bound to the model of the setting it
+    A change to one resource of a repository, bound to the model of the resource it
     changes.
     """
 
     @classproperty
-    def setting_type(cls) -> type[ResourceType]:
+    def resource_type(cls) -> type[ResourceType]:
         """
-        The model of the setting this write changes.
+        The model of the resource this write changes.
         """
-        return cls.bound_type_argument(SettingWrite)
+        return cls.bound_type_argument(ResourceWrite)
+
+
+class SettingWrite[ResourceType: ValidatedJSONModel](ResourceWrite[ResourceType], ABC):
+    """
+    A change to one setting of a repository, which the user can make by hand where
+    GitHub refuses it.
+    """
 
     @property
     @abstractmethod

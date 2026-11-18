@@ -1089,6 +1089,105 @@ def test_a_build_starting_workflow_keeps_to_the_actions_budget(
     assert ActionsBudget().violations_of(Workflow.at(path)) == ()
 
 
+# %% refreshing an installed merge workflow
+
+
+@pytest.fixture
+def stale_merge_workflow(published: Publishing) -> Publishing:
+    """:return: A notes repository whose default branch holds the merge workflow as an
+    earlier release wrote it."""
+    GitHubRemoteBranch(
+        UPSTREAM_BASE,
+        GitCommandRunner(published.checkout.project_root),
+        RemoteName.ORIGIN,
+    ).write(
+        {
+            MergeWorkflow.location.as_posix(): (
+                DatasetLocation.STALE_MERGE_WORKFLOW.read_text().rstrip("\n")
+            )
+        },
+        "Start the plan site build on every merge",
+    )
+    return published
+
+
+def test_a_stale_merge_workflow_is_proposed_again_as_a_pull_request(
+    stale_merge_workflow,
+):
+    client = stale_merge_workflow.runs_none()
+    publication = stale_merge_workflow.publication(client)
+
+    publication.refresh_merge_workflow()
+
+    assert client.writes == [stale_merge_workflow.merge_workflow_proposal.opening]
+    assert (
+        stale_merge_workflow.file(
+            stale_merge_workflow.notes_repository,
+            publication.merge_workflow_branch,
+            MergeWorkflow.location.as_posix(),
+        )
+        == MergeWorkflow(publication.dispatch_workflow).text
+    )
+
+
+def test_refreshing_a_stale_merge_workflow_leaves_merging_it_to_the_user(
+    stale_merge_workflow,
+):
+    pull_request = RestPullRequestSummary.from_json(
+        json.loads(DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST.read_text())
+    )
+
+    step = stale_merge_workflow.publication(
+        stale_merge_workflow.runs_none()
+    ).refresh_merge_workflow()
+
+    assert step == MergeWorkflowProposal.merging(pull_request)
+
+
+def test_a_stale_merge_workflow_whose_pull_request_is_open_is_not_proposed_again(
+    stale_merge_workflow,
+):
+    client = stale_merge_workflow.runs(
+        DatasetLocation.WORKFLOW_RUNS_NONE,
+        DatasetLocation.WORKFLOW_RUNS_NONE,
+        open_pull_requests=(DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST,),
+    )
+
+    stale_merge_workflow.publication(client).refresh_merge_workflow()
+
+    assert client.writes == []
+
+
+def test_a_current_merge_workflow_needs_no_refresh(published):
+    published.merge_the_workflow()
+    client = published.runs_none()
+
+    step = published.publication(client).refresh_merge_workflow()
+
+    assert (step, client.writes) == (None, [])
+
+
+def test_a_default_branch_without_the_merge_workflow_is_left_to_publication(published):
+    """
+    Writing it the first time also needs the token, which only publishing walks through.
+    """
+    client = published.runs_none()
+
+    step = published.publication(client).refresh_merge_workflow()
+
+    assert (step, client.writes) == (None, [])
+
+
+def test_a_fork_s_stale_merge_workflow_is_left_as_its_upstream_has_it(
+    stale_merge_workflow,
+):
+    client = stale_merge_workflow.fork_runs()
+
+    step = stale_merge_workflow.publication(client).refresh_merge_workflow()
+
+    assert (step, client.writes) == (None, [])
+
+
 # %% a private repository the build reads
 
 

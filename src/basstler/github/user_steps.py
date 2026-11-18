@@ -8,9 +8,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from basstler.class_property import classproperty
 from basstler.github.workflows import RepositoryWorkflow
-from basstler.github.repository import Repository, RepositoryMember
+from basstler.github.repository import Repository, HasRepository
 
 # %% a step
 
@@ -53,7 +52,7 @@ class UserStep(ABC):
 
 
 @dataclass(frozen=True)
-class AllowActions(RepositoryMember, UserStep):
+class AllowActions(HasRepository, UserStep):
     """
     Allowing a repository to run Actions.
     """
@@ -81,7 +80,7 @@ class AllowActions(RepositoryMember, UserStep):
 
 
 @dataclass(frozen=True)
-class EnableWorkflow(RepositoryWorkflow, RepositoryMember, UserStep):
+class EnableWorkflow(RepositoryWorkflow, HasRepository, UserStep):
     """
     Enabling one disabled workflow of a repository.
     """
@@ -142,89 +141,6 @@ class OpenPullRequestFromForm(MergePullRequest):
             f"Open {self.page_url} - its title and description are filled in.",
             "Click Create pull request, review it, then merge it.",
         )
-
-
-# %% files
-
-
-@dataclass(frozen=True)
-class FileEdit(UserStep, ABC):
-    """
-    Committing one file through GitHub's pages.
-    """
-
-    target: str
-    """
-    The file, as a phrase such as ``<path> on <owner/name>'s <branch>``.
-    """
-
-    @classproperty
-    def commit_step(cls) -> str:
-        """
-        The browser step committing the edit, wherever the branch may refuse direct
-        commits.
-        """
-        return (
-            "Click Commit changes; where the branch is protected, choose to create a "
-            "new branch and start a pull request."
-        )
-
-
-@dataclass(frozen=True)
-class AddFile(FileEdit):
-    """
-    Adding a file through GitHub's page filled in with its path and content.
-    """
-
-    form_url: str
-    """
-    The new-file page with the file's path and content filled in.
-    """
-
-    @property
-    def description(self) -> str:
-        return f"add {self.target}"
-
-    @property
-    def browser_steps(self) -> tuple[str, ...]:
-        return (
-            f"Open {self.form_url} - the file's path and content are filled in.",
-            self.commit_step,
-        )
-
-
-@dataclass(frozen=True)
-class ReplaceFile(FileEdit):
-    """
-    Replacing a file's whole content through GitHub's edit page, which takes none to
-    fill in.
-    """
-
-    edit_url: str
-    """
-    The file's edit page.
-    """
-
-    replacement: str
-    """
-    The file's new whole content.
-    """
-
-    @property
-    def description(self) -> str:
-        return f"replace {self.target}"
-
-    @property
-    def browser_steps(self) -> tuple[str, ...]:
-        return (
-            f"Open {self.edit_url}.",
-            "Paste the file below as its whole content.",
-            self.commit_step,
-        )
-
-    @property
-    def text(self) -> str | None:
-        return self.replacement
 
 
 # %% forks

@@ -35,7 +35,7 @@ from basstler.github.exceptions import (
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.github.repository import GitHubAddress, RepositoryMember
+from basstler.github.repository import GitHubAddress, HasRepository
 from basstler.json_model import ValidatedJSONModel
 
 # %% the interface
@@ -110,7 +110,7 @@ class GitHubWrite(ValidatedJSONModel, ABC):
         """
 
 
-class RepositoryWrite(GitHubWrite, RepositoryMember, ABC):
+class RepositoryWrite(GitHubWrite, HasRepository, ABC):
     """
     A change to a resource of one repository.
     """

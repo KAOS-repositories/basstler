@@ -32,6 +32,10 @@ class FileSample(StrEnum):
     DOCUMENTATION_RENAMED = "documentation-renamed"
     IDENTIFIER_RENAMED = "identifier-renamed"
     IDENTITY_DECORATOR_ADDED = "identity-decorator-added"
+    IMPORT_ADDED_FROM_OTHER_MODULE = "import-added-from-other-module"
+    IMPORT_ADDED_UNDER_STAR_IMPORT = "import-added-under-star-import"
+    IMPORT_ADDED_UNUSED = "import-added-unused"
+    IMPORT_REMOVED_UNUSED = "import-removed-unused"
     IMPORT_SOURCE_CHANGED = "import-source-changed"
     IMPORTS_REORDERED = "imports-reordered"
     KEYWORD_ARGUMENTS_ADDED = "keyword-arguments-added"
@@ -222,6 +226,42 @@ class SubclassSubstitutionSample(SampleTrees):
     @classproperty
     def directory_name(cls) -> str:
         return "subclass-substitution"
+
+
+class BindingRenameSample(SampleTrees):
+    """
+    A pull request renaming a module's class, and every spelling of its old name with
+    it: the class's own uses, an unrelated class of the same name, an external one and
+    a string literal.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        """
+        The directory holding the binding-rename sample.
+        """
+        return "binding-rename"
+
+
+class AttributeRenameSample(SampleTrees):
+    """
+    A pull request renaming methods and attributes of classes, with the same names on
+    unrelated objects, an override left behind and a standard library override changed
+    alike.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        """
+        The directory holding the attribute-rename sample.
+        """
+        return "attribute-rename"
 
 
 # %% the base branch merged after a review

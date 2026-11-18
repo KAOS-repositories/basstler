@@ -149,6 +149,20 @@ class CommitModules(DefinitionSearch):
         return DOTTED_NAME_SEPARATOR.join(components)
 
     @cached_property
+    def module_files(self) -> dict[str, tuple[str, ...]]:
+        """
+        A key for every ``.py`` file of the commit importable by each dotted path; more
+        than one when the path is ambiguous.
+        """
+        files: dict[str, list[str]] = {}
+        for path in sorted(self.tree.file_paths):
+            if path.suffix == MODULE_SUFFIX:
+                files.setdefault(self.module_path(path), []).append(
+                    f"{self.tree.commit}:{path}"
+                )
+        return {module: tuple(keys) for module, keys in files.items()}
+
+    @cached_property
     def definition_files(self) -> dict[str, tuple[str, ...]]:
         """
         The files defining a function, method or class of each name, listed by one

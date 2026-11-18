@@ -9,6 +9,7 @@ import ast
 import io
 import keyword
 import tokenize
+from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
@@ -53,7 +54,9 @@ class IdentifierField(StrEnum):
 
     MODULE = "module"
     """
-    The module an ``import ... from`` reads.
+    The module an ``import ...
+
+    from`` reads.
     """
 
     NAMES = "names"
@@ -99,10 +102,9 @@ The typing name of a type allowing only the values it lists.
 
 TUPLE_CLASSES = frozenset({"tuple", "Tuple"})
 """
-The names of the tuple class, whose annotation ``tuple[X, ...]`` declares any number
-of ``X``.
+The names of the tuple class, whose annotation ``tuple[X, ...]`` declares any number of
+``X``.
 """
-
 
 # %% type annotations
 
@@ -166,7 +168,6 @@ CONTAINER_KINDS: dict[str, ContainerKind] = {
 """
 The standard containers, by the name of their class or typing alias.
 """
-
 REMOVED_ITEM_METHODS: dict[ContainerKind, frozenset[str]] = {
     ContainerKind.SEQUENCE: frozenset({"pop", "popleft"}),
     ContainerKind.MAPPING: frozenset({"get", "pop", "setdefault"}),
@@ -186,7 +187,6 @@ class MappingView:
     """
     The name of the view's class.
     """
-
     held_argument: int
     """
     The position of the mapping's type argument the view holds.
@@ -200,7 +200,6 @@ MAPPING_VIEWS: dict[str, MappingView] = {
 """
 The methods of a mapping returning a view, by name.
 """
-
 COPY_METHOD = "copy"
 """
 The method of a standard container returning a shallow copy of it.
@@ -210,8 +209,8 @@ The method of a standard container returning a shallow copy of it.
 @dataclass(frozen=True, slots=True)
 class AnnotatedType:
     """
-    What a type annotation declares a value to be: an instance of one class, holding
-    the values its type arguments declare.
+    What a type annotation declares a value to be: an instance of one class, holding the
+    values its type arguments declare.
     """
 
     class_name: str
@@ -221,8 +220,8 @@ class AnnotatedType:
 
     arguments: tuple[AnnotatedType | None, ...] = ()
     """
-    What the type arguments declare, ``None`` for one allowing no single class; a
-    tuple of any length has its one item type only.
+    What the type arguments declare, ``None`` for one allowing no single class; a tuple
+    of any length has its one item type only.
     """
 
     @classmethod
@@ -740,8 +739,8 @@ class PythonSource:
     @cached_property
     def without_module_documentation(self) -> PythonSource:
         """
-        The file without the documentation string at the top, itself when it has none
-        or shares its lines with other code.
+        The file without the documentation string at the top, itself when it has none or
+        shares its lines with other code.
         """
         first = next(iter(self.tree.body), None)
         if first is None or not self.is_documentation(first):
@@ -784,9 +783,19 @@ class PythonSource:
         :param end: The number of the line after the last.
         :return: The :attr:`significant_tokens` starting on those lines.
         """
-        return tuple(
-            token for token in self.significant_tokens if first <= token.start[0] < end
-        )
+        return self.significant_tokens[
+            bisect_left(self.significant_token_lines, first) : bisect_left(
+                self.significant_token_lines, end
+            )
+        ]
+
+    @cached_property
+    def significant_token_lines(self) -> tuple[int, ...]:
+        """
+        The line each of :attr:`significant_tokens` starts on, in the same order, which
+        never decreases.
+        """
+        return tuple(token.start[0] for token in self.significant_tokens)
 
     @staticmethod
     def referenced_name(expression: ast.expr) -> str | None:

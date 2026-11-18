@@ -1,0 +1,7 @@
+mutation MarkFilesAsViewed(${{ pull_request_variable }}: ID!{% for path_variable in path_variables %}, ${{ path_variable }}: String!{% endfor %}) {
+{% for path_variable in path_variables %}
+  {{ path_variable }}: markFileAsViewed(input: {pullRequestId: ${{ pull_request_variable }}, path: ${{ path_variable }}}) {
+    clientMutationId
+  }
+{% endfor %}
+}

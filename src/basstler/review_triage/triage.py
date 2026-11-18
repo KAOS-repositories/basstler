@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
+from basstler.progress import ProgressStep, ProgressUnit
 from basstler.github.pull_request_changes import (
     PullRequestChanges,
     RestPullRequest,
@@ -39,7 +40,7 @@ from basstler.review_triage.referents import MemberResolver
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
-from basstler.review_triage.renames import RenameMap
+from basstler.review_triage.renames import RenameDecisions, RenameMap
 from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
 
@@ -132,33 +133,58 @@ class PullRequestTriager:
         """
         separated = BaseBranchMergeDetection().separate(changes)
         own_changes = separated.own
-        renames = RenameMap.from_decisions(
-            source.decisions(own_changes) for source in self.rename_sources
-        )
-        base_modules = CommitModules(own_changes.commits.base_tree)
-        base_definitions = DefinitionIndex(base_modules)
-        triager = FileTriager(
-            JudgmentContext(
-                renames,
-                base_definitions,
-                DefinitionMoveDetection().moved_definitions(own_changes, renames),
-                RenameMap.from_decisions(
-                    [SubclassSubstitutionDetection().decisions(own_changes)]
-                ),
-                self.rules,
-                MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
-            ),
-            self.judgments,
-        )
+        context = self.context(own_changes)
+        triager = FileTriager(context, self.judgments)
         verdicts: dict[PurePosixPath, FileVerdict] = {
             change.path: MechanicalFile(
                 change, frozenset({MechanicalChange.BASE_BRANCH_MERGE})
             )
             for change in separated.merged
-        } | {change.path: triager.triage(change) for change in own_changes.files}
+        }
+        with ProgressStep.JUDGING_FILES.bar(
+            len(own_changes.files), ProgressUnit.FILE
+        ) as progress:
+            for change in own_changes.files:
+                verdicts[change.path] = triager.triage(change)
+                progress.update()
         return TriageOutcome(
             changes.pull_request,
-            renames,
+            context.renames,
             tuple(verdicts[change.path] for change in changes.files),
             changes.start,
+        )
+
+    def context(self, changes: PullRequestChanges) -> JudgmentContext:
+        """
+        :param changes: A pull request's own changes, without merges of its base branch.
+        :return: What its files are judged against: the renames every source of
+            :attr:`rename_sources` finds in them, and the definitions they move.
+        """
+        moves = DefinitionMoveDetection()
+        substitutions = SubclassSubstitutionDetection()
+        decisions: list[RenameDecisions] = []
+        with ProgressStep.FINDING_RENAMES_AND_MOVES.bar(
+            len((*self.rename_sources, moves, substitutions)), ProgressUnit.DETECTION
+        ) as progress:
+            for source in self.rename_sources:
+                progress.set_postfix_str(source.label)
+                decisions.append(source.decisions(changes))
+                progress.update()
+            renames = RenameMap.from_decisions(decisions)
+            progress.set_postfix_str(moves.label)
+            moved_definitions = moves.moved_definitions(changes, renames)
+            progress.update()
+            progress.set_postfix_str(substitutions.label)
+            substitution_renames = RenameMap.from_decisions(
+                [substitutions.decisions(changes)]
+            )
+            progress.update()
+        base_modules = CommitModules(changes.commits.base_tree)
+        return JudgmentContext(
+            renames,
+            DefinitionIndex(base_modules),
+            moved_definitions,
+            substitution_renames,
+            self.rules,
+            MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
         )

@@ -53,13 +53,16 @@ class RenameDetection(RenameSource):
                     PythonSource(change.head_text),
                     candidates,
                 )
-        base = changes.commits.base_tree
-        head = changes.commits.head_tree
+        consistent = candidates.consistent()
+        kept_in_head = changes.commits.head_tree.mentioned_words(frozenset(consistent))
+        already_in_base = changes.commits.base_tree.mentioned_words(
+            frozenset(consistent.values())
+        )
         return RenameDecisions(
             tuple(
                 Rename(old, new, self)
-                for old, new in sorted(candidates.consistent().items())
-                if not head.mentions(old) and not base.mentions(new)
+                for old, new in sorted(consistent.items())
+                if old not in kept_in_head and new not in already_in_base
             )
         )
 

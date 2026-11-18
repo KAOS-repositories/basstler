@@ -185,16 +185,43 @@ class CommitRange:
             ``None``.
         :return: Those files the range changes, with their texts read unless binary.
         """
+        changes = tuple(
+            change
+            for change in self.file_changes()
+            if paths is None or change.path in paths
+        )
+        texts = self.git.existing_object_texts(
+            tuple(
+                name
+                for change in changes
+                if not change.is_binary
+                for name in (
+                    self.base_version_name(change),
+                    self.head_version_name(change),
+                )
+            )
+        )
         return tuple(
             FileVersions(**asdict(change))
             if change.is_binary
             else FileVersions(
                 **asdict(change),
-                base_text=self.git.file_at(
-                    self.base_commit, change.previous_path or change.path
-                ),
-                head_text=self.git.file_at(self.head_commit, change.path),
+                base_text=texts.get(self.base_version_name(change)),
+                head_text=texts.get(self.head_version_name(change)),
             )
-            for change in self.file_changes()
-            if paths is None or change.path in paths
+            for change in changes
         )
+
+    def base_version_name(self, change: FileChange) -> str:
+        """
+        :param change: A file the range changes.
+        :return: What git names the file's version in :attr:`base_commit` by.
+        """
+        return f"{self.base_commit}:{change.previous_path or change.path}"
+
+    def head_version_name(self, change: FileChange) -> str:
+        """
+        :param change: A file the range changes.
+        :return: What git names the file's version in :attr:`head_commit` by.
+        """
+        return f"{self.head_commit}:{change.path}"

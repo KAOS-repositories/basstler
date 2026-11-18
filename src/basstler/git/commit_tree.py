@@ -4,6 +4,7 @@ Searching the files of one commit.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import PurePosixPath
@@ -16,6 +17,13 @@ from basstler.git.commands import GitCommandRunner
 PATH_TERMINATOR = "\0"
 """
 What ``git ls-tree -z`` ends each path it lists with.
+"""
+
+WORD = re.compile(r"\w+", re.ASCII)
+"""
+A run of the characters ``git grep --word-regexp`` counts as part of a word, which a
+regular expression matches literally: whole-word matches of two such runs never overlap,
+so one search for their alternation finds each a search for it alone finds.
 """
 
 
@@ -81,6 +89,34 @@ class CommitTree:
         if search.exit_status == GitGrepExitCode.NO_MATCH:
             return False
         return search.raise_if_failed().succeeded
+
+    def mentioned_words(self, words: frozenset[str]) -> frozenset[str]:
+        """
+        :param words: Names or any other fixed strings.
+        :return: Those of *words* some file of the commit holds as a whole word, as
+            :meth:`mentions` decides each.
+        :raises GitCommandFailed: If a search itself fails.
+        """
+        identifiers = frozenset(word for word in words if WORD.fullmatch(word))
+        others = frozenset(word for word in words - identifiers if self.mentions(word))
+        if not identifiers:
+            return others
+        search = self.git.attempt(
+            "grep",
+            "--only-matching",
+            "-h",
+            "--word-regexp",
+            "--extended-regexp",
+            "-f",
+            "-",
+            self.commit,
+            standard_input=f"{'|'.join(sorted(identifiers))}\n",
+        )
+        if search.exit_status == GitGrepExitCode.NO_MATCH:
+            return others
+        return others | (
+            frozenset(search.raise_if_failed().output.splitlines()) & identifiers
+        )
 
     def holds(self, path: PurePosixPath) -> bool:
         """

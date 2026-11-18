@@ -266,6 +266,14 @@ class MemberResolver:
     Each file read so far by its key, ``None`` when it does not parse.
     """
 
+    classes_by_file: dict[str, dict[ast.ClassDef, frozenset[str]]] = field(
+        default_factory=dict
+    )
+    """
+    The classes each parsed file of :attr:`read_files` defines at any depth, with the
+    names their bases spell.
+    """
+
     def names_of(self, module: str) -> ModuleNames | None:
         """
         :param module: A dotted module path.
@@ -610,16 +618,14 @@ class MemberResolver:
         seen: set[tuple[str, int]] = set()
         while pending:
             name = pending.pop()
-            for key in self.modules.files_subclassing(name):
-                tree = self.file_tree(key)
+            keys = self.modules.files_subclassing(name)
+            self.read_file_trees(keys)
+            for key in keys:
+                tree = self.read_files[key]
                 if tree is None:
                     return None
-                for node in ast.walk(tree):
-                    if (
-                        not isinstance(node, ast.ClassDef)
-                        or (key, node.lineno) in seen
-                        or name not in base_words(node)
-                    ):
+                for node, words in self.file_classes(key, tree).items():
+                    if (key, node.lineno) in seen or name not in words:
                         continue
                     seen.add((key, node.lineno))
                     identity = self.top_level_class(key, tree, node)
@@ -631,15 +637,33 @@ class MemberResolver:
                         pending.append(node.name)
         return found
 
-    def file_tree(self, key: str) -> ast.Module | None:
+    def read_file_trees(self, keys: tuple[str, ...]) -> None:
+        """
+        Parse those of *keys* not read yet into :attr:`read_files`.
+
+        :param keys: Files of the commit.
+        """
+        unread = tuple(key for key in keys if key not in self.read_files)
+        for key, text in self.modules.texts_of(unread).items():
+            source = PythonSource(text)
+            self.read_files[key] = source.tree if source.parses else None
+
+    def file_classes(
+        self, key: str, tree: ast.Module
+    ) -> dict[ast.ClassDef, frozenset[str]]:
         """
         :param key: A file of the commit.
-        :return: Its syntax tree, ``None`` when it does not parse.
+        :param tree: Its syntax tree.
+        :return: Every class the file defines at any depth, in :func:`ast.walk` order,
+            with the names its bases spell.
         """
-        if key not in self.read_files:
-            source = PythonSource(self.modules.texts_of((key,))[key])
-            self.read_files[key] = source.tree if source.parses else None
-        return self.read_files[key]
+        if key not in self.classes_by_file:
+            self.classes_by_file[key] = {
+                node: base_words(node)
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ClassDef)
+            }
+        return self.classes_by_file[key]
 
     def top_level_class(
         self, key: str, tree: ast.Module, node: ast.ClassDef

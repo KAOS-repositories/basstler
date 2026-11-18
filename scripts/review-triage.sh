@@ -7,8 +7,8 @@
 # fetch the pull requests into; later runs reuse both.
 #
 # Usage:
-#   review-triage.sh <pull request URL> [--mark-viewed] [-- <option>...]
-#   review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]
+#   review-triage.sh <pull request URL> [--mark-viewed] [--verbose] [-- <option>...]
+#   review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [--verbose] [-- <option>...]
 #
 #   or, without downloading it first:
 #   curl -fsSL https://raw.githubusercontent.com/KAOS-repositories/basstler/main/scripts/review-triage.sh \
@@ -19,7 +19,10 @@
 #
 #   <pull request URL>     triage this pull request; <owner>/<name>#<number> works too
 #   <pull request number>  triage only this pull request; every open one when left out
-#   --mark-viewed          also mark the mechanical files viewed for your GitHub account
+#   --mark-viewed          also mark the mechanical files viewed for your GitHub account;
+#                          prints only how many files need review unless --verbose
+#   --verbose              also print basstler's installation and, with --mark-viewed,
+#                          the whole triage
 #   -- <option>...         passed on to `basstler review-triage`, such as --from-merge-base,
 #                          --since <commit>, --rename old=new or --ignore-rule <rule>
 #
@@ -43,8 +46,8 @@ fail() {
 }
 
 usage() {
-    printf 'usage: review-triage.sh <pull request URL> [--mark-viewed] [-- <option>...]\n' >&2
-    printf '   or: review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]\n' >&2
+    printf 'usage: review-triage.sh <pull request URL> [--mark-viewed] [--verbose] [-- <option>...]\n' >&2
+    printf '   or: review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [--verbose] [-- <option>...]\n' >&2
     exit 2
 }
 
@@ -53,10 +56,12 @@ usage() {
 repository=""
 pull_request=""
 command_name="report"
+verbose=""
 passed_on=()
 while (($#)); do
     case "$1" in
     --mark-viewed) command_name="mark-viewed" ;;
+    --verbose) verbose=1 ;;
     -h | --help) usage ;;
     --)
         shift
@@ -125,7 +130,9 @@ install_basstler() {
     if [[ -f "$stamp" && "$(cat "$stamp")" == "$commit" ]]; then
         return
     fi
-    printf 'review-triage: installing basstler %s (%s)\n' "$reference" "${commit:0:12}" >&2
+    if [[ -n "$verbose" ]]; then
+        printf 'review-triage: installing basstler %s (%s)\n' "$reference" "${commit:0:12}" >&2
+    fi
     package="basstler @ git+$basstler_repository@$commit"
     mkdir -p "$home"
     if command -v uv >/dev/null; then
@@ -175,8 +182,13 @@ PYTHON
 }
 
 triage() {
+    local output_options=()
+    if [[ "$command_name" == "mark-viewed" && -z "$verbose" ]]; then
+        output_options=(--summary-only)
+    fi
     (cd "$clone" && "$(environment_python)" -m basstler review-triage "$command_name" "$1" \
-        --repository "$repository" "${default_rules[@]}" ${passed_on[@]+"${passed_on[@]}"})
+        --repository "$repository" "${default_rules[@]}" \
+        ${output_options[@]+"${output_options[@]}"} ${passed_on[@]+"${passed_on[@]}"})
 }
 
 # %% running

@@ -157,6 +157,43 @@ def test_a_repository_without_a_number_asks_for_its_open_pull_requests(
     assert installed_triage.recorded_arguments() == ["-", REPOSITORY]
 
 
+# %% how much is printed
+
+SUMMARY_ONLY_OPTION = "--summary-only"
+"""
+The option of ``basstler review-triage mark-viewed`` printing only the triage's summary.
+"""
+
+
+def test_marking_viewed_prints_only_the_summary_by_default(
+    installed_triage: InstalledTriage,
+) -> None:
+    completed = installed_triage.run(REPOSITORY, PULL_REQUEST_NUMBER, "--mark-viewed")
+
+    assert completed.returncode == 0, completed.stderr
+    assert SUMMARY_ONLY_OPTION in installed_triage.recorded_arguments()
+
+
+def test_marking_viewed_verbosely_prints_the_whole_triage(
+    installed_triage: InstalledTriage,
+) -> None:
+    completed = installed_triage.run(
+        REPOSITORY, PULL_REQUEST_NUMBER, "--mark-viewed", "--verbose"
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert SUMMARY_ONLY_OPTION not in installed_triage.recorded_arguments()
+
+
+def test_a_report_is_printed_whole_without_verbose(
+    installed_triage: InstalledTriage,
+) -> None:
+    completed = installed_triage.run(REPOSITORY, PULL_REQUEST_NUMBER)
+
+    assert completed.returncode == 0, completed.stderr
+    assert SUMMARY_ONLY_OPTION not in installed_triage.recorded_arguments()
+
+
 # %% the clone's origin
 
 

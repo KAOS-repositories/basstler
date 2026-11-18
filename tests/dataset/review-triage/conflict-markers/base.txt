@@ -1,0 +1,14 @@
+from __future__ import annotations
+
+
+class Point:
+    def frame(self):
+<<<<<<<< ours
+        name = "world"
+========
+        name = "map"
+>>>>>>>> theirs
+        return name
+
+    def setters(self):
+        return None

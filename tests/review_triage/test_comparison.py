@@ -96,6 +96,15 @@ def test_a_rename_the_pull_request_does_not_make_needs_review():
     assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
 
 
+def test_a_python_file_that_does_not_parse_needs_review():
+    """
+    A version that is not valid Python, such as one holding merge conflict markers, needs
+    review.
+    """
+    change = FileSample.CONFLICT_MARKERS.change()
+    assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
+
+
 # %% whole files
 
 

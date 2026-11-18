@@ -25,6 +25,7 @@ class FileSample(StrEnum):
 
     BEHAVIOUR_CHANGED = "behaviour-changed"
     CODE_REFORMATTED = "code-reformatted"
+    CONFLICT_MARKERS = "conflict-markers"
     DOCSTRING_REFLOWED = "docstring-reflowed"
     DOCSTRING_REWORDED = "docstring-reworded"
     DOCUMENTATION_IMPORT_MOVED = "documentation-import-moved"
@@ -63,13 +64,13 @@ class FileSample(StrEnum):
 
     def change(self) -> FileVersions:
         """
-        :return: The change from the base to the head version, at a path with their
-            suffix.
+        :return: The change from the base to the head version, at a path with the head
+            version's suffix.
         """
         base = next(self.directory.glob("base.*"))
         head = next(self.directory.glob("head.*"))
         return FileVersions(
-            PurePosixPath(f"sample{base.suffix}"),
+            PurePosixPath(f"sample{head.suffix}"),
             base_text=base.read_text(),
             head_text=head.read_text(),
         )

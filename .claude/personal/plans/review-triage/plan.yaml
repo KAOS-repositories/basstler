@@ -36,9 +36,9 @@ items:
   track: triage
   blockers:
     - >-
-      Awaiting the owner on #215: the secret-model thread (keep the wrapper or have the read pick
-      `name` out), the README thread (does #214 or #215 update the README for the commit range), and
-      the 12 threads from 1c54d6ff. Head 1c627047 merges clean into main 1d8e0471; CI not read.
+      Awaiting the owner on #215: the secret-model thread (recommended keeping the wrapper), the
+      README thread, and any open threads from 1c54d6ff. Head 90303970 merges clean into main
+      f4d1178b; CI not read.
   depends_on: []
   status: blocked
   recommended_model: sonnet

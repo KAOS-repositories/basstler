@@ -90,6 +90,7 @@ def test_occurrences_bound_to_the_renamed_class_are_mechanical(
             PurePosixPath("app/star_imported_unrelated_last.py"),
             PurePosixPath("app/via_api.py"),
             PurePosixPath("docs/notebook.md"),
+            PurePosixPath("docs/notebook_options.md"),
             PurePosixPath("docs/usage.md"),
             PurePosixPath("geometry/api.py"),
             PurePosixPath("geometry/spatial.py"),

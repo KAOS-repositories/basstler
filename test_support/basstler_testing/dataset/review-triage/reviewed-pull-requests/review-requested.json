@@ -1,0 +1,8 @@
+{
+  "total_count": 2,
+  "incomplete_results": false,
+  "items": [
+    {"number": 12, "html_url": "https://github.com/example/project/pull/12"},
+    {"number": 7, "html_url": "https://github.com/example/project/pull/7"}
+  ]
+}

@@ -313,6 +313,19 @@ if SITE_URL="$(recorded_site_url)"; then
       check-access 2>/dev/null)" && [ -n "${SITE_ACCESS}" ]; then
     SUMMARY_HUB="$(printf '%s\n    %s' "${SUMMARY_HUB}" "${SITE_ACCESS}")"
   fi
+  # A merge workflow older than this release's starts no build for some pull request
+  # changes, so it is proposed again now and the pull request to merge is said here.
+  if MERGE_WORKFLOW_REFRESH="$("${BASSTLER_PYTHON}" \
+      -m "${PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE}" 2>&1)"; then
+    MERGE_WORKFLOW_REFRESH_LINE="${MERGE_WORKFLOW_REFRESH}"
+  else
+    MERGE_WORKFLOW_REFRESH_LINE="$(merge_workflow_refresh_line_failed \
+      "$(printf '%s\n' "${MERGE_WORKFLOW_REFRESH}" | tail -n 1)" \
+      "\"\${BASSTLER_PYTHON}\" -m ${PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE}")"
+  fi
+  if [ -n "${MERGE_WORKFLOW_REFRESH_LINE}" ]; then
+    SUMMARY_HUB="$(printf '%s\n    %s' "${SUMMARY_HUB}" "${MERGE_WORKFLOW_REFRESH_LINE}")"
+  fi
 fi
 
 if [ "${WROTE_ANYTHING}" = "1" ]; then

@@ -185,4 +185,12 @@ items:
   depends_on: []
   status: not started
   recommended_model: opus
+
+- id: repository-field-once
+  title: "Declare the repository field once in every GitHub model"
+  branch: null
+  track: triage
+  depends_on: []
+  status: not started
+  recommended_model: sonnet
 landed_item_count: 1

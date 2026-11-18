@@ -7,15 +7,17 @@
 # fetch the pull requests into; later runs reuse both.
 #
 # Usage:
+#   review-triage.sh <pull request URL> [--mark-viewed] [-- <option>...]
 #   review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]
 #
 #   or, without downloading it first:
 #   curl -fsSL https://raw.githubusercontent.com/KAOS-repositories/basstler/main/scripts/review-triage.sh \
-#       | bash -s -- <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]
+#       | bash -s -- https://github.com/<owner>/<name>/pull/<number> --mark-viewed -- --from-merge-base
 #
 #   To run an unmerged basstler branch, put its name in place of main in the URL and
 #   set BASSTLER_REF to it.
 #
+#   <pull request URL>     triage this pull request; <owner>/<name>#<number> works too
 #   <pull request number>  triage only this pull request; every open one when left out
 #   --mark-viewed          also mark the mechanical files viewed for your GitHub account
 #   -- <option>...         passed on to `basstler review-triage`, such as --from-merge-base,
@@ -41,7 +43,8 @@ fail() {
 }
 
 usage() {
-    printf 'usage: review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]\n' >&2
+    printf 'usage: review-triage.sh <pull request URL> [--mark-viewed] [-- <option>...]\n' >&2
+    printf '   or: review-triage.sh <owner>/<name> [<pull request number>] [--mark-viewed] [-- <option>...]\n' >&2
     exit 2
 }
 
@@ -73,6 +76,12 @@ while (($#)); do
     esac
     shift
 done
+if [[ -z "$pull_request" && (
+    "$repository" =~ ^https?://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/([0-9]+)([/?#].*)?$ ||
+    "$repository" =~ ^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#([0-9]+)$ ) ]]; then
+    repository="${BASH_REMATCH[1]}"
+    pull_request="${BASH_REMATCH[2]}"
+fi
 [[ "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || usage
 [[ -z "$pull_request" || "$pull_request" =~ ^[0-9]+$ ]] ||
     fail "the pull request must be a number, not $pull_request"
@@ -107,8 +116,11 @@ system_python() {
 
 install_basstler() {
     local commit stamp package python
-    commit="$(git ls-remote "$basstler_repository" "$reference" | head -n 1 | cut -f 1)"
-    commit="${commit:-$reference}"
+    commit="$reference"
+    if [[ ! "$reference" =~ ^[0-9a-f]{40}$ ]]; then
+        commit="$(git ls-remote "$basstler_repository" "$reference" | head -n 1 | cut -f 1)"
+        commit="${commit:-$reference}"
+    fi
     stamp="$environment/.basstler-commit"
     if [[ -f "$stamp" && "$(cat "$stamp")" == "$commit" ]]; then
         return
@@ -130,10 +142,17 @@ install_basstler() {
 
 # %% the repository's clone and pull requests
 
+# basstler falls back to the clone's origin for the repositories it is not given.
 prepare_clone() {
+    local remote_url="https://github.com/$repository.git"
     if [[ ! -d "$clone/.git" ]]; then
         mkdir -p "$clone"
         git -C "$clone" init --quiet
+    fi
+    if git -C "$clone" remote get-url origin >/dev/null 2>&1; then
+        git -C "$clone" remote set-url origin "$remote_url"
+    else
+        git -C "$clone" remote add origin "$remote_url"
     fi
 }
 

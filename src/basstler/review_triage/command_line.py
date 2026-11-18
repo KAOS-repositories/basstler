@@ -402,6 +402,7 @@ def set_up_mark_viewed(
     repository: str | None = None,
     branch_or_tag: str = BasstlerProject.default_branch.name,
     on_every_pull_request: bool = False,
+    in_reviews_schedule: str | None = None,
 ) -> ReviewTriageExitCode:
     """
     Set a repository's Actions up to mark files viewed, as far as a command can, and
@@ -414,6 +415,9 @@ def set_up_mark_viewed(
     :param branch_or_tag: The basstler branch or tag the installed workflow runs.
     :param on_every_pull_request: Also run it for every pull request opened or updated
         on the workflow repository, which then defaults to the pull requests'.
+    :param in_reviews_schedule: A cron schedule, in UTC, on which it also runs for
+        every open pull request on the pull requests' repository that the token's
+        owner reviews, each since its last review there.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     git = GitCommandRunner(Path.cwd())
@@ -424,6 +428,7 @@ def set_up_mark_viewed(
         Repository.parse(repository) if repository else None,
         branch_or_tag,
         on_every_pull_request,
+        in_reviews_schedule,
     )
     logger.info(setup.run(GitHubRestClient()))
     return ReviewTriageExitCode.SUCCESS

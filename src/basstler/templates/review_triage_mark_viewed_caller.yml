@@ -22,6 +22,12 @@ on:
   pull_request_target:
     types: [opened, reopened, synchronize, ready_for_review]
 {% endif %}
+{% if in_reviews_schedule %}
+  # On a schedule, every open pull request that asks the token's owner for a review or
+  # that it reviewed, each since its last review there.
+  schedule:
+    - cron: "{{ in_reviews_schedule }}"
+{% endif %}
 
 concurrency:
   group: mark-viewed-{{ '${{' }} inputs.pull_request || github.event.pull_request.number {{ '}}' }}
@@ -36,7 +42,11 @@ jobs:
     with:
       basstler_branch_or_tag: {{ branch_or_tag }}
       pull_request: {{ '${{' }} format('{0}', inputs.pull_request || github.event.pull_request.number) {{ '}}' }}
+{% if in_reviews_schedule and pull_request_repository %}
+      repository: {{ '${{' }} inputs.repository || '{{ pull_request_repository.full_name }}' {{ '}}' }}
+{% else %}
       repository: {{ '${{' }} inputs.repository || github.repository {{ '}}' }}
+{% endif %}
       started_by_person: {{ '${{' }} github.event_name == 'workflow_dispatch' {{ '}}' }}
     secrets:
       viewer_token: {{ '${{' }} secrets.{{ token_secret }} {{ '}}' }}

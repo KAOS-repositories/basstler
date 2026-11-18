@@ -9,6 +9,7 @@ from http import HTTPStatus
 from typing import Any
 
 import pytest
+import yaml
 
 from basstler.git.branch import Branch
 from basstler.github.actions_settings import (
@@ -536,6 +537,65 @@ def test_a_fork_cannot_run_on_its_parent_s_pull_requests():
     assert [
         step.state for step in setup.steps if UPSTREAM.full_name in step.reason
     ] == [SetupState.LEFT_TO_USER]
+
+
+# %% every pull request the token's owner reviews, on a schedule
+
+SCHEDULE = "41 6 * * 1"
+"""
+The schedule the reviewer asks the workflow to run on.
+"""
+
+
+def caller_triggers(setup: MarkViewedSetup) -> dict[str, Any]:
+    """
+    :param setup: The setup whose caller workflow is read.
+    :return: The events the caller workflow runs on, by name.
+    """
+    workflow = yaml.safe_load(setup.caller_workflow)
+    # YAML 1.1 reads the bare key "on" as true.
+    return workflow[True]
+
+
+def test_the_workflow_runs_on_a_schedule_only_when_asked():
+    """
+    A schedule is added for marking the reviews, and only then.
+    """
+    schedules = [
+        caller_triggers(
+            MarkViewedSetup(FORK, UPSTREAM, in_reviews_schedule=schedule)
+        ).get("schedule")
+        for schedule in (None, SCHEDULE)
+    ]
+    assert schedules == [None, [{"cron": SCHEDULE}]]
+
+
+def test_a_scheduled_run_marks_the_reviews_on_the_pull_request_repository():
+    """
+    A run the schedule starts names no pull request, so the reusable workflow marks
+    every one the token's owner reviews on the pull request repository.
+    """
+    setup = MarkViewedSetup(FORK, UPSTREAM, in_reviews_schedule=SCHEDULE)
+
+    (job,) = yaml.safe_load(setup.caller_workflow)["jobs"].values()
+
+    assert job["with"]["repository"] == (
+        f"${{{{ inputs.repository || '{UPSTREAM.full_name}' }}}}"
+    )
+
+
+def test_the_reusable_workflow_takes_a_run_naming_no_pull_request():
+    """
+    The pull request is optional, since a scheduled run names none.
+    """
+    reusable = yaml.safe_load(
+        (
+            RepositoryLocation.ROOT / WorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED
+        ).read_text()
+    )
+    pull_request = reusable[True]["workflow_call"]["inputs"]["pull_request"]
+
+    assert (pull_request["required"], pull_request["default"]) == (False, "")
 
 
 # %% one token for several jobs

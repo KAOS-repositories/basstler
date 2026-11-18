@@ -2258,15 +2258,19 @@ class UnsetUpClient(PullRequestOpeningClient):
         return GitHubResponse(None, failure=refusal_of(path, HTTPStatus.NOT_FOUND))
 
 
-def published_marking_viewed(published: Publishing):
+def published_marking_viewed(published: Publishing, in_reviews: str | None = None):
     """
     :param published: A notes repository published once, without marking files viewed.
+    :param in_reviews: The schedule on which the pull requests its owner reviews are
+        marked too, ``None`` for none.
     :return: The report of publishing it again, also setting up marking files viewed.
     """
     runs = published.runs_none()
     client = UnsetUpClient(runs.responses, opened=runs.opened, refusals=runs.refusals)
     return replace(
-        published.publication(client), mark_viewed_on=published.notes_repository
+        published.publication(client),
+        mark_viewed_on=published.notes_repository,
+        mark_viewed_in_reviews_schedule=in_reviews,
     ).publish()
 
 
@@ -2306,3 +2310,15 @@ def test_the_shared_token_is_stored_as_both_secrets(published):
 def test_marking_files_viewed_is_reported_after_the_plan_site(published):
     report = published_marking_viewed(published)
     assert report.render().endswith(report.mark_viewed_report)
+
+
+@pytest.mark.parametrize("in_reviews", [None, "41 6 * * 1"])
+def test_the_pull_requests_the_owner_reviews_are_set_up_only_when_asked(
+    published, in_reviews: str | None
+):
+    """
+    The notes repository's workflow marks its owner's reviews on the schedule given.
+    """
+    report = published_marking_viewed(published, in_reviews)
+
+    assert report.mark_viewed.in_reviews_schedule == in_reviews

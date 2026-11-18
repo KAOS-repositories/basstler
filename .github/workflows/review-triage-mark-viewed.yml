@@ -6,9 +6,10 @@ name: Review triage mark viewed
 # (basstler review-triage mark-viewed falls back to it; request-mark-viewed asks
 # directly).
 #
-# Reusable: a repository calls it from a dispatch-only workflow of its own, which
+# Reusable: a repository calls it from a workflow of its own, which
 # basstler review-triage set-up-mark-viewed installs and which passes the token stored
-# in its REVIEW_TRIAGE_VIEWER_TOKEN secret.
+# in its REVIEW_TRIAGE_VIEWER_TOKEN secret. A run naming no pull request, as a scheduled
+# one, marks every open pull request the token's owner reviews.
 
 on:
   workflow_call:
@@ -18,8 +19,9 @@ on:
         required: true
         type: string
       pull_request:
-        description: "The number of the pull request whose files to mark"
-        required: true
+        description: "The number of the pull request whose files to mark; none marks every open one the token's owner reviews"
+        required: false
+        default: ""
         type: string
       repository:
         description: "The owner/name repository the pull request is opened on"
@@ -108,6 +110,12 @@ jobs:
           GH_TOKEN: ${{ secrets.viewer_token }}
           PULL_REQUEST: ${{ inputs.pull_request }}
           REPOSITORY: ${{ inputs.repository }}
-        run: >-
-          python -m basstler review-triage mark-viewed "$PULL_REQUEST"
-          --repository "$REPOSITORY" --directly >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          set -euo pipefail
+          if [ -z "$PULL_REQUEST" ]; then
+            python -m basstler review-triage mark-viewed-in-reviews \
+              --repository "$REPOSITORY" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python -m basstler review-triage mark-viewed "$PULL_REQUEST" \
+            --repository "$REPOSITORY" --directly >> "$GITHUB_STEP_SUMMARY"

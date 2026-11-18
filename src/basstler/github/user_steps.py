@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from basstler.github.workflows import RepositoryWorkflow
-from basstler.github.repository import Repository, RepositoryMember
+from basstler.github.repository import Repository, HasRepository
 
 # %% a step
 
@@ -52,7 +52,7 @@ class UserStep(ABC):
 
 
 @dataclass(frozen=True)
-class AllowActions(RepositoryMember, UserStep):
+class AllowActions(HasRepository, UserStep):
     """
     Allowing a repository to run Actions.
     """
@@ -80,7 +80,7 @@ class AllowActions(RepositoryMember, UserStep):
 
 
 @dataclass(frozen=True)
-class EnableWorkflow(RepositoryWorkflow, RepositoryMember, UserStep):
+class EnableWorkflow(RepositoryWorkflow, HasRepository, UserStep):
     """
     Enabling one disabled workflow of a repository.
     """

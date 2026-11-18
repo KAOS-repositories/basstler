@@ -54,7 +54,7 @@ def test_a_secret_read_gives_the_secret_it_asked_for():
     secret = ReviewTriageSecret.VIEWER_TOKEN
     client = PathAnsweringClient({secret.path_on(REPOSITORY): {"name": secret.value}})
     reading = ActionsSecretRead(REPOSITORY, secret).attempt(client)
-    assert reading.resource.name is secret
+    assert reading.resource.secret is secret
 
 
 def test_a_secret_read_refuses_a_name_of_another_kind():

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import TypeAdapter
+from pydantic import Field, TypeAdapter
 
 from basstler.class_property import classproperty
 from basstler.github.workflows import RepositoryWorkflow
@@ -130,9 +130,9 @@ class StoredSecretMetadata[Secret: ActionsSecret](ValidatedJSONModel):
     One Actions secret a repository stores, as GitHub describes it without its value.
     """
 
-    name: Secret
+    secret: Annotated[Secret, Field(alias="name")]
     """
-    The secret.
+    The secret, which GitHub names it by.
     """
 
 

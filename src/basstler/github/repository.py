@@ -445,7 +445,7 @@ class Repository:
 
 
 @dataclass(frozen=True)
-class RepositoryMember:
+class HasRepository:
     """
     Something that belongs to one GitHub repository.
     """
@@ -457,7 +457,7 @@ class RepositoryMember:
 
 
 @dataclass(frozen=True)
-class RepositoryBranch(RepositoryMember, Branch):
+class RepositoryBranch(HasRepository, Branch):
     """
     A branch of one GitHub repository.
     """
@@ -481,7 +481,7 @@ class RepositoryBranch(RepositoryMember, Branch):
 
 
 @dataclass(frozen=True)
-class PullRequestReference(RepositoryMember):
+class PullRequestReference(HasRepository):
     """
     One pull request, named by the repository it is opened on and its number.
 

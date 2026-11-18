@@ -87,6 +87,43 @@ class ItemStatus(StrEnum):
         return cls.underscore_spellings().get(value)
 
 
+class DependencyRelease(StrEnum):
+    """
+    What of a dependency an item waits for before it can start.
+    """
+
+    READY_FOR_REVIEW = "ready for review"
+    """
+    The dependency's pull request is out of draft, or merged.
+    """
+
+    MERGED = "merged"
+    """
+    The dependency is merged or done.
+    """
+
+    PUSHES_DONE = "pushes done"
+    """
+    The dependency's pull request still points at the commit its pushes ended at.
+    """
+
+
+class Performer(StrEnum):
+    """
+    Who carries a plan item out.
+    """
+
+    SESSION = "session"
+    """
+    A session, on a branch with a pull request.
+    """
+
+    OWNER = "owner"
+    """
+    The plan's owner, by hand: a step no session's credential can take.
+    """
+
+
 # %% the vocabulary a plan manifest is written in
 
 
@@ -346,6 +383,22 @@ class ManifestKey(KeySpecification, Enum):
     The items this one stacks on, by id.
     """
 
+    DEPENDS_ON_MERGED = ("depends_on_merged", ValueStyle.SEQUENCE)
+    """
+    The entries of :attr:`DEPENDS_ON` that must be merged before the item starts.
+    """
+
+    DEPENDS_ON_PUSHES_DONE = ("depends_on_pushes_done", ValueStyle.SEQUENCE)
+    """
+    The entries of :attr:`DEPENDS_ON` whose pushes must be done, though still drafts,
+    before the item starts.
+    """
+
+    PUSHES_DONE_AT = ("pushes_done_at",)
+    """
+    The commit an item's pull request takes no more pushes after.
+    """
+
     STATUS = ("status",)
     """
     The session's own planning assessment - see :class:`ItemStatus`.
@@ -369,6 +422,26 @@ class ManifestKey(KeySpecification, Enum):
     BLOCKERS = ("blockers", ValueStyle.SEQUENCE)
     """
     Why the item is stuck, written as a sequence.
+    """
+
+    PERFORMED_BY = ("performed_by",)
+    """
+    Who carries the item out - see :class:`Performer`.
+    """
+
+    COMMANDS = ("commands", ValueStyle.SEQUENCE)
+    """
+    The commands that carry out an item its owner performs, in order.
+    """
+
+    DONE_WHEN = ("done_when", ValueStyle.SEQUENCE)
+    """
+    The arguments of the basstler command whose success means the item is done.
+    """
+
+    DECISION = ("decision",)
+    """
+    What the item asks its owner to decide - see :class:`~basstler.plan.decision.Decision`.
     """
 
     ITEMS = ("items",)
@@ -603,16 +676,30 @@ class PlanItem:
     def without_dependencies(self, identifiers: set[str]) -> PlanItem:
         """
         :param identifiers: Item ids to stop depending on.
-        :return: This item with every dependency on *identifiers* removed.
+        :return: This item with every dependency on *identifiers* removed, from each
+            of its dependency lists.
         """
         if not identifiers & set(self.dependencies):
             return self
-        remaining = [
-            dependency
-            for dependency in self.dependencies
-            if dependency not in identifiers
-        ]
-        return PlanItem({**self.content, ManifestKey.DEPENDS_ON.key: remaining})
+        dependency_keys = (
+            ManifestKey.DEPENDS_ON,
+            ManifestKey.DEPENDS_ON_MERGED,
+            ManifestKey.DEPENDS_ON_PUSHES_DONE,
+        )
+        return PlanItem(
+            {
+                **self.content,
+                **{
+                    key.key: [
+                        dependency
+                        for dependency in self.content[key.key]
+                        if dependency not in identifiers
+                    ]
+                    for key in dependency_keys
+                    if self.content.get(key.key) is not None
+                },
+            }
+        )
 
 
 class ItemSummaryKey(StrEnum):

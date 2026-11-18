@@ -1,0 +1,41 @@
+schema_version: 1
+id: site-setup
+title: Publish the plan site
+description: A plan whose middle step only its owner can perform.
+default_repository: example/site
+waves:
+- id: setup
+  name: Setup
+tracks:
+- id: publication
+  name: Publication
+  wave: setup
+items:
+- id: build-workflow
+  title: Add the workflow that builds the site
+  track: publication
+  branch: build-workflow
+  pull_request_number: 11
+  status: in progress
+  recommended_model: sonnet
+- id: store-token
+  title: Store the site token as a repository secret
+  track: publication
+  performed_by: owner
+  commands:
+  - gh secret set PLAN_SITE_TOKEN --repo example/site
+  - gh workflow run plan-site.yml --repo example/site
+  done_when:
+  - plan-site
+  - published
+  - example/site
+  depends_on:
+  - build-workflow
+  status: not started
+- id: verify-site
+  title: Check the published site against the plans
+  track: publication
+  depends_on:
+  - store-token
+  status: not started
+  recommended_model: haiku

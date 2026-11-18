@@ -416,6 +416,22 @@ if MAIN_FAILURE_ISSUE="$("${BASSTLER_PYTHON}" -m "${MAIN_FAILURE_MODULE}" show \
   fi
 fi
 
+# Goals: how far each goal on the notes branch is and the command that comes next, so a
+# session starts from the path instead of rediscovering it. Never fatal.
+SUMMARY_GOALS="$(goals_line_not_checked)"
+if GOALS_REPORT="$("${BASSTLER_PYTHON}" -m basstler goal summary 2>/dev/null)"; then
+  if [ -z "${GOALS_REPORT}" ]; then
+    SUMMARY_GOALS="$(goals_line_none)"
+  else
+    SUMMARY_GOALS="$(goals_line_listed "${GOALS_REPORT}")"
+  fi
+fi
+
+# The session record the stop hook reads starts here, at the checked-out commit; a
+# clone that already has one keeps it. Never fatal.
+"${BASSTLER_PYTHON}" -m basstler session-close begin \
+  || echo "Starting the session record failed; the error is above." >&2
+
 # Setup verdict from check-setup.sh, run last so it sees what this run wrote.
 SUMMARY_SETUP="$(setup_line_not_checked "${CHECK_SETUP_SCRIPT}")"
 if [ -f "${CHECK_SETUP_SCRIPT}" ]; then
@@ -450,6 +466,7 @@ session-start.sh summary:
   reviews Action:  ${SUMMARY_UPSTREAM_REVIEWS_ACTION}
   Actions usage:   ${SUMMARY_ACTIONS_USAGE}
   main tests:      ${SUMMARY_MAIN_TESTS}
+  goals:           ${SUMMARY_GOALS}
   setup:           ${SUMMARY_SETUP}
   plan state SHA:  $(last_recorded_plan_state_sha) (run plan-updates-since.sh <plan-id> to recheck from here later)
 SUMMARY

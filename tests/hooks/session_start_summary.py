@@ -109,6 +109,11 @@ class SummaryLine(StrEnum):
     Whether an issue reports the default branch's tests failing.
     """
 
+    GOALS = "goals"
+    """
+    How far each goal on the notes branch is and the command that comes next.
+    """
+
     PLAN_STATE_SHA = "plan state SHA"
     """
     The personal-notes commit this clone read plan state at.
@@ -357,6 +362,21 @@ class SummaryMessage(StrEnum):
     ACTIONS_USAGE_WITHIN_BUDGET = "actions_usage_line_within_budget"
     """
     No workflow is near a daily ceiling.
+    """
+
+    GOALS_NOT_CHECKED = "goals_line_not_checked"
+    """
+    The goals or the plans they span could not be read.
+    """
+
+    GOALS_NONE = "goals_line_none"
+    """
+    The notes branch holds no goal.
+    """
+
+    GOALS_LISTED = "goals_line_listed"
+    """
+    Each goal's progress and next command.
     """
 
     MAIN_TESTS_NOT_CHECKED = "main_tests_line_not_checked"

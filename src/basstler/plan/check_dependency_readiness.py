@@ -11,6 +11,7 @@ from typing import Any
 
 from basstler.github.pull_request_state import LivePullRequests
 from basstler.plan.dependencies import Dependency, DependencyResolver, PlanDirectory
+from basstler.plan.model import DependencyRelease
 from basstler.plan.structure import Plan
 
 
@@ -42,6 +43,18 @@ class DependencyReadiness:
     The dependency, with its live state already classified.
     """
 
+    release: DependencyRelease = DependencyRelease.READY_FOR_REVIEW
+    """
+    What the dependent waits for of the dependency.
+    """
+
+    @property
+    def is_ready(self) -> bool:
+        """
+        Whether the dependent can start as far as this dependency goes.
+        """
+        return self.dependency.releases_dependent(self.release)
+
     def to_json(self) -> dict[str, Any]:
         """
         This readiness as the one entry the item brief serializes for it.
@@ -51,9 +64,7 @@ class DependencyReadiness:
             ReadinessField.IDENTIFIER.value: self.dependency.reference.text,
             ReadinessField.TITLE.value: self.dependency.title,
             ReadinessField.LIVE_STATE.value: live_state.value if live_state else None,
-            ReadinessField.IS_READY.value: (
-                self.dependency.is_ready_to_unblock_dependents()
-            ),
+            ReadinessField.IS_READY.value: self.is_ready,
         }
 
     @classmethod
@@ -83,4 +94,7 @@ class DependencyReadiness:
 
         resolver = DependencyResolver(plan=plan, plan_directory=plan_directory)
         resolver.classify_live_states(live_pull_requests)
-        return [cls(dependency) for dependency in resolver.dependencies_of(item)]
+        return [
+            cls(resolver.resolve(entry), item.release_needed_from(entry))
+            for entry in item.depends_on
+        ]

@@ -5,6 +5,7 @@ every :class:`~basstler.plan.exceptions.ValidationProblem` it carries at once.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -14,10 +15,14 @@ import rustworkx
 
 from basstler.plan.exceptions import (
     DependencyCycle,
+    DependsOnMergedNotDependedOn,
+    DependsOnPushesDoneNotDependedOn,
     DuplicateItemId,
     InvalidBlockers,
+    InvalidCommands,
     InvalidDependsOn,
     InvalidLandedItemCount,
+    InvalidPushesDoneAt,
     InvalidManifestRoot,
     InvalidSchemaVersion,
     MalformedDependencyReference,
@@ -28,8 +33,10 @@ from basstler.plan.exceptions import (
     RemovedItemStillNamed,
     SelfPlanReference,
     SharedBranch,
+    UnknownDecision,
     UnknownDependency,
     UnknownDependencyPlan,
+    UnknownPerformer,
     UnknownRecommendedModel,
     UnknownStatus,
     UnknownTrack,
@@ -42,8 +49,15 @@ from basstler.plan.dependencies import (
     PlanDirectory,
     ResolvedDependency,
 )
-from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.decision import Decision
+from basstler.plan.goal import Goal
+from basstler.plan.model import ItemStatus, ManifestKey, Performer
 from basstler.plan.model_alias import ModelAlias
+
+COMMIT_IDENTIFIER = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?")
+"""
+A full git commit id: SHA-1, or SHA-256.
+"""
 
 # %% dependency cycles
 
@@ -60,7 +74,9 @@ class DependencyGraph:
     """
 
     plan_id: Any
-    """The validated plan's own id."""
+    """
+    The validated plan's own id.
+    """
 
     plan_directory: PlanDirectory | None = None
     """
@@ -398,17 +414,21 @@ class PlanValidator:
 
     def removed_item_problems(self) -> list[ValidationProblem]:
         """
-        :return: A problem for each item the save removes that another plan's item
-            still names; none when no save is being checked.
+        :return: A problem for each item the save removes that another plan's item or
+            a goal still names; none when no save is being checked.
         """
         if self.saved_item_identifiers is None or self.plan_directory is None:
             return []
+        goals = Goal.every_goal_in(self.plan_directory.directory)
         problems: list[ValidationProblem] = []
         for identifier in sorted(
             self.saved_item_identifiers - set(self.item_identifiers)
         ):
             reference = DependencyReference(identifier, self.plan_id).text
-            named_by = self.plan_directory.items_naming(reference)
+            named_by = [
+                *self.plan_directory.items_naming(reference),
+                *(goal.identifier for goal in goals if reference in goal.targets),
+            ]
             if named_by:
                 problems.append(RemovedItemStillNamed(reference, named_by))
         return problems
@@ -439,8 +459,24 @@ class PlanValidator:
             problems.append(
                 UnknownStatus(item_identifier, item.get(ManifestKey.STATUS.key))
             )
+        performed_by = item.get(ManifestKey.PERFORMED_BY.key, Performer.SESSION)
+        if performed_by not in list(Performer):
+            problems.append(UnknownPerformer(item_identifier, performed_by))
+        decision = item.get(ManifestKey.DECISION.key)
+        if decision is not None and decision not in list(Decision):
+            problems.append(UnknownDecision(item_identifier, decision))
+        for command_key in (ManifestKey.COMMANDS.key, ManifestKey.DONE_WHEN.key):
+            commands = item.get(command_key) or []
+            if not isinstance(commands, list) or not all(
+                isinstance(command, str) for command in commands
+            ):
+                problems.append(InvalidCommands(item_identifier, command_key))
         recommended_model = item.get(ManifestKey.RECOMMENDED_MODEL.key)
-        if recommended_model is None and self.is_new_item(item_identifier):
+        if (
+            recommended_model is None
+            and performed_by != Performer.OWNER
+            and self.is_new_item(item_identifier)
+        ):
             problems.append(MissingRecommendedModel(item_identifier))
         elif recommended_model is not None and recommended_model not in list(
             ModelAlias
@@ -456,6 +492,32 @@ class PlanValidator:
                 if (problem := self.dependency_problem(item_identifier, entry))
                 is not None
             )
+        depends_on_merged = item.get(ManifestKey.DEPENDS_ON_MERGED.key) or []
+        if not isinstance(depends_on_merged, list) or not all(
+            isinstance(depends_on, list) and entry in depends_on
+            for entry in depends_on_merged
+        ):
+            problems.append(
+                DependsOnMergedNotDependedOn(item_identifier, depends_on_merged)
+            )
+        depends_on_pushes_done = item.get(ManifestKey.DEPENDS_ON_PUSHES_DONE.key) or []
+        if not isinstance(depends_on_pushes_done, list) or not all(
+            isinstance(depends_on, list)
+            and entry in depends_on
+            and entry not in depends_on_merged
+            for entry in depends_on_pushes_done
+        ):
+            problems.append(
+                DependsOnPushesDoneNotDependedOn(
+                    item_identifier, depends_on_pushes_done
+                )
+            )
+        pushes_done_at = item.get(ManifestKey.PUSHES_DONE_AT.key)
+        if pushes_done_at is not None and not (
+            isinstance(pushes_done_at, str)
+            and COMMIT_IDENTIFIER.fullmatch(pushes_done_at)
+        ):
+            problems.append(InvalidPushesDoneAt(item_identifier, pushes_done_at))
         blockers = item.get(ManifestKey.BLOCKERS.key)
         if blockers is not None and not isinstance(blockers, list):
             problems.append(InvalidBlockers(item_identifier, type(blockers)))

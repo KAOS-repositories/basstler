@@ -1,6 +1,6 @@
 ---
 name: plan-item-resolve
-description: Resolve what stalls an underway plan item - conflicts, CI, review threads, tracking-issue discussion - on its existing branch, per the execution mode. Invoke as "/plan-item-resolve {plan-id} {item-id}" or "/plan-item-resolve {pull-request-number}". Use from a plan page's Resolve/Resume/Reconsider link or when asked to resolve, unblock or resume an item.
+description: Resolve what stalls an underway plan item - conflicts, CI, review threads, tracking-issue discussion - on its existing branch, per the execution mode. Invoke as "/plan-item-resolve {plan-id} {item-id} [{context}]" or "/plan-item-resolve {pull-request-number}". Use from a plan page's Resolve/Resume/Reconsider link or when asked to resolve, unblock or resume an item.
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, AskUserQuestion, Skill, EnterPlanMode, ExitPlanMode, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__issue_read, mcp__github__get_file_contents, mcp__github__update_pull_request, mcp__claude-code-remote__subscribe_pr_activity
 ---
 
@@ -31,6 +31,13 @@ This skill never creates a branch or a pull request — the item already has
 both, and an item that has neither belongs to `plan-item-kickoff`. Every
 invocation starts fresh in the current session; it does not try to detect or
 resume any other session.
+
+## 0. Keep what was said with the invocation
+
+Text given after the ids is the user's context for this run, and exists nowhere else. Before
+anything else, add it to the item's `notes` in the user's own words (rewrite the notes to
+stay within the size limit, never drop the new text) and save the plan. Step 1 then reads
+it back like any other note.
 
 ## 1. Gather the item's context
 
@@ -176,7 +183,9 @@ item is already underway rather than being started:
 - **The record is an update, not a first draft.** Rewrite the item's
   `blockers`, `notes` and `status` to say what is true now - replacing a
   blocker whose recorded cause turned out to be wrong rather than adding to
-  it - and refresh the PR-progress note (`save-pr-progress.sh --branch <the
+  it. Set `status: blocked` when a session must act next; leave it `in progress` when
+  the item waits on its owner, since a blocker alone never makes it a session's move.
+  Refresh the PR-progress note (`save-pr-progress.sh --branch <the
   item's branch> --source <file>`, as kickoff writes it) and the pull request
   description the same way. What the resolution was, and why, belongs in the pull request,
   not in `roadmap.md`; add a roadmap entry only for a rule every later item
@@ -198,6 +207,12 @@ Push the item's branch, from its checkout, only with
 `"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" maintenance push`: it checks the move
 against a board it exports now and pushes only when that is clear. Any status
 but 0 means nothing was pushed - never follow it with a `git push` of your own.
+
+When another item lists this one under `depends_on_pushes_done` and this push ends the
+work its notes list, record it after the push:
+`"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" __main__ goal pushes-done <plan-id>/<item-id> "$(git rev-parse HEAD)"`.
+A push after a recorded one holds those items back again, so record the new last push
+too (`plan-schema.md`, "Needing a dependency's pushes done").
 
 Once the fix is pushed, carry it into the pull requests stacked on this item's
 branch, which a resolve otherwise leaves holding the state it replaced — follow

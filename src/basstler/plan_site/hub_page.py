@@ -17,6 +17,7 @@ from basstler.github.client import PageParameter
 from basstler.github.repository import GitHubAddress
 from basstler.github.repository_access import ListingParameter, PullRequestListState
 from basstler.locations import SiteTemplate
+from basstler.plan_site.goal_page import GoalSummary
 from basstler.plan.model import ItemStatus
 from basstler.plan.structure import Item, Plan, ProgressStage
 from basstler.plan_site.site_vocabulary import LiveStateVocabulary
@@ -711,6 +712,11 @@ class RepositoryIndexPage(LiveProgressPage):
     The address of the site's :class:`SiteStylesheet`.
     """
 
+    goals: list[GoalSummary] = field(default_factory=list)
+    """
+    The repository's goals, listed above its plans.
+    """
+
     @classproperty
     def template(cls) -> str:
         return SiteTemplate.REPOSITORY_INDEX.name
@@ -721,6 +727,7 @@ class RepositoryIndexPage(LiveProgressPage):
         """
         return self.render_template(
             repository=self.repository,
+            goals=self.goals,
             hub_url=self.hub_url,
             stylesheet_url=self.stylesheet_url,
         )

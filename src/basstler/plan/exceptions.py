@@ -12,6 +12,8 @@ from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, ManifestToolsExitCode
 from basstler.github.repository import Repository
+from basstler.plan.decision import Decision
+from basstler.plan.model import Performer
 
 if TYPE_CHECKING:
     from basstler.plan.merge import PlanPart
@@ -143,6 +145,81 @@ class UnknownRepositoryRuleError(DataclassException, LookupError):
         return f"Use one of: {', '.join(self.known_identifiers) or 'none yet'}."
 
 
+# %% goals
+
+
+@dataclass
+class UnknownGoalError(DataclassException, LookupError):
+    """
+    Raised when a goal is asked for that the notes branch does not hold.
+    """
+
+    identifier: str
+    """
+    The id that was asked for.
+    """
+
+    known_identifiers: tuple[str, ...]
+    """
+    The ids of the goals the notes branch holds, sorted.
+    """
+
+    def error_message(self) -> str:
+        return f"the notes branch holds no goal {self.identifier!r}"
+
+    def suggest_correction(self) -> str:
+        return f"Use one of: {', '.join(self.known_identifiers) or 'none yet'}."
+
+
+@dataclass
+class StepReferenceWithoutPlanError(DataclassException, ValueError):
+    """
+    Raised when a step is named without the plan holding it.
+    """
+
+    step: str
+    """
+    The step as it was given.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.step!r} does not name a step with its plan"
+
+    def suggest_correction(self) -> str:
+        return "Name the step as <plan-id>/<item-id>."
+
+
+@dataclass
+class UnresolvedGoalReferenceError(DataclassException, LookupError):
+    """
+    Raised when a goal's path reaches a reference that names no item of any plan.
+    """
+
+    goal_identifier: str
+    """
+    The goal whose path was being computed.
+    """
+
+    reference_text: str
+    """
+    The reference that names nothing, as ``<plan-id>/<item-id>``.
+    """
+
+    named_by: str
+    """
+    What names it: the goal's targets, or the item whose ``depends_on`` holds it.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"goal {self.goal_identifier!r} needs {self.reference_text!r}, named by "
+            f"{self.named_by}, which is no item of any plan"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Name an existing item as <plan-id>/<item-id>, or remove the reference."
+
+
 # %% plan validation
 
 
@@ -265,32 +342,6 @@ class SharedBranch(ValidationProblem):
             "Keep the branch on the one item that owns it; fold each other item into "
             "it, or leave the branch off that item and say in its notes that it lands "
             "there."
-        )
-
-
-@dataclass
-class RemovedItemStillNamed(ValidationProblem):
-    """
-    A save removes an item that another plan's item still names.
-    """
-
-    reference_text: str
-    """
-    The removed item, as ``<plan-id>/<item-id>``.
-    """
-
-    named_by: list[str]
-    """
-    Each other plan's item naming it, as ``<plan-id>/<item-id>``.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.reference_text!r} is removed but still named by {self.named_by}"
-
-    def suggest_correction(self) -> str:
-        return (
-            "point each of them at the item's new <plan-id>/<item-id>, or drop it "
-            "there, and save them before removing it; mark a finished item done instead"
         )
 
 
@@ -426,6 +477,187 @@ class InvalidBlockers(ValidationProblem):
 
     def error_message(self) -> str:
         return f"item {self.item_identifier!r} blockers must be a list, got {self.actual_type.__name__}"
+
+
+@dataclass
+class DependsOnMergedNotDependedOn(ValidationProblem):
+    """
+    An item's ``depends_on_merged`` isn't a list of entries of its ``depends_on``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    depends_on_merged: Any
+    """
+    Whatever ``depends_on_merged`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} depends_on_merged must list entries of its "
+            f"depends_on, got {self.depends_on_merged!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "list each entry under depends_on as well, spelled the same"
+
+
+@dataclass
+class DependsOnPushesDoneNotDependedOn(ValidationProblem):
+    """
+    An item's ``depends_on_pushes_done`` isn't a list of entries of its ``depends_on``
+    that are not under ``depends_on_merged``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    depends_on_pushes_done: Any
+    """
+    Whatever ``depends_on_pushes_done`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} depends_on_pushes_done must list entries of "
+            f"its depends_on not under depends_on_merged, got "
+            f"{self.depends_on_pushes_done!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "list each entry under depends_on as well, and under at most one of "
+            "depends_on_merged and depends_on_pushes_done"
+        )
+
+
+@dataclass
+class InvalidPushesDoneAt(ValidationProblem):
+    """
+    An item's ``pushes_done_at`` isn't a full commit id.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    pushes_done_at: Any
+    """
+    Whatever ``pushes_done_at`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} pushes_done_at must be a full commit id, "
+            f"got {self.pushes_done_at!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "record the id git rev-parse HEAD prints after the item's last push"
+
+
+@dataclass
+class RemovedItemStillNamed(ValidationProblem):
+    """
+    A save removes an item that another plan's item or a goal still names.
+    """
+
+    reference_text: str
+    """
+    The removed item, as ``<plan-id>/<item-id>``.
+    """
+
+    named_by: list[str]
+    """
+    Each other plan's item, as ``<plan-id>/<item-id>``, and each goal naming it.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.reference_text!r} is removed but still named by {self.named_by}"
+
+    def suggest_correction(self) -> str:
+        return (
+            "point each of them at the item's new <plan-id>/<item-id>, or drop it "
+            "there, and save them before removing it; mark a finished item done instead"
+        )
+
+
+@dataclass
+class UnknownPerformer(ValidationProblem):
+    """
+    An item's ``performed_by`` isn't one of :class:`Performer`'s values.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    performed_by: Any
+    """
+    Whatever ``performed_by`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} has unknown performed_by "
+            f"{self.performed_by!r}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "set performed_by to one of: " + ", ".join(Performer)
+
+
+@dataclass
+class UnknownDecision(ValidationProblem):
+    """
+    An item's ``decision`` isn't one of :class:`Decision`'s values.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    decision: Any
+    """
+    Whatever ``decision`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return f"item {self.item_identifier!r} has unknown decision {self.decision!r}"
+
+    def suggest_correction(self) -> str:
+        return "set decision to one of: " + ", ".join(Decision)
+
+
+@dataclass
+class InvalidCommands(ValidationProblem):
+    """
+    An item's ``commands`` or ``done_when`` isn't a list of strings.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    manifest_key: str
+    """
+    The key whose value is not a list of strings.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} {self.manifest_key} must be a list of "
+            "strings"
+        )
 
 
 @dataclass

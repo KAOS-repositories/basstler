@@ -1,0 +1,21 @@
+schema_version: 1
+id: review-experiment
+title: Try a new review flow
+description: A plan whose last step is its owner's verdict on an experiment.
+default_repository: example/site
+waves:
+- id: trial
+  name: Trial
+tracks:
+- id: sandbox
+  name: Sandbox
+  wave: trial
+items:
+- id: verdict
+  title: "Decide the review-flow experiment"
+  track: sandbox
+  performed_by: owner
+  decision: experiment-verdict
+  status: not started
+  notes: |
+    Accept splits the experiment into pull requests, drop closes it.

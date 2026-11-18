@@ -1,0 +1,199 @@
+schema_version: 1
+id: review-triage
+title: 'Review triage: mechanical files proven and marked viewed'
+description: A pull request's files whose change is provably only imports, a PR-wide rename
+  or docstring and comment formatting are classified as mechanical, listed in a CI summary,
+  and marked viewed for the reviewer, so review time goes to the files that changed behaviour.
+default_repository: KAOS-repositories/basstler
+waves:
+- id: triage
+  name: Triage
+tracks:
+- id: triage
+  name: Classify, report and mark viewed
+  wave: triage
+- id: pattern-fixes
+  name: Rule fixes applied and proven mechanical
+  wave: triage
+- id: windows
+  name: The Windows fixes the triage is proven on
+  wave: triage
+items:
+- id: keyword-argument-triage
+  title: Prove keyword-argument conversions mechanical
+  track: triage
+  depends_on:
+  - move-triage
+  status: in progress
+  recommended_model: sonnet
+  branch: ccr-37402cb7-cls5ht-keyword-arguments
+  session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
+  pull_request_number: 214
+  notes: 'Draft #214, stacked on #213: signature-checked keyword-argument judgment, and rename
+    sources for module moves, definitions moved between modules and moved file paths in prose;
+    relative imports resolved per file, templates and empty package initializers judged. CRAM
+    #967: 123 of 154 files mechanical; #210: 233 of 246.
+
+
+    Split: the moves and the general triage go to move-triage; #214 is restacked onto it and
+    keeps keyword_arguments, calls, signatures and tree_matching with their tests and datasets,
+    supplying KeywordArgumentComparison.'
+- id: viewed-marking-workflow
+  title: Mark files viewed on every pull request, from Actions or your own computer
+  track: triage
+  blockers:
+    - >-
+      Mergeable with main at 1c54d6ff; CI there not yet read. REVIEW_TRIAGE_VIEWER_TOKEN is stored
+      per the user (not checked: unreadable from a cloud session). #219 (stacked) conflicts in
+      token_form.py, site_repository.py, user_steps.py, test_site_repository.py.
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet
+  branch: ccr-37402cb7-cls5ht-viewed-workflow
+  session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
+  pull_request_number: 215
+  notes: >
+    Draft #215, now on main (#213 merged): set-up-mark-viewed installs the workflow (on every pull
+    request with --on-every-pull-request), turns Actions on for forks and lists the token steps
+    left; mark-viewed falls back to Actions and names both routes and the README when neither works.
+    The user says the token is stored (not checked from a cloud session).
+
+    #221 merges only after #215: #221's mark-viewed.yml calls #215's reusable
+    review-triage-mark-viewed.yml.
+- id: rule-fixes
+  title: Declare reversible fixes on code rules and apply them with code-rules fix
+  track: pattern-fixes
+  status: in progress
+  recommended_model: opus
+  branch: claude/pattern-checkers-mechanical-marking-arg9pe
+  session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
+  pull_request_number: 222
+  notes: 'Draft #222, stacked on #220. basstler.code_modification (specifications, NodeReplacement
+    with exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
+    SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107 of #220''s 129 .py files;
+    examples under tests/dataset/rule-fixes tested automatically.
+
+    '
+- id: directory-and-bash-fixes
+  title: Fixes for directory removal and bash started by name
+  track: pattern-fixes
+  branch: claude/kind-bohr-db512e
+  pull_request_number: 227
+  session: https://claude.ai/code/session_018wfiv9JCt7E3PATWtKuv68
+  depends_on:
+  - rule-fixes
+  status: in progress
+  recommended_model: sonnet
+  notes: rmtree(x) becomes DirectoryTree(x).remove(); with ignore_errors=True the fix keeps
+    ignoring errors through a declared DirectoryTree option, unless the rule wants it to raise,
+    and declares that. Bash.locate fix only where an environment is in scope.
+- id: rule-fix-triage
+  title: Prove a file mechanical when recomputing a rule's fix on the base reproduces the head
+  track: pattern-fixes
+  depends_on:
+  - move-triage
+  - rule-fixes
+  status: not started
+  recommended_model: opus
+  notes: 'Done when #220''s rule-fix files (107 of 129 from the UTF-8 fix) are marked mechanical,
+    run from this item''s branch. basstler-review-triage depends on basstler-rules; a new
+    change kind names the rule. Mark #220 only once windows-suite stops pushing. Stack on the
+    highest pushed pattern-fixes branch (#227 or #228, else #222). Check: basstler review-triage
+    report 220, run from this branch, lists those files as mechanical.'
+- id: reduced-review-diff
+  title: Show a reviewer only what is left once rule fixes are reversed
+  track: pattern-fixes
+  depends_on:
+  - rule-fix-triage
+  status: not started
+  recommended_model: sonnet
+  notes: For a file mixing a rule fix and a real change, reverse the fix's actions on the
+    head and show the remaining diff against the base in the report.
+
+- id: move-triage
+  title: Prove module, definition and file moves mechanical
+  track: triage
+  branch: claude/youthful-babbage-btoebw
+  pull_request_number: 226
+  session: https://claude.ai/code/session_018wfiv8MVHyrTDcHrfEBtkJ
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet
+  notes: 'The general part of #214, split out onto a new branch from main: commit_tree, definitions,
+    python_source, renames, moved_definitions, module_moves, file_moves, definition_moves,
+    subclass_substitutions, base_branch_merges and the reviewed-commit / --last triage, the
+    changes to comparison, detection and triage, the git/ and github/ changes (dc0f2460''s
+    UTF-8 git text may overlap #220), with their tests and datasets. definition_moves defaults
+    to a plain PythonComparison. Exempt from the basstler-packages freeze on github. Split by moving files, not cherry-picking: #214''s commits mix
+    both parts.'
+
+- id: generated-file-triage
+  title: Prove a generated file mechanical by regenerating it
+  track: triage
+  depends_on:
+  - move-triage
+  status: not started
+  recommended_model: sonnet
+  notes: A file the repository generates, starting with AGENTS.md from basstler code-rules
+    agents-md (code_rules/command_line.py generate_agents_instructions), is mechanical when
+    regenerating it from the head's sources reproduces the head's file. Each generated file
+    and its generator are declared once, not hardcoded in the triage.
+
+- id: portability-fixes
+  title: Fixes for file URLs and paths written into git and shell text
+  track: pattern-fixes
+  branch: claude/loving-maxwell-s1y58z
+  pull_request_number: 228
+  session: https://claude.ai/code/session_018wfiv7tGSxnxF2wRvV9Fa4
+  depends_on:
+  - rule-fixes
+  status: in progress
+  recommended_model: opus
+  notes: 'Two patterns #220 applied by hand: a file:// URL built from a path becomes Path.as_uri();
+    str(path) in git or shell command text becomes as_posix(), only if a checker can tell
+    reliably that it sits in command text, otherwise that half is dropped and the item says
+    so. Done when code-rules fix reproduces #220''s hand edits and rule-fix-triage marks those
+    files mechanical.'
+
+- id: windows-suite
+  title: Make the suite pass on Windows
+  track: windows
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet
+  branch: fix-windows-test-failures
+  pull_request_number: 220
+  notes: 'Draft #220, main merged at b2bb4d75; last Windows run 39 failed, 2712 passed. Runs on
+    a Windows machine (.venv/Scripts/python.exe). Next, in order: install-lock liveness (kill -0
+    sees MSYS PIDs); session start on Scripts/python.exe environments and their removal;
+    GH_CONFIG_DIR at a temporary folder for no-credential tests; the no-upstream remote test;
+    skip the ~20 gh/bash stub tests on win32, naming the limit. Push only through basstler.sh
+    maintenance push; a push restacks #222 and clears Viewed. Update these notes per push
+    and say when the order is done: only then is #220 marked viewed.'
+
+- id: action-plan-triage
+  title: Prove a file mechanical when replaying a recorded code modification plan reproduces
+    the head
+  track: pattern-fixes
+  depends_on:
+  - rule-fix-triage
+  - basstler-packages/uv-workspace
+  status: not started
+  recommended_model: opus
+  notes: 'Done when #223''s moved files are marked mechanical. A new change kind names the
+    plan. Next: decide how a commit records the plan it applied; nothing stores #223''s
+    relocation plan replayably yet. uv-workspace supplies the file actions it replays.'
+
+- id: actions-marking
+  title: Install the mark-viewed workflow in this repository
+  track: triage
+  branch: basstler/mark-viewed
+  pull_request_number: 221
+  depends_on:
+  - viewed-marking-workflow
+  status: in progress
+  recommended_model: haiku
+  notes: 'Open #221, written by set-up-mark-viewed. Its mark-viewed.yml calls #215''s reusable
+    review-triage-mark-viewed.yml, so the owner merges it only after #215 has merged. Needs
+    the REVIEW_TRIAGE_VIEWER_TOKEN secret stored by the owner.'
+landed_item_count: 1

@@ -43,6 +43,9 @@ from basstler.github.pull_request_source import (
 from basstler.github.repository import GitHubAddress, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
+from basstler.plan.goal import Goal
+from basstler.plan.goal_path import GoalPath, NeededItems
+from basstler.plan_site.goal_page import GoalPage, GoalSummary
 from basstler.plan.model import PlanDocument
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.validation import PlanValidator
@@ -333,17 +336,79 @@ class RepositorySite(SiteSection[RepositorySummary]):
         repository_directory = output / str(self.notes.repository)
         for directory_name, plan in published.items():
             self.write_page(repository_directory / directory_name, plan.page.html)
+        goals: list[GoalSummary] = []
+        skipped_goals: list[SkippedPage] = []
+        for goal in Goal.every_goal_in(self.plans_directory):
+            needed = NeededItems.of_goal(goal, self.plan_directory)
+            if needed.unresolved:
+                skipped_goals.append(self.skipped_goal_page_of(needed))
+                continue
+            goals.append(self.publish_goal(needed, repository_directory))
         repository = RepositorySummary.over_plans(
             str(self.notes.repository),
             self.address.repository_url(self.notes.repository),
             [plan.summary for plan in published.values()],
-            list(skipped.values()),
+            list(skipped.values()) + skipped_goals,
         )
         index = RepositoryIndexPage(
-            repository, self.address.hub_url, self.stylesheet_url
+            repository, self.address.hub_url, self.stylesheet_url, goals
         )
         self.write_page(repository_directory, index.render())
         return repository
+
+    def skipped_goal_page_of(self, needed: NeededItems) -> SkippedPage:
+        """
+        :param needed: A goal's items, some of whose references name no item.
+        :return: Why the goal is left out of the site, logging it.
+        """
+        page = SkippedPage(
+            site_path=self.goal_site_path(needed.goal),
+            reason="; ".join(problem.error_message() for problem in needed.unresolved),
+        )
+        logger.warning(f"{page.site_path} is not published: {page.reason}")
+        return page
+
+    def goal_site_path(self, goal: Goal) -> str:
+        """
+        :param goal: One of the repository's goals.
+        :return: Where its page is published below the site's address.
+        """
+        return (
+            f"{self.notes.repository}/{ProjectLocation.PLAN_GOALS.name}/"
+            f"{goal.identifier}"
+        )
+
+    def publish_goal(
+        self, needed: NeededItems, repository_directory: Path
+    ) -> GoalSummary:
+        """
+        Render one goal's page into the site.
+
+        :param needed: The goal's items, every reference among them resolved.
+        :param repository_directory: The directory the repository's pages are served from.
+        :return: The goal's entry on the repository's index.
+        """
+        path = GoalPath.from_needed_items(needed, self.pull_request_source)
+        page = GoalPage(
+            path=path,
+            repository_name=str(self.notes.repository),
+            stylesheet_url=self.stylesheet_url,
+            hub_url=self.address.hub_url,
+            index_url=self.address.repository_url(self.notes.repository),
+            locate_item_card=lambda reference: self.address.item_url(
+                self.notes.repository, reference.plan_id, reference.item_identifier
+            ),
+            built_at=self.built_at,
+        )
+        self.write_page(
+            repository_directory
+            / ProjectLocation.PLAN_GOALS.name
+            / path.goal.identifier,
+            page.render(),
+        )
+        return GoalSummary.from_path(
+            path, self.address.goal_url(self.notes.repository, path.goal.identifier)
+        )
 
     def skipped_page_of(self, source: PlanSource) -> SkippedPage | None:
         """

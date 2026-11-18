@@ -23,6 +23,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 import pytest
+import yaml
 
 from basstler.document_references import CitedNames, ShippedModules
 from basstler.github.release_version import ReleaseVersion
@@ -39,7 +40,10 @@ from basstler.plan.merged_items.every_plan import (
     MergedItemsCommand,
     MergedItemsSummary,
 )
+from basstler.plan.goal import Goal, GoalStore
+from basstler.plan.item_action import StartNowAction
 from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan.structure import Item
 from basstler.plan_site.hub import SiteAddress
 from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
@@ -53,6 +57,8 @@ from ..constants.environment import (
     SearchPathVariable,
 )
 from ..constants.notes import ClaudeLocalSection, ScratchBranch
+from ..fixture_plans import PLAN_UNDER_TEST_ID
+from ..manifest_builders import manifest_item, minimal_plan
 from ..constants.paths import (
     DatasetLocation,
     PersonalNotesPath,
@@ -2331,6 +2337,49 @@ def test_reports_main_s_tests_as_not_checked_where_the_repository_is_unknown(
     assert summary_value(result.stdout, SummaryLine.MAIN_TESTS) == summary_message(
         SummaryMessage.MAIN_TESTS_NOT_CHECKED
     )
+
+
+# %% the goals line
+
+
+def test_reports_that_no_goal_is_set(session_start_repository: ScratchRepository):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.GOALS) == summary_message(
+        SummaryMessage.GOALS_NONE
+    )
+
+
+def test_lists_each_goal_with_what_comes_next(
+    session_start_repository: ScratchRepository,
+):
+    item_identifier = "first-step"
+    goal = Goal(
+        identifier="first-step-lands",
+        title="The first step lands",
+        targets=[f"{PLAN_UNDER_TEST_ID}/{item_identifier}"],
+    )
+    manifest = minimal_plan(items=[manifest_item(item_identifier, branch=None)])
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PlanDocument.MANIFEST.path_within_notes_branch(
+                PLAN_UNDER_TEST_ID
+            ): yaml.safe_dump(manifest),
+            GoalStore.goal_path(goal.identifier).as_posix(): goal.render(),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    start = StartNowAction.starting(
+        PLAN_UNDER_TEST_ID, Item.from_mapping(manifest[ManifestKey.ITEMS.key][0])
+    )
+    listed = summary_message(
+        SummaryMessage.GOALS_LISTED,
+        f"{goal.identifier}: 0/1 steps finished; next: {start.command}",
+    )
+    assert listed in result.stdout
 
 
 # %% one environment per project

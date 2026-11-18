@@ -386,14 +386,27 @@ class PythonComparison(ContentComparison):
     ) -> ChangeKinds | None:
         """
         :meth:`ContentComparison.changes`, resolving each version's relative imports
-        against the directory holding it.
+        against the directory holding it; a name only one version imports needs review
+        unless its code uses it and both versions star-import it from one module.
         """
         base_path = change.previous_path or change.path
-        return self.source_changes(
-            PythonSource(change.base_text, base_path.parent.parts),
-            PythonSource(change.head_text, change.path.parent.parts),
-            context,
-        )
+        base = PythonSource(change.base_text, base_path.parent.parts)
+        head = PythonSource(change.head_text, change.path.parent.parts)
+        kinds = self.source_changes(base, head, context)
+        if kinds is None or MechanicalChange.IMPORTS not in kinds:
+            return kinds
+        base_imports = base.imports(context.renames)
+        head_imports = head.import_bindings
+        if not (
+            base_imports.binds_only_respellings(
+                head_imports, base.referenced_names(context.renames)
+            )
+            and head_imports.binds_only_respellings(
+                base_imports, head.referenced_names(RenameMap())
+            )
+        ):
+            return None
+        return kinds
 
     def source_changes(
         self, base: PythonSource, head: PythonSource, context: JudgmentContext

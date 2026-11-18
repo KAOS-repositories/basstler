@@ -178,4 +178,11 @@ items:
     Prose alone never proves a rename (no false positives). Next: indented code blocks in list
     items, the domain_models READMEs.'
 
+- id: per-reviewer-viewed-marking
+  title: "Mark files viewed since each reviewer's last review"
+  branch: null
+  track: triage
+  depends_on: []
+  status: not started
+  recommended_model: opus
 landed_item_count: 1

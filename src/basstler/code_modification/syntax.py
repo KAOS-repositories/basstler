@@ -5,7 +5,6 @@ it, and calls changed to pass other arguments.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -65,14 +64,6 @@ class ExpressionSyntax:
             return ExpressionSyntax(expression.value).final_name
         return None
 
-    def is_name(self, name: str) -> bool:
-        """
-        :return: Whether the expression is the bare name *name*.
-        """
-        return (
-            isinstance(self.expression, libcst.Name) and self.expression.value == name
-        )
-
     @property
     def is_constant(self) -> bool:
         """
@@ -119,28 +110,6 @@ class CallSyntax:
     """
     The call.
     """
-
-    @cached_property
-    def keyword_arguments(self) -> Mapping[str, libcst.Arg]:
-        """
-        The arguments the call passes by keyword, by keyword.
-        """
-        return {
-            argument.keyword.value: argument
-            for argument in self.call.args
-            if argument.keyword is not None
-        }
-
-    @cached_property
-    def positional_arguments(self) -> tuple[libcst.Arg, ...]:
-        """
-        The arguments the call passes by position, ``*`` unpackings included.
-        """
-        return tuple(
-            argument
-            for argument in self.call.args
-            if argument.keyword is None and argument.star != "**"
-        )
 
     @staticmethod
     def keyword_argument(keyword: str, value: libcst.BaseExpression) -> libcst.Arg:

@@ -95,10 +95,26 @@ class NodeReplacement(Action):
 # %% imports
 
 
-@dataclass(frozen=True)
-class ModuleReplacement(Action):
+class ModuleTransformation(Action, ABC):
     """
-    Replaces a whole module, which the action that restores the module undoes.
+    Changes a whole module, which the action that restores the module undoes.
+    """
+
+    @abstractmethod
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        """
+        :param module: The module the action is applied to.
+        :return: The module with the change made.
+        """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        return AppliedAction(self.transform(module), ModuleReplacement(module))
+
+
+@dataclass(frozen=True)
+class ModuleReplacement(ModuleTransformation):
+    """
+    Replaces a module with another one.
     """
 
     replacement: libcst.Module
@@ -106,12 +122,12 @@ class ModuleReplacement(Action):
     The module that takes the place of the one the action is applied to.
     """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        return AppliedAction(self.replacement, ModuleReplacement(module))
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        return self.replacement
 
 
 @dataclass(frozen=True)
-class ImportInsertion(Action):
+class ImportInsertion(ModuleTransformation):
     """
     Imports a class in a module, merged into an import of its module where there is one
     and left out where the module imports the class already.
@@ -122,14 +138,12 @@ class ImportInsertion(Action):
     The class to import.
     """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
+    def transform(self, module: libcst.Module) -> libcst.Module:
         context = CodemodContext()
         AddImportsVisitor.add_needed_import(
             context, self.imported.__module__, self.imported.__name__
         )
-        return ModuleReplacement(
-            AddImportsVisitor(context).transform_module(module)
-        ).apply(module)
+        return AddImportsVisitor(context).transform_module(module)
 
 
 # %% plans

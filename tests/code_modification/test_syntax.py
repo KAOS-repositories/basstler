@@ -108,22 +108,32 @@ def test_an_appended_argument_follows_the_layout_of_the_call():
 # %% bodies
 
 
+def body() -> BodySyntax:
+    """
+    :return: The body of the snippet that holds a statement of every kind.
+    """
+    return BodySyntax(
+        libcst.parse_module(TextFile(CodeModificationSnippet.BODY).read())
+    )
+
+
 def test_a_body_lists_the_statements_sharing_a_line_one_by_one():
     """
     Each statement of a simple line is a statement of its own; a compound one is whole.
     """
-    body = BodySyntax(
-        libcst.parse_module(TextFile(CodeModificationSnippet.BODY).read())
-    )
+    listed = [
+        (libcst.Module([]).code_for_node(statement).strip("; \n"), type(statement))
+        for statement in body().statements
+    ]
 
-    assert [type(statement) for statement in body.statements] == [
-        libcst.Expr,
-        libcst.ImportFrom,
-        libcst.Assign,
-        libcst.Expr,
-        libcst.Expr,
-        libcst.Expr,
-        libcst.If,
+    assert listed == [
+        ('"""\nHolds statements of every kind a body can have.\n"""', libcst.Expr),
+        ("from __future__ import annotations", libcst.ImportFrom),
+        ("SIZE = 1", libcst.Assign),
+        ('"The size."', libcst.Expr),
+        ('"unrelated"', libcst.Expr),
+        ("print(SIZE)", libcst.Expr),
+        ("if SIZE:\n    print(SIZE)", libcst.If),
     ]
 
 
@@ -131,16 +141,20 @@ def test_only_a_string_literal_statement_is_a_string():
     """
     The docstring and the strings are strings; a call is not.
     """
-    body = BodySyntax(
-        libcst.parse_module(TextFile(CodeModificationSnippet.BODY).read())
-    )
+    strings = [
+        (
+            libcst.Module([]).code_for_node(statement).strip("; \n"),
+            BodySyntax.is_string(statement),
+        )
+        for statement in body().statements
+    ]
 
-    assert [BodySyntax.is_string(statement) for statement in body.statements] == [
-        True,
-        False,
-        False,
-        True,
-        True,
-        False,
-        False,
+    assert strings == [
+        ('"""\nHolds statements of every kind a body can have.\n"""', True),
+        ("from __future__ import annotations", False),
+        ("SIZE = 1", False),
+        ('"The size."', True),
+        ('"unrelated"', True),
+        ("print(SIZE)", False),
+        ("if SIZE:\n    print(SIZE)", False),
     ]

@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import override
 
 import libcst
-import libcst.matchers as m
+from libcst import matchers
 
 from basstler.class_property import classproperty
+from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.specification import Specification
 from basstler.code_modification.syntax import ExpressionSyntax
@@ -68,30 +69,46 @@ class TextFileFix(CodeFix[Specification]):
         )
 
 
+# %% the pattern
+
+
+class UTF8EncodingArgument(CodePattern):
+    """
+    The argument that names UTF-8 as the encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Arg:
+        return matchers.Arg(
+            keyword=matchers.Name(TextKeyword.ENCODING),
+            value=matchers.MatchIfTrue(
+                lambda value: ExpressionSyntax(value).literal_text == UTF_8
+            ),
+        )
+
+
+class TextFileCall(CodePattern):
+    """
+    A read, or a write of one text, of a path, with no encoding or UTF-8 and nothing
+    else a text file lacks.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        encoding = matchers.ZeroOrOne(UTF8EncodingArgument.matcher)
+        return matchers.OneOf(
+            matchers.Call(
+                func=matchers.Attribute(attr=matchers.Name(TextFunction.READ_TEXT)),
+                args=[encoding],
+            ),
+            matchers.Call(
+                func=matchers.Attribute(attr=matchers.Name(TextFunction.WRITE_TEXT)),
+                args=[matchers.Arg(keyword=None, star=""), encoding],
+            ),
+        )
+
+
 # %% the check
-
-ENCODING_AS_UTF_8 = m.Arg(
-    keyword=m.Name(TextKeyword.ENCODING),
-    value=m.MatchIfTrue(lambda value: ExpressionSyntax(value).literal_text == UTF_8),
-)
-"""
-The argument that names UTF-8 as the encoding.
-"""
-
-TEXT_CALL = m.OneOf(
-    m.Call(
-        func=m.Attribute(attr=m.Name(TextFunction.READ_TEXT)),
-        args=[m.ZeroOrOne(ENCODING_AS_UTF_8)],
-    ),
-    m.Call(
-        func=m.Attribute(attr=m.Name(TextFunction.WRITE_TEXT)),
-        args=[m.Arg(keyword=None, star=""), m.ZeroOrOne(ENCODING_AS_UTF_8)],
-    ),
-)
-"""
-The calls a text file makes in the same way: a read, or a write of one text, each with
-no encoding or UTF-8 and nothing else.
-"""
 
 
 @dataclass(frozen=True)
@@ -123,6 +140,5 @@ class TextFileChecker(FixableChecker[Specification]):
     def specifications_of_module(
         self, module: PositionedModule
     ) -> Iterator[Specification]:
-        for node, location in module.positions.items():
-            if m.matches(node, TEXT_CALL):
-                yield Specification(location, node)
+        for occurrence in TextFileCall.found_in(module):
+            yield Specification(occurrence.location, occurrence.node)

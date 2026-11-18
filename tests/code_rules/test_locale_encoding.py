@@ -5,10 +5,6 @@ the locale encoding, which on Windows cannot encode most of Unicode.
 
 from __future__ import annotations
 
-import libcst.matchers as matchers
-
-from basstler.code_modification.source_file import PythonSourceFile
-from basstler.code_modification.syntax import CallSyntax
 from basstler.code_rules.checker import CodeRulesCheck
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 
@@ -38,32 +34,13 @@ def test_text_as_utf_8_and_bytes_are_not_reported():
 # %% calls that are not of open
 
 
-def other_calls() -> list[CallSyntax]:
-    """
-    :return: The calls of the snippet of calls that are not of :func:`open`.
-    """
-    module = PythonSourceFile(LocaleEncodingSnippet.OTHER_CALLS).parse()
-    return [CallSyntax(node) for node in matchers.findall(module, matchers.Call())]
-
-
 def test_a_call_that_is_not_of_open_opens_no_file():
     """
     Only a call of :data:`TextFunction.OPEN` opens a file, whatever it is given.
     """
-    assert [LocaleEncodingChecker.opens_a_file(call) for call in other_calls()] == [
-        False,
-        False,
-    ]
-
-
-def test_a_call_that_is_not_of_open_names_no_binary_mode():
-    """
-    Only a call of :data:`TextFunction.OPEN` has a mode, whatever it is given.
-    """
-    assert [LocaleEncodingChecker.opens_bytes(call) for call in other_calls()] == [
-        False,
-        False,
-    ]
+    assert (
+        list(LocaleEncodingChecker().violations(LocaleEncodingSnippet.OTHER_CALLS)) == []
+    )
 
 
 # %% this repository

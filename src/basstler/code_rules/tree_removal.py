@@ -11,22 +11,35 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-import libcst.matchers as m
+from libcst import matchers
 
 from basstler import directory_tree
+from basstler.class_property import classproperty
+from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_rules.checker import CodeRuleViolation
 from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
 from basstler.directory_tree import DirectoryTree
 
-# %% the check
+# %% the pattern
 
-RMTREE_CALL = m.Call(
-    func=m.Attribute(value=m.Name(shutil.__name__), attr=m.Name(shutil.rmtree.__name__))
-)
-"""
-A call to :func:`shutil.rmtree`.
-"""
+
+class TreeRemovalCall(CodePattern):
+    """
+    A call to :func:`shutil.rmtree`.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        return matchers.Call(
+            func=matchers.Attribute(
+                value=matchers.Name(shutil.__name__),
+                attr=matchers.Name(shutil.rmtree.__name__),
+            )
+        )
+
+
+# %% the check
 
 
 @dataclass(frozen=True)
@@ -42,13 +55,11 @@ class TreeRemovalChecker(SyntaxTreeChecker):
     ) -> Iterator[CodeRuleViolation]:
         if path.resolve() == Path(directory_tree.__file__).resolve():
             return
-        for node, location in module.positions.items():
-            if not m.matches(node, RMTREE_CALL):
-                continue
+        for occurrence in TreeRemovalCall.found_in(module):
             yield CodeRuleViolation(
                 path,
-                location.start.line,
-                location.end.line,
+                occurrence.location.start.line,
+                occurrence.location.end.line,
                 f"removes a directory with {shutil.__name__}."
                 f"{shutil.rmtree.__name__}, which stops at a read-only entry; call "
                 f"{DirectoryTree.__name__}(...).{DirectoryTree.remove.__name__}()",

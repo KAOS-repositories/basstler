@@ -193,4 +193,12 @@ items:
   depends_on: []
   status: not started
   recommended_model: sonnet
+
+- id: branch-owns-its-repository
+  title: "Make every branch hold the repository it belongs to"
+  branch: null
+  track: triage
+  depends_on: []
+  status: not started
+  recommended_model: opus
 landed_item_count: 1

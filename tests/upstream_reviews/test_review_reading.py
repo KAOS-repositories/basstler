@@ -13,12 +13,13 @@ Filesystem only: no network, no credentials, no scratch repository.
 
 from __future__ import annotations
 
-import re
-
+from basstler.document_references import COMMAND_PREFIX
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
 )
+from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
+from basstler.yaml_syntax import YamlSyntax
 
 from ..constants.paths import RepositoryLocation, SkillDirectory
 
@@ -46,6 +47,12 @@ def promotion_label() -> str:
     return CommittedStackConfiguration().values()[StackSetting.IN_REVIEW_LABEL]
 
 
+NAME_KEY = "name"
+"""
+The front matter key holding a skill's name, which it is read back under.
+"""
+
+
 def upstream_reviews_invocation() -> str:
     """
     How a session invokes the upstream-reviews skill.
@@ -53,8 +60,20 @@ def upstream_reviews_invocation() -> str:
     :return: The slash command, read from the skill's own frontmatter.
     """
     frontmatter = skill_document(SkillDirectory.UPSTREAM_REVIEWS)
-    name = re.search(r"^name:\s*(?P<name>\S+)\s*$", frontmatter, re.MULTILINE)
-    return f"/{name.group('name')}"
+    name = (
+        RegularExpression.sequence(
+            Anchor.LINE_START,
+            NAME_KEY,
+            YamlSyntax.MAPPING_VALUE,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(NAME_KEY),
+            CharacterClass.WHITESPACE.zero_or_more(),
+            Anchor.LINE_END,
+        )
+        .compiled()
+        .search(frontmatter)
+    )
+    return f"{COMMAND_PREFIX}{name[NAME_KEY]}"
 
 
 # %% the resolve skill's upstream read

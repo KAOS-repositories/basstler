@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import re
 import sys
 import tempfile
 from abc import ABC, abstractmethod
@@ -63,6 +62,8 @@ from basstler.plan_site.item_classifier import ItemClassifier
 from basstler.plan.structure import Plan
 from basstler.plan_site.plan_page import PlanPage, RenderedPlanPage
 from basstler.plan_site.plan_page_header import PlanPageHeader
+from basstler.regular_expression import CharacterSet, RegularExpression
+from basstler.render_common import HtmlSyntax
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -97,9 +98,30 @@ class SiteFile(StrEnum):
     """
 
 
-BUILD_TIME_PATTERN = re.compile(
-    rf"<time [^>]*{PlanTimeAttribute.REFRESHED}[^>]*>[^<]*</time>".encode()
-)
+TIME_ELEMENT = "time"
+"""
+The HTML element a time is shown in.
+"""
+
+ATTRIBUTE_SEPARATOR = " "
+"""
+Separates an HTML tag's name from its attributes.
+"""
+
+BUILD_TIME_PATTERN = RegularExpression.sequence(
+    HtmlSyntax.TAG_START,
+    TIME_ELEMENT,
+    ATTRIBUTE_SEPARATOR,
+    CharacterSet.any_except(HtmlSyntax.TAG_END).zero_or_more(),
+    PlanTimeAttribute.REFRESHED,
+    CharacterSet.any_except(HtmlSyntax.TAG_END).zero_or_more(),
+    HtmlSyntax.TAG_END,
+    CharacterSet.any_except(HtmlSyntax.TAG_START).zero_or_more(),
+    HtmlSyntax.TAG_START,
+    HtmlSyntax.CLOSING_MARK,
+    TIME_ELEMENT,
+    HtmlSyntax.TAG_END,
+).compiled_for_bytes()
 """
 The element a plan page shows the build time in.
 """

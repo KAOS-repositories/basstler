@@ -12,17 +12,36 @@ covered without this file being edited.
 
 from __future__ import annotations
 
-import re
+import posixpath
 import subprocess
 from enum import StrEnum
 from pathlib import Path
 
 import pytest
 
-from basstler.locations import PluginLocation
+from basstler.locations import PluginLocation, ProjectLocation
+from basstler.regular_expression import (
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from ..constants.paths import RepositoryLocation, SkillDirectory, SkillFile
+from ..constants.patterns import markdown_link_target
+
+
+class PlaceholderGroup(StrEnum):
+    """
+    The part of a placeholder read back from its match.
+    """
+
+    NAME = "name"
+    """
+    What the placeholder stands for.
+    """
+
 
 # %% shell constants
 
@@ -85,6 +104,59 @@ def staleness_document() -> str:
     ).read_text()
 
 
+HEADING_LINK_PREFIX = "#"
+"""
+What a link to a heading on the same page starts with.
+"""
+
+RELATIVE_LINK_TARGET = markdown_link_target(
+    HEADING_LINK_PREFIX, CharacterClass.WHITESPACE
+).compiled()
+"""
+A Markdown link to a file, capturing its target.
+"""
+
+PLACEHOLDER_START = "<"
+"""
+Opens a placeholder a reader fills in.
+"""
+
+PLACEHOLDER_END = ">"
+"""
+Closes a placeholder a reader fills in.
+"""
+
+LOWERCASE_HYPHENATED_WORDS = CharacterSet.any_of(
+    CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT, "-"
+)
+"""
+A character of a name in lower case, words joined by hyphens.
+"""
+
+PLACEHOLDER = RegularExpression.sequence(
+    PLACEHOLDER_START,
+    CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
+    .one_or_more()
+    .captured_as(PlaceholderGroup.NAME),
+    PLACEHOLDER_END,
+).compiled()
+"""
+A placeholder such as ``<plan-id>``, capturing its name.
+"""
+
+NAMED_PLAN_DIRECTORY = RegularExpression.sequence(
+    ProjectLocation.PLANS.name,
+    posixpath.sep,
+    RegularExpression.negative_lookahead(PLACEHOLDER_START),
+    CharacterRange.ASCII_LOWERCASE_LETTER,
+    LOWERCASE_HYPHENATED_WORDS.zero_or_more(),
+    posixpath.sep,
+).compiled()
+"""
+A plan's directory named by an actual plan rather than a placeholder.
+"""
+
+
 def linked_documents(skill: Path) -> set[Path]:
     """
     :return: Every file the skill's instructions link to with a relative Markdown link,
@@ -92,7 +164,7 @@ def linked_documents(skill: Path) -> set[Path]:
     """
     return {
         (skill.parent / target).resolve()
-        for target in re.findall(r"\]\(([^)#\s]+)\)", skill.read_text())
+        for target in RELATIVE_LINK_TARGET.findall(skill.read_text())
     }
 
 
@@ -140,8 +212,11 @@ def test_the_rule_links_the_plan_site_page_instead_of_a_republish():
 
 
 def test_the_rule_names_no_plan_of_its_own():
+    """
+    The document is generic: it shows a plan's directory only through a placeholder.
+    """
     document = staleness_document()
-    placeholders = set(re.findall(r"<([a-z-]+)>", document))
+    placeholders = set(PLACEHOLDER.findall(document))
 
     assert "plan-id" in placeholders
-    assert not re.search(r"plans/(?!<)[a-z][a-z0-9-]*/", document)
+    assert NAMED_PLAN_DIRECTORY.search(document) is None

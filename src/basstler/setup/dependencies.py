@@ -39,6 +39,7 @@ from typing import Any
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.locations import PackageLocation
+from basstler.regular_expression import CharacterSet
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -139,6 +140,53 @@ class MalformedDependencyDeclarationError(UnreadableDependencyDeclarationError):
         )
 
 
+class ConstraintStart(StrEnum):
+    """
+    The characters that end a distribution's name in a PEP 508 specifier, each
+    beginning what constrains it.
+    """
+
+    LESS_THAN = "<"
+    """
+    Begins an upper version bound.
+    """
+
+    GREATER_THAN = ">"
+    """
+    Begins a lower version bound.
+    """
+
+    EQUALS = "="
+    """
+    Begins an exact version.
+    """
+
+    EXCLUSION = "!"
+    """
+    Begins a version left out.
+    """
+
+    COMPATIBLE_RELEASE = "~"
+    """
+    Begins a compatible release.
+    """
+
+    MARKER_SEPARATOR = ";"
+    """
+    Begins an environment marker.
+    """
+
+    EXTRAS_START = "["
+    """
+    Begins the extras.
+    """
+
+    SPACE = " "
+    """
+    Separates the name from whatever follows it.
+    """
+
+
 @dataclass(frozen=True)
 class Dependency:
     """
@@ -151,7 +199,9 @@ class Dependency:
     """
 
     constraint_start: re.Pattern[str] = field(
-        default=re.compile(r"[<>=!~;\[ ]"), repr=False, compare=False
+        default=CharacterSet.any_of(*ConstraintStart).compiled(),
+        repr=False,
+        compare=False,
     )
     """
     The first character that ends a distribution's name and begins a version bound, an extra

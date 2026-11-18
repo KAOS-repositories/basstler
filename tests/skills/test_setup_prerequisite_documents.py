@@ -18,7 +18,16 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from basstler.setup.gate import BasstlerSkill
+from basstler.locations import PackageLocation
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
+from basstler.setup import gate
+from basstler.setup.gate import BasstlerSkill, GateOption
 
 from ..constants.paths import RepositoryLocation, SkillDirectory
 
@@ -57,6 +66,54 @@ class OfferingVerb(StrEnum):
 
 
 # %% the documents under test
+
+
+class VerbEnding(StrEnum):
+    """
+    The endings an offering verb takes in an instruction.
+    """
+
+    THIRD_PERSON = "s"
+    """
+    As in *offers*.
+    """
+
+    PRESENT_PARTICIPLE = "ing"
+    """
+    As in *offering*.
+    """
+
+
+class InstructionWord(StrEnum):
+    """
+    The words between an offering verb and the command it offers.
+    """
+
+    TO = "to"
+    """
+    Opens the infinitive, as in *offer to run*.
+    """
+
+    RUN = "run"
+    """
+    The verb an offer to run a command uses.
+    """
+
+    CODE_QUOTE = "`"
+    """
+    Encloses the command as inline code.
+    """
+
+
+class GateGroup(StrEnum):
+    """
+    The part of a gate command read back from its match.
+    """
+
+    SKILL = "skill"
+    """
+    The skill the gate checks for.
+    """
 
 
 @dataclass(frozen=True)
@@ -110,10 +167,24 @@ class SkillDocument:
         asking, and it must not fire on prose *about* the rule, which discusses offering
         and asking at length.
         """
-        verbs = "|".join(OfferingVerb)
-        command = re.escape(SkillCommand.SETUP_PERSONAL_NOTES)
-        return re.compile(
-            rf"\b(?:{verbs})(?:s|ing)?\s+(?:to\s+run\s+)?`?{command}", re.IGNORECASE
+        to_run = RegularExpression.sequence(
+            InstructionWord.TO,
+            CharacterClass.WHITESPACE.one_or_more(),
+            InstructionWord.RUN,
+            CharacterClass.WHITESPACE.one_or_more(),
+        )
+        return (
+            RegularExpression.sequence(
+                Anchor.WORD_BOUNDARY,
+                RegularExpression.either(*OfferingVerb),
+                RegularExpression.either(*VerbEnding).optional(),
+                CharacterClass.WHITESPACE.one_or_more(),
+                to_run.optional(),
+                RegularExpression.sequence(InstructionWord.CODE_QUOTE).optional(),
+                SkillCommand.SETUP_PERSONAL_NOTES,
+            )
+            .case_insensitive()
+            .compiled()
         )
 
 
@@ -162,7 +233,20 @@ def test_the_sweep_reads_the_skill_documents_rather_than_nothing() -> None:
 
 # %% each skill gates on its own checks
 
-GATE_COMMAND = re.compile(r"setup\.gate --skill (?P<skill>[a-z-]+)")
+COMMAND_SEPARATOR = " "
+"""
+Separates the words of a command line.
+"""
+
+GATE_COMMAND = RegularExpression.sequence(
+    gate.__name__.removeprefix(f"{PackageLocation.DIRECTORY.name}."),
+    COMMAND_SEPARATOR,
+    GateOption.SKILL,
+    COMMAND_SEPARATOR,
+    CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
+    .one_or_more()
+    .captured_as(GateGroup.SKILL),
+).compiled()
 """
 How a document runs a skill's setup gate, naming the skill.
 """
@@ -174,7 +258,7 @@ def gated_skill_names() -> list[str]:
         found.
     """
     return [
-        match["skill"]
+        match[GateGroup.SKILL]
         for document in skill_documents()
         for match in GATE_COMMAND.finditer(document.text)
     ]

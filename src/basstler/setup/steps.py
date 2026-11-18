@@ -48,6 +48,13 @@ from basstler.github.repository import Repository
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
 from basstler.plugin_root import PluginRoot
+from basstler.regular_expression import (
+    ANY_CHARACTER_EXCEPT_LINE_BREAK,
+    LINE_BREAK,
+    SPACE_OR_TAB,
+    Anchor,
+    RegularExpression,
+)
 from basstler.shell_configuration import (
     FetchedBranchReference,
     ShellConfigurationFunction,
@@ -603,6 +610,17 @@ class PersonalNotesWriteRefusedError(RuntimeError):
         return f"could not save to the personal-notes branch: {self.detail}"
 
 
+class TomlSyntax(StrEnum):
+    """
+    The TOML a personal ``stack.toml`` is written in.
+    """
+
+    KEY_VALUE_SEPARATOR = "="
+    """
+    Separates a key from its value.
+    """
+
+
 @dataclass(frozen=True)
 class PersonalUpstream:
     """
@@ -620,9 +638,15 @@ class PersonalUpstream:
         """
         A ``stack.toml`` line naming the upstream, wherever it sits in the file.
         """
-        return re.compile(
-            rf"^[ \t]*{StackSetting.UPSTREAM_REPOSITORY}[ \t]*=.*(?:\n|$)", re.MULTILINE
-        )
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            SPACE_OR_TAB.zero_or_more(),
+            StackSetting.UPSTREAM_REPOSITORY,
+            SPACE_OR_TAB.zero_or_more(),
+            TomlSyntax.KEY_VALUE_SEPARATOR,
+            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            RegularExpression.either(LINE_BREAK, Anchor.LINE_END),
+        ).compiled()
 
     def written_over(self, existing: str) -> str:
         """
@@ -635,7 +659,7 @@ class PersonalUpstream:
         if kept and not kept.endswith("\n"):
             kept += "\n"
         return (
-            f"{kept}{StackSetting.UPSTREAM_REPOSITORY} = "
+            f"{kept}{StackSetting.UPSTREAM_REPOSITORY} {TomlSyntax.KEY_VALUE_SEPARATOR} "
             f'"{self.repository.full_name}"\n'
         )
 

@@ -4,11 +4,11 @@ A fork pull request's description: what a pass reads out of it and writes into i
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from basstler.github.constants import DescriptionPattern, MaintenanceText
 from basstler.github.repository import Repository
+from basstler.regular_expression import SPACE_OR_TAB, Anchor, RegularExpression
 
 # %% the upstream pull request a description links to
 
@@ -139,8 +139,12 @@ class PullRequestDescription:
         :return: The text before the section, the section's content (``None`` when the
             description has no such heading), and the text after it.
         """
-        found = re.search(
-            rf"^{re.escape(heading)}[ \t]*$", self.text, flags=re.MULTILINE
+        found = (
+            RegularExpression.sequence(
+                Anchor.LINE_START, heading, SPACE_OR_TAB.zero_or_more(), Anchor.LINE_END
+            )
+            .compiled()
+            .search(self.text)
         )
         if found is None:
             return self.text, None, ""

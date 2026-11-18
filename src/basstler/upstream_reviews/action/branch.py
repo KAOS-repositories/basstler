@@ -16,7 +16,9 @@ from basstler.class_property import classproperty
 from basstler.git.branch import Branch
 from basstler.git.commands import CommitTrailer, GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
+from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
 from basstler.render_common import create_template_environment
+from basstler.yaml_syntax import YamlSyntax
 from basstler.github.basstler_project import BasstlerProject
 
 # %% the Action branch's names
@@ -101,6 +103,28 @@ class BasstlerSource(StrEnum):
 # %% installing
 
 
+class ReviewsWorkflowInput(StrEnum):
+    """
+    The inputs of basstler's reusable upstream reviews workflow.
+    """
+
+    BRANCH_OR_TAG = "basstler_branch_or_tag"
+    """
+    The basstler branch or release tag the workflow runs.
+    """
+
+
+class InstalledWorkflowGroup(StrEnum):
+    """
+    The part of an installed workflow read back from its match.
+    """
+
+    BRANCH_OR_TAG = "branch_or_tag"
+    """
+    The basstler branch or release tag the workflow runs.
+    """
+
+
 class ActionTemplate(StrEnum):
     """
     The templates in :attr:`PackageLocation.TEMPLATES` the Action's files are rendered
@@ -151,9 +175,18 @@ class ActionInstallation:
         """
         The line of an installed workflow naming the basstler branch or tag it runs.
         """
-        return re.compile(
-            r"^\s*basstler_branch_or_tag:\s*(?P<branch_or_tag>\S+)\s*$", re.MULTILINE
-        )
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            ReviewsWorkflowInput.BRANCH_OR_TAG,
+            YamlSyntax.MAPPING_VALUE,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+                InstalledWorkflowGroup.BRANCH_OR_TAG
+            ),
+            CharacterClass.WHITESPACE.zero_or_more(),
+            Anchor.LINE_END,
+        ).compiled()
 
     @property
     def workflow(self) -> str:
@@ -189,7 +222,7 @@ class ActionInstallation:
         if workflow is None:
             return InstallationState.MISSING, None
         match = self.branch_or_tag_line.search(workflow)
-        installed = match["branch_or_tag"] if match else None
+        installed = match[InstalledWorkflowGroup.BRANCH_OR_TAG] if match else None
         if workflow == self.workflow:
             return InstallationState.CURRENT, installed
         return InstallationState.STALE, installed

@@ -4,9 +4,15 @@ Branch names and CLAUDE.local.md sections the personal-notes suites share.
 
 from __future__ import annotations
 
-import re
 from enum import StrEnum
 
+from basstler.regular_expression import (
+    ANY_CHARACTER,
+    LINE_BREAK,
+    CharacterSet,
+    RegularExpression,
+)
+from basstler.render_common import HtmlSyntax
 from basstler.setup.steps import PersonalNotesSetting
 
 
@@ -23,6 +29,43 @@ class ScratchBranch(StrEnum):
     WORK = "some-work-branch"
     """
     The throwaway branch a scratch repository is left checked out on.
+    """
+
+
+class SectionMarker(StrEnum):
+    """
+    The text of the HTML comments that open and close a marked section.
+    """
+
+    BEGIN = "BEGIN-"
+    """
+    Precedes the section's name in the opening comment.
+    """
+
+    END = "END-"
+    """
+    Precedes the section's name in the closing comment.
+    """
+
+    LABEL_SEPARATOR = ": "
+    """
+    Separates the section's name from the label an opening comment may carry.
+    """
+
+    PADDING = " "
+    """
+    Separates a comment's text from its delimiters.
+    """
+
+
+class SectionGroup(StrEnum):
+    """
+    The part of a marked section read back from its match.
+    """
+
+    CONTENT = "content"
+    """
+    What lies between the section's markers.
     """
 
 
@@ -63,16 +106,47 @@ class ClaudeLocalSection(StrEnum):
         :param label: What the opening marker names after its colon, if anything.
         :return: *content* between this section's markers.
         """
-        opening = self if label is None else f"{self}: {label}"
-        return f"<!-- BEGIN-{opening} -->\n{content}<!-- END-{self} -->\n"
+        opening = (
+            self if label is None else f"{self}{SectionMarker.LABEL_SEPARATOR}{label}"
+        )
+        return (
+            f"{self.comment(SectionMarker.BEGIN + opening)}{LINE_BREAK}"
+            f"{content}{self.comment(SectionMarker.END + self)}{LINE_BREAK}"
+        )
+
+    @staticmethod
+    def comment(text: str) -> str:
+        """
+        :param text: What the comment says.
+        :return: The HTML comment saying it.
+        """
+        return (
+            f"{HtmlSyntax.COMMENT_START}{SectionMarker.PADDING}{text}"
+            f"{SectionMarker.PADDING}{HtmlSyntax.COMMENT_END}"
+        )
 
     def within(self, text: str) -> str:
         """
         :param text: A document holding this section once.
         :return: The section's content, without its markers.
         """
-        pattern = rf"<!-- BEGIN-{self}(?:: [^>]*)? -->\n(.*?)<!-- END-{self} -->"
-        return re.search(pattern, text, re.DOTALL).group(1)
+        label = RegularExpression.sequence(
+            SectionMarker.LABEL_SEPARATOR,
+            CharacterSet.any_except(HtmlSyntax.TAG_END).zero_or_more(),
+        )
+        pattern = RegularExpression.sequence(
+            HtmlSyntax.COMMENT_START,
+            SectionMarker.PADDING,
+            SectionMarker.BEGIN,
+            self,
+            label.optional(),
+            SectionMarker.PADDING,
+            HtmlSyntax.COMMENT_END,
+            LINE_BREAK,
+            ANY_CHARACTER.zero_or_more(shortest=True).captured_as(SectionGroup.CONTENT),
+            self.comment(SectionMarker.END + self),
+        )
+        return pattern.compiled().search(text)[SectionGroup.CONTENT]
 
 
 class ProgressBranch(StrEnum):

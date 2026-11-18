@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import os
+import posixpath
 import re
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
@@ -21,6 +22,7 @@ from cyclopts import App, Parameter
 
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure
+from basstler.git.branch import Branch
 from basstler.git.commands import GitCommandResult, GitCommandRunner
 from basstler.github.login_lending import GitHubLoginLendingRunner
 from basstler.github.remote_branch import GitHubRemoteBranch
@@ -64,6 +66,7 @@ from basstler.plan_site.workflows import (
 )
 from basstler.review_triage.viewed_setup import MarkViewedSetup
 from basstler.setup.steps import PersonalNotesSetting, resolve_repository
+from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
 from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
@@ -81,6 +84,45 @@ The command line that publishes again, once this session reaches the site reposi
 
 
 # %% publishing
+
+
+class SymbolicReferenceListing(StrEnum):
+    """
+    The text of the line ``git ls-remote --symref`` lists a symbolic reference on.
+    """
+
+    PREFIX = "ref: "
+    """
+    Starts the line, before the reference pointed at.
+    """
+
+    HEAD = "HEAD"
+    """
+    The reference naming a repository's default branch.
+    """
+
+    BRANCH_GROUP = "branch"
+    """
+    The name the default branch is read back under.
+    """
+
+    @staticmethod
+    def default_branch_line() -> re.Pattern[str]:
+        """
+        :return: The line naming the branch a remote's ``HEAD`` points at.
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            SymbolicReferenceListing.PREFIX,
+            Branch.namespace,
+            posixpath.sep,
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+                SymbolicReferenceListing.BRANCH_GROUP
+            ),
+            CharacterClass.WHITESPACE.one_or_more(),
+            SymbolicReferenceListing.HEAD,
+            Anchor.LINE_END,
+        ).compiled()
 
 
 @dataclass
@@ -247,12 +289,16 @@ class PlanSitePublication:
         :return: Its default branch, :attr:`initial_branch` when it has none yet.
         :raises GitCommandFailed: If git cannot reach it.
         """
-        listed = self.git.run("ls-remote", "--symref", remote, "HEAD")
-        match = re.search(
-            r"^ref: refs/heads/(?P<branch>\S+)\s+HEAD$", listed, re.MULTILINE
+        listed = self.git.run(
+            "ls-remote", "--symref", remote, SymbolicReferenceListing.HEAD
         )
+        match = SymbolicReferenceListing.default_branch_line().search(listed)
         return GitHubRemoteBranch(
-            match["branch"] if match else self.initial_branch, self.git, remote
+            match[SymbolicReferenceListing.BRANCH_GROUP]
+            if match
+            else self.initial_branch,
+            self.git,
+            remote,
         )
 
     def site_branch(self) -> GitHubRemoteBranch | None:

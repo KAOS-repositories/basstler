@@ -30,9 +30,9 @@ import shlex
 import sys
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 from typing import Any
 
+from basstler.locations import PackageLocation
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.class_property import classproperty
 from basstler.github.repository import Repository
@@ -42,7 +42,6 @@ from basstler.github.exceptions import UpstreamReadError
 from basstler.upstream_reviews.failure_logs import (
     FailedJob,
 )
-from basstler.upstream_reviews.helper import fetch
 from basstler.upstream_reviews.helper.recording import (
     HelperChunk,
     HelperRecording,
@@ -172,7 +171,9 @@ class HelperScript:
         """
         :return: The shell command running the fetch module from its own source.
         """
-        source = self.code_only(Path(fetch.__file__).read_text())
+        source = self.code_only(
+            PackageLocation.UPSTREAM_REVIEWS_FETCH_PROGRAM.read_text()
+        )
         configuration = json.dumps(self.configuration, separators=(",", ":"))
         return "\n".join(
             [

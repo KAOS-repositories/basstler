@@ -10,14 +10,23 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from cyclopts import App
 
+from basstler.bash import (
+    ShellBuiltin,
+    ShellExpansionCharacter,
+    ShellMetacharacter,
+    ShellQuote,
+    ShellToken,
+)
 from basstler.class_property import classproperty
 from basstler.exit_codes import StackExitCode
 from basstler.github.repository_attachment import SessionTool
@@ -25,6 +34,11 @@ from basstler.json_model import ValidatedJSONModel
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
 from basstler.plan_site.attach_approval import AllowedAttach, AttachAnswer
 from basstler.plugin_root import PluginRoot
+from basstler.regular_expression import (
+    CharacterClass,
+    CharacterSet,
+    RegularExpression,
+)
 
 # %% what Claude Code sends
 
@@ -59,6 +73,17 @@ class ShellCall(ValidatedJSONModel):
 # %% the command
 
 
+class EntryPointGroup(StrEnum):
+    """
+    The parts of an entry point invocation read back from its match.
+    """
+
+    EXPANDED_ROOT = "expanded_root"
+    """
+    The plugin root, where the command names it by its path.
+    """
+
+
 @dataclass(frozen=True)
 class EntryPointInvocation:
     """
@@ -83,62 +108,126 @@ class EntryPointInvocation:
         return cls(PluginRoot.locate(environment))
 
     @classproperty
-    def entry_point(cls) -> str:
+    def plain_word(cls) -> RegularExpression:
         """
-        The entry point script's path below the plugin root, as a pattern.
+        A word with nothing the shell would interpret: no metacharacter, expansion or
+        quote.
         """
-        return re.escape(PluginLocation.ENTRY_POINT_SCRIPT.as_posix())
+        return CharacterSet.any_except(
+            CharacterClass.WHITESPACE,
+            *ShellMetacharacter,
+            *ShellExpansionCharacter,
+            *ShellQuote,
+        ).one_or_more()
 
     @classproperty
-    def plugin_root_variable(cls) -> str:
+    def plugin_root_variable(cls) -> RegularExpression:
         """
-        The plugin root as the skills write it, through either variable, as a pattern.
+        The plugin root as the skills write it, through either variable.
         """
-        variables = f"{BasstlerVariable.PLUGIN_ROOT}|{ClaudeCodeVariable.PLUGIN_ROOT}"
-        return rf"\$(?:\{{(?:{variables})\}}|{variables})"
+        variable_name = RegularExpression.either(
+            BasstlerVariable.PLUGIN_ROOT, ClaudeCodeVariable.PLUGIN_ROOT
+        )
+        return RegularExpression.either(
+            RegularExpression.sequence(
+                ShellToken.BRACED_PARAMETER_START,
+                variable_name,
+                ShellToken.BRACED_PARAMETER_END,
+            ),
+            RegularExpression.sequence(
+                ShellExpansionCharacter.PARAMETER_EXPANSION, variable_name
+            ),
+        )
 
     @classproperty
-    def plugin_root_path(cls) -> str:
+    def plugin_root_path(cls) -> RegularExpression:
         """
-        The plugin root once expanded, a plain path with nothing the shell would
-        interpret, as a pattern whose group is that path.
+        The plugin root once expanded: an absolute path that is a plain word.
         """
-        return r"(?P<expanded_root>/[^\s\"'`$;&|<>()\\]+)"
+        return RegularExpression.sequence(posixpath.sep, cls.plain_word).captured_as(
+            EntryPointGroup.EXPANDED_ROOT
+        )
 
     @classproperty
-    def arguments(cls) -> str:
+    def script(cls) -> RegularExpression:
         """
-        What may follow the script, as a pattern: words with nothing that chains,
-        substitutes or redirects.
+        The entry point script below the plugin root, optionally double-quoted.
         """
-        return r"(?:\s+[^\s;&|<>`$()\\]+)*"
+        double_quote = RegularExpression.sequence(ShellQuote.DOUBLE_QUOTE).optional()
+        return RegularExpression.sequence(
+            double_quote,
+            RegularExpression.either(cls.plugin_root_variable, cls.plugin_root_path),
+            posixpath.sep,
+            PluginLocation.ENTRY_POINT_SCRIPT.as_posix(),
+            double_quote,
+        )
 
     @classproperty
-    def directory_change(cls) -> str:
+    def arguments(cls) -> RegularExpression:
         """
-        What may come before the script, as a pattern: a change into a directory named
-        by one word with nothing the shell would interpret.
+        What may follow the script: words with nothing that chains, substitutes or
+        redirects.
         """
-        return r"(?:cd\s+[^\s\"'`$;&|<>()\\]+\s*(?:&&|;)\s*)?"
+        argument = CharacterSet.any_except(
+            CharacterClass.WHITESPACE,
+            *ShellMetacharacter,
+            *ShellExpansionCharacter,
+            ShellQuote.ESCAPE,
+        ).one_or_more()
+        return RegularExpression.sequence(
+            CharacterClass.WHITESPACE.one_or_more(), argument
+        ).zero_or_more()
 
     @classproperty
-    def status_report(cls) -> str:
+    def directory_change(cls) -> RegularExpression:
         """
-        What may follow the arguments, as a pattern: printing plain text and the
-        script's exit status.
+        What may come before the script: a change into a directory named by a plain
+        word.
         """
-        return r'(?:\s*;\s*echo\s+"[^"$`\\]*\$\?")?'
+        return RegularExpression.sequence(
+            ShellBuiltin.CHANGE_DIRECTORY,
+            CharacterClass.WHITESPACE.one_or_more(),
+            cls.plain_word,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            RegularExpression.either(
+                ShellToken.AND_LIST, ShellMetacharacter.COMMAND_SEPARATOR
+            ),
+            CharacterClass.WHITESPACE.zero_or_more(),
+        ).optional()
+
+    @classproperty
+    def status_report(cls) -> RegularExpression:
+        """
+        What may follow the arguments: printing plain text and the script's exit status.
+        """
+        plain_text = CharacterSet.any_except(
+            ShellQuote.DOUBLE_QUOTE, ShellQuote.ESCAPE, *ShellExpansionCharacter
+        ).zero_or_more()
+        return RegularExpression.sequence(
+            CharacterClass.WHITESPACE.zero_or_more(),
+            ShellMetacharacter.COMMAND_SEPARATOR,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            ShellBuiltin.ECHO,
+            CharacterClass.WHITESPACE.one_or_more(),
+            ShellQuote.DOUBLE_QUOTE,
+            plain_text,
+            ShellToken.LAST_EXIT_STATUS,
+            ShellQuote.DOUBLE_QUOTE,
+        ).optional()
 
     @classproperty
     def command_line(cls) -> re.Pattern[str]:
         """
         What a whole command line has to match.
         """
-        root = rf"(?:{cls.plugin_root_variable}|{cls.plugin_root_path})"
-        script = rf'"?{root}/{cls.entry_point}"?'
-        return re.compile(
-            rf"\s*{cls.directory_change}{script}{cls.arguments}{cls.status_report}\s*"
-        )
+        return RegularExpression.sequence(
+            CharacterClass.WHITESPACE.zero_or_more(),
+            cls.directory_change,
+            cls.script,
+            cls.arguments,
+            cls.status_report,
+            CharacterClass.WHITESPACE.zero_or_more(),
+        ).compiled()
 
     def matches(self, command: str) -> bool:
         """
@@ -150,7 +239,7 @@ class EntryPointInvocation:
         match = self.command_line.fullmatch(command)
         if match is None:
             return False
-        expanded_root = match.group("expanded_root")
+        expanded_root = match[EntryPointGroup.EXPANDED_ROOT]
         if expanded_root is None:
             return True
         return Path(expanded_root).resolve() == self.plugin_root.directory.resolve()

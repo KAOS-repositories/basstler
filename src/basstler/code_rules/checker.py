@@ -8,10 +8,18 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import cached_property
 from pathlib import Path
 
+from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandRunner
+from basstler.regular_expression import (
+    ANY_CHARACTER_EXCEPT_LINE_BREAK,
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+)
 
 # %% violations
 
@@ -75,6 +83,73 @@ class CodeRuleChecker(ABC):
 # %% the staged change
 
 
+class UnifiedDiffSyntax(StrEnum):
+    """
+    The text that marks the headers of a diff git writes.
+    """
+
+    FILE_HEADER = "diff --git"
+    """
+    Starts the header of each file the diff changes.
+    """
+
+    OLD_FILE_PREFIX = "a/"
+    """
+    Precedes the file's path before the change.
+    """
+
+    NEW_FILE_PREFIX = "b/"
+    """
+    Precedes the file's path after the change.
+    """
+
+    HUNK_MARKER = "@@"
+    """
+    Encloses the line ranges of a changed block.
+    """
+
+    OLD_RANGE_PREFIX = "-"
+    """
+    Precedes the block's lines before the change.
+    """
+
+    NEW_RANGE_PREFIX = "+"
+    """
+    Precedes the block's lines after the change.
+    """
+
+    RANGE_COUNT_SEPARATOR = ","
+    """
+    Separates a range's first line from its number of lines.
+    """
+
+    FIELD_SEPARATOR = " "
+    """
+    Separates the parts of a header.
+    """
+
+
+class DiffHeaderGroup(StrEnum):
+    """
+    The parts of a diff header read back from its match.
+    """
+
+    STAGED_FILE = "staged_file"
+    """
+    The path of a file the change touches, after the change.
+    """
+
+    FIRST_LINE = "first_line"
+    """
+    The first line of a changed block, after the change.
+    """
+
+    LINE_COUNT = "line_count"
+    """
+    How many lines the changed block has after the change, absent for one line.
+    """
+
+
 @dataclass(frozen=True)
 class StagedLines:
     """
@@ -94,6 +169,43 @@ class StagedLines:
         """
         return self.lines_by_file.get(path.resolve(), set())
 
+    @classproperty
+    def diff_header(cls) -> re.Pattern[str]:
+        """
+        A file's header, or a changed block's, in a diff without context lines.
+        """
+        file_header = RegularExpression.sequence(
+            Anchor.LINE_START,
+            UnifiedDiffSyntax.FILE_HEADER,
+            UnifiedDiffSyntax.FIELD_SEPARATOR,
+            UnifiedDiffSyntax.OLD_FILE_PREFIX,
+            ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more(),
+            UnifiedDiffSyntax.FIELD_SEPARATOR,
+            UnifiedDiffSyntax.NEW_FILE_PREFIX,
+            ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(
+                DiffHeaderGroup.STAGED_FILE
+            ),
+            Anchor.LINE_END,
+        )
+        line_count = RegularExpression.sequence(
+            UnifiedDiffSyntax.RANGE_COUNT_SEPARATOR,
+            CharacterClass.DIGIT.one_or_more().captured_as(DiffHeaderGroup.LINE_COUNT),
+        )
+        block_header = RegularExpression.sequence(
+            Anchor.LINE_START,
+            UnifiedDiffSyntax.HUNK_MARKER,
+            UnifiedDiffSyntax.FIELD_SEPARATOR,
+            UnifiedDiffSyntax.OLD_RANGE_PREFIX,
+            CharacterClass.NON_WHITESPACE.one_or_more(),
+            UnifiedDiffSyntax.FIELD_SEPARATOR,
+            UnifiedDiffSyntax.NEW_RANGE_PREFIX,
+            CharacterClass.DIGIT.one_or_more().captured_as(DiffHeaderGroup.FIRST_LINE),
+            line_count.optional(),
+            UnifiedDiffSyntax.FIELD_SEPARATOR,
+            UnifiedDiffSyntax.HUNK_MARKER,
+        )
+        return RegularExpression.either(file_header, block_header).compiled()
+
     @cached_property
     def lines_by_file(self) -> dict[Path, set[int]]:
         """
@@ -110,18 +222,16 @@ class StagedLines:
         )
         lines_by_file: dict[Path, set[int]] = {}
         lines: set[int] = set()
-        for match in re.finditer(
-            r"^diff --git a/.+ b/(.+)$|^@@ -\S+ \+(\d+)(?:,(\d+))? @@",
-            diff,
-            re.MULTILINE,
-        ):
-            if match[1] is not None:
+        for match in self.diff_header.finditer(diff):
+            staged_file = match[DiffHeaderGroup.STAGED_FILE]
+            if staged_file is not None:
                 lines = lines_by_file.setdefault(
-                    (self.git.working_directory / match[1]).resolve(), set()
+                    (self.git.working_directory / staged_file).resolve(), set()
                 )
                 continue
-            start = int(match[2])
-            count = 1 if match[3] is None else int(match[3])
+            start = int(match[DiffHeaderGroup.FIRST_LINE])
+            line_count = match[DiffHeaderGroup.LINE_COUNT]
+            count = 1 if line_count is None else int(line_count)
             lines.update(range(start, start + count))
         return lines_by_file
 

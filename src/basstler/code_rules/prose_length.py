@@ -7,7 +7,6 @@ from __future__ import annotations
 import ast
 import inspect
 import io
-import re
 import tokenize
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -16,6 +15,12 @@ from pathlib import Path
 from typing import override
 
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    CharacterSet,
+    RegularExpression,
+)
 
 # %% what is measured
 
@@ -36,7 +41,18 @@ class ProseKind(StrEnum):
     """
 
 
-FIELD_LIST_ITEM = re.compile(r"^:[^:\s][^:]*:")
+FIELD_MARKER = ":"
+"""
+What encloses a reStructuredText field's name.
+"""
+
+FIELD_LIST_ITEM = RegularExpression.sequence(
+    Anchor.LINE_START,
+    FIELD_MARKER,
+    CharacterSet.any_except(FIELD_MARKER, CharacterClass.WHITESPACE),
+    CharacterSet.any_except(FIELD_MARKER).zero_or_more(),
+    FIELD_MARKER,
+).compiled()
 """
 A reStructuredText field such as ``:param name:``, which starts a docstring's field list.
 """
@@ -46,7 +62,59 @@ SECTION_HEADER = "# %%"
 The start of a section header comment, which is a label, not prose.
 """
 
-TOOL_DIRECTIVE = re.compile(r"^#\s*(noqa|type:|pragma|fmt:|ruff:|!|-\*-)")
+COMMENT_MARKER = "#"
+"""
+What starts a Python comment.
+"""
+
+
+class ToolDirective(StrEnum):
+    """
+    What a comment addressed to a tool starts with, after its comment marker.
+    """
+
+    LINT_SUPPRESSION = "noqa"
+    """
+    Silences a linter finding on its line.
+    """
+
+    TYPE_COMMENT = "type:"
+    """
+    Gives a type checker a type or silences it.
+    """
+
+    PRAGMA = "pragma"
+    """
+    Instructs a coverage or other tool.
+    """
+
+    FORMATTER = "fmt:"
+    """
+    Switches the formatter off or on.
+    """
+
+    RUFF = "ruff:"
+    """
+    Configures ruff for the file.
+    """
+
+    INTERPRETER = "!"
+    """
+    Names the interpreter, in a script's first line.
+    """
+
+    ENCODING = "-*-"
+    """
+    Declares the file's encoding.
+    """
+
+
+TOOL_DIRECTIVE = RegularExpression.sequence(
+    Anchor.LINE_START,
+    COMMENT_MARKER,
+    CharacterClass.WHITESPACE.zero_or_more(),
+    RegularExpression.either(*ToolDirective),
+).compiled()
 """
 A comment addressed to a tool rather than a reader.
 """

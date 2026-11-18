@@ -19,6 +19,7 @@ import nh3
 
 from basstler.class_property import classproperty
 from basstler.locations import PackageLocation
+from basstler.regular_expression import CharacterSet, RegularExpression
 
 
 class AllowedUrlScheme(StrEnum):
@@ -34,6 +35,58 @@ class AllowedUrlScheme(StrEnum):
     HTTPS = "https"
     """
     Secure web links.
+    """
+
+
+class HtmlSyntax(StrEnum):
+    """
+    The parts of an HTML heading tag.
+    """
+
+    TAG_START = "<"
+    """
+    Opens a tag.
+    """
+
+    TAG_END = ">"
+    """
+    Closes a tag.
+    """
+
+    CLOSING_MARK = "/"
+    """
+    Marks a tag as the one ending an element.
+    """
+
+    HEADING_ELEMENT = "h"
+    """
+    Names a heading element, followed by its level.
+    """
+
+    COMMENT_START = "<!--"
+    """
+    Opens a comment.
+    """
+
+    COMMENT_END = "-->"
+    """
+    Closes a comment.
+    """
+
+
+class HeadingTagGroup(StrEnum):
+    """
+    The parts of a heading tag read back from its match.
+    """
+
+    CLOSING_MARK = "closing_mark"
+    """
+    The closing mark, empty for an opening tag.
+    """
+
+    LEVEL = "level"
+    """
+    The heading's level.
     """
 
 
@@ -63,9 +116,20 @@ class HeadingShift(IntEnum):
     def tag_pattern() -> re.Pattern[str]:
         """
         :return: The pattern matching one opening or closing HTML heading tag, ``<h1>``
-            through ``</h6>``; group 1 is the closing slash, group 2 the level.
+            through ``</h6>``.
         """
-        return re.compile(r"<(/?)h([1-6])>")
+        levels = "".join(
+            str(level) for level in range(1, HeadingShift.DEEPEST_LEVEL + 1)
+        )
+        return RegularExpression.sequence(
+            HtmlSyntax.TAG_START,
+            RegularExpression.sequence(HtmlSyntax.CLOSING_MARK)
+            .optional()
+            .captured_as(HeadingTagGroup.CLOSING_MARK),
+            HtmlSyntax.HEADING_ELEMENT,
+            CharacterSet.any_of(levels).captured_as(HeadingTagGroup.LEVEL),
+            HtmlSyntax.TAG_END,
+        ).compiled()
 
     @classmethod
     def shifted(cls, heading_tag_match: re.Match[str]) -> str:
@@ -78,12 +142,13 @@ class HeadingShift(IntEnum):
         :param heading_tag_match: A match of :meth:`tag_pattern`.
         :return: The tag with its level shifted.
         """
-        closing_slash, original_level = (
-            heading_tag_match.group(1),
-            int(heading_tag_match.group(2)),
-        )
+        closing_mark = heading_tag_match[HeadingTagGroup.CLOSING_MARK]
+        original_level = int(heading_tag_match[HeadingTagGroup.LEVEL])
         shifted_level = min(original_level + cls.LEVELS, cls.DEEPEST_LEVEL)
-        return f"<{closing_slash}h{shifted_level}>"
+        return (
+            f"{HtmlSyntax.TAG_START}{closing_mark}{HtmlSyntax.HEADING_ELEMENT}"
+            f"{shifted_level}{HtmlSyntax.TAG_END}"
+        )
 
 
 def create_template_environment() -> jinja2.Environment:

@@ -36,6 +36,11 @@ class ReviewTriageCommand(BasstlerCommand):
     """
     Ask a repository's Actions to mark a pull request's mechanical files viewed.
     """
+    MARK_VIEWED_IN_REVIEWS = "mark-viewed-in-reviews"
+    """
+    Mark the mechanical files of every open pull request the logged-in account reviews
+    viewed, each from where it last viewed it.
+    """
     SET_UP_MARK_VIEWED = "set-up-mark-viewed"
     """
     Set a repository's Actions up to mark files viewed, listing the steps left.

@@ -6,6 +6,7 @@ triage.
 from __future__ import annotations
 
 from dataclasses import replace
+from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -29,7 +30,7 @@ from basstler.review_triage.keyword_arguments import (
     UnprovenKeywordCall,
 )
 from basstler.review_triage.outputs import MarkdownReport, ViewedFile, ViewedMarking
-from basstler.review_triage.renames import Rename, RenameDecisions
+from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from ..scratch_repository import ScratchRepository
@@ -37,6 +38,7 @@ from .conftest import (
     SAMPLE_REPOSITORY,
     OnePullRequestReader,
     RecordingWriter,
+    RefusingWriter,
     read_sample,
 )
 from .samples import DescriptionSample, PullRequestSample
@@ -135,6 +137,23 @@ def test_a_rename_rejected_by_argument_is_not_applied(
     }
 
 
+def test_a_rename_declared_by_argument_is_applied(
+    sample_changes: PullRequestChanges, old_name_renamed: RenameMap
+):
+    """
+    A rename given as an argument is applied, as the detected one is.
+    """
+    default = PullRequestTriager()
+    triager = replace(
+        default,
+        rename_sources=(
+            *default.rename_sources,
+            ArgumentDeclaration(TriageDeclaration(old_name_renamed.replacements)),
+        ),
+    )
+    assert mechanical_kinds(triager.triage(sample_changes)) == MECHANICAL_KINDS
+
+
 # %% outputs
 
 
@@ -215,6 +234,18 @@ def test_a_refused_marking_is_raised(sample_changes: PullRequestChanges):
     writer = RecordingWriter({"errors": [{"message": "Resource not accessible"}]})
     with pytest.raises(GraphQLErrorsReturned):
         ViewedMarking(writer).publish(triage)
+
+
+def test_a_refused_call_is_raised_as_a_refused_marking(
+    sample_changes: PullRequestChanges,
+):
+    """
+    A call GitHub refuses outright, as a session without GraphQL access gets, is raised
+    as a refused marking, which names the other ways to mark the files.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    with pytest.raises(GraphQLErrorsReturned):
+        ViewedMarking(RefusingWriter(HTTPStatus.FORBIDDEN)).publish(triage)
 
 
 # %% reading in a checkout lacking the pull request

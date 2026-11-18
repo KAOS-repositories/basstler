@@ -18,7 +18,6 @@ from typing import Any
 
 from basstler.class_property import classproperty
 from basstler.github.pull_request_record import (
-    PullRequestField,
     PullRequestHead,
     PullRequestRecord,
 )
@@ -217,10 +216,4 @@ class UpstreamPullRequests:
         :return: The ones whose head is a branch of *fork*.
         :raises MissingPullRequestFieldError: If a record omits its number or its head.
         """
-        pull_request_by_branch = {}
-        for record in records:
-            number = int(PullRequestField.NUMBER.read(record))
-            head = PullRequestHead.from_record(record, number)
-            if head.repository == fork.full_name:
-                pull_request_by_branch[head.branch] = number
-        return cls(fork, pull_request_by_branch)
+        return cls(fork, PullRequestHead.numbers_by_branch(records, fork.full_name))

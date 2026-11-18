@@ -14,7 +14,11 @@ from basstler.github.pull_request_state import (
     LiveState,
     PullRequestRecord,
 )
-from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository import (
+    PullRequestReference,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.plan.dependencies import DependencyResolver
 from basstler.plan.model import ItemStatus
 from basstler.maintenance.promotion import PromotionSummary
@@ -133,15 +137,14 @@ class ItemClassifier:
         record = item.pull_request_record
         if lineage is None or record is None or not item.has_open_pull_request:
             return None
-        blockers = self._readiness_of(record, lineage).blockers
-        if blockers:
-            return PromotionButton(lineage.upstream_repository, None, blockers)
+        blockers = self._readiness_of(item, record, lineage).blockers
         fork = Repository.parse(self._repository_of(item))
         link = PromotionLink.for_target(
             PromotionTarget(
-                upstream_repository=lineage.upstream_repository,
-                upstream_base=lineage.upstream_default_branch,
-                fork_owner=fork.owner,
+                upstream_base=RepositoryBranch(
+                    lineage.upstream_default_branch, lineage.upstream_repository
+                ),
+                fork=fork,
             ),
             item.branch,
             record.title or item.title,
@@ -149,20 +152,25 @@ class ItemClassifier:
                 fork.pull_request_url(item.pull_request_number)
             ),
         )
-        return PromotionButton(lineage.upstream_repository, link.url, [])
+        return PromotionButton(lineage.upstream_repository, link.url, blockers)
 
     def _readiness_of(
-        self, record: PullRequestRecord, lineage: ForkLineage
+        self, item: Item, record: PullRequestRecord, lineage: ForkLineage
     ) -> PromotionReadiness:
         """
-        :return: What decides whether the pull request may be promoted, read as the
-            stack reads it.
+        :return: What decides whether the item's pull request may be promoted, read as
+            the stack reads it; an open upstream pull request is found from its
+            description's link or from the upstream's own listing.
         """
+        upstream_pull_requests = self.live_pull_requests.upstream_pull_requests.get(
+            self._repository_of(item), {}
+        )
         return PromotionReadiness(
             status=BranchStatus.derive(
                 draft=record.draft,
                 merged=record.was_merged,
-                in_review=record.upstream_link is not None,
+                in_review=record.upstream_link is not None
+                or item.branch in upstream_pull_requests,
             ),
             parent_landed=self._base_has_landed(record, lineage),
             withheld=self.needs_resolution_label in record.labels,

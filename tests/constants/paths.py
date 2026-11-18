@@ -45,6 +45,11 @@ class RepositoryLocation(PathEnumeration):
     The shell entry points under test.
     """
 
+    REVIEW_TRIAGE_SCRIPT = ROOT / "scripts" / "review-triage.sh"
+    """
+    The script that triages a repository's pull requests without a checkout of basstler.
+    """
+
     WORKFLOWS = ROOT / ".github" / "workflows"
     """
     The repository's Actions workflows.
@@ -360,6 +365,11 @@ class DatasetLocation(PathEnumeration):
     """
     Executables copied onto a scratch ``PATH`` to stand in for a real ``gh``, ``curl`` or
     hook script.
+    """
+
+    RECORDING_PYTHON_STUB = STUBS / "recording_python.sh"
+    """
+    An interpreter that runs nothing and records the arguments it is given.
     """
 
     DISPATCH_CHECK_NEEDS_SETUP_STUB = STUBS / "dispatch_check_needs_setup.py"

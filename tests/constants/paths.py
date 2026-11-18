@@ -426,6 +426,14 @@ class DatasetLocation(PathEnumeration):
     class only mentioning it.
     """
 
+    CONFLICTED_MODULE = (
+        DIRECTORY / "review-triage" / "conflicted-module" / "triangle.py.txt"
+    )
+    """
+    A subclass of the class header dataset's base class, left with a merge's conflict
+    markers.
+    """
+
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
     """
     The recorded GraphQL responses the upstream review reader is replayed against.

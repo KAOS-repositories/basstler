@@ -36,12 +36,11 @@ items:
   track: triage
   blockers:
     - >-
-      Owner's review of 3be60760: 15 new threads asking to unify repeated fields and duplicated
-      classes (branch, head/base, repository+branch, workflow path, token pages), type branches as
-      Branch, and add two rules (shared field in one mixin; most specific type). Resolving on the
-      branch.
+      Awaiting the owner: 9 open threads on 8457b9be (ListedPullRequest vs summary, git reference
+      base, hand file steps, fork sync, secret read typing, dataclass questions) and the
+      per-reviewer marking plan item; 12 open from 1c54d6ff.
   depends_on: []
-  status: in progress
+  status: blocked
   recommended_model: sonnet
   branch: ccr-37402cb7-cls5ht-viewed-workflow
   session: https://claude.ai/code/session_018wfiv8tMgn3AnHYP1h7jn7

@@ -192,6 +192,11 @@ items:
   depends_on: []
   status: in progress
   recommended_model: sonnet
+  notes: 'Folded into branch-owns-its-repository at the user''s request; it lands in that
+    item''s pull request, #257, which also moves each remaining model that redeclares
+    repository onto HasRepository.
+
+    '
 
 - id: branch-owns-its-repository
   title: "Make every branch hold the repository it belongs to"

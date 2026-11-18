@@ -3,9 +3,9 @@ Plan (markdown-binding-renames, draft #254, stacked on #253):
 
 Done:
 - Blocks read as one module, resolved like a Python file; {code-cell} ipython3 cells read as code; 178 triage tests pass
-- Pushed; CRAM 527 from the merge base: 62 of 335 need review (81 on #253 alone)
+- Pushed b911dee8; the script from this branch on CRAM 527 with --mark-viewed: 62 of 335 need review, all 273 mechanical marked viewed
 
 Next:
-- Run the script on CRAM 527 with --mark-viewed from this branch
+
 - Read CI on #254
 - Indented code blocks in list items; the self_assessment exercises and domain_models READMEs still in review

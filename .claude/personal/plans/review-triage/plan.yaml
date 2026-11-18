@@ -27,32 +27,9 @@ items:
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 214
   notes: 'Draft #214, stacked on #226 and restacked onto its 8f01b9a9 at 4d13d564 (CI not
-    read). Keeps keyword_arguments,
-    calls, signatures and tree_matching, supplying KeywordArgumentComparison and the call
-    resolution binding-renames builds on. CRAM #967: 123 of 154 files mechanical; #210: 233
-    of 246.'
-- id: viewed-marking-workflow
-  title: Mark files viewed on every pull request, from Actions or your own computer
-  track: triage
-  blockers:
-    - >-
-      Awaiting the owner on #215: the secret-model thread (recommended keeping the wrapper), the
-      README thread, and any open threads from 1c54d6ff. Head 90303970 merges clean into main
-      f4d1178b; CI not read.
-  depends_on: []
-  status: blocked
-  recommended_model: sonnet
-  branch: ccr-37402cb7-cls5ht-viewed-workflow
-  session: https://claude.ai/code/session_018wfiv8tMgn3AnHYP1h7jn7
-  pull_request_number: 215
-  notes: >
-    Draft #215, now on main (#213 merged): set-up-mark-viewed installs the workflow (on every pull
-    request with --on-every-pull-request), turns Actions on for forks and lists the token steps
-    left; mark-viewed falls back to Actions and names both routes and the README when neither works.
-    The user says the token is stored (not checked from a cloud session).
-
-    #221 merges only after #215: #221's mark-viewed.yml calls #215's reusable
-    review-triage-mark-viewed.yml.
+    read). Keeps keyword_arguments, calls, signatures and tree_matching, supplying KeywordArgumentComparison
+    and the call resolution binding-renames builds on. CRAM #967: 123 of 154 files mechanical;
+    #210: 233 of 246.'
 - id: move-triage
   title: Prove module, definition and file moves mechanical
   track: triage
@@ -63,12 +40,11 @@ items:
   status: in progress
   recommended_model: sonnet
   notes: 'The general part of #214 (moves, triage since a commit, opt-in rules), split out
-    by moving files. report and mark-viewed now default to the viewer''s last submitted
-    review, else the merge base; --from-merge-base asks for the whole change. --rename no
-    longer crashes (c5473e82, Rename.found_by out of equality). main merged at 8f01b9a9, one
-    conflict in github/repository.py kept both methods; #214, #241 and #238 restacked onto it.
-    Next: read CI. Exempt from the basstler-packages freeze on github.'
-
+    by moving files. report and mark-viewed now default to the viewer''s last submitted review,
+    else the merge base; --from-merge-base asks for the whole change. --rename no longer crashes
+    (c5473e82, Rename.found_by out of equality). main merged at 8f01b9a9, one conflict in
+    github/repository.py kept both methods; #214, #241 and #238 restacked onto it. Next: read
+    CI. Exempt from the basstler-packages freeze on github.'
 - id: generated-file-triage
   title: Prove a generated file mechanical by regenerating it
   track: triage
@@ -80,7 +56,6 @@ items:
     agents-md (code_rules/command_line.py generate_agents_instructions), is mechanical when
     regenerating it from the head's sources reproduces the head's file. Each generated file
     and its generator are declared once, not hardcoded in the triage.
-
 - id: windows-suite
   title: Make the suite pass on Windows
   track: windows
@@ -89,26 +64,24 @@ items:
   recommended_model: sonnet
   branch: fix-windows-test-failures
   pull_request_number: 220
-  notes: 'Draft #220, main merged at b2bb4d75; last Windows run 39 failed, 2712 passed. Runs on a Windows
-    machine (.venv/Scripts/python.exe). Next, in order: install-lock liveness (kill -0 sees MSYS PIDs);
-    session start on Scripts/python.exe environments and their removal; GH_CONFIG_DIR at a temporary
-    folder for no-credential tests; the no-upstream remote test; skip the ~20 gh/bash stub tests on
-    win32, naming the limit. Push only through basstler.sh maintenance push; a push restacks #222 and
-    clears Viewed. Update these notes per push; after this order''s last push, run goal pushes-done
-    on this item.'
+  notes: 'Draft #220, main merged at b2bb4d75; last Windows run 39 failed, 2712 passed. Runs
+    on a Windows machine (.venv/Scripts/python.exe). Next, in order: install-lock liveness
+    (kill -0 sees MSYS PIDs); session start on Scripts/python.exe environments and their removal;
+    GH_CONFIG_DIR at a temporary folder for no-credential tests; the no-upstream remote test;
+    skip the ~20 gh/bash stub tests on win32, naming the limit. Push only through basstler.sh
+    maintenance push; a push restacks #222 and clears Viewed. Update these notes per push;
+    after this order''s last push, run goal pushes-done on this item.'
 - id: actions-marking
   title: Install the mark-viewed workflow in this repository
   track: triage
   branch: basstler/mark-viewed
   pull_request_number: 221
-  depends_on:
-  - viewed-marking-workflow
+  depends_on: []
   status: in progress
   recommended_model: haiku
   notes: 'Open #221, written by set-up-mark-viewed. Its mark-viewed.yml calls #215''s reusable
     review-triage-mark-viewed.yml, so the owner merges it only after #215 has merged. Needs
     the REVIEW_TRIAGE_VIEWER_TOKEN secret stored by the owner.'
-
 - id: mark-220-viewed
   title: 'Mark #220''s mechanical files viewed'
   track: windows
@@ -124,10 +97,10 @@ items:
   commands:
   - basstler review-triage report 220
   - basstler review-triage mark-viewed 220
-  notes: 'Run on your own computer, from a checkout that has rule-fix-triage merged, and before you
-    review #220: it shrinks that review''s diff. It waits for windows-suite''s last push to be recorded
-    (goal pushes-done), and waits again if #220 is pushed after it, since every push clears Viewed.
-    The report lists what will be marked; read it before marking.'
+  notes: 'Run on your own computer, from a checkout that has rule-fix-triage merged, and before
+    you review #220: it shrinks that review''s diff. It waits for windows-suite''s last push
+    to be recorded (goal pushes-done), and waits again if #220 is pushed after it, since every
+    push clears Viewed. The report lists what will be marked; read it before marking.'
 - id: move-split
   title: Split every proven mechanical change out of a pull request, and leave one sample
     per rename unviewed
@@ -139,12 +112,11 @@ items:
   - binding-renames
   status: in progress
   recommended_model: opus
-  notes: 'Draft #241 at 157be7bc, restacked on #226''s 8f01b9a9. split-mechanical: statement-level mechanical
-    commit proven with the PR''s renames, head tree after, summary in the description.
-    Samples: one unviewed file per rename. Local splits: CRAM 609 3435 to 1455 lines,
-    business_consulting 125 2757 to 2084. CI not read. Next: restack onto binding-renames
-    once it is built, adapting SourceRenaming, the samples and the summary to binding renames.'
-
+  notes: 'Draft #241 at 157be7bc, restacked on #226''s 8f01b9a9. split-mechanical: statement-level
+    mechanical commit proven with the PR''s renames, head tree after, summary in the description.
+    Samples: one unviewed file per rename. Local splits: CRAM 609 3435 to 1455 lines, business_consulting
+    125 2757 to 2084. CI not read. Next: restack onto binding-renames once it is built, adapting
+    SourceRenaming, the samples and the summary to binding renames.'
 - id: binding-renames
   title: Prove a rename of one class, function, attribute, parameter or variable mechanical
   track: triage
@@ -155,13 +127,11 @@ items:
   - keyword-argument-triage
   status: in progress
   recommended_model: opus
-  notes: 'Draft #253 on #214, pushed at 61f0f5ef. Renames of module members and class
-    methods/attributes are proven by resolution; scripts/review-triage.sh runs the triage on
-    any repository. CRAM 527 at 6f2bd2c4: 99 of 440 need review from the merge base. CI not
-    read; #254 not restacked onto 61f0f5ef. Next: unresolved receivers, keyword parameters,
-    word-level renames accepting an overridden stdlib method, business_consulting #125
-    evaluation.py check.'
-
+  notes: 'Draft #253 on #214, pushed at 61f0f5ef. Renames of module members and class methods/attributes
+    are proven by resolution; scripts/review-triage.sh runs the triage on any repository.
+    CRAM 527 at 6f2bd2c4: 99 of 440 need review from the merge base. CI not read; #254 not
+    restacked onto 61f0f5ef. Next: unresolved receivers, keyword parameters, word-level renames
+    accepting an overridden stdlib method, business_consulting #125 evaluation.py check.'
 - id: markdown-binding-renames
   title: Prove binding renames in Markdown code blocks and notebook cells
   track: triage
@@ -172,46 +142,44 @@ items:
   status: in progress
   recommended_model: opus
   notes: 'Draft #254 on #253, pushed at dba4f8b4. A document''s python code blocks and MyST
-    {code-cell} ipython3 cells, after their options, are read as one module and resolved like a
-    Python file. CRAM 527: 58 of 335 need review; run there with --mark-viewed. CI not read.
-    Prose alone never proves a rename (no false positives). Next: indented code blocks in list
-    items, the domain_models READMEs.'
-
+    {code-cell} ipython3 cells, after their options, are read as one module and resolved like
+    a Python file. CRAM 527: 58 of 335 need review; run there with --mark-viewed. CI not read.
+    Prose alone never proves a rename (no false positives). Next: indented code blocks in
+    list items, the domain_models READMEs.'
 - id: per-reviewer-viewed-marking
-  title: "Mark files viewed since each reviewer's last review"
+  title: Mark files viewed since each reviewer's last review
   branch: null
   track: triage
   depends_on: []
   status: not started
   recommended_model: opus
-
 - id: repository-field-once
-  title: "Declare the repository field once in every GitHub model"
+  title: Declare the repository field once in every GitHub model
   branch: null
   track: triage
   depends_on: []
   status: in progress
   recommended_model: sonnet
   notes: 'Folded into branch-owns-its-repository at the user''s request; it lands in that
-    item''s pull request, #257, which also moves each remaining model that redeclares
-    repository onto HasRepository.
+    item''s pull request, #257, which also moves each remaining model that redeclares repository
+    onto HasRepository.
 
     '
-
 - id: branch-owns-its-repository
-  title: "Make every branch hold the repository it belongs to"
+  title: Make every branch hold the repository it belongs to
   branch: claude/ecstatic-carson-fs34i3
   track: triage
   pull_request_number: 257
   session: https://claude.ai/code/session_01JxHGiNcmkURK6bxmkkdhe5
-  notes: >
-    Starts once #215 lands. `Branch` (basstler-git) holds a required repository: add a git-layer
-    repository base that GitHub's `Repository` subclasses, and merge `RepositoryBranch` into
-    `Branch`. Payload models naming a branch (`PullRequestEnd`, `ExistingBranch`, the default
-    branches in `repository_details`) take it from the read, with one reader and writer for a
-    `Branch`'s wire form; give `PullRequestReference` the same treatment. Comes from the review
-    threads on #215 at 39d7cd13.
+  notes: 'Starts once #215 lands. `Branch` (basstler-git) holds a required repository: add
+    a git-layer repository base that GitHub''s `Repository` subclasses, and merge `RepositoryBranch`
+    into `Branch`. Payload models naming a branch (`PullRequestEnd`, `ExistingBranch`, the
+    default branches in `repository_details`) take it from the read, with one reader and writer
+    for a `Branch`''s wire form; give `PullRequestReference` the same treatment. Comes from
+    the review threads on #215 at 39d7cd13.
+
+    '
   depends_on: []
   status: in progress
   recommended_model: opus
-landed_item_count: 1
+landed_item_count: 2

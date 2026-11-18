@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import override
 
 import libcst
+import libcst.matchers as m
 
 from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.specification import Specification
-from basstler.code_modification.syntax import CallSyntax, ExpressionSyntax
+from basstler.code_modification.syntax import ExpressionSyntax
 from basstler.code_rules.fixes import (
     BehaviourDeclaration,
     BehaviourEffect,
@@ -26,22 +26,6 @@ from basstler.code_rules.locale_encoding import TextFunction, TextKeyword
 from basstler.text_file import UTF_8, TextFile
 
 # %% the fix
-
-
-class TextFileMethod(StrEnum):
-    """
-    The methods of a text file, by the path method each stands for.
-    """
-
-    READ = "read"
-    """
-    :meth:`basstler.text_file.TextFile.read`.
-    """
-
-    WRITE = "write"
-    """
-    :meth:`basstler.text_file.TextFile.write`.
-    """
 
 
 class TextFileFix(CodeFix[Specification]):
@@ -58,10 +42,11 @@ class TextFileFix(CodeFix[Specification]):
         )
 
     @classproperty
-    def required_import(cls) -> libcst.SimpleStatementLine:
-        return libcst.parse_statement(
-            f"from {TextFile.__module__} import {TextFile.__name__}\n"
-        )
+    def required_import(cls) -> type:
+        """
+        :class:`~basstler.text_file.TextFile`.
+        """
+        return TextFile
 
     def replacement(self, specification: Specification) -> libcst.Call:
         call = libcst.ensure_type(specification.node, libcst.Call)
@@ -70,18 +55,41 @@ class TextFileFix(CodeFix[Specification]):
             libcst.Name(TextFile.__name__), [libcst.Arg(path_method.value)]
         )
         method = (
-            TextFileMethod.READ
+            TextFile.read
             if path_method.attr.value == TextFunction.READ_TEXT
-            else TextFileMethod.WRITE
+            else TextFile.write
         )
         text = [libcst.Arg(argument.value) for argument in call.args[:1]]
         return libcst.Call(
-            libcst.Attribute(text_file, libcst.Name(method)),
-            text if method is TextFileMethod.WRITE else [],
+            libcst.Attribute(text_file, libcst.Name(method.__name__)),
+            text if method is TextFile.write else [],
         )
 
 
 # %% the check
+
+ENCODING_AS_UTF_8 = m.Arg(
+    keyword=m.Name(TextKeyword.ENCODING),
+    value=m.MatchIfTrue(lambda value: ExpressionSyntax(value).literal_text == UTF_8),
+)
+"""
+The argument that names UTF-8 as the encoding.
+"""
+
+TEXT_CALL = m.OneOf(
+    m.Call(
+        func=m.Attribute(attr=m.Name(TextFunction.READ_TEXT)),
+        args=[m.ZeroOrOne(ENCODING_AS_UTF_8)],
+    ),
+    m.Call(
+        func=m.Attribute(attr=m.Name(TextFunction.WRITE_TEXT)),
+        args=[m.Arg(keyword=None, star=""), m.ZeroOrOne(ENCODING_AS_UTF_8)],
+    ),
+)
+"""
+The calls a text file makes in the same way: a read, or a write of one text, each with
+no encoding or UTF-8 and nothing else.
+"""
 
 
 @dataclass(frozen=True)
@@ -107,29 +115,5 @@ class TextFileChecker(FixableChecker[Specification]):
         self, module: PositionedModule
     ) -> Iterator[Specification]:
         for node, location in module.positions.items():
-            if isinstance(node, libcst.Call) and self.is_text_call(CallSyntax(node)):
+            if m.matches(node, TEXT_CALL):
                 yield Specification(location, node)
-
-    @staticmethod
-    def is_text_call(call: CallSyntax) -> bool:
-        """
-        :return: Whether *call* is a call of a path's ``read_text`` or ``write_text``
-            that a :class:`~basstler.text_file.TextFile` makes in the same way.
-        """
-        if not isinstance(call.call.func, libcst.Attribute):
-            return False
-        name = ExpressionSyntax(call.call.func).final_name
-        if name not in (TextFunction.READ_TEXT, TextFunction.WRITE_TEXT):
-            return False
-        texts = 0 if name == TextFunction.READ_TEXT else 1
-        keywords = call.keyword_arguments
-        if len(call.call.args) != len(call.positional_arguments) + len(keywords):
-            return False
-        encoding = keywords.get(TextKeyword.ENCODING)
-        if len(call.positional_arguments) != texts or set(keywords) - {
-            TextKeyword.ENCODING
-        }:
-            return False
-        return (
-            encoding is None or ExpressionSyntax(encoding.value).literal_text == UTF_8
-        )

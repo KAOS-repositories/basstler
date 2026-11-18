@@ -858,6 +858,20 @@ class CodeModificationSnippet(PathEnumeration):
     :mod:`os`.
     """
 
+    IMPORTS_OF_TEXT_FILE_MODULE = DIRECTORY / "imports-of-text-file-module.py.txt"
+    """
+    A module that imports :data:`~basstler.text_file.UTF_8` and nothing else from
+    :mod:`basstler.text_file`.
+    """
+
+    IMPORTS_OF_TEXT_FILE_MODULE_MERGED = (
+        DIRECTORY / "imports-of-text-file-module-merged.py.txt"
+    )
+    """
+    :attr:`IMPORTS_OF_TEXT_FILE_MODULE` with :class:`~basstler.text_file.TextFile`
+    imported in the same statement.
+    """
+
     NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
     """
     A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`

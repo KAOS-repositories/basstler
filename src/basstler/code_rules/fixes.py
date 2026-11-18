@@ -81,9 +81,9 @@ class CodeFix[SpecificationType: Specification](ABC):
         """
 
     @classproperty
-    def required_import(cls) -> libcst.SimpleStatementLine | None:
+    def required_import(cls) -> type | None:
         """
-        The import statement the replacement needs in the module, if any.
+        The class the replacement needs imported in the module, if any.
         """
         return None
 
@@ -233,7 +233,7 @@ class SourceFixer:
             places breaking a rule as there were before it.
         """
         inverses: list[Action] = []
-        imports: list[libcst.SimpleStatementLine] = []
+        imports: list[type] = []
         module = source_file.parse()
         places = self.places(module)
         while places:
@@ -253,8 +253,8 @@ class SourceFixer:
                     )
                 )
             places = remaining
-        for statement in imports:
-            applied = ImportInsertion(statement).apply(module)
+        for imported in dict.fromkeys(imports):
+            applied = ImportInsertion(imported).apply(module)
             module = applied.module
             inverses.append(applied.inverse)
         return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))

@@ -8,6 +8,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import libcst
+from libcst.codemod import CodemodContext
+from libcst.codemod.visitors import AddImportsVisitor
 from libcst.metadata import CodeRange
 
 from basstler.code_modification.exceptions import ActionTargetMissingError
@@ -90,100 +92,44 @@ class NodeReplacement(Action):
         )
 
 
-# %% statements
+# %% imports
 
 
 @dataclass(frozen=True)
-class StatementRemoval(Action):
+class ModuleReplacement(Action):
     """
-    Removes a statement from the top level of a module.
-    """
-
-    statement: libcst.SimpleStatementLine
-    """
-    The statement removed, which the module must hold at its top level.
+    Replaces a whole module, which the action that restores the module undoes.
     """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        index = next(
-            (
-                position
-                for position, candidate in enumerate(module.body)
-                if candidate.deep_equals(self.statement)
-            ),
-            None,
-        )
-        if index is None:
-            raise ActionTargetMissingError(
-                PositionedModule(module).positions[module.body[0]],
-                type(self.statement).__name__,
-            )
-        body = [*module.body[:index], *module.body[index + 1 :]]
-        return AppliedAction(
-            module.with_changes(body=body), StatementInsertion(index, self.statement)
-        )
-
-
-@dataclass(frozen=True)
-class StatementInsertion(Action):
+    replacement: libcst.Module
     """
-    Puts a statement at one position of a module's top level.
-    """
-
-    index: int
-    """
-    The position of the statement among the module's top-level statements.
-    """
-
-    statement: libcst.SimpleStatementLine
-    """
-    The statement inserted.
+    The module that takes the place of the one the action is applied to.
     """
 
     def apply(self, module: libcst.Module) -> AppliedAction:
-        body = [*module.body[: self.index], self.statement, *module.body[self.index :]]
-        return AppliedAction(
-            module.with_changes(body=body), StatementRemoval(self.statement)
-        )
+        return AppliedAction(self.replacement, ModuleReplacement(module))
 
 
 @dataclass(frozen=True)
 class ImportInsertion(Action):
     """
-    Imports a name in a module that does not import it yet, after the module's last
-    import.
+    Imports a class in a module, merged into an import of its module where there is one
+    and left out where the module imports the class already.
     """
 
-    statement: libcst.SimpleStatementLine
+    imported: type
     """
-    The import statement.
+    The class to import.
     """
 
     def apply(self, module: libcst.Module) -> AppliedAction:
-        if any(candidate.deep_equals(self.statement) for candidate in module.body):
-            return AppliedAction(module, ActionPlan())
-        return StatementInsertion(self.insertion_index(module), self.statement).apply(
-            module
+        context = CodemodContext()
+        AddImportsVisitor.add_needed_import(
+            context, self.imported.__module__, self.imported.__name__
         )
-
-    @staticmethod
-    def insertion_index(module: libcst.Module) -> int:
-        """
-        :return: The position after the module's last import, or after its docstring
-            where it imports nothing.
-        """
-        last_import = max(
-            (
-                position
-                for position, candidate in enumerate(module.body)
-                if isinstance(candidate, libcst.SimpleStatementLine)
-                and isinstance(candidate.body[0], libcst.Import | libcst.ImportFrom)
-            ),
-            default=None,
-        )
-        if last_import is not None:
-            return last_import + 1
-        return 1 if module.get_docstring(clean=False) is not None else 0
+        return ModuleReplacement(
+            AddImportsVisitor(context).transform_module(module)
+        ).apply(module)
 
 
 # %% plans

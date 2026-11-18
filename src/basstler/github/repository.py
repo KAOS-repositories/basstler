@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from pydantic import Field
 
@@ -80,6 +80,23 @@ class NewTokenPage(StrEnum):
         The form's address.
         """
         return f"{GitHubAddress.WEB}/{self}"
+
+
+class ReviewerInvolvement(StrEnum):
+    """
+    How the credential's account takes part in reviewing a pull request, as the
+    qualifier GitHub's issue search finds such pull requests by.
+    """
+
+    REVIEW_REQUESTED = "review-requested"
+    """
+    Its review is requested, from it or from a team it belongs to.
+    """
+
+    REVIEWED = "reviewed-by"
+    """
+    It has submitted a review, after which GitHub no longer lists the request.
+    """
 
 
 @dataclass
@@ -355,6 +372,17 @@ class Repository:
         :return: The REST path listing that pull request's reviews, oldest first.
         """
         return f"{self.pull_request_path(number)}/reviews"
+
+    def reviewer_pull_request_search_path(
+        self, involvement: ReviewerInvolvement
+    ) -> str:
+        """
+        :param involvement: How the credential's account takes part in the review.
+        :return: The REST path of the issue search listing the repository's open pull
+            requests the account takes part in reviewing that way.
+        """
+        query = f"repo:{self.full_name} is:pr is:open {involvement}:@me"
+        return f"search/issues?{urlencode({'q': query})}"
 
     def compare_path(self, base: str) -> str:
         """

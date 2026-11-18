@@ -160,13 +160,9 @@ def test_a_workflow_s_page_lists_its_runs_under_the_repository_s_actions():
     )
 
 
-def test_the_new_file_page_is_under_its_branch():
-    assert REPOSITORY.new_file_page_url(BRANCH) == f"{REPOSITORY.url}/new/{BRANCH.name}"
-
-
-def test_the_edit_page_of_a_file_is_under_its_branch():
-    assert REPOSITORY.edit_file_url(BRANCH, "a/b.yml") == (
-        f"{REPOSITORY.url}/edit/{BRANCH.name}/a/b.yml"
+def test_a_branch_is_moved_under_the_git_references_path():
+    assert REPOSITORY.branch_update_path(BRANCH) == (
+        f"{REPOSITORY.git_references_path}/heads/{BRANCH.name}"
     )
 
 

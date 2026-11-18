@@ -5,7 +5,6 @@ pull request.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -15,6 +14,7 @@ from basstler.class_property import classproperty
 from basstler.git.branch import Branch
 from basstler.github.client import (
     GitHubAttemptClient,
+    GitHubCallFailed,
     GitHubResponse,
     HttpMethod,
     RepositoryWrite,
@@ -24,11 +24,9 @@ from basstler.github.pull_request import NewPullRequest
 from basstler.github.pull_request_form import PullRequestForm
 from basstler.github.repository import RepositoryBranch
 from basstler.github.repository_access import PullRequestListState
-from basstler.github.repository_resources import RepositoryRead, SettingWrite
-from basstler.github.rest_models import ListedPullRequest, PullRequestPage
-from basstler.github.user_steps import AddFile, ReplaceFile, UserStep
-from basstler.github.web_form import PrefilledForm, UrlQueryParameter
-from basstler.json_model import ValidatedJSONModel
+from basstler.github.repository_resources import RepositoryRead, ResourceWrite
+from basstler.github.rest_models import PullRequestPage, RestPullRequestSummary
+from basstler.json_model import RawValueReader, ValidatedJSONModel
 
 # %% the contents API
 
@@ -63,7 +61,7 @@ class FileRead(RepositoryRead[RepositoryFile]):
         )
 
 
-class FileWrite(SettingWrite[RepositoryFile], EncodedContent):
+class FileWrite(ResourceWrite[RepositoryFile], EncodedContent):
     """
     Commits one file to a branch of a repository: creates it, or replaces the blob it
     holds.
@@ -100,56 +98,11 @@ class FileWrite(SettingWrite[RepositoryFile], EncodedContent):
     def path(self) -> str:
         return self.repository.contents_path(self.file_path_from_repository_root)
 
-    @property
-    def target(self) -> str:
-        """
-        The file and where it goes, as a phrase.
-        """
-        return (
-            f"{self.file_path_from_repository_root} on "
-            f"{self.repository.full_name}'s {self.branch.name}"
-        )
-
-    @property
-    def manual_step(self) -> UserStep:
-        if self.replaced_object_hash is None:
-            return AddFile(
-                self.target,
-                NewFileForm(
-                    RepositoryBranch(self.branch.name, self.repository),
-                    self.file_path_from_repository_root,
-                    self.text,
-                ).url,
-            )
-        return ReplaceFile(
-            self.target,
-            self.repository.edit_file_url(
-                self.branch, self.file_path_from_repository_root
-            ),
-            self.text,
-        )
-
-
-class NewFileParameter(UrlQueryParameter):
-    """
-    The query parameters GitHub's new-file page fills its fields from.
-    """
-
-    FILE_NAME = "filename"
-    """
-    The file's path from the repository's root.
-    """
-
-    VALUE = "value"
-    """
-    The file's whole content.
-    """
-
 
 @dataclass(frozen=True)
-class BranchFile:
+class FileCommit:
     """
-    One file's whole content on a branch of a repository.
+    One file's whole content, committed to a branch of a repository.
     """
 
     branch: RepositoryBranch
@@ -165,31 +118,6 @@ class BranchFile:
     text: str
     """
     The file's whole content.
-    """
-
-
-@dataclass(frozen=True)
-class NewFileForm(PrefilledForm, BranchFile):
-    """
-    GitHub's page adding one file to a branch, with its path and content filled in.
-    """
-
-    @property
-    def page_url(self) -> str:
-        return self.branch.repository.new_file_page_url(self.branch)
-
-    @property
-    def filled_fields(self) -> Mapping[UrlQueryParameter, str]:
-        return {
-            NewFileParameter.FILE_NAME: self.file_path_from_repository_root,
-            NewFileParameter.VALUE: self.text,
-        }
-
-
-@dataclass(frozen=True)
-class FileCommit(BranchFile):
-    """
-    One file's whole content, committed to a branch of a repository.
     """
 
     message: str
@@ -224,9 +152,34 @@ class FileCommit(BranchFile):
 # %% branches and pull requests
 
 
-class BranchReference(ValidatedJSONModel):
+class FullReferenceName(RawValueReader):
     """
-    One branch, as the git references API returns it.
+    Reads a branch's full reference as the branch's name.
+    """
+
+    def read(self, value: str) -> str:
+        return value.removeprefix(f"{Branch.namespace}/")
+
+
+class BranchReference(ValidatedJSONModel, Branch):
+    """
+    A branch as the git references API names it: by its full reference.
+    """
+
+    name: Annotated[
+        str,
+        Field(alias="ref"),
+        FullReferenceName(),
+        PlainSerializer(lambda name: Branch(name).reference),
+    ]
+    """
+    The branch's name, read and written as its full reference.
+    """
+
+
+class ExistingBranch(BranchReference):
+    """
+    A branch of a repository, as the git references API returns it.
     """
 
     target: Annotated[GitObject, Field(alias="object")]
@@ -236,7 +189,7 @@ class BranchReference(ValidatedJSONModel):
 
 
 @dataclass(frozen=True)
-class BranchReferenceRead(RepositoryRead[BranchReference]):
+class BranchReferenceRead(RepositoryRead[ExistingBranch]):
     """
     Reads where one branch of a repository points.
     """
@@ -251,18 +204,9 @@ class BranchReferenceRead(RepositoryRead[BranchReference]):
         return self.repository.branch_reference_path(self.branch)
 
 
-class NewBranch(RepositoryWrite, GitObject, Branch):
+class NewBranch(RepositoryWrite, GitObject, BranchReference):
     """
     A branch that does not exist yet, starting at one commit, the object it stands for.
-    """
-
-    name: Annotated[
-        str,
-        Field(alias="ref"),
-        PlainSerializer(lambda name: Branch(name).reference),
-    ]
-    """
-    The branch's name, written as its full reference.
     """
 
     @classproperty
@@ -293,9 +237,9 @@ class ProposalOutcome:
     Whether this proposal opened it, rather than finding it open.
     """
 
-    failure: str = ""
+    failure: GitHubCallFailed | None = None
     """
-    Why no pull request could be opened, empty otherwise.
+    Why no pull request could be opened, ``None`` otherwise.
     """
 
     form_url: str = ""
@@ -393,14 +337,14 @@ class FileProposal:
             from_branch if from_branch.failure is not None else None
         ) or self._put_on_branch(client)
         if failed is not None:
-            return ProposalOutcome(failure=failed.failure.error_message())
+            return ProposalOutcome(failure=failed.failure)
         if from_branch.body:
             return ProposalOutcome(PullRequestPage.from_json(from_branch.body[0]))
         return self._open_pull_request(client)
 
     def _pull_request_carrying(
         self, client: GitHubAttemptClient
-    ) -> ListedPullRequest | None:
+    ) -> RestPullRequestSummary | None:
         """
         :param client: Reads the repository.
         :return: The open pull request from another branch than the commit's whose
@@ -412,7 +356,7 @@ class FileProposal:
             return None
         carrying = [
             pull_request
-            for pull_request in map(ListedPullRequest.from_json, listed.body)
+            for pull_request in map(RestPullRequestSummary.from_json, listed.body)
             if pull_request.head.name != self.commit.branch.name
             and self._held_by(client, pull_request)
         ]
@@ -425,7 +369,7 @@ class FileProposal:
         return lowest[0] if lowest else None
 
     def _held_by(
-        self, client: GitHubAttemptClient, pull_request: ListedPullRequest
+        self, client: GitHubAttemptClient, pull_request: RestPullRequestSummary
     ) -> bool:
         """
         :param client: Reads the repository.
@@ -498,7 +442,7 @@ class FileProposal:
         if opened.failure is not None:
             link = self.form.link
             return ProposalOutcome(
-                failure=opened.failure.error_message(),
+                failure=opened.failure,
                 form_url="" if link is None else link.url,
             )
         return ProposalOutcome(PullRequestPage.from_json(opened.body), opened_now=True)

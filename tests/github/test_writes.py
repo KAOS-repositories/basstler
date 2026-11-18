@@ -21,6 +21,7 @@ from basstler.github.label import LabelReplacement, NewLabel, RepositoryLabel
 from basstler.github.pull_request import NewPullRequest, PullRequestDescription
 from basstler.git.branch import Branch
 from basstler.github.file_proposal import NewBranch
+from basstler.github.fork_sync import ForkFastForward
 from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
@@ -82,6 +83,10 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     (
         NewBranch(repository=REPOSITORY, object_hash="a-commit", name="feature"),
         {"ref": Branch("feature").reference, "sha": "a-commit"},
+    ),
+    (
+        ForkFastForward(repository=FORK, object_hash="a-commit", branch=Branch("main")),
+        {"sha": "a-commit"},
     ),
     (PullRequestDescription(REPOSITORY, 1, "a description"), {"body": "a description"}),
     (

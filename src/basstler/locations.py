@@ -462,6 +462,12 @@ class ProjectLocation(PathEnumeration):
     Where the personal-notes branch keeps everything it holds.
     """
 
+    PYPROJECT = Path("pyproject.toml")
+    """
+    The Python project metadata, whose ``[tool.basstler]`` table holds a project's
+    settings for this package's tools.
+    """
+
     PROJECT_STACK_CONFIGURATION = CLAUDE_CODE_DIRECTORY / "basstler" / "stack.toml"
     """
     The stack settings a project commits, naming its own upstream - layered over

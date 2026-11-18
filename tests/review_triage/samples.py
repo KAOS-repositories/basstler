@@ -9,7 +9,9 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from basstler.class_property import classproperty
 from basstler.git.commit_range import FileVersions
+from basstler.review_triage.definitions import DefinitionIndex, SourceDefinitions
 
 from ..constants.paths import DatasetLocation
 
@@ -25,12 +27,17 @@ class FileSample(StrEnum):
     CODE_REFORMATTED = "code-reformatted"
     DOCSTRING_REFLOWED = "docstring-reflowed"
     DOCSTRING_REWORDED = "docstring-reworded"
+    DOCUMENTATION_IMPORT_MOVED = "documentation-import-moved"
     DOCUMENTATION_REFLOWED = "documentation-reflowed"
     DOCUMENTATION_RENAMED = "documentation-renamed"
     IDENTIFIER_RENAMED = "identifier-renamed"
     IMPORT_SOURCE_CHANGED = "import-source-changed"
     IMPORTS_REORDERED = "imports-reordered"
+    MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
+    MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
+    RELATIVE_IMPORT_MOVED = "relative-import-moved"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
+    TEMPLATE_RENAMED = "template-renamed"
 
     @property
     def directory(self) -> Path:
@@ -51,6 +58,13 @@ class FileSample(StrEnum):
             base_text=base.read_text(),
             head_text=head.read_text(),
         )
+
+    def base_definitions(self) -> DefinitionIndex:
+        """
+        :return: What the base version defines, as the base commit's definitions.
+        """
+        base = next(self.directory.glob("base.*"))
+        return DefinitionIndex(SourceDefinitions((base.read_text(),)))
 
 
 # %% pull request descriptions
@@ -75,23 +89,24 @@ class DescriptionSample(StrEnum):
 # %% the pull request
 
 
-class PullRequestSample(StrEnum):
+class SampleTrees(StrEnum):
     """
-    The parts of the sample pull request: its two trees, its REST payload and its
-    report.
+    The parts of a sample pull request kept in one directory, its two trees among them.
     """
 
-    BASE_TREE = "base"
-    HEAD_TREE = "head"
-    PAYLOAD = "pull-request.json"
-    REPORT = "report.md"
+    @classproperty
+    def directory_name(cls) -> str:
+        """
+        The name of the directory holding the parts.
+        """
+        raise NotImplementedError
 
     @property
     def path(self) -> Path:
         """
         Where the part is.
         """
-        return DatasetLocation.REVIEW_TRIAGE / "pull-request" / self
+        return DatasetLocation.REVIEW_TRIAGE / self.directory_name / self
 
     def files(self) -> dict[Path, str]:
         """
@@ -103,8 +118,149 @@ class PullRequestSample(StrEnum):
             if file.is_file()
         }
 
-    def payload(self) -> dict[str, Any]:
+    def payload(self) -> Any:
         """
-        :return: The REST payload, parsed.
+        :return: The part's JSON, parsed.
         """
-        return json.loads(self.path.read_text())
+        return json.loads(self.path.read_text(encoding="utf-8"))
+
+
+class PullRequestSample(SampleTrees):
+    """
+    The parts of the sample pull request: its two trees, its REST payload and its
+    report.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    PAYLOAD = "pull-request.json"
+    REPORT = "report.md"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "pull-request"
+
+
+# %% the module move
+
+
+class ModuleMoveSample(SampleTrees):
+    """
+    A pull request moving a module into a subpackage and importing it from there.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "module-move"
+
+
+# %% the definition move
+
+
+class DefinitionMoveSample(SampleTrees):
+    """
+    A pull request moving classes out of a module that stays, into one that exists and
+    one it adds, and importing them from there.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move"
+
+
+class DefinitionMoveFromMovedModuleSample(SampleTrees):
+    """
+    A pull request moving a module and, out of it, one class into a module it adds.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-from-moved-module"
+
+
+class SubclassSubstitutionSample(SampleTrees):
+    """
+    A pull request moving a property of a class down into a new subclass, one caller
+    switching to the subclass and another keeping the class.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "subclass-substitution"
+
+
+# %% the base branch merged after a review
+
+
+class BaseBranchMergeSample(SampleTrees):
+    """
+    A pull request reviewed once, then merging an update of its base branch and changing
+    one file again.
+    """
+
+    BASE_TREE = "base"
+    """
+    The files of the base branch the pull request started from.
+    """
+
+    REVIEWED_TREE = "reviewed"
+    """
+    The files the pull request had changed when it was reviewed.
+    """
+
+    BASE_BRANCH_UPDATE = "base-branch-update"
+    """
+    The files the base branch changed after the review.
+    """
+
+    HEAD_TREE = "head"
+    """
+    The files the pull request changed after merging the update.
+    """
+
+    REVIEWS = "reviews.json"
+    """
+    The pull request's reviews as REST lists them, each ``commit_id`` naming a
+    :class:`ReviewedHistory` commit by its field.
+    """
+
+    AUTHENTICATED_USER = "authenticated-user.json"
+    """
+    The account the credential belongs to, as REST describes it.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "base-branch-merge"
+
+
+SECTIONED_BOARD = DatasetLocation.REVIEW_TRIAGE / "definition-move-sectioned"
+"""
+Versions of the definition-move sample's board module that hold section headers.
+"""
+
+TEMPLATE_REINDENTED = (
+    DatasetLocation.REVIEW_TRIAGE / "template-renamed" / "reindented.py.jinja"
+)
+"""
+The renamed template's head version, its renamed line also indented.
+"""
+
+# %% rule settings
+
+RULE_SETTINGS = DatasetLocation.REVIEW_TRIAGE / "rules"
+"""
+The checkouts, each holding a ``pyproject.toml``, the rule settings are read from.
+"""

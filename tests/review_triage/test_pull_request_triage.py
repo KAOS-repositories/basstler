@@ -6,6 +6,7 @@ triage.
 from __future__ import annotations
 
 from dataclasses import replace
+from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -33,6 +34,7 @@ from .conftest import (
     SAMPLE_REPOSITORY,
     OnePullRequestReader,
     RecordingWriter,
+    RefusingWriter,
     read_sample,
 )
 from .samples import DescriptionSample, PullRequestSample
@@ -210,6 +212,18 @@ def test_a_refused_marking_is_raised(sample_changes: PullRequestChanges):
     writer = RecordingWriter({"errors": [{"message": "Resource not accessible"}]})
     with pytest.raises(GraphQLErrorsReturned):
         ViewedMarking(writer).publish(triage)
+
+
+def test_a_refused_call_is_raised_as_a_refused_marking(
+    sample_changes: PullRequestChanges,
+):
+    """
+    A call GitHub refuses outright, as a session without GraphQL access gets, is raised
+    as a refused marking, which names the other ways to mark the files.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    with pytest.raises(GraphQLErrorsReturned):
+        ViewedMarking(RefusingWriter(HTTPStatus.FORBIDDEN)).publish(triage)
 
 
 # %% reading in a checkout lacking the pull request

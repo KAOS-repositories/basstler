@@ -9,7 +9,6 @@ import textwrap
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from urllib.parse import urlencode
 
 from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
@@ -18,9 +17,18 @@ from basstler.github.client import (
 )
 from basstler.github.exceptions import GitHubCallFailed
 from basstler.github.pull_request import NewPullRequest
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.pull_request_ends import PullRequestOpening
+from basstler.github.repository_access import PullRequestListState
+from basstler.github.basstler_project import BasstlerProject
+from basstler.github.repository import GitHubAddress, NewTokenPage, Repository
 from basstler.github.rest_models import RestPullRequestSummary
 from basstler.github.run_listing import ListedRun
+from basstler.github.token_form import (
+    CreateToken,
+    SharedToken,
+    StoreToken,
+    TokenUse,
+)
 from basstler.plan_site import token_storage
 from basstler.plan_site.build_start import CodeFence
 from basstler.plan_site.site_repository import SiteRepository
@@ -173,6 +181,25 @@ class UserSteps:
     Whether this runs in a Claude Code cloud session, whose user has no terminal on it.
     """
 
+    shared_uses: tuple[TokenUse, ...] = ()
+    """
+    Other jobs of basstler's the person's token may do too; those on the site owner's
+    repositories share the token that starts the build.
+    """
+
+    @property
+    def shared_token(self) -> SharedToken | None:
+        """
+        The token starting the build and doing the jobs of :attr:`shared_uses` it can
+        share, ``None`` when it shares none.
+        """
+        token = SharedToken.from_requested_use(
+            BasstlerProject.name,
+            self.site.token_use([Repository.parse(name) for name in self.registered]),
+            self.shared_uses,
+        )
+        return token if len(token.uses) > 1 else None
+
     def pending(
         self, step: UserStep, latest_run: ListedRun | None = None
     ) -> PendingStep:
@@ -230,7 +257,32 @@ class UserSteps:
                 latest_run,
             ),
         }
+        shared = self.shared_token
+        if shared is not None:
+            steps |= self.shared_token_steps(shared, latest_run)
         return steps[step]
+
+    def shared_token_steps(
+        self, token: SharedToken, latest_run: ListedRun | None
+    ) -> dict[UserStep, PendingStep]:
+        """
+        :param token: The token shared with other jobs.
+        :param latest_run: The latest run of the dispatch workflow, ``None`` when it
+            has not run.
+        :return: Creating that token and storing it as every job's secret.
+        """
+        creating, storing = CreateToken(token), StoreToken(token)
+        return {
+            UserStep.CREATE_TOKEN: PendingStep(
+                UserStep.CREATE_TOKEN, None, creating.browser_steps, latest_run
+            ),
+            UserStep.STORE_TOKEN: PendingStep(
+                UserStep.STORE_TOKEN,
+                storing.command,
+                storing.browser_steps,
+                latest_run,
+            ),
+        }
 
     @property
     def store_token_command(self) -> str:
@@ -310,7 +362,7 @@ class PrivateRepositoryAccess:
         owners = list(dict.fromkeys(repository.owner for repository in repositories))
         token_steps = (
             (
-                f"Open {SiteRepository.classic_token_page}.",
+                f"Open {NewTokenPage.CLASSIC.url}.",
                 "A fine-grained token reads the repositories of one owner only, and "
                 f"these belong to {', '.join(owners)}: name the token and select "
                 "the repo scope.",
@@ -318,7 +370,7 @@ class PrivateRepositoryAccess:
             )
             if len(owners) > 1
             else (
-                f"Open {SiteRepository.token_page}.",
+                f"Open {NewTokenPage.FINE_GRAINED.url}.",
                 f"Name the token and set Resource owner to {owners[0]}.",
                 "Under Repository access, choose Only select repositories and "
                 f"select {names}.",
@@ -363,25 +415,10 @@ class PrivateRepositoryAccess:
 
 
 @dataclass(frozen=True)
-class MergeWorkflowProposal:
+class MergeWorkflowProposal(PullRequestOpening):
     """
     The merge workflow waiting on a branch of its own, for the user to merge into the
-    notes repository's default branch.
-    """
-
-    repository: Repository
-    """
-    The notes repository.
-    """
-
-    base: str
-    """
-    Its default branch, which refused the workflow.
-    """
-
-    head: str
-    """
-    The branch holding the workflow.
+    notes repository's default branch, which refused it.
     """
 
     title: str = "Start the plan site build on every merge"
@@ -392,23 +429,15 @@ class MergeWorkflowProposal:
     @property
     def opening(self) -> NewPullRequest:
         """:return: The pull request proposing the workflow, opened ready to merge."""
-        return NewPullRequest(
-            self.repository, self.title, self.head, self.base, draft=False
-        )
+        return NewPullRequest(self.base, self.head, self.title, self.body, draft=False)
 
     @property
     def open_pull_requests_path(self) -> str:
-        """:return: The listing of the open pull requests from :attr:`head` into
-        :attr:`base`."""
-        query = urlencode(
-            {
-                "head": f"{self.repository.owner}:{self.head}",
-                "base": self.base,
-                "state": "open",
-            },
-            safe=":",
-        )
-        return f"{self.repository.pull_requests_path}?{query}"
+        """
+        The REST path listing the open pull requests from :attr:`head` into
+        :attr:`base`.
+        """
+        return PullRequestListState.OPEN.path_between(self)
 
     def pending(self, github: GitHubClient) -> PendingStep:
         """
@@ -424,11 +453,10 @@ class MergeWorkflowProposal:
         if opened.failure is not None:
             return PendingStep(
                 UserStep.ADD_MERGE_WORKFLOW,
-                f"gh pr create --repo {self.repository.full_name} --base {self.base} "
-                f"--head {self.head} --fill, then merge it",
+                f"gh pr create --repo {self.base.repository.full_name} "
+                f"--base {self.base.name} --head {self.head.name} --fill, then merge it",
                 (
-                    f"Open {self.repository.url}/compare/{self.base}...{self.head}"
-                    "?expand=1.",
+                    f"Open {self.compare_url}?expand=1.",
                     "Click Create pull request.",
                     "Merge the pull request.",
                 ),

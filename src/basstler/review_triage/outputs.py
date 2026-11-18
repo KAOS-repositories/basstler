@@ -14,6 +14,7 @@ from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.github.client import GitHubWriter
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ReviewTriageLocation
@@ -91,7 +92,7 @@ class ViewedFile(ValidatedJSONModel):
 class ViewedMarking(TriageOutput):
     """
     Marks every mechanical file viewed for the account whose credential the writer
-    sends, raising :class:`GraphQLErrorsReturned` when GitHub refuses one.
+    sends, raising :class:`GraphQLErrorsReturned` when GitHub refuses one or the call.
     """
 
     github: GitHubWriter
@@ -100,11 +101,28 @@ class ViewedMarking(TriageOutput):
     """
 
     def publish(self, outcome: TriageOutcome) -> None:
+        refusals = self.refusals(outcome)
+        if refusals:
+            raise GraphQLErrorsReturned(refusals)
+
+    def refusals(self, outcome: TriageOutcome) -> tuple[str, ...]:
+        """
+        Mark the mechanical files viewed, stopping at the first refusal.
+
+        :param outcome: The triaged pull request.
+        :return: What GitHub refused with, empty once every file is marked.
+        """
         document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
         for file in outcome.mechanical_files:
             variables = ViewedFile(
                 outcome.pull_request.node_identifier, file.change.path
             )
-            GraphQLResponse.from_json(
-                self.github.send(GraphQLRequest(document, variables.to_json()))
-            ).result()
+            response = self.github.attempt_send(
+                GraphQLRequest(document, variables.to_json())
+            )
+            if response.failure is not None:
+                return (response.failure.error_message(),)
+            answer = GraphQLResponse.from_json(response.body)
+            if answer.errors:
+                return tuple(error.message for error in answer.errors)
+        return ()

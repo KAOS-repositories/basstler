@@ -28,8 +28,8 @@ from basstler.github.pull_request_state import (
     PullRequestState,
 )
 from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository_details import RepositoryDetails
 from basstler.github.repository_access import GitHubRepository
-from basstler.json_model import ValidatedJSONModel
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -41,55 +41,6 @@ READ_ACCESS_STATUSES = frozenset({HTTPStatus.NOT_FOUND, HTTPStatus.FORBIDDEN})
 """
 What GitHub answers a token that is not granted a repository.
 """
-
-# %% repository details
-
-
-class UpstreamDetails(ValidatedJSONModel):
-    """
-    The repository a fork was forked from, as a repository's details name it.
-    """
-
-    full_name: str
-    """
-    The upstream's ``owner/name``.
-    """
-
-    default_branch: str
-    """
-    The upstream's default branch.
-    """
-
-
-class RepositoryDetails(ValidatedJSONModel):
-    """
-    What a repository's details say about the repository's own default branch and what
-    it was forked from.
-    """
-
-    default_branch: str
-    """
-    The repository's default branch.
-    """
-
-    parent: UpstreamDetails | None = None
-    """
-    What it was forked from, absent unless it is a fork.
-    """
-
-    @property
-    def lineage(self) -> ForkLineage | None:
-        """
-        :return: What the repository was forked from, ``None`` unless it is a fork.
-        """
-        if self.parent is None:
-            return None
-        return ForkLineage(
-            upstream_repository=Repository.parse(self.parent.full_name),
-            upstream_default_branch=self.parent.default_branch,
-            fork_default_branch=self.default_branch,
-        )
-
 
 # %% live pull request state
 

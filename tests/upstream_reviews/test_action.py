@@ -469,16 +469,19 @@ def test_the_result_answering_the_request_is_collected(fork):
     assert result == committed(ActionResult.answering(request(), github()))
 
 
-def test_the_request_s_branch_is_deleted_once_its_result_is_collected(fork):
+def test_collecting_a_result_leaves_its_branch_to_the_run_s_pruning(fork):
+    """
+    A cloud session's proxy refuses to delete a remote branch, so the session never
+    tries; the run deletes the branch once it is abandoned.
+    """
     ActionInstallation(BRANCH_OR_TAG).install(fork.branch)
     read = ActionRead(fork.branch, request())
     read.send()
     fork.answer(ActionResult.answering(request(), github()))
-    assert read.request_branch.name in fork.branches()
 
     read.wait(timeout=0)
 
-    assert read.request_branch.name not in fork.branches()
+    assert read.request_branch.name in fork.branches()
 
 
 def test_concurrent_requests_each_collect_their_own_result(fork):

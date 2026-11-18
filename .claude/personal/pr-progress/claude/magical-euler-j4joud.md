@@ -1,14 +1,14 @@
 ## Plan
-- Read: open pull requests on a repository that request or were reviewed by the credential's account
-- Command: mark those pull requests' mechanical files viewed, each from the account's last review (#226)
-- Workflow: reusable workflow plus a scheduled caller template for the reviewer's own repository
-- Setup: set-up-mark-viewed option and plan_site.publication option installing the scheduled caller
-- Docs: README section on per-reviewer marking; /setup-review-triage offers it
+- Per-reviewer marking from a scheduled workflow in each reviewer's own repository (chosen design)
 
 ## Done
-- Design chosen: a workflow in each reviewer's own repository, holding their own token
-- Merged main into #226 (claude/youthful-babbage-btoebw) to clear its conflicts; stacked this branch on it
-- Draft PR #262 opened; item recorded in progress
+- ReviewedPullRequests: search a repository's open pull requests a reviewer is asked on or reviewed; mark each, going on past refusals
+- review-triage mark-viewed-in-reviews command
+- Reusable workflow: pull_request optional, none runs mark-viewed-in-reviews; caller template adds a schedule
+- set-up-mark-viewed --in-reviews-schedule and plan_site.publication --mark-viewed-in-reviews
+- README section and /setup-review-triage offer
+- Merged main into #226 to clear its conflicts; this branch is stacked on it
 
 ## Next
-- Tests for the reviewed pull requests read, then the read
+- Read CI on 02329387
+- Retarget to main once #226 lands

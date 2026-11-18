@@ -437,6 +437,12 @@ class DatasetLocation(PathEnumeration):
     The file versions, descriptions and pull request the review triage is tested on.
     """
 
+    RECEIVER_INFERENCE = DIRECTORY / "experiments" / "receiver-inference"
+    """
+    The checker reports and probed files the receiver inference experiment is tested
+    on.
+    """
+
     CLASS_HEADERS = DIRECTORY / "review-triage" / "class-headers"
     """
     A base class, two subclasses naming it on and after the line defining them, and a

@@ -1,0 +1,23 @@
+{
+    "version": "1.1.414",
+    "generalDiagnostics": [
+        {
+            "file": "CHECKOUT/pkg/use.py",
+            "severity": "information",
+            "message": "Type of \"p\" is \"Plotter\"",
+            "range": {"start": {"line": 4, "character": 20}, "end": {"line": 4, "character": 21}}
+        },
+        {
+            "file": "CHECKOUT/pkg/use.py",
+            "severity": "error",
+            "message": "\"unknown_name\" is not defined",
+            "range": {"start": {"line": 9, "character": 16}, "end": {"line": 9, "character": 28}}
+        },
+        {
+            "file": "CHECKOUT/pkg/use.py",
+            "severity": "information",
+            "message": "Type of \"Plotter\" is \"type[Plotter]\"",
+            "range": {"start": {"line": 8, "character": 16}, "end": {"line": 8, "character": 23}}
+        }
+    ]
+}

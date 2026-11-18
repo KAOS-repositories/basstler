@@ -16,6 +16,7 @@ from basstler.github.client import (
     GitHubRestClient,
 )
 from basstler.github.comparison import Comparison
+from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import (
     PullRequestField,
@@ -162,16 +163,28 @@ class GitHubPullRequestSource(PullRequestSource):
     Whether the check state of an open pull request is read; off, it stays unknown.
     """
 
+    reads_mergeable_states: bool = False
+    """
+    Whether the mergeable state of an open pull request out of draft is read, which
+    takes a request of its own; off, it stays unknown.
+    """
+
     @classmethod
     def from_environment(
-        cls, reads_check_states: bool = True
+        cls, reads_check_states: bool = True, reads_mergeable_states: bool = False
     ) -> GitHubPullRequestSource:
         """
         :param reads_check_states: Whether open pull requests' check states are read.
+        :param reads_mergeable_states: Whether open pull requests' mergeable states are
+            read.
         :return: A source authenticating with whichever credential the environment
             carries.
         """
-        return cls(client=GitHubRestClient(), reads_check_states=reads_check_states)
+        return cls(
+            client=GitHubRestClient(),
+            reads_check_states=reads_check_states,
+            reads_mergeable_states=reads_mergeable_states,
+        )
 
     def client_for(self, repository: Repository) -> GitHubRepository:
         """
@@ -227,9 +240,24 @@ class GitHubPullRequestSource(PullRequestSource):
             record.check_state = self.client_for(reference.repository).check_state(
                 record.head_commit
             )
+        if self.reads_mergeable_states and record.has_unread_mergeable_state:
+            record.mergeable_state = self.mergeable_state(reference)
         if record.landed_upstream is None:
             record.landed_upstream = self.landed_upstream(reference.repository, record)
         return record
+
+    def mergeable_state(self, reference: PullRequestReference) -> MergeableState | None:
+        """
+        :param reference: An open pull request.
+        :return: What reading it on its own says about its conflicts - a listing leaves
+            that out - or ``None`` when it cannot be read or GitHub reports none.
+        """
+        api_record = self.read_if_present(
+            f"/{reference.repository.pull_request_path(reference.number)}"
+        )
+        if api_record is None:
+            return None
+        return PullRequestRecord.from_api(api_record).mergeable_state
 
     def landed_upstream(
         self, repository: Repository, record: PullRequestRecord

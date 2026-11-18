@@ -1,12 +1,10 @@
 ## Plan
-- Resolve the owner's review of 3be60760 (15 new threads, 2026-11-17):
-  - Rules: a field shared by several classes lives in one mixin; a field takes the most specific correct type.
-  - One concept per thing: `RepositoryBranch(Branch)`; `PullRequestEnds` (base, head) for the form, the file proposal, the merge-workflow proposal and `NewPullRequest`; `PullRequestEnd(GitObject, Branch)` replacing `RestPullRequestHead`; one base for `BranchReference`/`NewBranch`; `BranchFile` for `FileCommit`/`NewFileForm`; listing filters from the ends.
-  - `workflow` -> `workflow_path` (one mixin); `GitHubAccountPage` -> `NewTokenPage`, used by the plan site too.
-  - Answer the questions (ValidatedJSONModel is a dataclass, why the secret read binds metadata, why file and fork steps fall to the user, per-reviewer marking).
+- Wait for the owner's answers on the open threads, then carry them out.
 
 ## Done
-- main merged by the maintenance pass (head e05ec18b, clean against main d576e5a9).
+- 8457b9be: resolved the review of 3be60760. Shared fields now have one definition each: RepositoryMember, RepositoryWorkflow, RepositoryBranch, PullRequestEnds/Opening, BranchFile, PullRequestEnd as a Branch, one RepositoryDetails, and NewTokenPage. Added two rules (shared field in one mixin; most specific type). 6 threads resolved, 10 replied and left open.
+- Checked at 8457b9be: clean against main d576e5a9. Local suite 3085 passed (2 tag-only failures, as on main). CI: py3.12, ruff, Actions usage and Windows passed; py3.13 was still running.
+- Stacked claude/eager-archimedes-98og6c merged it (token-page conflict resolved) and was pushed; the restack now reads up-to-date.
 
 ## Next
-- Tests first, then the refactor; full suite, ruff, code-rules check; push; restack #221; reply to every thread.
+- Owner decisions: merge ListedPullRequest into RestPullRequestSummary? Git reference base? Drop the AddFile/ReplaceFile fallbacks? Fork sync option (2)? Type the secret read? Plan items for per-reviewer marking and for the repository-field cleanup.

@@ -87,9 +87,9 @@ an upstream is named; to do it yourself, or to bring it to a new release:
 
 That writes `basstler/upstream-reviews` on your fork: a workflow calling basstler's
 reusable one, and a README. Each read pushes a branch of its own from it under
-`basstler/upstream-reviews-requests/`, the run commits what it read onto that branch,
-and the session deletes it once read - so any number of sessions can read at once. A
-branch left by a read that gave up is deleted by the next run once it is an hour old. The one step left to you: GitHub starts every fork with
+`basstler/upstream-reviews-requests/`, and the run commits what it read onto that
+branch - so any number of sessions can read at once. A session cannot delete a remote
+branch, so each run deletes the request branches that are over an hour old. The one step left to you: GitHub starts every fork with
 Actions off, so enable them once at `https://github.com/<your fork>/actions`.
 
 Until then, or wherever the Action cannot answer, the skill reads the upstream from the
@@ -108,7 +108,16 @@ A project that prefers a dispatch-only workflow on its default branch may still 
 the package, both from `main`; to pin a release instead, change both references to its
 tag.
 
-## 4. Check it worked
+## 4. For the review triage: choose how files are marked viewed
+
+Only if you use `basstler review-triage mark-viewed`. "Viewed" is kept for each GitHub
+account, and only GitHub's GraphQL API sets it, which a Claude Code cloud session cannot
+reach. There are two routes: marking from your own computer, where `gh` is logged in, or
+from a repository's Actions, which `basstler review-triage set-up-mark-viewed` sets up.
+[The review triage's README](review-triage/README.md) describes both and the steps for
+each; in Claude Code, `/setup-review-triage` walks you through them.
+
+## 5. Check it worked
 
 ```bash
 "${BASSTLER_PLUGIN_ROOT}/hooks/check-setup.sh"

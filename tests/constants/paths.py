@@ -300,6 +300,12 @@ class DatasetLocation(PathEnumeration):
     The REST response for the pull request proposing the plan site's merge workflow.
     """
 
+    STALE_MERGE_WORKFLOW = DIRECTORY / "plan-site-merge-workflow-closed-only.yml"
+    """
+    The plan site's merge workflow as an earlier release wrote it, starting the build
+    only when a pull request closes.
+    """
+
     PULL_REQUEST_REFUSED = DIRECTORY / "pull-request-refused.json"
     """
     GitHub's answer refusing to open a pull request for a token without the right.
@@ -392,6 +398,17 @@ class DatasetLocation(PathEnumeration):
     A script standing in for check-setup.sh, failing before it prints a report.
     """
 
+    MERGE_WORKFLOW_REFRESH_STUB = STUBS / "merge_workflow_refresh_from_environment.py"
+    """
+    A module standing in for :mod:`basstler.plan_site.merge_workflow_refresh`'s command,
+    printing what the environment says.
+    """
+
+    MERGE_WORKFLOW_REFRESH_OUTPUT = DIRECTORY / "merge-workflow-refresh-output.txt"
+    """
+    What the real command prints once it proposed the current merge workflow.
+    """
+
     MERGED_ITEMS_STUB = STUBS / "merged_items_from_recording.py"
     """
     A module standing in for :mod:`basstler.plan.merged_items`'s command, reading the
@@ -424,6 +441,14 @@ class DatasetLocation(PathEnumeration):
     """
     A base class, two subclasses naming it on and after the line defining them, and a
     class only mentioning it.
+    """
+
+    CONFLICTED_MODULE = (
+        DIRECTORY / "review-triage" / "conflicted-module" / "triangle.py.txt"
+    )
+    """
+    A subclass of the class header dataset's base class, left with a merge's conflict
+    markers.
     """
 
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
@@ -701,6 +726,27 @@ class PersonalNotesPath(PathEnumeration):
     BRANCH_INDEX = ProjectLocation.PLAN_BRANCH_INDEX
     """
     The generated reverse index mapping an item's branch to the plan tracking it.
+    """
+
+
+class AddressSnippet(PathEnumeration):
+    """
+    Python sources the address check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "address-building"
+    """
+    The directory holding them.
+    """
+
+    HAND_BUILT = DIRECTORY / "hand-built-addresses.py"
+    """
+    A REST path and a page each appended to a repository's address by hand.
+    """
+
+    FROM_THEIR_CLASS = DIRECTORY / "addresses-from-their-class.py"
+    """
+    An address the repository builds, and a repository's name in a sentence.
     """
 
 

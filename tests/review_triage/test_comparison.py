@@ -34,6 +34,7 @@ from .samples import TEMPLATE_REINDENTED, FileSample
     ("sample", "kinds"),
     [
         (FileSample.IMPORTS_REORDERED, {MechanicalChange.IMPORTS}),
+        (FileSample.IMPORT_ADDED_UNDER_STAR_IMPORT, {MechanicalChange.IMPORTS}),
         (
             FileSample.IDENTIFIER_RENAMED,
             {MechanicalChange.IMPORTS, MechanicalChange.RENAME},
@@ -64,6 +65,9 @@ def test_a_mechanical_change_is_reported_with_its_kinds(
     "sample",
     [
         FileSample.IMPORT_SOURCE_CHANGED,
+        FileSample.IMPORT_ADDED_UNUSED,
+        FileSample.IMPORT_REMOVED_UNUSED,
+        FileSample.IMPORT_ADDED_FROM_OTHER_MODULE,
         FileSample.STRING_LITERAL_RENAMED,
         FileSample.DOCSTRING_REWORDED,
         FileSample.BEHAVIOUR_CHANGED,
@@ -73,8 +77,9 @@ def test_a_change_of_meaning_needs_review(
     sample: FileSample, old_name_renamed: RenameMap
 ):
     """
-    A changed import source, string literal, docstring wording or expression needs
-    review, renames or not.
+    A changed import source, an import the code does not use, an import of a name another
+    module's star import supplied, or a changed string literal, docstring wording or
+    expression needs review, renames or not.
     """
     change = sample.change()
     assert FileTriager(JudgmentContext(old_name_renamed)).triage(

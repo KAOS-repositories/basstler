@@ -638,17 +638,37 @@ class DefinitionIndex:
     The classes naming each class looked up so far among their bases.
     """
 
+    unparsable_files: set[str] = field(default_factory=set)
+    """
+    The keys of the files read so far that are not valid Python, such as a file a merge
+    left conflicted.
+    """
+
+    unreadable_names: set[str] = field(default_factory=set)
+    """
+    The names whose definitions a file that does not parse may hold.
+    """
+
+    classes_with_unreadable_subclasses: set[str] = field(default_factory=set)
+    """
+    The names of the classes a file that does not parse may hold a subclass of.
+    """
+
     def file_definitions(self, files: tuple[str, ...]) -> Iterator[Definition]:
         """
         :param files: Keys of files the search found.
-        :return: Every definition they hold, the files not read yet read together.
+        :return: Every definition the files that parse hold, the files not read yet
+            read together.
         """
         unread = tuple(
             dict.fromkeys(file for file in files if file not in self.by_file)
         )
         for file, text in self.search.texts_of(unread).items():
-            self.by_file[file] = tuple(
-                DefinitionReader(PythonSource(text)).definitions()
+            source = PythonSource(text)
+            if not source.parses:
+                self.unparsable_files.add(file)
+            self.by_file[file] = (
+                tuple(DefinitionReader(source).definitions()) if source.parses else ()
             )
         for file in files:
             yield from self.by_file[file]
@@ -667,12 +687,16 @@ class DefinitionIndex:
         for definition in self.file_definitions(files):
             if definition.name in found:
                 found[definition.name].append(definition)
+        if not self.unparsable_files.isdisjoint(files):
+            self.unreadable_names |= missing
+            found = {name: [] for name in missing}
         self.by_name |= {name: tuple(named) for name, named in found.items()}
 
     def definitions_of(self, name: str) -> tuple[Definition, ...]:
         """
         :param name: The name of a function, method or class.
-        :return: Every definition of it.
+        :return: Every definition of it, none when a file that does not parse may
+            hold one.
         """
         self.load(frozenset({name}))
         return self.by_name[name]
@@ -721,12 +745,32 @@ class DefinitionIndex:
                     if isinstance(definition, ClassDefinition)
                     and current in definition.bases
                 )
+                if not self.unparsable_files.isdisjoint(files):
+                    self.classes_with_unreadable_subclasses.add(current)
             for subclass in self.direct_subclasses[current]:
                 found.append(subclass)
                 if subclass.name not in visited:
                     visited.add(subclass.name)
                     pending.append(subclass.name)
         return found
+
+    def reads_hierarchy_of(self, name: str) -> bool:
+        """
+        :param name: The name of a class.
+        :return: Whether the classes of that name, their subclasses and their ancestors
+            are all read from files that parse.
+        """
+        lower = [*self.classes_named(name), *self.subclasses_of(name)]
+        related = [*lower, *self.ancestors_of(lower)]
+        lower_names = {name, *(definition.name for definition in lower)}
+        names = {
+            *lower_names,
+            *(definition.name for definition in related),
+            *(base for definition in related for base in definition.bases if base),
+        }
+        return self.unreadable_names.isdisjoint(
+            names
+        ) and self.classes_with_unreadable_subclasses.isdisjoint(lower_names)
 
     def ancestors_of(self, classes: list[ClassDefinition]) -> list[ClassDefinition]:
         """

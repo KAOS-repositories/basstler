@@ -40,6 +40,7 @@ from basstler.plan.merged_items.every_plan import (
     MergedItemsSummary,
 )
 from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan_site import merge_workflow_refresh
 from basstler.plan_site.hub import SiteAddress
 from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
@@ -48,6 +49,7 @@ from basstler.upstream_reviews.action.branch import InstallationState
 from ..constants.environment import (
     ConfigurationVariable,
     FileMode,
+    MergeWorkflowRefreshStubVariable,
     PullRequestStubVariable,
     ScrubbedEnvironmentPrefix,
     SearchPathVariable,
@@ -216,6 +218,9 @@ def session_start_repository(
     scratch_repository.install_package()
     scratch_repository.replace_package_module(
         merged_items_command, DatasetLocation.MERGED_ITEMS_STUB
+    )
+    scratch_repository.replace_package_module(
+        merge_workflow_refresh, DatasetLocation.MERGE_WORKFLOW_REFRESH_STUB
     )
     scratch_repository.install_package_environment()
     scratch_repository.write_setup_prerequisites()
@@ -2213,6 +2218,71 @@ def test_links_the_plan_under_the_notes_repository_the_site_lists(
         SITE_URL,
         SiteAddress(SITE_URL).plan_url(SiteRepository.NOTES.value, PLAN_IDENTIFIER),
     )
+
+
+# %% the plan site's merge workflow
+
+
+def publish_hub_and_run(
+    repository: ScratchRepository, environment: Mapping[str, str]
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run session-start.sh against a notes branch that lists a plan site.
+
+    :param repository: The fixture-built scratch repository.
+    :param environment: Variables to set for the hook's run.
+    :return: The finished session-start.sh process.
+    """
+    return publish_and_run(
+        repository, {ProjectLocation.PLAN_HUB: HUB_FILE}, environment
+    )
+
+
+def test_says_the_pull_request_that_brings_the_merge_workflow_up_to_date(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A merge workflow older than the release starts no build for some pull request
+    changes, so the session says what to merge instead of leaving the site stale.
+    """
+    result = publish_hub_and_run(
+        session_start_repository,
+        {
+            MergeWorkflowRefreshStubVariable.OUTPUT: str(
+                DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT.read_text().rstrip("\n")
+        in result.stdout
+    )
+
+
+def test_says_nothing_of_the_merge_workflow_when_it_is_current(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_hub_and_run(session_start_repository, {})
+
+    assert result.returncode == 0, result.stderr
+    assert "merge workflow" not in result.stdout
+
+
+def test_says_how_to_check_the_merge_workflow_by_hand_when_the_check_fails(
+    session_start_repository: ScratchRepository,
+):
+    failure = "GitHub refused the read"
+
+    result = publish_hub_and_run(
+        session_start_repository,
+        {MergeWorkflowRefreshStubVariable.FAILURE: failure},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert merge_workflow_refresh.__name__ in result.stdout
+    assert failure in result.stdout
 
 
 # %% the upstream-reviews Action line

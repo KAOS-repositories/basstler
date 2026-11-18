@@ -170,7 +170,7 @@ class BuildStart:
             WorkflowDispatch(
                 site.repository,
                 WorkflowLocation.PLAN_SITE,
-                RepositoryDetails.from_json(read.body).default_branch,
+                RepositoryDetails.from_json(read.body).default_branch.name,
             )
         )
         return cls(site, dispatch)

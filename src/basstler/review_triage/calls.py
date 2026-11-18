@@ -231,6 +231,8 @@ class MethodTarget(CallTarget):
 
     def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
         index = reader.definitions
+        if not index.reads_hierarchy_of(self.class_name):
+            return [None]
         lower = [
             *index.classes_named(self.class_name),
             *index.subclasses_of(self.class_name),
@@ -266,6 +268,8 @@ class ClassTarget(CallTarget):
 
     def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
         index = reader.definitions
+        if not index.reads_hierarchy_of(self.class_name):
+            return [None]
         classes: list[ClassDefinition] = [
             *index.classes_named(self.class_name),
             *index.subclasses_of(self.class_name),
@@ -727,9 +731,9 @@ class ReceiverWalk:
         receiver = owner
         if owner.class_name == CLASS_OBJECT:
             receiver = owner.arguments[0] if len(owner.arguments) == 1 else None
-        if receiver is None:
-            return None
         index = self.reader.definitions
+        if receiver is None or not index.reads_hierarchy_of(receiver.class_name):
+            return None
         classes = list(index.classes_named(receiver.class_name))
         methods = [
             found

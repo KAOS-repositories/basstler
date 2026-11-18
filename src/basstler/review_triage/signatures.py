@@ -231,6 +231,8 @@ class SignatureReader:
         :return: What every declaration of the attribute in the class and its ancestors
             declares, ``None`` when there is none or they disagree.
         """
+        if not self.definitions.reads_hierarchy_of(class_name):
+            return None
         classes = list(self.definitions.classes_named(class_name))
         declared = {
             declaration.declared_type

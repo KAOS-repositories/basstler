@@ -1,6 +1,6 @@
 """
 One read through the fork's Action, from the session's side: request it on a branch of
-its own, wait for its result there, then delete the branch.
+its own and wait for its result there; the run deletes the branch once it is abandoned.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import GitHubReader
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.run_listing import RunListing
-from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.action.branch import ActionBranch, ActionFile
 from basstler.upstream_reviews.action.exchange import (
     ActionAnswer,
@@ -26,11 +25,6 @@ from basstler.upstream_reviews.exceptions import (
     ActionRunFailed,
     ActionRunNotStarted,
 )
-
-logger = StandardStreamHandler.logger_for(__name__)
-"""
-This module's logger.
-"""
 
 # %% the session's side
 
@@ -106,7 +100,7 @@ class ActionRead[AnswerType: ActionAnswer]:
         :param timeout: How many seconds to wait at most.
         :param commit: The pushed request, whose run is looked for once
             :attr:`start_allowance` has passed.
-        :return: The result answering this request, whose branch is then deleted.
+        :return: The result answering this request.
         :raises ActionRunNotStarted: If GitHub started no run for it.
         :raises ActionRunFailed: If its run failed before committing a result.
         :raises ActionResultMissing: If no result arrives in time.
@@ -115,7 +109,6 @@ class ActionRead[AnswerType: ActionAnswer]:
         while True:
             result = self.collect()
             if result is not None:
-                self.discard_request_branch()
                 return result
             elapsed = time.monotonic() - started
             if commit is not None and elapsed >= self.start_allowance:
@@ -139,18 +132,6 @@ class ActionRead[AnswerType: ActionAnswer]:
         if data[ActionJSONKey.REQUEST_IDENTIFIER] != self.request.identifier:
             return None
         return self.answer_type.from_json(data)
-
-    def discard_request_branch(self) -> None:
-        """
-        Delete :attr:`request_branch` once its result is read; a branch the fork refuses
-        to delete is only warned about, as it holds nothing a later read depends on.
-        """
-        deleted = self.request_branch.delete()
-        if not deleted.succeeded:
-            logger.warning(
-                f"could not delete {self.request_branch.name} on "
-                f"{self.branch.description}: {deleted.error_output}"
-            )
 
     def check_run(self, commit: str, elapsed: int) -> None:
         """

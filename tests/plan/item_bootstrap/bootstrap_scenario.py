@@ -193,7 +193,7 @@ class RecordingPullRequestOpener(PullRequestOpener):
         Record *pull_request* and hand back a pull request as GitHub would.
         """
         self.requests.append(pull_request)
-        return PullRequestReference(pull_request.repository, self.number)
+        return PullRequestReference(pull_request.base.repository, self.number)
 
 
 @dataclass

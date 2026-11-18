@@ -710,6 +710,27 @@ class PersonalNotesPath(PathEnumeration):
     """
 
 
+class AddressSnippet(PathEnumeration):
+    """
+    Python sources the address check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "address-building"
+    """
+    The directory holding them.
+    """
+
+    HAND_BUILT = DIRECTORY / "hand-built-addresses.py"
+    """
+    A REST path and a page each appended to a repository's address by hand.
+    """
+
+    FROM_THEIR_CLASS = DIRECTORY / "addresses-from-their-class.py"
+    """
+    An address the repository builds, and a repository's name in a sentence.
+    """
+
+
 class ProseSnippet(PathEnumeration):
     """
     Python sources the prose length check measures.

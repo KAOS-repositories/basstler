@@ -22,7 +22,7 @@ from basstler.github.pull_request_state import (
     PullRequestRecord,
     PullRequestState,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.stack.promotability import PromotionBlocker
 from basstler.stack.promotion_link import PromotionLink, PromotionTarget
 
@@ -119,9 +119,10 @@ def test_a_promotable_item_links_to_the_prefilled_upstream_form():
         promotion.url
         == PromotionLink.for_target(
             PromotionTarget(
-                upstream_repository=LINEAGE.upstream_repository,
-                upstream_base=LINEAGE.upstream_default_branch,
-                fork_owner=FORK.owner,
+                upstream_base=RepositoryBranch(
+                    LINEAGE.upstream_default_branch, LINEAGE.upstream_repository
+                ),
+                fork=FORK,
             ),
             "a",
             "A title",

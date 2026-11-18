@@ -8,12 +8,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.github.client import GitHubWriter
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.github.review_models import PageInfo
 from basstler.json_model import ValidatedJSONModel
@@ -161,6 +162,23 @@ class ListedFilesAnswer(ValidatedJSONModel):
 
 
 @dataclass(frozen=True)
+class AttemptedRequest:
+    """
+    GitHub's answer to a GraphQL request, or what it refused the request with.
+    """
+
+    result: Any = None
+    """
+    What the request returned, ``None`` when it was refused.
+    """
+
+    refusals: tuple[str, ...] = ()
+    """
+    What GitHub refused the request with, empty when it answered.
+    """
+
+
+@dataclass(frozen=True)
 class ViewedMarking(TriageOutput):
     """
     Marks every mechanical file GitHub lists in the pull request viewed, for the account
@@ -177,9 +195,23 @@ class ViewedMarking(TriageOutput):
     """
 
     def publish(self, outcome: TriageOutcome) -> None:
-        listed = self.listed_paths(outcome)
+        refusals = self.refusals(outcome)
+        if refusals:
+            raise GraphQLErrorsReturned(refusals)
+
+    def refusals(self, outcome: TriageOutcome) -> tuple[str, ...]:
+        """
+        Mark the mechanical files GitHub lists viewed, stopping at the first refusal.
+
+        :param outcome: The triaged pull request.
+        :return: What GitHub refused with, empty once every listed file is marked.
+        :raises PullRequestHeadMoved: If its head commit is no longer the triaged one.
+        """
+        listing = self.listed_paths(outcome)
+        if listing.refusals:
+            return listing.refusals
         mechanical = [file.change.path for file in outcome.mechanical_files]
-        unlisted = [path for path in mechanical if path not in listed]
+        unlisted = [path for path in mechanical if path not in listing.result]
         if unlisted:
             logger.warning(
                 "Not marked viewed, as GitHub does not list them in pull request "
@@ -187,28 +219,28 @@ class ViewedMarking(TriageOutput):
             )
         document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
         for path in mechanical:
-            if path not in listed:
+            if path not in listing.result:
                 continue
             variables = ViewedFile(outcome.pull_request.node_identifier, path)
-            GraphQLResponse.from_json(
-                self.github.send(GraphQLRequest(document, variables.to_json()))
-            ).result()
+            marking = self.attempt(GraphQLRequest(document, variables.to_json()))
+            if marking.refusals:
+                return marking.refusals
+        return ()
 
-    def listed_paths(self, outcome: TriageOutcome) -> frozenset[PurePosixPath]:
+    def listed_paths(self, outcome: TriageOutcome) -> AttemptedRequest:
         """
         :param outcome: A triaged pull request.
-        :return: The paths of every file GitHub lists in it.
+        :return: The paths of every file GitHub lists in it, as a frozen set.
         :raises PullRequestHeadMoved: If its head commit is no longer the triaged one.
         """
         document = ReviewTriageLocation.PULL_REQUEST_FILES.read_text()
         request = FilesPageRequest(outcome.pull_request.node_identifier)
         paths: set[PurePosixPath] = set()
         while True:
-            answer = ListedFilesAnswer.from_json(
-                GraphQLResponse.from_json(
-                    self.github.send(GraphQLRequest(document, request.to_json()))
-                ).result()
-            ).pull_request
+            page = self.attempt(GraphQLRequest(document, request.to_json()))
+            if page.refusals:
+                return page
+            answer = ListedFilesAnswer.from_json(page.result).pull_request
             if answer.head_commit != outcome.pull_request.head.commit:
                 raise PullRequestHeadMoved(
                     outcome.pull_request.number,
@@ -217,5 +249,20 @@ class ViewedMarking(TriageOutput):
                 )
             paths.update(file.path for file in answer.files.files)
             if not answer.files.page_info.has_next_page:
-                return frozenset(paths)
+                return AttemptedRequest(frozenset(paths))
             request = replace(request, cursor=answer.files.page_info.end_cursor)
+
+    def attempt(self, request: GraphQLRequest) -> AttemptedRequest:
+        """
+        :param request: The request to send.
+        :return: Its result, or what GitHub refused it with.
+        """
+        response = self.github.attempt_send(request)
+        if response.failure is not None:
+            return AttemptedRequest(refusals=(response.failure.error_message(),))
+        answer = GraphQLResponse.from_json(response.body)
+        if answer.errors:
+            return AttemptedRequest(
+                refusals=tuple(error.message for error in answer.errors)
+            )
+        return AttemptedRequest(answer.data or {})

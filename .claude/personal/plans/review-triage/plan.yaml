@@ -36,9 +36,9 @@ items:
   track: triage
   blockers:
     - >-
-      Awaiting the owner: 9 open threads on 8457b9be (ListedPullRequest vs summary, git reference
-      base, hand file steps, fork sync, secret read typing, dataclass questions) and the
-      per-reviewer marking plan item; 12 open from 1c54d6ff.
+      Awaiting the owner: the README thread on #215 (does #214 or #215 update the README for the
+      commit range) and 12 open threads from 1c54d6ff. Head 39d7cd13 merges clean into main
+      d576e5a9; CI not read.
   depends_on: []
   status: blocked
   recommended_model: sonnet

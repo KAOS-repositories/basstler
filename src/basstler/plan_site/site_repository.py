@@ -7,12 +7,11 @@ from __future__ import annotations
 import shlex
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import StrEnum
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlsplit
 
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
-from basstler.github.repository import NewTokenPage, Repository
+from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.workflows import (
@@ -26,46 +25,6 @@ PAGES_HOST_SUFFIX = ".github.io"
 """
 What the host of every address GitHub Pages serves a user's site from ends with.
 """
-
-# %% the token that starts the build
-
-
-class TokenFormField(StrEnum):
-    """
-    The query parameters GitHub fills its new fine-grained token form from.
-    """
-
-    NAME = "name"
-    """
-    The token's name, at most 40 characters.
-    """
-
-    DESCRIPTION = "description"
-    """
-    The token's description.
-    """
-
-    RESOURCE_OWNER = "target_name"
-    """
-    The user or organisation whose repositories the token reaches.
-    """
-
-    ACTIONS = "actions"
-    """
-    The token's access to repositories' Actions workflows and runs.
-    """
-
-
-class PermissionLevel(StrEnum):
-    """
-    The access a fine-grained token's permission grants.
-    """
-
-    WRITE = "write"
-    """
-    Read and write.
-    """
-
 
 # %% the site repository
 
@@ -136,20 +95,19 @@ class SiteRepository:
     def token_form_url(self, token_name: str = "basstler plan site") -> str:
         """
         :param token_name: The name the form fills in.
-        :return: :attr:`NewTokenPage.FINE_GRAINED` with everything filled in that starting the build
-            needs, except the repository, which the form cannot be given.
+        :return: The fine-grained token form with everything filled in that starting
+            the build needs, except the repository, which the form cannot be given.
         """
-        query = urlencode(
+        return token_form.FineGrainedTokenForm(
+            token_name,
+            f"Starts the plan site build in {self.repository.full_name}",
+            self.repository.owner,
             {
-                TokenFormField.NAME: token_name,
-                TokenFormField.DESCRIPTION: (
-                    f"Starts the plan site build in {self.repository.full_name}"
-                ),
-                TokenFormField.RESOURCE_OWNER: self.repository.owner,
-                TokenFormField.ACTIONS: PermissionLevel.WRITE,
-            }
-        )
-        return f"{NewTokenPage.FINE_GRAINED.url}?{query}"
+                token_form.RepositoryPermission.ACTIONS: (
+                    token_form.PermissionLevel.WRITE
+                )
+            },
+        ).url
 
     def token_use(self, stored_on: Sequence[Repository]) -> token_form.TokenUse:
         """

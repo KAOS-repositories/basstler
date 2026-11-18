@@ -7,11 +7,12 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlsplit
 
 from basstler.github.repository import NewTokenPage, Repository
-from basstler.plan_site.site_repository import (
+from basstler.github.token_form import (
     PermissionLevel,
-    SiteRepository,
-    TokenFormField,
+    RepositoryPermission,
+    TokenFormParameter,
 )
+from basstler.plan_site.site_repository import SiteRepository
 
 SITE = SiteRepository(Repository("an-owner", "plans"))
 """
@@ -27,6 +28,6 @@ def test_the_token_form_asks_for_actions_write_under_the_site_owner_only():
     fields = parse_qs(address.query)
 
     assert address._replace(query="").geturl() == NewTokenPage.FINE_GRAINED.url
-    assert fields[TokenFormField.RESOURCE_OWNER] == [SITE.repository.owner]
-    assert fields[TokenFormField.ACTIONS] == [PermissionLevel.WRITE]
-    assert set(fields) == set(TokenFormField)
+    assert fields[TokenFormParameter.RESOURCE_OWNER] == [SITE.repository.owner]
+    assert fields[RepositoryPermission.ACTIONS] == [PermissionLevel.WRITE]
+    assert set(fields) == {*TokenFormParameter, RepositoryPermission.ACTIONS}

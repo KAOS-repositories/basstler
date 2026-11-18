@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum, StrEnum
 from http import HTTPStatus
@@ -44,8 +44,14 @@ from basstler.github.exceptions import (
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import (
+    GitHubAddress,
+    NewTokenPage,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.github.rest_models import RestPullRequestSummary
+from basstler.github.token_form import CreateToken, StoreToken, TokenStep
 from basstler.github.run_listing import ListedRun, RunListing
 from basstler.github.states import CheckOutcome
 from basstler.github.workflows import TriggerEvent, Workflow
@@ -91,6 +97,7 @@ from basstler.plan_site.workflows import (
     WorkflowFile,
     WorkflowStep,
 )
+from basstler.review_triage.viewed_request import ReviewTriageSecret
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
@@ -347,7 +354,10 @@ class Publishing:
         :return: The merge workflow as publishing proposes it into *base*.
         """
         return MergeWorkflowProposal(
-            self.notes_repository, base, PlanSitePublication.merge_workflow_branch
+            RepositoryBranch(base, self.notes_repository),
+            RepositoryBranch(
+                PlanSitePublication.merge_workflow_branch, self.notes_repository
+            ),
         )
 
     @property
@@ -1464,9 +1474,7 @@ def test_private_repositories_of_several_owners_need_a_classic_token():
         site, (Repository("an-owner", "notes"), WORK_REPOSITORY)
     )
 
-    assert access.pending.browser_steps[0] == (
-        f"Open {SiteRepository.classic_token_page}."
-    )
+    assert access.pending.browser_steps[0] == (f"Open {NewTokenPage.CLASSIC.url}.")
 
 
 def test_a_classic_token_is_asked_for_with_a_warning_that_it_can_also_write():
@@ -1677,11 +1685,12 @@ def test_an_unopened_pull_request_leaves_opening_it_to_the_user_with_the_reason(
 
     assert pending.failure == str(failed_opening.failure)
     assert pending.line == (
-        f"gh pr create --repo {notes.full_name} --base {proposal.base} "
-        f"--head {proposal.head} --fill, then merge it"
+        f"gh pr create --repo {notes.full_name} --base {proposal.base.name} "
+        f"--head {proposal.head.name} --fill, then merge it"
     )
     assert pending.browser_steps[0] == (
-        f"Open {notes.url}/compare/{proposal.base}...{proposal.head}?expand=1."
+        f"Open {notes.url}/compare/{proposal.base.name}...{proposal.head.name}"
+        "?expand=1."
     )
 
 
@@ -2230,3 +2239,70 @@ def test_the_command_takes_every_option_it_names(option):
     _, bound, _ = publication_app.parse_args([option, "a-value"])
 
     assert list(bound.arguments.values()) == ["a-value"]
+
+
+# %% marking files viewed with the build's token
+
+
+@dataclass
+class UnsetUpClient(PullRequestOpeningClient):
+    """
+    Answers like :class:`PullRequestOpeningClient`, and every path it holds no
+    recording for as missing.
+    """
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        if path in self.responses or path in self.refusals:
+            return super().attempt_get(path)
+        self.calls.append(path)
+        return GitHubResponse(None, failure=refusal_of(path, HTTPStatus.NOT_FOUND))
+
+
+def published_marking_viewed(published: Publishing):
+    """
+    :param published: A notes repository published once, without marking files viewed.
+    :return: The report of publishing it again, also setting up marking files viewed.
+    """
+    runs = published.runs_none()
+    client = UnsetUpClient(runs.responses, opened=runs.opened, refusals=runs.refusals)
+    return replace(
+        published.publication(client), mark_viewed_on=published.notes_repository
+    ).publish()
+
+
+def test_one_owner_s_build_and_marking_files_viewed_leave_one_pair_of_token_steps(
+    published,
+):
+    """
+    The plan site's own token steps are left out, and the mark-viewed part creates and
+    stores the one token both jobs share.
+    """
+    report = published_marking_viewed(published)
+    assert (
+        [
+            pending.step
+            for pending in report.pending
+            if pending.step in (UserStep.CREATE_TOKEN, UserStep.STORE_TOKEN)
+        ],
+        [
+            (type(step), len(step.token.uses))
+            for step in report.mark_viewed.user_steps
+            if isinstance(step, TokenStep)
+        ],
+    ) == ([], [(CreateToken, 2), (StoreToken, 2)])
+
+
+def test_the_shared_token_is_stored_as_both_secrets(published):
+    report = published_marking_viewed(published)
+    (command,) = [
+        step.command for step in report.mark_viewed.user_steps if step.command
+    ]
+    assert all(
+        f"gh secret set {secret}" in command
+        for secret in (PlanSiteSecret.TOKEN, ReviewTriageSecret.VIEWER_TOKEN)
+    )
+
+
+def test_marking_files_viewed_is_reported_after_the_plan_site(published):
+    report = published_marking_viewed(published)
+    assert report.render().endswith(report.mark_viewed_report)

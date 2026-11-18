@@ -32,6 +32,9 @@ if [ "$(git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree 2>/dev/null)" !
   exit 78
 fi
 CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
+# Whether Claude Code runs this in a cloud session (basstler.locations.ClaudeCodeVariable.REMOTE),
+# which setup-review-triage's skill reads; unset elsewhere, so it is "false" there.
+CLAUDE_CODE_REMOTE="${CLAUDE_CODE_REMOTE:-false}"
 
 # Every caller also does `git` operations (config, fetch, worktree, branch)
 # that assume they're running inside the project. Move there explicitly instead

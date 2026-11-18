@@ -198,6 +198,13 @@ items:
   title: "Make every branch hold the repository it belongs to"
   branch: null
   track: triage
+  notes: >
+    Starts once #215 lands. `Branch` (basstler-git) holds a required repository: add a git-layer
+    repository base that GitHub's `Repository` subclasses, and merge `RepositoryBranch` into
+    `Branch`. Payload models naming a branch (`PullRequestEnd`, `ExistingBranch`, the default
+    branches in `repository_details`) take it from the read, with one reader and writer for a
+    `Branch`'s wire form; give `PullRequestReference` the same treatment. Comes from the review
+    threads on #215 at 39d7cd13.
   depends_on: []
   status: not started
   recommended_model: opus

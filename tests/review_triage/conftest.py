@@ -37,6 +37,7 @@ from basstler.github.pull_request_changes import (
 from basstler.github.repository import Repository
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameMap
+from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from ..constants.paths import DatasetLocation
 from ..scratch_repository import ScratchRepository
@@ -311,3 +312,11 @@ def sample_changes(
     return read_sample(
         scratch_repository, sample_payload, DescriptionSample.WITHOUT_DECLARATION
     )
+
+
+@pytest.fixture
+def sample_triage(sample_changes: PullRequestChanges) -> TriageOutcome:
+    """
+    :return: The sample pull request, triaged.
+    """
+    return PullRequestTriager().triage(sample_changes)

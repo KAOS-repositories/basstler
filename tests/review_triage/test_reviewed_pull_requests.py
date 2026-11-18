@@ -7,14 +7,20 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import Any
 
+import pytest
+
 from basstler.github.client import GitHubReader
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.repository import ReviewerInvolvement
+from basstler.review_triage.outputs import ViewedMarking
 from basstler.review_triage.reviewed_pull_requests import ReviewedPullRequests
+from basstler.review_triage.triage import TriageOutcome
 
 from ..constants.paths import DatasetLocation
-from .conftest import SAMPLE_REPOSITORY
+from .conftest import SAMPLE_REPOSITORY, RecordingWriter, RefusingWriter
 
 # %% a search answering each involvement with its own page
 
@@ -63,3 +69,41 @@ def test_every_pull_request_requested_or_reviewed_is_found_once_lowest_first():
     found = ReviewedPullRequests(SAMPLE_REPOSITORY).numbers(SearchByInvolvement())
 
     assert found == tuple(expected)
+
+
+# %% marking them
+
+
+def test_every_reviewed_pull_request_s_mechanical_files_are_marked(
+    sample_triage: TriageOutcome,
+):
+    """
+    Each pull request's mechanical files are marked, one mutation per file.
+    """
+    writer = RecordingWriter({"data": {}})
+
+    ReviewedPullRequests(SAMPLE_REPOSITORY).mark_viewed(
+        ViewedMarking(writer), (sample_triage, sample_triage)
+    )
+
+    assert len(writer.sent) == 2 * len(sample_triage.mechanical_files)
+
+
+def test_a_refused_pull_request_is_raised_once_every_one_was_tried(
+    sample_triage: TriageOutcome,
+):
+    """
+    A refusal stops neither the other pull requests nor goes unreported.
+    """
+    tried: list[TriageOutcome] = []
+
+    def outcomes():
+        for outcome in (sample_triage, sample_triage):
+            tried.append(outcome)
+            yield outcome
+
+    with pytest.raises(GraphQLErrorsReturned):
+        ReviewedPullRequests(SAMPLE_REPOSITORY).mark_viewed(
+            ViewedMarking(RefusingWriter(HTTPStatus.FORBIDDEN)), outcomes()
+        )
+    assert tried == [sample_triage, sample_triage]

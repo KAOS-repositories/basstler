@@ -60,3 +60,20 @@ def test_conflicting_or_empty_starts_are_refused(command, options):
         review_triage_app.parse_args(
             [command, "7", *options], exit_on_error=False, print_error=False
         )
+
+
+@pytest.mark.parametrize(
+    "options", [("--since", "abc123"), ("--last", "2"), ("--from-merge-base",)]
+)
+def test_marking_the_reviews_takes_no_start_since_each_starts_at_its_last_review(
+    options,
+):
+    """
+    Every pull request is marked from the account's own last review on it.
+    """
+    with pytest.raises(CycloptsError):
+        review_triage_app.parse_args(
+            [ReviewTriageCommand.MARK_VIEWED_IN_REVIEWS, *options],
+            exit_on_error=False,
+            print_error=False,
+        )

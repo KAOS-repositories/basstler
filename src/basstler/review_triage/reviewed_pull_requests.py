@@ -5,11 +5,19 @@ in.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from basstler.github.client import GitHubReader
-from basstler.github.repository import HasRepository, ReviewerInvolvement
+from basstler.github.exceptions import GraphQLErrorsReturned
+from basstler.github.repository import (
+    HasRepository,
+    PullRequestReference,
+    ReviewerInvolvement,
+)
 from basstler.json_model import ValidatedJSONModel
+from basstler.review_triage.outputs import ViewedMarking
+from basstler.review_triage.triage import TriageOutcome
 
 # %% the search's answer
 
@@ -63,3 +71,31 @@ class ReviewedPullRequests(HasRepository):
                 }
             )
         )
+
+    def mark_viewed(
+        self, marking: ViewedMarking, outcomes: Iterable[TriageOutcome]
+    ) -> str:
+        """
+        Mark each triaged pull request's mechanical files viewed, going on past a
+        refused one.
+
+        :param marking: Marks one pull request's files.
+        :param outcomes: The pull requests, triaged.
+        :return: What was marked, one line per pull request.
+        :raises GraphQLErrorsReturned: Once every one was tried, if any was refused.
+        """
+        marked: list[str] = []
+        refusals: list[str] = []
+        for outcome in outcomes:
+            url = PullRequestReference(self.repository, outcome.pull_request.number).url
+            refused = marking.refusals(outcome)
+            if refused:
+                refusals.extend(f"{url}: {refusal}" for refusal in refused)
+                continue
+            marked.append(
+                f"Marked {len(outcome.mechanical_files)} mechanical files of {url} "
+                "viewed"
+            )
+        if refusals:
+            raise GraphQLErrorsReturned(tuple(refusals))
+        return "\n".join(marked)

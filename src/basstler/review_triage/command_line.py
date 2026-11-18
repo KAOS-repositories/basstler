@@ -28,6 +28,7 @@ from basstler.locations import ClaudeCodeVariable
 from basstler.review_triage.command_names import ReviewTriageCommand
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
+from basstler.review_triage.reviewed_pull_requests import ReviewedPullRequests
 from basstler.review_triage.rules import (
     ReviewTriageSettings,
     RuleSelection,
@@ -320,6 +321,47 @@ def mark_viewed(
     return ReviewTriageExitCode.SUCCESS
 
 
+@review_triage_app.command(name=ReviewTriageCommand.MARK_VIEWED_IN_REVIEWS)
+def mark_viewed_in_reviews(
+    *,
+    repository: str | None = None,
+    select_rule: tuple[TriageRule, ...] = (),
+    ignore_rule: tuple[TriageRule, ...] = (),
+) -> ReviewTriageExitCode:
+    """
+    Mark viewed, for the logged-in account, the mechanical files of every open pull
+    request on a repository that asks it for a review or that it reviewed, each since
+    its last review there; then print what was marked.
+
+    :param repository: The repository as ``owner/name``, checked out in the current
+        directory; the checkout's ``origin`` by default.
+    :param select_rule: An opt-in rule to turn on, adding to the checkout's
+        ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
+    :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
+    :raises GraphQLErrorsReturned: Once every pull request was tried, if any was
+        refused.
+    """
+    reviewed = ReviewedPullRequests(
+        Repository.from_name_or_remote(repository, GitCommandRunner(Path.cwd()))
+    )
+    github = GitHubRestClient()
+    outcomes = (
+        TriagePublication.from_arguments(
+            number,
+            reviewed.repository.full_name,
+            TriageDeclaration(),
+            None,
+            None,
+            select_rule,
+            ignore_rule,
+        ).outcome()
+        for number in reviewed.numbers(github)
+    )
+    logger.info(reviewed.mark_viewed(ViewedMarking(github), outcomes))
+    return ReviewTriageExitCode.SUCCESS
+
+
 @review_triage_app.command(name=ReviewTriageCommand.REQUEST_MARK_VIEWED)
 def request_mark_viewed(
     pull_request: int,
@@ -360,6 +402,7 @@ def set_up_mark_viewed(
     repository: str | None = None,
     branch_or_tag: str = BasstlerProject.default_branch.name,
     on_every_pull_request: bool = False,
+    in_reviews_schedule: str | None = None,
 ) -> ReviewTriageExitCode:
     """
     Set a repository's Actions up to mark files viewed, as far as a command can, and
@@ -372,6 +415,9 @@ def set_up_mark_viewed(
     :param branch_or_tag: The basstler branch or tag the installed workflow runs.
     :param on_every_pull_request: Also run it for every pull request opened or updated
         on the workflow repository, which then defaults to the pull requests'.
+    :param in_reviews_schedule: A cron schedule, in UTC, on which it also runs for
+        every open pull request on the pull requests' repository that the token's
+        owner reviews, each since its last review there.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     git = GitCommandRunner(Path.cwd())
@@ -382,6 +428,7 @@ def set_up_mark_viewed(
         Repository.parse(repository) if repository else None,
         branch_or_tag,
         on_every_pull_request,
+        in_reviews_schedule,
     )
     logger.info(setup.run(GitHubRestClient()))
     return ReviewTriageExitCode.SUCCESS

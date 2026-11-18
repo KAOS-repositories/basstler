@@ -18,8 +18,7 @@ from basstler.review_triage.exceptions import (
     MarkViewedWorkflowRefused,
 )
 from basstler.review_triage.outputs import ViewedMarking
-from basstler.github.pull_request_changes import PullRequestChanges
-from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
+from basstler.review_triage.triage import TriageOutcome
 from basstler.review_triage.viewed_request import (
     MarkViewedDispatch,
     MarkViewedInputs,
@@ -121,14 +120,6 @@ def test_a_refused_dispatch_is_raised():
 
 
 # %% marking by whichever route works
-
-
-@pytest.fixture
-def sample_triage(sample_changes: PullRequestChanges) -> TriageOutcome:
-    """
-    :return: The sample pull request, triaged.
-    """
-    return PullRequestTriager().triage(sample_changes)
 
 
 def routes(

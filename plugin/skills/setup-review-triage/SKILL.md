@@ -91,6 +91,14 @@ this workflow up too and asks for one token, stored as both secrets with one com
 Relay its mark-viewed part as above. Where the owners differ, one fine-grained token
 cannot do both, so each keeps its own.
 
+**Every reviewer on a team:** when the user reviews pull requests on a repository that
+other people also review, offer marking their own reviews from a repository they own.
+Run the setup there with `--repository <owner>/<name>`, naming the team's repository,
+and `--in-reviews-schedule <cron>`, proposing `"17 7-19 * * 1-5"` and saying each run
+costs Actions minutes on that repository. With the plan site, the publication command
+takes `--mark-viewed-in-reviews <cron>` beside `--mark-viewed-on` instead. Each other
+reviewer runs the same on a repository of their own.
+
 Once the user says they took the steps, run the setup again and report what it says
 now, not what you expect. Call the route set up only when nothing is left.
 

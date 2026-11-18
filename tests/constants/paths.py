@@ -280,6 +280,22 @@ class DatasetLocation(PathEnumeration):
     A repository's REST response for one whose default branch is not ``main``.
     """
 
+    REVIEW_REQUESTED_PULL_REQUESTS = (
+        DIRECTORY / "review-triage" / "reviewed-pull-requests" / "review-requested.json"
+    )
+    """
+    The issue search's page of open pull requests requesting the credential's account
+    as a reviewer: numbers 12 and 7.
+    """
+
+    REVIEWED_PULL_REQUESTS = (
+        DIRECTORY / "review-triage" / "reviewed-pull-requests" / "reviewed.json"
+    )
+    """
+    The issue search's page of open pull requests the credential's account reviewed:
+    numbers 7 and 3.
+    """
+
     MAIN_FAILURE_OPEN_ISSUE = DIRECTORY / "main-failure" / "open-issue.json"
     """
     The open issue reporting main's failing tests, as the issues API lists it.

@@ -6,6 +6,7 @@ remote URL.
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -18,6 +19,7 @@ from basstler.github.repository import (
     RepositoryBranch,
     PullRequestReference,
     Repository,
+    ReviewerInvolvement,
 )
 from basstler.setup.steps import Host
 
@@ -251,6 +253,22 @@ def test_a_workflow_s_dispatch_path_is_below_its_own_path():
     assert REPOSITORY.workflow_dispatch_path(WORKFLOW) == (
         f"{REPOSITORY.workflow_resource_path(WORKFLOW)}/dispatches"
     )
+
+
+@pytest.mark.parametrize("involvement", list(ReviewerInvolvement))
+def test_the_reviewer_s_pull_request_search_finds_open_ones_on_the_repository(
+    involvement: ReviewerInvolvement,
+):
+    """
+    The search asks for the repository's open pull requests the credential's account
+    takes part in reviewing that way.
+    """
+    address = urlsplit(REPOSITORY.reviewer_pull_request_search_path(involvement))
+
+    assert address.path == "search/issues"
+    assert parse_qs(address.query)["q"] == [
+        f"repo:{REPOSITORY.full_name} is:pr is:open {involvement}:@me"
+    ]
 
 
 def test_a_job_log_path_is_the_one_the_actions_api_serves_it_from():

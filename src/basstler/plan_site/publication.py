@@ -201,6 +201,12 @@ class PlanSitePublication:
     Actions are also set up to mark viewed, ``None`` to set nothing up for it.
     """
 
+    mark_viewed_in_reviews_schedule: str | None = None
+    """
+    The cron schedule on which those Actions also mark every open pull request on
+    :attr:`mark_viewed_on` that the token's owner reviews, ``None`` for none.
+    """
+
     github_retry_policy: RetryPolicy = RetryPolicy(
         retries=4, first_delay=timedelta(seconds=2)
     )
@@ -383,6 +389,7 @@ class PlanSitePublication:
         setup = MarkViewedSetup(
             self.dispatch_workflow.notes_repository,
             self.mark_viewed_on,
+            in_reviews_schedule=self.mark_viewed_in_reviews_schedule,
             shared_uses=(
                 site.token_use([Repository.parse(name) for name in hub.repositories]),
             ),
@@ -708,6 +715,12 @@ class PublicationOption(StrEnum):
     repository's Actions also mark viewed; nothing is set up for it when not given.
     """
 
+    MARK_VIEWED_IN_REVIEWS = "--mark-viewed-in-reviews"
+    """
+    The cron schedule on which to also mark every open pull request on the
+    :attr:`MARK_VIEWED_ON` repository that the token's owner reviews.
+    """
+
 
 app = App(help=__doc__)
 """
@@ -719,6 +732,7 @@ def clone_publication(
     branch_or_tag: str,
     site_repository: str | None = None,
     mark_viewed_on: str | None = None,
+    mark_viewed_in_reviews: str | None = None,
 ) -> PlanSitePublication:
     """
     :param branch_or_tag: The basstler branch or release tag the site's build runs.
@@ -727,6 +741,8 @@ def clone_publication(
     :param mark_viewed_on: The ``owner/name`` repository whose pull requests' files
         the notes repository's Actions also mark viewed, with one token for that and
         the build where the owners match.
+    :param mark_viewed_in_reviews: The cron schedule on which those Actions also mark
+        every open pull request there that the token's owner reviews.
     :return: Publishing this clone's notes repository on its site.
     :raises NotesRepositoryUnresolvedError: If the notes remote is not on GitHub.
     """
@@ -755,6 +771,7 @@ def clone_publication(
         remote_root=GitHubAddress.clone_root_for(notes_branch.url),
         in_cloud_session=ClaudeCodeVariable.REMOTE.is_true(),
         mark_viewed_on=Repository.parse(mark_viewed_on) if mark_viewed_on else None,
+        mark_viewed_in_reviews_schedule=mark_viewed_in_reviews,
     )
 
 
@@ -770,6 +787,9 @@ def publish(
     mark_viewed_on: Annotated[
         str | None, Parameter(name=PublicationOption.MARK_VIEWED_ON)
     ] = None,
+    mark_viewed_in_reviews: Annotated[
+        str | None, Parameter(name=PublicationOption.MARK_VIEWED_IN_REVIEWS)
+    ] = None,
 ) -> int:
     """
     Publish this clone's notes repository on the plan site. See the module docstring.
@@ -780,10 +800,14 @@ def publish(
     :param mark_viewed_on: The ``owner/name`` repository whose pull requests' files
         the notes repository's Actions also mark viewed, with one token for that and
         the build where the owners match.
+    :param mark_viewed_in_reviews: The cron schedule on which to also mark every open
+        pull request there that the token's owner reviews.
     :return: The status :meth:`PlanSitePublication.run` ends with.
     :raises NotesRepositoryUnresolvedError: If the notes remote is not on GitHub.
     """
-    return clone_publication(branch_or_tag, site_repository, mark_viewed_on).run()
+    return clone_publication(
+        branch_or_tag, site_repository, mark_viewed_on, mark_viewed_in_reviews
+    ).run()
 
 
 if __name__ == "__main__":

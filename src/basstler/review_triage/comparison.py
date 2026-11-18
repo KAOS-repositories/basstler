@@ -570,14 +570,20 @@ class FileTriager:
     ) -> frozenset[ChangeKind] | None:
         """
         :param change: A file the pull request changes.
-        :return: What its content change consists of once the occurrences proven to
-            refer to a renamed module member are renamed in its base version, ``None``
-            when none is or the change is not then provably mechanical.
+        :return: What its content change consists of once the occurrences in its code,
+            or in a Markdown file's python code blocks, proven to refer to a renamed
+            member are renamed in its base version, ``None`` when none is or the
+            change is not then provably mechanical.
         """
         renamer = self.context.member_renamer
-        if renamer is None or not PythonComparison().applies_to(change):
+        if renamer is None or change.base_text is None or change.head_text is None:
             return None
-        renamed = renamer.renamed_base(change)
+        if change.path.suffix == FileSuffix.MARKDOWN:
+            renamed = renamer.renamed_documentation(change)
+        elif PythonComparison().applies_to(change):
+            renamed = renamer.renamed_base(change)
+        else:
+            return None
         if renamed.text == change.base_text:
             return None
         kinds = self.judged_changes(

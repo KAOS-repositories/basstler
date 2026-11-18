@@ -190,7 +190,7 @@ items:
   branch: null
   track: triage
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: sonnet
 
 - id: branch-owns-its-repository

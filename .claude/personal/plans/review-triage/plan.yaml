@@ -148,10 +148,12 @@ items:
     list items, the domain_models READMEs.'
 - id: per-reviewer-viewed-marking
   title: Mark files viewed since each reviewer's last review
-  branch: null
+  branch: claude/magical-euler-j4joud
   track: triage
+  pull_request_number: 262
+  session: https://claude.ai/code/session_018wfiv8NqR6npX5nceRLddu
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: opus
 - id: repository-field-once
   title: Declare the repository field once in every GitHub model

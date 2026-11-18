@@ -4,13 +4,19 @@ Searching the files of one commit.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from functools import cached_property
 from pathlib import PurePosixPath
 
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
 
 # %% the search
+
+PATH_TERMINATOR = "\0"
+"""
+What ``git ls-tree -z`` ends each path it lists with.
+"""
 
 
 class GitGrepExitCode(ExitCode):
@@ -45,12 +51,17 @@ class CommitTree:
     The commit searched.
     """
 
-    held_paths: dict[PurePosixPath, bool] = field(
-        default_factory=dict, compare=False, repr=False
-    )
-    """
-    :meth:`holds` for each path asked about so far.
-    """
+    @cached_property
+    def file_paths(self) -> frozenset[PurePosixPath]:
+        """
+        The path of every file of the commit, from its root, listed by one command.
+
+        :raises GitCommandFailed: If the listing fails.
+        """
+        listing = self.git.run("ls-tree", "-r", "--name-only", "-z", self.commit)
+        return frozenset(
+            PurePosixPath(path) for path in listing.split(PATH_TERMINATOR) if path
+        )
 
     def mentions(self, word: str) -> bool:
         """
@@ -76,8 +87,4 @@ class CommitTree:
         :param path: A path from the commit's root.
         :return: Whether the commit has a file there.
         """
-        if path not in self.held_paths:
-            self.held_paths[path] = self.git.attempt(
-                "cat-file", "-e", f"{self.commit}:{path}"
-            ).succeeded
-        return self.held_paths[path]
+        return path in self.file_paths

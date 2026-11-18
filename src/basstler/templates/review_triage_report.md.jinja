@@ -18,6 +18,9 @@ Renames applied - check them once here instead of in every file:
 
 {% for file in outcome.files_needing_review %}
 - `{{ file.change.path }}`
+{% for reason in file.reasons %}
+  - line {{ reason.line }}: {{ reason.explanation }}
+{% endfor %}
 {% else %}
 Nothing.
 {% endfor %}

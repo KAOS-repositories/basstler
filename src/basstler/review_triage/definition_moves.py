@@ -24,6 +24,7 @@ from basstler.review_triage.comparison import (
     MechanicalChange,
     PythonComparison,
 )
+from basstler.review_triage.keyword_arguments import KeywordArgumentComparison
 from basstler.review_triage.moved_definitions import MovedDefinition, MovedDefinitions
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.python_source import LineSpan, PythonSource
@@ -155,7 +156,7 @@ class DefinitionMoveComparison(FileJudgment):
     taken out, and any other Python file as :attr:`comparison` does.
     """
 
-    comparison: PythonComparison = field(default_factory=PythonComparison)
+    comparison: PythonComparison = field(default_factory=KeywordArgumentComparison)
     """
     How what is left of a module, and every other Python file, is compared.
     """

@@ -10,8 +10,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
+from functools import cached_property
 
-from basstler.review_triage.python_source import PythonSource
+from basstler.review_triage.python_source import AnnotatedType, PythonSource
 
 # %% names the reading recognises
 
@@ -60,6 +61,16 @@ class DataclassName(StrEnum):
 PROPERTY_DECORATORS = frozenset({"property", "cached_property"})
 """
 The decorators that make a method an attribute holding what it returns.
+"""
+
+TYPE_VARIABLE = "TypeVar"
+"""
+The class whose instances are type variables.
+"""
+
+CLASS_OBJECT_ANNOTATIONS = frozenset({"type", "Type"})
+"""
+The annotations of a parameter taking a class rather than an instance.
 """
 
 # %% the conventional receiver names
@@ -132,6 +143,17 @@ class FunctionDefinition:
     Whether it is an undecorated function of one parameter that only returns it.
     """
 
+    return_type: AnnotatedType | None = None
+    """
+    What its return annotation declares, ``None`` when it allows no single class.
+    """
+
+    class_argument_parameter: str | None = None
+    """
+    The parameter annotated ``type[T]`` whose argument's class it returns an instance
+    of, its return annotation being the type variable ``T``.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class DataclassField:
@@ -161,10 +183,9 @@ class AttributeType:
     The attribute's name.
     """
 
-    class_name: str | None
+    declared_type: AnnotatedType | None
     """
-    The name of the one class its annotation allows, ``None`` when it allows none or
-    several.
+    What its annotation declares, ``None`` when it allows no single class.
     """
 
 
@@ -264,9 +285,23 @@ class DefinitionReader:
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 yield self.function_definition(node, owners.get(node))
 
-    @staticmethod
+    @cached_property
+    def type_variables(self) -> frozenset[str]:
+        """
+        The names the file's top level binds to a :class:`typing.TypeVar`.
+        """
+        return frozenset(
+            target.id
+            for statement in self.source.tree.body
+            if isinstance(statement, ast.Assign)
+            and isinstance(statement.value, ast.Call)
+            and PythonSource.referenced_name(statement.value.func) == TYPE_VARIABLE
+            for target in statement.targets
+            if isinstance(target, ast.Name)
+        )
+
     def function_definition(
-        node: ast.FunctionDef | ast.AsyncFunctionDef, owner: str | None
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef, owner: str | None
     ) -> FunctionDefinition:
         """
         :param node: A function definition.
@@ -304,6 +339,54 @@ class DefinitionReader:
                 and isinstance(body[0].value, ast.Name)
                 and body[0].value.id == arguments.args[0].arg
             ),
+            return_type=(
+                None
+                if node.returns is None
+                else AnnotatedType.from_annotation(
+                    node.returns, self.generic_names(node)
+                )
+            ),
+            class_argument_parameter=self.class_argument_parameter(node),
+        )
+
+    def generic_names(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+    ) -> frozenset[str]:
+        """
+        :param node: A function or class definition.
+        :return: The type variables its annotations may use.
+        """
+        return self.type_variables | {variable.name for variable in node.type_params}
+
+    def class_argument_parameter(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> str | None:
+        """
+        :param node: A function definition.
+        :return: The parameter annotated ``type[T]`` when it returns the type variable
+            ``T``.
+        """
+        if not isinstance(node.returns, ast.Name):
+            return None
+        variable = node.returns.id
+        if variable not in self.generic_names(node):
+            return None
+        arguments = node.args
+        return next(
+            (
+                parameter.arg
+                for parameter in (
+                    *arguments.posonlyargs,
+                    *arguments.args,
+                    *arguments.kwonlyargs,
+                )
+                if isinstance(parameter.annotation, ast.Subscript)
+                and PythonSource.referenced_name(parameter.annotation.value)
+                in CLASS_OBJECT_ANNOTATIONS
+                and isinstance(parameter.annotation.slice, ast.Name)
+                and parameter.annotation.slice.id == variable
+            ),
+            None,
         )
 
     def class_definition(self, node: ast.ClassDef) -> ClassDefinition:
@@ -329,19 +412,19 @@ class DefinitionReader:
             attribute_types=tuple(self.attribute_types(node)),
         )
 
-    @staticmethod
-    def attribute_types(node: ast.ClassDef) -> Iterator[AttributeType]:
+    def attribute_types(self, node: ast.ClassDef) -> Iterator[AttributeType]:
         """
         :param node: A class definition.
-        :return: Every attribute declaration of the class, with the class it allows.
+        :return: Every attribute declaration of the class, with what it declares.
         """
+        generic = self.generic_names(node)
         for statement in node.body:
             if isinstance(statement, ast.AnnAssign) and isinstance(
                 statement.target, ast.Name
             ):
                 yield AttributeType(
                     statement.target.id,
-                    PythonSource.annotated_class(statement.annotation),
+                    AnnotatedType.from_annotation(statement.annotation, generic),
                 )
             if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
@@ -352,7 +435,7 @@ class DefinitionReader:
                 yield AttributeType(
                     statement.name,
                     statement.returns
-                    and PythonSource.annotated_class(statement.returns),
+                    and AnnotatedType.from_annotation(statement.returns, generic),
                 )
             for assignment in ast.walk(statement):
                 if (
@@ -363,7 +446,7 @@ class DefinitionReader:
                 ):
                     yield AttributeType(
                         assignment.target.attr,
-                        PythonSource.annotated_class(assignment.annotation),
+                        AnnotatedType.from_annotation(assignment.annotation, generic),
                     )
 
     def dataclass_decorator(self, node: ast.ClassDef) -> ast.expr | None:
@@ -487,18 +570,18 @@ class DefinitionSearch(ABC):
         """
 
     @abstractmethod
-    def files_mentioning(self, name: str) -> tuple[str, ...]:
+    def files_subclassing(self, name: str) -> tuple[str, ...]:
         """
-        :param name: A name, such as that of a class.
-        :return: A key for every file holding it as a whole word; files not holding it
-            may be among them.
+        :param name: The name of a class.
+        :return: A key for every file defining a class that names it among its bases;
+            files defining none may be among them.
         """
 
     @abstractmethod
-    def text_of(self, file: str) -> str:
+    def texts_of(self, files: tuple[str, ...]) -> dict[str, str]:
         """
-        :param file: The key of a file this search found.
-        :return: Its content.
+        :param files: Keys of files this search found.
+        :return: The content of each, by its key.
         """
 
 
@@ -516,11 +599,11 @@ class SourceDefinitions(DefinitionSearch):
     def files_defining(self, names: frozenset[str]) -> tuple[str, ...]:
         return tuple(map(str, range(len(self.texts))))
 
-    def files_mentioning(self, name: str) -> tuple[str, ...]:
+    def files_subclassing(self, name: str) -> tuple[str, ...]:
         return tuple(map(str, range(len(self.texts))))
 
-    def text_of(self, file: str) -> str:
-        return self.texts[int(file)]
+    def texts_of(self, files: tuple[str, ...]) -> dict[str, str]:
+        return {file: self.texts[int(file)] for file in files}
 
 
 # %% the index
@@ -558,12 +641,16 @@ class DefinitionIndex:
     def file_definitions(self, files: tuple[str, ...]) -> Iterator[Definition]:
         """
         :param files: Keys of files the search found.
-        :return: Every definition they hold, each file read the first time only.
+        :return: Every definition they hold, the files not read yet read together.
         """
+        unread = tuple(
+            dict.fromkeys(file for file in files if file not in self.by_file)
+        )
+        for file, text in self.search.texts_of(unread).items():
+            self.by_file[file] = tuple(
+                DefinitionReader(PythonSource(text)).definitions()
+            )
         for file in files:
-            if file not in self.by_file:
-                source = PythonSource(self.search.text_of(file))
-                self.by_file[file] = tuple(DefinitionReader(source).definitions())
             yield from self.by_file[file]
 
     def load(self, names: frozenset[str]) -> None:
@@ -627,7 +714,7 @@ class DefinitionIndex:
         while pending:
             current = pending.pop()
             if current not in self.direct_subclasses:
-                files = self.search.files_mentioning(current)
+                files = self.search.files_subclassing(current)
                 self.direct_subclasses[current] = tuple(
                     definition
                     for definition in self.file_definitions(files)

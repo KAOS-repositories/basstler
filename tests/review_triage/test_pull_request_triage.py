@@ -25,6 +25,10 @@ from basstler.locations import ReviewTriageLocation
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.detection import RenameDetection
+from basstler.review_triage.keyword_arguments import (
+    UnprovenBinding,
+    UnprovenKeywordCall,
+)
 from basstler.review_triage.outputs import MarkdownReport, ViewedFile, ViewedMarking
 from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
@@ -177,6 +181,24 @@ def test_the_report_leaves_out_the_paths_of_moved_files(
     rows = [f"| `{rename.old}` | `{rename.new}` |" in report for rename in moved]
     assert rows == [False] * len(moved)
     assert moved != []
+
+
+def test_the_report_names_why_a_file_needs_review(sample_changes: PullRequestChanges):
+    """
+    Each reason a file needs review is listed under it, with its line.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    reason = UnprovenKeywordCall(3, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN)
+    explained = replace(triage.files_needing_review[0], reasons=(reason,))
+    triage = replace(
+        triage,
+        files=tuple(
+            explained if verdict.change == explained.change else verdict
+            for verdict in triage.files
+        ),
+    )
+    line = f"  - line {reason.line}: {reason.explanation}"
+    assert line in MarkdownReport().render(triage).splitlines()
 
 
 def test_each_mechanical_file_is_marked_viewed(sample_changes: PullRequestChanges):

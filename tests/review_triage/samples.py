@@ -31,10 +31,21 @@ class FileSample(StrEnum):
     DOCUMENTATION_REFLOWED = "documentation-reflowed"
     DOCUMENTATION_RENAMED = "documentation-renamed"
     IDENTIFIER_RENAMED = "identifier-renamed"
+    IDENTITY_DECORATOR_ADDED = "identity-decorator-added"
     IMPORT_SOURCE_CHANGED = "import-source-changed"
     IMPORTS_REORDERED = "imports-reordered"
+    KEYWORD_ARGUMENTS_ADDED = "keyword-arguments-added"
+    KEYWORD_ARGUMENTS_REORDERED = "keyword-arguments-reordered"
+    KEYWORD_ARGUMENTS_SWAPPED = "keyword-arguments-swapped"
+    KEYWORD_ARGUMENTS_UNKNOWN_CALLEE = "keyword-arguments-unknown-callee"
+    KEYWORD_ONLY_PARAMETERS = "keyword-only-parameters"
     MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
     MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
+    RECEIVER_BINDS_DIFFERENTLY = "receiver-binds-differently"
+    RECEIVER_TYPE_AMBIGUOUS = "receiver-type-ambiguous"
+    RECEIVER_TYPE_FOLLOWED = "receiver-type-followed"
+    RECEIVER_TYPE_INFERRED = "receiver-type-inferred"
+    RECEIVER_TYPE_UNKNOWN = "receiver-type-unknown"
     RELATIVE_IMPORT_MOVED = "relative-import-moved"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
     TEMPLATE_RENAMED = "template-renamed"
@@ -61,10 +72,22 @@ class FileSample(StrEnum):
 
     def base_definitions(self) -> DefinitionIndex:
         """
-        :return: What the base version defines, as the base commit's definitions.
+        :return: What the base version and the sample's ``other_*.py`` files define, as
+            the base commit's definitions.
         """
-        base = next(self.directory.glob("base.*"))
-        return DefinitionIndex(SourceDefinitions((base.read_text(),)))
+        files = [
+            next(self.directory.glob("base.*")),
+            *sorted(self.directory.glob("other_*.py")),
+        ]
+        return DefinitionIndex(
+            SourceDefinitions(tuple(file.read_text(encoding="utf-8") for file in files))
+        )
+
+
+SIGNATURE_DEFINITIONS = DatasetLocation.REVIEW_TRIAGE / "signatures" / "definitions.py"
+"""
+The file whose definitions the signature suite reads.
+"""
 
 
 # %% pull request descriptions

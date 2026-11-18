@@ -30,7 +30,6 @@ import shlex
 import sys
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 from typing import Any
 
 from basstler.class_property import classproperty
@@ -42,7 +41,7 @@ from basstler.text_file import TextFile
 from basstler.upstream_reviews.failure_logs import (
     FailedJob,
 )
-from basstler.upstream_reviews.helper import fetch
+from basstler.locations import PackageLocation
 from basstler.upstream_reviews.helper.recording import (
     HelperChunk,
     HelperRecording,
@@ -172,7 +171,7 @@ class HelperScript:
         """
         :return: The shell command running the fetch module from its own source.
         """
-        source = self.code_only(TextFile(Path(fetch.__file__)).read())
+        source = self.code_only(TextFile(PackageLocation.UPSTREAM_REVIEWS_FETCH).read())
         configuration = json.dumps(self.configuration, separators=(",", ":"))
         return "\n".join(
             [

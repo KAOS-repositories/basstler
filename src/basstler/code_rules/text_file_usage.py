@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import override
 
 import libcst
@@ -23,6 +24,7 @@ from basstler.code_rules.fixes import (
     FixableChecker,
 )
 from basstler.code_rules.locale_encoding import TextFunction, TextKeyword
+from basstler.locations import PackageLocation
 from basstler.text_file import UTF_8, TextFile
 
 # %% the fix
@@ -109,6 +111,13 @@ class TextFileChecker(FixableChecker[Specification]):
             f"reads or writes text through the path; use "
             f'{TextFile.__name__} for {TextKeyword.ENCODING}="{UTF_8}"'
         )
+
+    @override
+    def checks(self, path: Path) -> bool:
+        """
+        Skips the program that runs without ``basstler``; :meth:`FixableChecker.checks`.
+        """
+        return path.resolve() != PackageLocation.UPSTREAM_REVIEWS_FETCH.resolve()
 
     @override
     def specifications_of_module(

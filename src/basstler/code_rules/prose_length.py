@@ -4,7 +4,6 @@ Finds docstrings and comment blocks whose prose runs longer than a line limit.
 
 from __future__ import annotations
 
-import ast
 import inspect
 import io
 import re
@@ -15,6 +14,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import override
 
+import libcst
+from libcst.metadata import CodeRange
+
+from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.syntax import BodySyntax, ExpressionSyntax
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.text_file import TextFile
 
@@ -104,47 +108,53 @@ class SourceProse:
         :return: The docstring of the module and of every class and function, and every
             attribute docstring directly below an assignment in a module or class body.
         """
-        for node in ast.walk(ast.parse(self.source)):
-            if not isinstance(
-                node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
-            ):
+        module = PositionedModule(libcst.parse_module(self.source))
+        for node in module.positions:
+            if not isinstance(node, libcst.ClassDef | libcst.FunctionDef):
                 continue
-            for index, statement in enumerate(node.body):
-                if not self.is_string(statement):
-                    continue
-                follows_assignment = index > 0 and isinstance(
-                    node.body[index - 1], ast.Assign | ast.AnnAssign
-                )
-                if index == 0 or (
-                    follows_assignment and isinstance(node, ast.Module | ast.ClassDef)
-                ):
-                    yield self.docstring_block(statement)
-
-    @staticmethod
-    def is_string(statement: ast.stmt) -> bool:
-        """
-        :return: Whether *statement* is a bare string literal.
-        """
-        return (
-            isinstance(statement, ast.Expr)
-            and isinstance(statement.value, ast.Constant)
-            and isinstance(statement.value.value, str)
+            yield from self.docstrings_of_body(module, node, BodySyntax(node.body))
+        yield from self.docstrings_of_body(
+            module, module.module, BodySyntax(module.module)
         )
 
+    def docstrings_of_body(
+        self, module: PositionedModule, owner: libcst.CSTNode, body: BodySyntax
+    ) -> Iterator[ProseBlock]:
+        """
+        :param owner: The module, class or function whose body *body* is.
+        :return: The docstrings among the statements of *body*.
+        """
+        for index, statement in enumerate(body.statements):
+            if not BodySyntax.is_string(statement):
+                continue
+            follows_assignment = index > 0 and isinstance(
+                body.statements[index - 1], libcst.Assign | libcst.AnnAssign
+            )
+            if index == 0 or (
+                follows_assignment
+                and isinstance(owner, libcst.Module | libcst.ClassDef)
+            ):
+                yield self.docstring_block(
+                    libcst.ensure_type(statement, libcst.Expr),
+                    module.positions[statement],
+                )
+
     @staticmethod
-    def docstring_block(statement: ast.Expr) -> ProseBlock:
+    def docstring_block(statement: libcst.Expr, location: CodeRange) -> ProseBlock:
         """
         :param statement: A bare string literal.
+        :param location: Where it lies in the source.
         :return: It, measured as a docstring.
         """
         prose_lines = 0
-        for line in inspect.cleandoc(statement.value.value).splitlines():
+        text = ExpressionSyntax(statement.value).literal_text
+        for line in inspect.cleandoc(text or "").splitlines():
             if FIELD_LIST_ITEM.match(line):
                 break
             if line.strip() and not line[0].isspace():
                 prose_lines += 1
         return ProseBlock(
-            ProseKind.DOCSTRING, statement.lineno, statement.end_lineno, prose_lines
+            ProseKind.DOCSTRING, location.start.line, location.end.line, prose_lines
         )
 
     def comment_blocks(self) -> Iterator[ProseBlock]:

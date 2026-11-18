@@ -5,7 +5,6 @@ Finds modules, classes, functions and fields that have no docstring.
 from __future__ import annotations
 
 import abc
-import ast
 import importlib
 import sys
 from collections.abc import Iterator
@@ -16,9 +15,12 @@ from pathlib import Path
 from types import ModuleType
 from typing import override
 
-from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
-from basstler.code_rules.prose_length import SourceProse
-from basstler.text_file import TextFile
+import libcst
+
+from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.syntax import BodySyntax
+from basstler.code_rules.checker import CodeRuleViolation
+from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
 
 # %% what is documented
 
@@ -119,109 +121,126 @@ class ImportedModule:
 
 
 @dataclass(frozen=True)
-class MissingDocstringChecker(CodeRuleChecker):
+class MissingDocstringChecker(SyntaxTreeChecker):
     """
     Finds undocumented code; a method implementing an abstract method inherits its
     base's docstring and needs none of its own.
     """
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = ast.parse(TextFile(path).read())
-        if module.body and ast.get_docstring(module) is None:
-            yield self.violation(
-                path, DocumentedKind.MODULE, 1, module.body[-1].end_lineno
-            )
-        yield from self.undocumented_definitions(path, module, (), ImportedModule(path))
+    def violations_of_module(
+        self, path: Path, module: PositionedModule
+    ) -> Iterator[CodeRuleViolation]:
+        if module.module.body and module.module.get_docstring(clean=False) is None:
+            last_line = module.positions[module.module.body[-1]].end.line
+            yield self.violation(path, DocumentedKind.MODULE, 1, last_line)
+        yield from self.undocumented_definitions(
+            path, module, module.module, (), ImportedModule(path)
+        )
 
     def undocumented_definitions(
         self,
         path: Path,
-        parent: ast.AST,
+        module: PositionedModule,
+        parent: libcst.CSTNode,
         scope: tuple[str, ...] | None,
         imported: ImportedModule,
+        methods: frozenset[libcst.CSTNode] = frozenset(),
     ) -> Iterator[CodeRuleViolation]:
         """
+        :param module: The module of *path*.
         :param parent: A node whose descendants are checked.
         :param scope: The names of the classes enclosing *parent*; none inside a
             function, where a class cannot be looked up.
-        :param imported: The module of *path*.
+        :param imported: The module of *path* as Python imports it.
+        :param methods: The functions defined directly in the body of the class
+            enclosing *parent*.
         :return: A violation for every undocumented class, function and field below
             *parent*. A method is skipped when its class cannot be looked up, and
             when it implements an abstract method, whose docstring suffices.
         """
-        for node in ast.iter_child_nodes(parent):
-            if isinstance(node, ast.ClassDef):
-                yield from self.undocumented_fields(path, node)
-                if ast.get_docstring(node) is None:
-                    yield self.violation(
-                        path,
-                        DocumentedKind.CLASS,
-                        self.first_line(node),
-                        node.end_lineno,
+        for node in parent.children:
+            if isinstance(node, libcst.ClassDef):
+                yield from self.undocumented_fields(path, module, node)
+                if node.get_docstring(clean=False) is None:
+                    yield self.definition_violation(
+                        path, module, DocumentedKind.CLASS, node
                     )
-                class_scope = None if scope is None else (*scope, node.name)
+                class_scope = None if scope is None else (*scope, node.name.value)
+                members = frozenset(
+                    statement
+                    for statement in BodySyntax(node.body).statements
+                    if isinstance(statement, libcst.FunctionDef)
+                )
                 yield from self.undocumented_definitions(
-                    path, node, class_scope, imported
+                    path, module, node, class_scope, imported, members
                 )
                 continue
-            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-                yield from self.undocumented_definitions(path, node, scope, imported)
+            if not isinstance(node, libcst.FunctionDef):
+                yield from self.undocumented_definitions(
+                    path, module, node, scope, imported, methods
+                )
                 continue
-            if ast.get_docstring(node) is None and not self.is_exempt_method(
-                parent, scope, node, imported
+            if node.get_docstring(clean=False) is None and not self.is_exempt_method(
+                methods, scope, node, imported
             ):
-                yield self.violation(
-                    path,
-                    DocumentedKind.FUNCTION,
-                    self.first_line(node),
-                    node.end_lineno,
+                yield self.definition_violation(
+                    path, module, DocumentedKind.FUNCTION, node
                 )
-            yield from self.undocumented_definitions(path, node, None, imported)
+            yield from self.undocumented_definitions(path, module, node, None, imported)
 
     @staticmethod
     def is_exempt_method(
-        parent: ast.AST,
+        methods: frozenset[libcst.CSTNode],
         scope: tuple[str, ...] | None,
-        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        node: libcst.FunctionDef,
         imported: ImportedModule,
     ) -> bool:
         """
         :return: Whether *node* is a method that needs no docstring of its own: its class
             cannot be looked up, or it implements an abstract method.
         """
-        if not isinstance(parent, ast.ClassDef):
+        if node not in methods:
             return False
         if imported.class_named(scope) is None:
             return True
-        return imported.implements_abstract_method(scope, node.name)
-
-    @staticmethod
-    def first_line(
-        definition: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
-    ) -> int:
-        """
-        :return: The line of the first decorator of *definition*, else of its keyword.
-        """
-        decorators = definition.decorator_list
-        return decorators[0].lineno if decorators else definition.lineno
+        return imported.implements_abstract_method(scope, node.name.value)
 
     def undocumented_fields(
-        self, path: Path, definition: ast.ClassDef
+        self, path: Path, module: PositionedModule, definition: libcst.ClassDef
     ) -> Iterator[CodeRuleViolation]:
         """
         :return: A violation for every annotated assignment in *definition*'s body that no
             string literal directly follows.
         """
-        for index, statement in enumerate(definition.body):
-            if not isinstance(statement, ast.AnnAssign):
+        statements = BodySyntax(definition.body).statements
+        for index, statement in enumerate(statements):
+            if not isinstance(statement, libcst.AnnAssign):
                 continue
-            following = definition.body[index + 1 : index + 2]
-            if following and SourceProse.is_string(following[0]):
+            following = statements[index + 1 : index + 2]
+            if following and BodySyntax.is_string(following[0]):
                 continue
+            location = module.positions[statement]
             yield self.violation(
-                path, DocumentedKind.FIELD, statement.lineno, statement.end_lineno
+                path, DocumentedKind.FIELD, location.start.line, location.end.line
             )
+
+    def definition_violation(
+        self,
+        path: Path,
+        module: PositionedModule,
+        kind: DocumentedKind,
+        definition: libcst.ClassDef | libcst.FunctionDef,
+    ) -> CodeRuleViolation:
+        """
+        :return: The violation of the undocumented class or function *definition*,
+            starting at its first decorator, else at its keyword.
+        """
+        decorators = definition.decorators
+        first = module.positions[decorators[0] if decorators else definition]
+        return self.violation(
+            path, kind, first.start.line, module.positions[definition].end.line
+        )
 
     @staticmethod
     def violation(

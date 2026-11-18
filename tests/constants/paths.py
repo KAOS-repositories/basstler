@@ -847,6 +847,12 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
     """
 
+    BODY = DIRECTORY / "body.py.txt"
+    """
+    A module of a docstring, an assignment with a string below it, two statements on one
+    line and a compound statement.
+    """
+
     IMPORTS = DIRECTORY / "imports.py.txt"
     """
     A module that imports :mod:`os` and calls nothing from it but :data:`os.name`.

@@ -169,7 +169,16 @@ class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
         :return: Every place in it that breaks the rule.
         """
 
+    def checks(self, path: Path) -> bool:
+        """
+        :param path: A Python source file.
+        :return: Whether the checker reports places in it.
+        """
+        return True
+
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+        if not self.checks(path):
+            return
         module = PositionedModule(PythonSourceFile(path).parse())
         for specification in self.specifications_of_module(module):
             yield CodeRuleViolation(
@@ -235,7 +244,7 @@ class SourceFixer:
         inverses: list[Action] = []
         imports: list[type] = []
         module = source_file.parse()
-        places = self.places(module)
+        places = self.places(module, source_file.path)
         while places:
             imports.extend(
                 place.fix.required_import
@@ -245,7 +254,7 @@ class SourceFixer:
             applied = self.round_of_fixes(places).apply(module)
             module = applied.module
             inverses.append(applied.inverse)
-            remaining = self.places(module)
+            remaining = self.places(module, source_file.path)
             if len(remaining) >= len(places):
                 raise FixDoesNotConvergeError(
                     tuple(
@@ -259,14 +268,17 @@ class SourceFixer:
             inverses.append(applied.inverse)
         return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))
 
-    def places(self, module: libcst.Module) -> list[FixablePlace]:
+    def places(self, module: libcst.Module, path: Path) -> list[FixablePlace]:
         """
-        :return: Every place in *module* that one of :attr:`checkers` reports.
+        :param path: The file *module* was parsed from.
+        :return: Every place in *module* that one of :attr:`checkers` that checks *path*
+            reports.
         """
         positioned = PositionedModule(module)
         return [
             FixablePlace(checker.fix, specification)
             for checker in self.checkers
+            if checker.checks(path)
             for specification in checker.specifications_of_module(positioned)
         ]
 

@@ -12,10 +12,13 @@ import libcst
 
 from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_modification.syntax import (
+    BodySyntax,
     CallSyntax,
     ConstantName,
     ExpressionSyntax,
 )
+
+from basstler.text_file import TextFile
 
 from ..constants.paths import CodeModificationSnippet
 
@@ -100,3 +103,44 @@ def test_an_appended_argument_follows_the_layout_of_the_call():
         passed.code
         == PythonSourceFile(CodeModificationSnippet.CALL_ARGUMENTS_WITH_CHECK).read()
     )
+
+
+# %% bodies
+
+
+def test_a_body_lists_the_statements_sharing_a_line_one_by_one():
+    """
+    Each statement of a simple line is a statement of its own; a compound one is whole.
+    """
+    body = BodySyntax(
+        libcst.parse_module(TextFile(CodeModificationSnippet.BODY).read())
+    )
+
+    assert [type(statement) for statement in body.statements] == [
+        libcst.Expr,
+        libcst.ImportFrom,
+        libcst.Assign,
+        libcst.Expr,
+        libcst.Expr,
+        libcst.Expr,
+        libcst.If,
+    ]
+
+
+def test_only_a_string_literal_statement_is_a_string():
+    """
+    The docstring and the strings are strings; a call is not.
+    """
+    body = BodySyntax(
+        libcst.parse_module(TextFile(CodeModificationSnippet.BODY).read())
+    )
+
+    assert [BodySyntax.is_string(statement) for statement in body.statements] == [
+        True,
+        False,
+        False,
+        True,
+        True,
+        False,
+        False,
+    ]

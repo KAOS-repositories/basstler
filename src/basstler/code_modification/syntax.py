@@ -200,3 +200,41 @@ class CallSyntax:
             ),
             libcst.Call,
         )
+
+
+# %% bodies
+
+
+@dataclass(frozen=True)
+class BodySyntax:
+    """
+    The statements of a module, class or function body, one by one.
+    """
+
+    body: libcst.Module | libcst.BaseSuite
+    """
+    The module, or the suite of a class or function.
+    """
+
+    @cached_property
+    def statements(self) -> tuple[libcst.CSTNode, ...]:
+        """
+        The statements of the body in order, those sharing a line included.
+        """
+        statements: list[libcst.CSTNode] = []
+        for statement in self.body.body:
+            if isinstance(statement, libcst.SimpleStatementLine):
+                statements.extend(statement.body)
+                continue
+            statements.append(statement)
+        return tuple(statements)
+
+    @staticmethod
+    def is_string(statement: libcst.CSTNode) -> bool:
+        """
+        :return: Whether *statement* is a bare string literal.
+        """
+        return (
+            isinstance(statement, libcst.Expr)
+            and ExpressionSyntax(statement.value).literal_text is not None
+        )

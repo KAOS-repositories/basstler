@@ -41,6 +41,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.exceptions import GraphQLErrorsReturned, UpstreamReadError
 from basstler.locations import RepositoryStateLocation
 from basstler.maintenance.commands import MaintenanceCommand, MaintenancePass
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.maintenance.upstream_read_route import UpstreamReadRoute
 from basstler.stack.settings import Configuration
 from basstler.standard_streams import StandardStreamHandler
@@ -112,6 +113,7 @@ def _dispatch() -> ExitCode:
             git=git,
             board=git.repository_state_path(RepositoryStateLocation.BOARD),
             upstream_read=UpstreamReadRoute(arguments.upstream_read),
+            closing_follow_ups=LandedClosingFollowUps.installed(),
         )
         return requested.run(maintenance, arguments)
     except CommandFailure as error:

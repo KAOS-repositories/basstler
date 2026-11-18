@@ -15,7 +15,7 @@ from basstler.github.repository import Repository
 
 class SessionTool(StrEnum):
     """
-    The Claude Code tools a session is told to call to reach a repository.
+    The Claude Code tools a session calls.
     """
 
     ATTACH_REPOSITORY = "mcp__claude-code-remote__add_repo"
@@ -27,6 +27,11 @@ class SessionTool(StrEnum):
     ASK_USER = "AskUserQuestion"
     """
     Asks the user to choose between options.
+    """
+
+    RUN_SHELL_COMMAND = "Bash"
+    """
+    Runs a command in the session's shell.
     """
 
 

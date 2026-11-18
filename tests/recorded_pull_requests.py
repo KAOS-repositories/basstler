@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from basstler.github.exceptions import GitHubCallFailed
 from basstler.github.pull_request_source import PullRequestSource
-from basstler.github.pull_request_state import PullRequestRecord
+from basstler.github.pull_request_state import ForkLineage, PullRequestRecord
 from basstler.github.repository import PullRequestReference, Repository
 
 # %% recorded pull request state
@@ -36,6 +36,11 @@ class RecordedPullRequestSource(PullRequestSource):
     Why each repository whose pull requests cannot be read cannot be.
     """
 
+    fork_lineages: dict[Repository, ForkLineage] = field(default_factory=dict)
+    """
+    What each repository that is a fork was forked from.
+    """
+
     looked_up: list[PullRequestReference] = field(default_factory=list)
     """
     Every pull request asked for, in order.
@@ -50,3 +55,6 @@ class RecordedPullRequestSource(PullRequestSource):
 
     def read_failure_of(self, repository: Repository) -> GitHubCallFailed | None:
         return self.read_failures.get(repository)
+
+    def fork_lineage_of(self, repository: Repository) -> ForkLineage | None:
+        return self.fork_lineages.get(repository)

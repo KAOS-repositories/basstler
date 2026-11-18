@@ -145,9 +145,12 @@ def test_the_plugin_runs_the_hook_before_the_attach_tool_and_nothing_else():
         (plugin_root / PluginLocation.HOOKS / "hooks.json").read_text(encoding="utf-8")
     )
 
-    (registration,) = manifest["hooks"][HOOK_EVENT]
+    (registration,) = [
+        entry
+        for entry in manifest["hooks"][HOOK_EVENT]
+        if entry["matcher"] == SessionTool.ATTACH_REPOSITORY
+    ]
     (hook,) = registration["hooks"]
-    assert registration["matcher"] == SessionTool.ATTACH_REPOSITORY
     assert hook["command"].endswith(
         f"{PluginLocation.ENTRY_POINT_SCRIPT} "
         f"{basstler.plan_site.attach_approval.__spec__.name.removeprefix('basstler.')}"

@@ -9,10 +9,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-from basstler.class_property import classproperty
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
-from basstler.github.repository import GitHubAccountPage, Repository
+from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.workflows import (
@@ -92,14 +91,6 @@ class SiteRepository:
         if hub is None or hub.site_url is None:
             return None
         return cls.from_site_url(hub.site_url)
-
-    @classproperty
-    def classic_token_page(cls) -> str:
-        """
-        Where a classic token, which may read the repositories of several owners, is
-        created.
-        """
-        return GitHubAccountPage.NEW_CLASSIC_TOKEN.url
 
     def token_form_url(self, token_name: str = "basstler plan site") -> str:
         """

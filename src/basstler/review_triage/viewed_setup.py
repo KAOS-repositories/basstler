@@ -26,7 +26,7 @@ from basstler.github.file_proposal import (
     ProposalOutcome,
     RepositoryFile,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetails, RepositoryDetailsRead
 from basstler.github.repository_resources import SettingWrite
 from basstler.github.token_form import (
@@ -230,11 +230,11 @@ class MarkViewedSetup(TemplatePage):
         """
         description = (
             f"the {WorkflowLocation.MARK_VIEWED.name} workflow on "
-            f"{self.workflow_repository.full_name}'s {details.default_branch}"
+            f"{self.workflow_repository.full_name}'s {details.default_branch.name}"
         )
         installed = (
             self.workflow_commit(self.workflow_repository, details.default_branch)
-            .read_at(details.default_branch)
+            .read_at(details.default_branch.name)
             .attempt(client)
             .resource
         )
@@ -245,15 +245,14 @@ class MarkViewedSetup(TemplatePage):
         self.report_proposal(description, details, outcome, installed)
         return installed is not None
 
-    def workflow_commit(self, repository: Repository, branch: str) -> FileCommit:
+    def workflow_commit(self, repository: Repository, branch: Branch) -> FileCommit:
         """
         :param repository: The repository the caller workflow is committed to.
         :param branch: The branch it is committed on.
         :return: The caller workflow, committed there.
         """
         return FileCommit(
-            repository,
-            Branch(branch),
+            RepositoryBranch(branch.name, repository),
             WorkflowLocation.MARK_VIEWED.as_posix(),
             self.caller_workflow,
             "Mark pull requests' mechanical files viewed from Actions",
@@ -277,10 +276,11 @@ class MarkViewedSetup(TemplatePage):
         """
         return FileProposal(
             commit=self.workflow_commit(
-                self.workflow_repository, ProposalBranch.MARK_VIEWED
+                self.workflow_repository, Branch(ProposalBranch.MARK_VIEWED)
             ),
-            base_repository=self.proposal_repository(details),
-            base=Branch(details.default_branch),
+            base=RepositoryBranch(
+                details.default_branch.name, self.proposal_repository(details)
+            ),
             description=f"Installed by `basstler review-triage set-up-mark-viewed` "
             f"({self.branch_or_tag}). Merging it lets the workflow mark files viewed "
             f"for the owner of the token stored as `{ReviewTriageSecret.VIEWER_TOKEN}`.",
@@ -353,9 +353,9 @@ class MarkViewedSetup(TemplatePage):
         url = outcome.pull_request.page_url
         found = "opened" if outcome.opened_now else "already open"
         stacked = (
-            f", merging into {outcome.merges_into}: it reaches "
-            f"{details.default_branch} once that branch merges"
-            if outcome.merges_into
+            f", merging into {outcome.merges_into.name}: it reaches "
+            f"{details.default_branch.name} once that branch merges"
+            if outcome.merges_into is not None
             else ""
         )
         self.steps.append(

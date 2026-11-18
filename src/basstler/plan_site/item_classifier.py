@@ -14,7 +14,11 @@ from basstler.github.pull_request_state import (
     LiveState,
     PullRequestRecord,
 )
-from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository import (
+    PullRequestReference,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.plan.dependencies import DependencyResolver
 from basstler.plan.model import ItemStatus
 from basstler.maintenance.promotion import PromotionSummary
@@ -137,9 +141,10 @@ class ItemClassifier:
         fork = Repository.parse(self._repository_of(item))
         link = PromotionLink.for_target(
             PromotionTarget(
-                upstream_repository=lineage.upstream_repository,
-                upstream_base=lineage.upstream_default_branch,
-                fork_owner=fork.owner,
+                upstream_base=RepositoryBranch(
+                    lineage.upstream_default_branch, lineage.upstream_repository
+                ),
+                fork=fork,
             ),
             item.branch,
             record.title or item.title,

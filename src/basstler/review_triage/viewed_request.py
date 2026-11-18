@@ -119,7 +119,7 @@ class MarkViewedRequest:
             MarkViewedDispatch(
                 self.workflow_repository,
                 WorkflowLocation.MARK_VIEWED,
-                details.resource.default_branch,
+                details.resource.default_branch.name,
                 MarkViewedInputs.from_pull_request(self.pull_request),
             )
         )

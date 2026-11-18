@@ -8,9 +8,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated
-from urllib.parse import urlencode
 
-from pydantic import Field
+from pydantic import Field, PlainSerializer
 
 from basstler.class_property import classproperty
 from basstler.git.branch import Branch
@@ -23,14 +22,10 @@ from basstler.github.client import (
 from basstler.github.git_objects import EncodedContent, GitObject
 from basstler.github.pull_request import NewPullRequest
 from basstler.github.pull_request_form import PullRequestForm
-from basstler.github.repository import Repository
-from basstler.github.repository_access import (
-    MAXIMUM_PULL_REQUESTS_PER_PAGE,
-    ListingParameter,
-    PullRequestListState,
-)
+from basstler.github.repository import RepositoryBranch
+from basstler.github.repository_access import PullRequestListState
 from basstler.github.repository_resources import RepositoryRead, SettingWrite
-from basstler.github.rest_models import PullRequestPage
+from basstler.github.rest_models import ListedPullRequest, PullRequestPage
 from basstler.github.user_steps import AddFile, ReplaceFile, UserStep
 from basstler.github.web_form import PrefilledForm, UrlQueryParameter
 from basstler.json_model import ValidatedJSONModel
@@ -84,9 +79,9 @@ class FileWrite(SettingWrite[RepositoryFile], EncodedContent):
     The commit's message.
     """
 
-    branch: str
+    branch: Annotated[Branch, PlainSerializer(lambda branch: branch.name)]
     """
-    The name of the branch the commit is made on.
+    The branch the commit is made on.
     """
 
     replaced_object_hash: Annotated[
@@ -112,25 +107,25 @@ class FileWrite(SettingWrite[RepositoryFile], EncodedContent):
         """
         return (
             f"{self.file_path_from_repository_root} on "
-            f"{self.repository.full_name}'s {self.branch}"
+            f"{self.repository.full_name}'s {self.branch.name}"
         )
 
     @property
     def manual_step(self) -> UserStep:
-        branch = Branch(self.branch)
         if self.replaced_object_hash is None:
             return AddFile(
                 self.target,
                 NewFileForm(
-                    self.repository,
-                    branch,
+                    RepositoryBranch(self.branch.name, self.repository),
                     self.file_path_from_repository_root,
                     self.text,
                 ).url,
             )
         return ReplaceFile(
             self.target,
-            self.repository.edit_file_url(branch, self.file_path_from_repository_root),
+            self.repository.edit_file_url(
+                self.branch, self.file_path_from_repository_root
+            ),
             self.text,
         )
 
@@ -152,19 +147,14 @@ class NewFileParameter(UrlQueryParameter):
 
 
 @dataclass(frozen=True)
-class NewFileForm(PrefilledForm):
+class BranchFile:
     """
-    GitHub's page adding one file to a branch, with its path and content filled in.
-    """
-
-    repository: Repository
-    """
-    The repository the file is added to.
+    One file's whole content on a branch of a repository.
     """
 
-    branch: Branch
+    branch: RepositoryBranch
     """
-    The branch it is added to.
+    The branch holding the file.
     """
 
     file_path_from_repository_root: str
@@ -177,9 +167,16 @@ class NewFileForm(PrefilledForm):
     The file's whole content.
     """
 
+
+@dataclass(frozen=True)
+class NewFileForm(PrefilledForm, BranchFile):
+    """
+    GitHub's page adding one file to a branch, with its path and content filled in.
+    """
+
     @property
     def page_url(self) -> str:
-        return self.repository.new_file_page_url(self.branch)
+        return self.branch.repository.new_file_page_url(self.branch)
 
     @property
     def filled_fields(self) -> Mapping[UrlQueryParameter, str]:
@@ -190,29 +187,9 @@ class NewFileForm(PrefilledForm):
 
 
 @dataclass(frozen=True)
-class FileCommit:
+class FileCommit(BranchFile):
     """
     One file's whole content, committed to a branch of a repository.
-    """
-
-    repository: Repository
-    """
-    The repository holding the branch.
-    """
-
-    branch: Branch
-    """
-    The branch the commit is made on.
-    """
-
-    file_path_from_repository_root: str
-    """
-    The file's path from the repository's root.
-    """
-
-    text: str
-    """
-    The file's whole content.
     """
 
     message: str
@@ -225,7 +202,9 @@ class FileCommit:
         :param revision: The branch or commit to read the file at.
         :return: The read of the file there.
         """
-        return FileRead(self.repository, self.file_path_from_repository_root, revision)
+        return FileRead(
+            self.branch.repository, self.file_path_from_repository_root, revision
+        )
 
     def write_replacing(self, current: RepositoryFile | None) -> FileWrite:
         """
@@ -233,11 +212,11 @@ class FileCommit:
         :return: The write making the file hold :attr:`text`.
         """
         return FileWrite(
-            repository=self.repository,
+            repository=self.branch.repository,
             file_path_from_repository_root=self.file_path_from_repository_root,
             message=self.message,
             content=EncodedContent.encode(self.text),
-            branch=self.branch.name,
+            branch=self.branch,
             replaced_object_hash=None if current is None else current.object_hash,
         )
 
@@ -272,14 +251,18 @@ class BranchReferenceRead(RepositoryRead[BranchReference]):
         return self.repository.branch_reference_path(self.branch)
 
 
-class NewBranch(RepositoryWrite, GitObject):
+class NewBranch(RepositoryWrite, GitObject, Branch):
     """
     A branch that does not exist yet, starting at one commit, the object it stands for.
     """
 
-    reference: Annotated[str, Field(alias="ref")]
+    name: Annotated[
+        str,
+        Field(alias="ref"),
+        PlainSerializer(lambda name: Branch(name).reference),
+    ]
     """
-    The branch's full reference, as :attr:`Branch.reference` writes it.
+    The branch's name, written as its full reference.
     """
 
     @classproperty
@@ -289,34 +272,6 @@ class NewBranch(RepositoryWrite, GitObject):
     @property
     def path(self) -> str:
         return self.repository.git_references_path
-
-
-class PullRequestEnd(GitObject):
-    """
-    One end of a pull request - the branch it is opened from or merges into - standing
-    for the commit the branch points at.
-    """
-
-    branch_name: Annotated[str, Field(alias="ref")]
-    """
-    The branch's name.
-    """
-
-
-class ListedPullRequest(PullRequestPage):
-    """
-    An open pull request, as the repository's listing of them gives it.
-    """
-
-    head: PullRequestEnd
-    """
-    The branch it is opened from.
-    """
-
-    base: PullRequestEnd
-    """
-    The branch it merges into.
-    """
 
 
 # %% proposing the file
@@ -349,9 +304,9 @@ class ProposalOutcome:
     holds the file but the pull request could not be opened; empty otherwise.
     """
 
-    merges_into: str = ""
+    merges_into: Branch | None = None
     """
-    The branch the pull request merges into, when it is another than the base; empty
+    The branch the pull request merges into, when it is another than the base; ``None``
     otherwise.
     """
 
@@ -370,14 +325,10 @@ class FileProposal:
     request's title.
     """
 
-    base_repository: Repository
+    base: RepositoryBranch
     """
-    The repository the pull request is opened on.
-    """
-
-    base: Branch
-    """
-    The default branch the file is proposed for.
+    The default branch the file is proposed for, on the repository the pull request is
+    opened on.
     """
 
     description: str
@@ -386,28 +337,41 @@ class FileProposal:
     """
 
     @property
-    def head_owner(self) -> str | None:
+    def opening(self) -> NewPullRequest:
         """
-        The owner of the fork carrying the file, ``None`` when it is on
-        :attr:`base_repository` itself.
+        The pull request proposing the file, titled with the commit's message and
+        opened ready to merge.
         """
-        if self.commit.repository == self.base_repository:
-            return None
-        return self.commit.repository.owner
-
-    @property
-    def form(self) -> PullRequestForm:
-        """
-        The pull request form, with its title and description filled in.
-        """
-        return PullRequestForm(
-            self.base_repository,
+        return NewPullRequest(
             self.base,
             self.commit.branch,
             self.commit.message,
             self.description,
-            self.head_owner,
+            draft=False,
         )
+
+    @property
+    def form(self) -> PullRequestForm:
+        """
+        The form opening :attr:`opening`, with its title and description filled in.
+        """
+        opening = self.opening
+        return PullRequestForm(opening.base, opening.head, opening.title, opening.body)
+
+    @property
+    def open_pull_requests_path(self) -> str:
+        """
+        The REST path listing every open pull request on the base's repository.
+        """
+        return PullRequestListState.OPEN.path_on(self.base.repository)
+
+    @property
+    def open_from_branch_path(self) -> str:
+        """
+        The REST path listing the open pull requests from the commit's branch into
+        :attr:`base`.
+        """
+        return PullRequestListState.OPEN.path_between(self.opening)
 
     def propose(self, client: GitHubAttemptClient) -> ProposalOutcome:
         """
@@ -419,10 +383,10 @@ class FileProposal:
         """
         carrying = self._pull_request_carrying(client)
         if carrying is not None:
-            merges_into = carrying.base.branch_name
+            merges_into = carrying.base
             return ProposalOutcome(
                 carrying,
-                merges_into="" if merges_into == self.base.name else merges_into,
+                merges_into=None if merges_into.name == self.base.name else merges_into,
             )
         from_branch = client.attempt_get(self.open_from_branch_path)
         failed = (
@@ -433,41 +397,6 @@ class FileProposal:
         if from_branch.body:
             return ProposalOutcome(PullRequestPage.from_json(from_branch.body[0]))
         return self._open_pull_request(client)
-
-    @property
-    def open_pull_requests_path(self) -> str:
-        """
-        The REST path listing every open pull request on :attr:`base_repository`.
-        """
-        return self._listing_path({})
-
-    @property
-    def open_from_branch_path(self) -> str:
-        """
-        The REST path listing the open pull requests opened from the commit's branch.
-        """
-        return self._listing_path(
-            {
-                ListingParameter.HEAD: (
-                    f"{self.commit.repository.owner}:{self.commit.branch.name}"
-                )
-            }
-        )
-
-    def _listing_path(self, filters: Mapping[ListingParameter, str]) -> str:
-        """
-        :param filters: Further filters of the listing.
-        :return: The REST path listing :attr:`base_repository`'s open pull requests.
-        """
-        query = urlencode(
-            {
-                ListingParameter.STATE: PullRequestListState.OPEN.query,
-                ListingParameter.PAGE_SIZE: MAXIMUM_PULL_REQUESTS_PER_PAGE,
-                **filters,
-            },
-            safe=":",
-        )
-        return f"{self.base_repository.pull_requests_path}?{query}"
 
     def _pull_request_carrying(
         self, client: GitHubAttemptClient
@@ -484,14 +413,14 @@ class FileProposal:
         carrying = [
             pull_request
             for pull_request in map(ListedPullRequest.from_json, listed.body)
-            if pull_request.head.branch_name != self.commit.branch.name
+            if pull_request.head.name != self.commit.branch.name
             and self._held_by(client, pull_request)
         ]
-        heads = {pull_request.head.branch_name for pull_request in carrying}
+        heads = {pull_request.head.name for pull_request in carrying}
         lowest = [
             pull_request
             for pull_request in carrying
-            if pull_request.base.branch_name not in heads
+            if pull_request.base.name not in heads
         ]
         return lowest[0] if lowest else None
 
@@ -504,7 +433,7 @@ class FileProposal:
         :return: Whether its head holds the file with this content.
         """
         held = FileRead(
-            self.base_repository,
+            self.base.repository,
             self.commit.file_path_from_repository_root,
             pull_request.head.object_hash,
         ).attempt(client)
@@ -526,20 +455,20 @@ class FileProposal:
         :param client: Reads and writes the repository carrying the branch.
         :return: The answer that failed, ``None`` when the branch exists now.
         """
-        carrier = self.commit.repository
+        carrier = self.commit.branch.repository
         existing = BranchReferenceRead(carrier, self.commit.branch).attempt(client)
         if existing.resource is not None:
             return None
         if not existing.response.is_not_found:
             return existing.response
-        base = BranchReferenceRead(self.base_repository, self.base).attempt(client)
+        base = BranchReferenceRead(self.base.repository, self.base).attempt(client)
         if base.resource is None:
             return base.response
         created = client.attempt_send(
             NewBranch(
                 repository=carrier,
                 object_hash=base.resource.target.object_hash,
-                reference=self.commit.branch.reference,
+                name=self.commit.branch.name,
             )
         )
         return created if created.failure is not None else None
@@ -561,21 +490,11 @@ class FileProposal:
 
     def _open_pull_request(self, client: GitHubAttemptClient) -> ProposalOutcome:
         """
-        :param client: Opens pull requests on :attr:`base_repository`.
+        :param client: Opens pull requests on the base's repository.
         :return: The pull request opened, or the form that opens it when GitHub
             refuses.
         """
-        head = self.commit.branch.name
-        opened = client.attempt_send(
-            NewPullRequest(
-                self.base_repository,
-                title=self.commit.message,
-                head=head if self.head_owner is None else f"{self.head_owner}:{head}",
-                base=self.base.name,
-                body=self.description,
-                draft=False,
-            )
-        )
+        opened = client.attempt_send(self.opening)
         if opened.failure is not None:
             link = self.form.link
             return ProposalOutcome(

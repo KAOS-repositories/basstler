@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from pathlib import Path
 
 from basstler.class_property import classproperty
-from basstler.github.repository import Repository
+from basstler.github.workflows import RepositoryWorkflow
+from basstler.github.repository import Repository, RepositoryMember
 
 # %% a step
 
@@ -53,14 +53,9 @@ class UserStep(ABC):
 
 
 @dataclass(frozen=True)
-class AllowActions(UserStep):
+class AllowActions(RepositoryMember, UserStep):
     """
     Allowing a repository to run Actions.
-    """
-
-    repository: Repository
-    """
-    The repository.
     """
 
     known_off: bool
@@ -86,29 +81,19 @@ class AllowActions(UserStep):
 
 
 @dataclass(frozen=True)
-class EnableWorkflow(UserStep):
+class EnableWorkflow(RepositoryWorkflow, RepositoryMember, UserStep):
     """
     Enabling one disabled workflow of a repository.
     """
 
-    repository: Repository
-    """
-    The repository holding the workflow.
-    """
-
-    workflow: Path
-    """
-    The workflow's file in the repository.
-    """
-
     @property
     def description(self) -> str:
-        return f"enable the {self.workflow.name} workflow"
+        return f"enable the {self.workflow_path.name} workflow"
 
     @property
     def browser_steps(self) -> tuple[str, ...]:
         return (
-            f"Open {self.repository.workflow_page_url(self.workflow)}.",
+            f"Open {self.repository.workflow_page_url(self.workflow_path)}.",
             "Click Enable workflow.",
         )
 

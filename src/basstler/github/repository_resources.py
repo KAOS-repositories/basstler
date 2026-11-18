@@ -11,7 +11,7 @@ from typing import Any, get_args, get_origin
 
 from basstler.class_property import classproperty
 from basstler.github.client import GitHubAttemptReader, GitHubResponse, RepositoryWrite
-from basstler.github.repository import Repository
+from basstler.github.repository import RepositoryMember
 from basstler.github.user_steps import UserStep
 from basstler.json_model import ValidatedJSONModel
 
@@ -62,15 +62,12 @@ class ResourceReading[ResourceType: ValidatedJSONModel]:
 
 
 @dataclass(frozen=True)
-class RepositoryRead[ResourceType: ValidatedJSONModel](TypeBinding, ABC):
+class RepositoryRead[ResourceType: ValidatedJSONModel](
+    RepositoryMember, TypeBinding, ABC
+):
     """
     A read of one REST resource of a repository, bound to the model the resource parses
     into.
-    """
-
-    repository: Repository
-    """
-    The repository the resource belongs to.
     """
 
     @property

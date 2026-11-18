@@ -11,7 +11,7 @@ from enum import StrEnum
 
 from basstler.class_property import classproperty
 from basstler.github.actions_secret import ActionsSecret
-from basstler.github.repository import GitHubAccountPage, Repository
+from basstler.github.repository import NewTokenPage, Repository
 from basstler.github.user_steps import UserStep
 from basstler.github.web_form import PrefilledForm, UrlQueryParameter
 from basstler.locations import GitHubTemplate
@@ -120,7 +120,7 @@ class FineGrainedTokenForm(PrefilledForm):
 
     @property
     def page_url(self) -> str:
-        return GitHubAccountPage.NEW_FINE_GRAINED_TOKEN.url
+        return NewTokenPage.FINE_GRAINED.url
 
     @property
     def filled_fields(self) -> Mapping[UrlQueryParameter, str]:

@@ -12,8 +12,7 @@ from itertools import accumulate
 from urllib.parse import quote
 
 from basstler.class_property import classproperty
-from basstler.git.branch import Branch
-from basstler.github.repository import Repository
+from basstler.github.pull_request_ends import PullRequestOpening
 from basstler.github.web_form import PrefilledForm, UrlQueryParameter
 
 # %% the form's parameters
@@ -61,43 +60,13 @@ class PrefilledPullRequestLink:
 
 
 @dataclass(frozen=True)
-class PullRequestForm(PrefilledForm):
+class PullRequestForm(PrefilledForm, PullRequestOpening):
     """
-    The pull request form for one branch, filled in from its address.
+    The pull request form joining two branches, filled in from its address.
 
     The prefill travels in the query string, so an unencoded character truncates it and
-    an oversized one is discarded whole by the server - both silently.
-    """
-
-    repository: Repository
-    """
-    The repository the pull request is opened on.
-    """
-
-    base: Branch
-    """
-    The branch it merges into.
-    """
-
-    head: Branch
-    """
-    The branch it proposes.
-    """
-
-    title: str
-    """
-    The title to prefill.
-    """
-
-    body: str
-    """
-    The description to prefill, shortened if the URL would not otherwise fit.
-    """
-
-    head_owner: str | None = None
-    """
-    The owner of the fork holding :attr:`head`, ``None`` when it is on
-    :attr:`repository`.
+    an oversized one is discarded whole by the server - both silently, so
+    :attr:`link` shortens :attr:`body` to fit.
     """
 
     @classproperty
@@ -117,7 +86,7 @@ class PullRequestForm(PrefilledForm):
 
     @property
     def page_url(self) -> str:
-        return self.repository.compare_url(self.base, self.head, self.head_owner)
+        return self.compare_url
 
     @property
     def filled_fields(self) -> Mapping[UrlQueryParameter, str]:

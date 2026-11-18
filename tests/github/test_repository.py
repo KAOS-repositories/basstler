@@ -12,9 +12,10 @@ import pytest
 from basstler.git.branch import Branch
 from basstler.git.commands import GitCommandRunner
 from basstler.github.repository import (
-    GitHubAccountPage,
+    NewTokenPage,
     GitHubAddress,
     MalformedRepositoryError,
+    RepositoryBranch,
     PullRequestReference,
     Repository,
 )
@@ -176,21 +177,35 @@ def test_a_file_s_page_is_under_its_branch():
 
 
 def test_the_compare_page_of_a_branch_on_the_same_repository_names_it_alone():
-    assert REPOSITORY.compare_url(BRANCH, Branch("topic")) == (
+    assert REPOSITORY.compare_url(BRANCH, RepositoryBranch("topic", REPOSITORY)) == (
         f"{REPOSITORY.url}/compare/{BRANCH.name}...topic"
     )
 
 
 def test_the_compare_page_of_a_branch_on_a_fork_names_its_owner():
-    assert REPOSITORY.compare_url(BRANCH, Branch("topic"), "a-forker") == (
+    fork = Repository("a-forker", REPOSITORY.name)
+    assert REPOSITORY.compare_url(BRANCH, RepositoryBranch("topic", fork)) == (
         f"{REPOSITORY.url}/compare/{BRANCH.name}...a-forker:topic"
     )
 
 
-def test_an_account_page_is_under_github_s_web_root():
-    assert GitHubAccountPage.NEW_FINE_GRAINED_TOKEN.url == (
-        f"{GitHubAddress.WEB}/{GitHubAccountPage.NEW_FINE_GRAINED_TOKEN}"
+def test_a_token_form_is_under_github_s_web_root():
+    assert NewTokenPage.FINE_GRAINED.url == (
+        f"{GitHubAddress.WEB}/{NewTokenPage.FINE_GRAINED}"
     )
+
+
+# %% branches of a repository
+
+
+def test_a_branch_on_its_pull_request_s_repository_is_named_alone():
+    branch = RepositoryBranch("topic", REPOSITORY)
+    assert branch.name_from(REPOSITORY) == branch.name
+
+
+def test_a_branch_on_a_fork_is_named_under_the_fork_s_owner():
+    branch = RepositoryBranch("topic", Repository("a-forker", REPOSITORY.name))
+    assert branch.name_from(REPOSITORY) == branch.qualified_name == "a-forker:topic"
 
 
 # %% REST paths
@@ -231,14 +246,14 @@ def test_the_actions_permissions_path_is_below_the_repository_s_actions():
 
 
 def test_a_workflow_s_path_is_below_the_repository_s_workflows():
-    assert REPOSITORY.workflow_path(WORKFLOW) == (
+    assert REPOSITORY.workflow_resource_path(WORKFLOW) == (
         f"repos/{REPOSITORY.full_name}/actions/workflows/{WORKFLOW.name}"
     )
 
 
 def test_a_workflow_s_dispatch_path_is_below_its_own_path():
     assert REPOSITORY.workflow_dispatch_path(WORKFLOW) == (
-        f"{REPOSITORY.workflow_path(WORKFLOW)}/dispatches"
+        f"{REPOSITORY.workflow_resource_path(WORKFLOW)}/dispatches"
     )
 
 

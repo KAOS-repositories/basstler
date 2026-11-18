@@ -7,12 +7,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from basstler.class_property import classproperty
-from basstler.git.branch import Branch
 from basstler.github.pull_request_form import (
     PrefilledPullRequestLink,
     PullRequestForm,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.locations import ProjectLocation
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
@@ -33,23 +32,18 @@ This module's logger, which is also what its command prints through.
 @dataclass(frozen=True)
 class PromotionTarget:
     """
-    Where a fork branch is promoted to: the upstream repository and branch, and the
-    fork's owner.
+    Where a fork branch is promoted to: the upstream branch, and the fork the branch
+    lives in.
     """
 
-    upstream_repository: Repository
+    upstream_base: RepositoryBranch
     """
-    The repository the pull request is opened in.
-    """
-
-    upstream_base: str
-    """
-    The upstream branch it is opened against.
+    The upstream branch the pull request merges into, on the repository it is opened on.
     """
 
-    fork_owner: str
+    fork: Repository
     """
-    The account owning the fork the branch lives in.
+    The fork the promoted branch lives in.
     """
 
     @classmethod
@@ -66,9 +60,10 @@ class PromotionTarget:
                 ProjectLocation.PERSONAL_STACK_CONFIGURATION.value,
             )
         return cls(
-            upstream_repository=upstream_repository,
-            upstream_base=configuration.upstream_base,
-            fork_owner=configuration.fork_repository.owner,
+            upstream_base=RepositoryBranch(
+                configuration.upstream_base, upstream_repository
+            ),
+            fork=configuration.fork_repository,
         )
 
 
@@ -126,12 +121,7 @@ class PromotionLink(PrefilledPullRequestLink):
         :return: The link, flagged if the body was shortened.
         """
         form = PullRequestForm(
-            target.upstream_repository,
-            Branch(target.upstream_base),
-            Branch(branch),
-            title,
-            body,
-            head_owner=target.fork_owner,
+            target.upstream_base, RepositoryBranch(branch, target.fork), title, body
         )
         link = form.link
         if link is None:

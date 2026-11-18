@@ -19,7 +19,9 @@ from basstler.github.issue import (
 )
 from basstler.github.label import LabelReplacement, NewLabel, RepositoryLabel
 from basstler.github.pull_request import NewPullRequest, PullRequestDescription
-from basstler.github.repository import Repository
+from basstler.git.branch import Branch
+from basstler.github.file_proposal import NewBranch
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
 
@@ -27,6 +29,11 @@ from basstler.locations import WorkflowLocation
 
 REPOSITORY = Repository("example-owner", "example-repo")
 LABEL = RepositoryLabel("bug", "Something is broken")
+
+FORK = Repository("a-forker", REPOSITORY.name)
+"""
+A fork of :data:`REPOSITORY`, carrying a branch proposed to it.
+"""
 
 WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     (
@@ -45,7 +52,11 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     (NewLabel(REPOSITORY, LABEL), LABEL.to_json()),
     (LabelReplacement(REPOSITORY, 1, ["bug"]), {"labels": ["bug"]}),
     (
-        NewPullRequest(REPOSITORY, "a title", "feature", "main"),
+        NewPullRequest(
+            RepositoryBranch("main", REPOSITORY),
+            RepositoryBranch("feature", REPOSITORY),
+            "a title",
+        ),
         {
             "title": "a title",
             "head": "feature",
@@ -53,6 +64,24 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
             "body": "",
             "draft": True,
         },
+    ),
+    (
+        NewPullRequest(
+            RepositoryBranch("main", REPOSITORY),
+            RepositoryBranch("feature", FORK),
+            "a title",
+        ),
+        {
+            "title": "a title",
+            "head": f"{FORK.owner}:feature",
+            "base": "main",
+            "body": "",
+            "draft": True,
+        },
+    ),
+    (
+        NewBranch(repository=REPOSITORY, object_hash="a-commit", name="feature"),
+        {"ref": Branch("feature").reference, "sha": "a-commit"},
     ),
     (PullRequestDescription(REPOSITORY, 1, "a description"), {"body": "a description"}),
     (

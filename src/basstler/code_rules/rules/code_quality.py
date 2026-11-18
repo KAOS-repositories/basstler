@@ -432,6 +432,14 @@ class DesignPrinciplesRules(Section):
         "behaviour, give them a common base"
     )
 
+    SHARED_FIELDS_IN_ONE_MIXIN = (
+        "A field that means the same thing in several classes is declared once, in a "
+        "mixin or base those classes inherit, never redeclared in each; a set of "
+        "fields that travels together, such as a pull request's base and head, is "
+        "one such mixin. Two classes that mean the same thing under different names "
+        "are one class"
+    )
+
     MODELS_BOUND_TO_THEIR_CONCEPT = (
         "A model of an external resource or payload is bound to the concept it "
         "describes, so every representation of one concept can be found from it: a "
@@ -667,6 +675,13 @@ class TypeHintsRules(Section):
     ACCURATE_TYPE_HINTS = (
         "Type hints are accurate: `Any` where the value genuinely is anything, "
         "never as a shortcut"
+    )
+
+    MOST_SPECIFIC_TYPE = (
+        "A field, parameter or return value takes the most specific type that is "
+        "correct for its meaning and every one of its uses - a `Branch`, not the "
+        "`str` of its name; a `Path`, not a `str` - and a payload converts it to and "
+        "from its wire form at the boundary"
     )
 
     BOUND_GENERIC_PARAMETERS = (

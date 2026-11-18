@@ -6,16 +6,19 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
-from basstler.git.branch import Branch
 from basstler.github.pull_request_form import PullRequestForm, PullRequestFormParameter
-from basstler.github.repository import Repository
+from basstler.github.repository import Repository, RepositoryBranch
 
 # %% the filled-in form
 
+REPOSITORY = Repository("an-owner", "a-project")
+"""
+The repository the form opens a pull request on.
+"""
+
 FORM = PullRequestForm(
-    Repository("an-owner", "a-project"),
-    Branch("main"),
-    Branch("a-branch"),
+    RepositoryBranch("main", REPOSITORY),
+    RepositoryBranch("a-branch", REPOSITORY),
     "Add a workflow",
     "It marks files viewed.",
 )
@@ -33,18 +36,15 @@ def test_the_form_fills_in_the_title_and_description():
 
 
 def test_the_form_compares_the_branch_with_its_base():
-    assert FORM.link.url.startswith(
-        f"{FORM.repository.compare_url(FORM.base, FORM.head)}?"
-    )
+    assert FORM.link.url.startswith(f"{FORM.compare_url}?")
 
 
 def test_a_branch_on_a_fork_is_compared_under_its_owner():
+    fork = Repository("a-forker", REPOSITORY.name)
     form = PullRequestForm(
-        FORM.repository, FORM.base, FORM.head, FORM.title, FORM.body, "a-forker"
+        FORM.base, RepositoryBranch(FORM.head.name, fork), FORM.title, FORM.body
     )
-    assert form.link.url.startswith(
-        f"{FORM.repository.compare_url(FORM.base, FORM.head, 'a-forker')}?"
-    )
+    assert form.link.url.startswith(f"{REPOSITORY.compare_url(FORM.base, form.head)}?")
 
 
 # %% shortening the description
@@ -56,7 +56,6 @@ def test_a_shortened_description_keeps_every_character_that_fits():
     character would push the URL over the limit.
     """
     form = PullRequestForm(
-        FORM.repository,
         FORM.base,
         FORM.head,
         FORM.title,
@@ -65,7 +64,6 @@ def test_a_shortened_description_keeps_every_character_that_fits():
     kept = parse_qs(urlsplit(form.link.url).query)[PullRequestFormParameter.BODY][0]
     kept = kept.removesuffix(PullRequestForm.truncation_marker)
     one_more = PullRequestForm(
-        form.repository,
         form.base,
         form.head,
         form.title,

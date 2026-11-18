@@ -22,9 +22,8 @@ from enum import StrEnum
 from functools import cached_property
 from http import HTTPStatus
 from http.client import HTTPResponse
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
@@ -36,7 +35,7 @@ from basstler.github.exceptions import (
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, RepositoryMember
 from basstler.json_model import ValidatedJSONModel
 
 # %% the interface
@@ -111,14 +110,9 @@ class GitHubWrite(ValidatedJSONModel, ABC):
         """
 
 
-class RepositoryWrite(GitHubWrite, ABC):
+class RepositoryWrite(GitHubWrite, RepositoryMember, ABC):
     """
     A change to a resource of one repository.
-    """
-
-    repository: Annotated[Repository, Field(exclude=True)]
-    """
-    The repository the resource belongs to.
     """
 
 

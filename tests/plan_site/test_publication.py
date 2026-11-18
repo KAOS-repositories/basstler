@@ -44,7 +44,12 @@ from basstler.github.exceptions import (
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import (
+    GitHubAddress,
+    NewTokenPage,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.github.rest_models import RestPullRequestSummary
 from basstler.github.token_form import CreateToken, StoreToken, TokenStep
 from basstler.github.run_listing import ListedRun, RunListing
@@ -349,7 +354,10 @@ class Publishing:
         :return: The merge workflow as publishing proposes it into *base*.
         """
         return MergeWorkflowProposal(
-            self.notes_repository, base, PlanSitePublication.merge_workflow_branch
+            RepositoryBranch(base, self.notes_repository),
+            RepositoryBranch(
+                PlanSitePublication.merge_workflow_branch, self.notes_repository
+            ),
         )
 
     @property
@@ -1367,9 +1375,7 @@ def test_private_repositories_of_several_owners_need_a_classic_token():
         site, (Repository("an-owner", "notes"), WORK_REPOSITORY)
     )
 
-    assert access.pending.browser_steps[0] == (
-        f"Open {SiteRepository.classic_token_page}."
-    )
+    assert access.pending.browser_steps[0] == (f"Open {NewTokenPage.CLASSIC.url}.")
 
 
 def test_a_classic_token_is_asked_for_with_a_warning_that_it_can_also_write():
@@ -1580,11 +1586,12 @@ def test_an_unopened_pull_request_leaves_opening_it_to_the_user_with_the_reason(
 
     assert pending.failure == str(failed_opening.failure)
     assert pending.line == (
-        f"gh pr create --repo {notes.full_name} --base {proposal.base} "
-        f"--head {proposal.head} --fill, then merge it"
+        f"gh pr create --repo {notes.full_name} --base {proposal.base.name} "
+        f"--head {proposal.head.name} --fill, then merge it"
     )
     assert pending.browser_steps[0] == (
-        f"Open {notes.url}/compare/{proposal.base}...{proposal.head}?expand=1."
+        f"Open {notes.url}/compare/{proposal.base.name}...{proposal.head.name}"
+        "?expand=1."
     )
 
 

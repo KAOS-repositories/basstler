@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from http import HTTPStatus
+from pathlib import PurePosixPath
 from typing import Any
 
 import pytest
@@ -22,13 +23,25 @@ from basstler.github.client import (
 )
 from basstler.github.credential import CredentialProvider
 from basstler.github.exceptions import GitHubRequestFailed
+from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.github.pull_request_changes import (
     PullRequestChanges,
     PullRequestChangesReader,
 )
 from basstler.github.repository import Repository
+from basstler.github.review_models import PageInfo
+from basstler.locations import ReviewTriageLocation
 from basstler.review_triage.detection import RenameDetection
+from basstler.review_triage.outputs import (
+    FilesPageRequest,
+    ListedFile,
+    ListedFilesAnswer,
+    ListedFilesPage,
+    ListedPullRequest,
+    ViewedFile,
+)
 from basstler.review_triage.renames import Rename, RenameMap
+from basstler.review_triage.triage import TriageOutcome
 
 from ..constants.paths import DatasetLocation
 from ..scratch_repository import ScratchRepository
@@ -79,6 +92,67 @@ class RecordingWriter(GitHubWriter):
     def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
         self.sent.append(write)
         return GitHubResponse(self.answer)
+
+
+@dataclass
+class FileListingWriter(GitHubWriter):
+    """
+    Records every write, answers the query for a pull request's files with one page per
+    entry of :attr:`pages`, and every other request with an empty result.
+    """
+
+    head_commit: str
+    """
+    The pull request's head commit the listing reports.
+    """
+
+    pages: tuple[tuple[PurePosixPath, ...], ...]
+    """
+    The paths on each page of the listing, first page first.
+    """
+
+    sent: list[GraphQLRequest] = field(default_factory=list)
+    """
+    Every request sent, oldest first.
+    """
+
+    @property
+    def marked_paths(self) -> list[PurePosixPath]:
+        """
+        The path of every file a mutation marked viewed, in the order they were sent.
+        """
+        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
+        return [
+            ViewedFile.from_json(request.variables).path
+            for request in self.sent
+            if request.query == document
+        ]
+
+    def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
+        assert isinstance(write, GraphQLRequest)
+        self.sent.append(write)
+        if write.query != ReviewTriageLocation.PULL_REQUEST_FILES.read_text():
+            return GitHubResponse(GraphQLResponse(data={}).to_json())
+        cursor = FilesPageRequest.from_json(write.variables).cursor
+        index = int(cursor) if cursor else 0
+        next_page = index + 1
+        page = ListedFilesPage(
+            tuple(ListedFile(path) for path in self.pages[index]),
+            PageInfo(next_page < len(self.pages), str(next_page)),
+        )
+        answer = ListedFilesAnswer(ListedPullRequest(self.head_commit, page))
+        return GitHubResponse(GraphQLResponse(data=answer.to_json()).to_json())
+
+
+def listing_of(triage: TriageOutcome) -> FileListingWriter:
+    """
+    :param triage: A triaged pull request.
+    :return: A listing of every file it changes, on one page, at its triaged head.
+    """
+    return FileListingWriter(
+        triage.pull_request.head.commit,
+        (tuple(file.change.path for file in triage.files),),
+    )
 
 
 def refusal(status: HTTPStatus, method: HttpMethod, path: str) -> GitHubResponse:

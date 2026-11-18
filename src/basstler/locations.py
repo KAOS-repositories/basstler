@@ -272,6 +272,14 @@ class ReviewTriageLocation(PathEnumeration):
     The GraphQL mutation marking one file of a pull request viewed.
     """
 
+    PULL_REQUEST_FILES = (
+        PackageLocation.DIRECTORY.value / "review_triage" / "pull_request_files.graphql"
+    )
+    """
+    The GraphQL query reading one page of the files GitHub lists in a pull request,
+    with its head commit.
+    """
+
     REPORT_TEMPLATE = PackageLocation.TEMPLATES.value / "review_triage_report.md.jinja"
     """
     The Markdown report of which files of a pull request need review.

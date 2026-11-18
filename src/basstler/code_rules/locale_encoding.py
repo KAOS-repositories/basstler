@@ -109,11 +109,6 @@ class UTF8EncodingFix(KeywordArgumentFix):
 
 # %% the patterns
 
-SWITCH_SAVED_AS = "switch"
-"""
-The name the subprocess text switch is saved under when a pattern matches.
-"""
-
 
 class NonEncodingArgument(CodePattern):
     """
@@ -146,8 +141,15 @@ class ConstantPositionalArgument(CodePattern):
 class SubprocessTextSwitch(CodePattern):
     """
     A call of a :mod:`subprocess` function that decodes its output in the locale
-    encoding; the ``text=True`` argument is saved as :data:`SWITCH_SAVED_AS`.
+    encoding; the ``text=True`` argument is saved as :attr:`saved_switch_name`.
     """
+
+    @classproperty
+    def saved_switch_name(cls) -> str:
+        """
+        The name the ``text=True`` argument is saved under when the pattern matches.
+        """
+        return "switch"
 
     @classproperty
     def matcher(cls) -> matchers.Call:
@@ -158,7 +160,11 @@ class SubprocessTextSwitch(CodePattern):
         )
         return matchers.Call(
             func=SubprocessFunction.matcher,
-            args=[others, matchers.SaveMatchedNode(switch, SWITCH_SAVED_AS), others],
+            args=[
+                others,
+                matchers.SaveMatchedNode(switch, cls.saved_switch_name),
+                others,
+            ],
         )
 
 
@@ -303,5 +309,7 @@ class LocaleEncodingChecker(FixableChecker[CallLackingKeywordArgument]):
                 continue
             captured = LocaleTextCall.captures(call)
             yield CallLackingKeywordArgument(
-                occurrence.location, call, captured.get(SWITCH_SAVED_AS)
+                occurrence.location,
+                call,
+                captured.get(SubprocessTextSwitch.saved_switch_name),
             )

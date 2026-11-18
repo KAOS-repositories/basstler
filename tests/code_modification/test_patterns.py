@@ -6,6 +6,7 @@ have the shape a pattern declares.
 from __future__ import annotations
 
 import libcst
+import pytest
 from libcst import matchers
 
 from basstler.class_property import classproperty
@@ -48,13 +49,23 @@ def module() -> PositionedModule:
 # %% finding
 
 
+def source_of(node: libcst.CSTNode) -> str:
+    """
+    :return: The source text of *node*.
+    """
+    return libcst.Module([]).code_for_node(node)
+
+
 def test_the_nodes_with_the_shape_are_found_in_the_order_of_the_source():
     """
     Of the three calls of ``run``, the one given nothing is not found.
     """
     occurrences = list(RunCallWithArgument.found_in(module()))
 
-    assert [occurrence.location.start.line for occurrence in occurrences] == [14, 15]
+    assert [source_of(occurrence.node) for occurrence in occurrences] == [
+        "run(command)",
+        "run(\n    command,\n)",
+    ]
 
 
 def test_an_occurrence_is_the_node_and_its_code_range():
@@ -70,17 +81,23 @@ def test_an_occurrence_is_the_node_and_its_code_range():
 # %% matching
 
 
-def test_a_node_matches_only_the_pattern_it_has_the_shape_of():
+@pytest.mark.parametrize(
+    ("source", "has_the_shape"),
+    [
+        ("run(command)", True),
+        ("run(command, check)", True),
+        ("run()", False),
+        ("walk(command)", False),
+        ("run", False),
+    ],
+)
+def test_a_node_matches_only_the_pattern_it_has_the_shape_of(
+    source: str, has_the_shape: bool
+):
     """
-    A call given an argument matches; a call given none, and a name, do not.
+    A call of ``run`` given an argument matches; a call given none, and a name, do not.
     """
-    with_argument = libcst.parse_expression("run(command)")
-    without_argument = libcst.parse_expression("run()")
-
-    assert [
-        RunCallWithArgument.matches(node)
-        for node in (with_argument, without_argument, libcst.Name("run"))
-    ] == [True, False, False]
+    assert RunCallWithArgument.matches(libcst.parse_expression(source)) is has_the_shape
 
 
 # %% capturing

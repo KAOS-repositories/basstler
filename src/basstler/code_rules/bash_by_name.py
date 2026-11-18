@@ -23,11 +23,6 @@ from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
 
 # %% the patterns
 
-COMMAND_SAVED_AS = "command"
-"""
-The name the command line is saved under when a pattern matches.
-"""
-
 
 class BashCommandLine(CodePattern):
     """
@@ -54,12 +49,21 @@ class BashCommandLine(CodePattern):
 class BashStarted(CodePattern):
     """
     A call to a :mod:`subprocess` function, or a return, that hands on a command line
-    starting bash by its name; the command line is saved as :data:`COMMAND_SAVED_AS`.
+    starting bash by its name; the command line is saved as :attr:`saved_command_name`.
     """
 
     @classproperty
+    def saved_command_name(cls) -> str:
+        """
+        The name the command line is saved under when the pattern matches.
+        """
+        return "command"
+
+    @classproperty
     def matcher(cls) -> matchers.OneOf:
-        command = matchers.SaveMatchedNode(BashCommandLine.matcher, COMMAND_SAVED_AS)
+        command = matchers.SaveMatchedNode(
+            BashCommandLine.matcher, cls.saved_command_name
+        )
         return matchers.OneOf(
             matchers.Return(value=command),
             matchers.Call(
@@ -84,7 +88,9 @@ class BashByNameChecker(SyntaxTreeChecker):
         self, path: Path, module: PositionedModule
     ) -> Iterator[CodeRuleViolation]:
         for occurrence in BashStarted.found_in(module):
-            command = BashStarted.captures(occurrence.node)[COMMAND_SAVED_AS]
+            command = BashStarted.captures(occurrence.node)[
+                BashStarted.saved_command_name
+            ]
             location = module.positions[libcst.ensure_type(command, libcst.CSTNode)]
             yield CodeRuleViolation(
                 path,

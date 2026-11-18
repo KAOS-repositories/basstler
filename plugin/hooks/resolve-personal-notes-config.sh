@@ -373,6 +373,9 @@ PLAN_SITE_DISPATCH_CHECK_MODULE="basstler.plan_site.dispatch_check"
 # basstler.plan_site.build_start: starts the plan site's build with this session's own
 # GitHub credential, after a push to the notes branch.
 PLAN_SITE_BUILD_START_MODULE="basstler.plan_site.build_start"
+# basstler.plan_site.merge_workflow_refresh: proposes the current merge workflow when the
+# default branch holds an older one, and prints the step left to the user.
+PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE="basstler.plan_site.merge_workflow_refresh"
 # basstler.personal_notes.access: in a cloud session, prints how to attach a notes
 # repository other than the checkout's own when the session cannot reach it.
 NOTES_ACCESS_MODULE="basstler.personal_notes.access"

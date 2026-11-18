@@ -46,7 +46,10 @@ def record_merged_items(manifest: ExistingFile) -> ExitCode:
     :return: The status :meth:`MergedItems.record` ended with.
     """
     return MergedItems.record(
-        manifest, GitHubPullRequestSource.from_environment(reads_check_states=False)
+        manifest,
+        GitHubPullRequestSource.from_environment(
+            reads_check_states=False, reads_upstream_pull_requests=False
+        ),
     )
 
 
@@ -63,7 +66,9 @@ def record_merged_items_in_every_plan(
         keeps moving.
     """
     recording = MergedItemsInEveryPlan(
-        GitHubPullRequestSource.from_environment(reads_check_states=False)
+        GitHubPullRequestSource.from_environment(
+            reads_check_states=False, reads_upstream_pull_requests=False
+        )
     )
     logger.info(
         recording.record_on_notes_branch(project_root, push_attempts=push_attempts)

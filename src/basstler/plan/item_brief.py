@@ -283,7 +283,7 @@ def main() -> int:
     """
     ItemBriefCommandLine.run(
         ItemBriefCommandLine.parser().parse_args(),
-        GitHubPullRequestSource.from_environment(),
+        GitHubPullRequestSource.from_environment(reads_upstream_pull_requests=False),
         Path.cwd(),
     )
     return 0

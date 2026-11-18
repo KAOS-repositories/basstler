@@ -479,3 +479,18 @@ def test_github_source_records_the_upstream_pull_request_of_each_fork_branch():
     assert live_pull_requests.upstream_pull_requests == {
         str(PLAN_REPOSITORY): {"a-branch": 7}
     }
+
+
+def test_github_source_reading_no_upstream_pull_requests_leaves_the_upstream_unlisted():
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    source = GitHubPullRequestSource(
+        RecordedGitHubClient(
+            responses={f"/{PLAN_REPOSITORY.api_path}": fork},
+            pages={listing_path(PLAN_REPOSITORY): [[]]},
+        ),
+        reads_upstream_pull_requests=False,
+    )
+    live_pull_requests = source.live_pull_requests_of(
+        DependencyResolver(FIRST_PLAN).pull_request_references
+    )
+    assert live_pull_requests.upstream_pull_requests == {str(PLAN_REPOSITORY): {}}

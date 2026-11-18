@@ -162,16 +162,27 @@ class GitHubPullRequestSource(PullRequestSource):
     Whether the check state of an open pull request is read; off, it stays unknown.
     """
 
+    reads_upstream_pull_requests: bool = True
+    """
+    Whether a fork's upstream is asked for its open pull requests; off, none are found.
+    """
+
     @classmethod
     def from_environment(
-        cls, reads_check_states: bool = True
+        cls, reads_check_states: bool = True, reads_upstream_pull_requests: bool = True
     ) -> GitHubPullRequestSource:
         """
         :param reads_check_states: Whether open pull requests' check states are read.
+        :param reads_upstream_pull_requests: Whether forks' upstreams are asked for
+            their open pull requests.
         :return: A source authenticating with whichever credential the environment
             carries.
         """
-        return cls(client=GitHubRestClient(), reads_check_states=reads_check_states)
+        return cls(
+            client=GitHubRestClient(),
+            reads_check_states=reads_check_states,
+            reads_upstream_pull_requests=reads_upstream_pull_requests,
+        )
 
     def client_for(self, repository: Repository) -> GitHubRepository:
         """
@@ -214,6 +225,8 @@ class GitHubPullRequestSource(PullRequestSource):
     def upstream_pull_requests_of(
         self, fork: Repository, lineage: ForkLineage
     ) -> dict[str, int]:
+        if not self.reads_upstream_pull_requests:
+            return {}
         return PullRequestHead.numbers_by_branch(
             self.client_for(lineage.upstream_repository).open_pull_requests(),
             fork.full_name,

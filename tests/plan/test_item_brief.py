@@ -5,6 +5,8 @@ item.
 
 from __future__ import annotations
 
+import json
+import sys
 from typing import Any
 
 import pytest
@@ -22,6 +24,7 @@ from basstler.plan.item_brief import (
     ItemBriefOption,
     ItemByBranch,
     ItemByIdentifier,
+    main,
 )
 from basstler.plan.model import (
     ItemNotTrackedError,
@@ -33,6 +36,8 @@ from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.size_limits import Roadmap
 
 from ..constants.paths import DatasetLocation
+from ..github.pull_request_api import listing_path
+from ..github.recorded_client import RecordedGitHubClient
 from ..fixture_plans import FixturePlanId, ForeignItemId
 from ..recorded_pull_requests import RecordedPullRequestSource
 from ..scratch_repository import ScratchRepository
@@ -277,3 +282,44 @@ def test_the_command_prints_the_brief(
     assert yaml.safe_load(capsys.readouterr().out) == read_brief(
         briefed_repository, pull_request_source
     )
+
+
+def test_the_command_briefs_an_item_without_listing_the_upstreams_pull_requests(
+    briefed_repository: ScratchRepository,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    """
+    A fork's upstream whose pull requests cannot be listed leaves the brief readable.
+    """
+    plan_repository = Repository.parse(
+        BRIEFED_MANIFEST.content[ManifestKey.DEFAULT_REPOSITORY.key]
+    )
+    client = RecordedGitHubClient(
+        responses={
+            f"/{plan_repository.api_path}": json.loads(
+                DatasetLocation.REPOSITORY_FORK.read_text()
+            )
+        },
+        pages={listing_path(plan_repository): [[]]},
+    )
+    monkeypatch.setattr(
+        "basstler.github.pull_request_source.GitHubRestClient", lambda: client
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "item_brief",
+            ItemBriefOption.PLAN,
+            BRIEFED_MANIFEST.identifier,
+            ItemBriefOption.ITEM,
+            BRIEFED_ITEM.identifier,
+        ],
+    )
+    monkeypatch.chdir(briefed_repository.project_root)
+
+    assert main() == 0
+    brief = yaml.safe_load(capsys.readouterr().out)
+    header = BRIEFED_MANIFEST.item_header(BRIEFED_ITEM)
+    assert {key: brief[key] for key in header} == header

@@ -9,9 +9,12 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 from cyclopts import App
 
@@ -21,6 +24,7 @@ from basstler.github.repository_attachment import SessionTool
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
 from basstler.plan_site.attach_approval import AllowedAttach, AttachAnswer
+from basstler.plugin_root import PluginRoot
 
 # %% what Claude Code sends
 
@@ -58,9 +62,24 @@ class ShellCall(ValidatedJSONModel):
 @dataclass(frozen=True)
 class EntryPointInvocation:
     """
-    A command line that runs the entry point script alone, whether it names the plugin
-    root through a variable or by its path, with arguments the shell leaves as they are.
+    A command line that runs this plugin's entry point script alone, whether it names the
+    plugin root through a variable or by its path, with arguments the shell leaves as
+    they are.
     """
+
+    plugin_root: PluginRoot
+    """
+    The plugin the session runs, the only root an expanded path may name.
+    """
+
+    @classmethod
+    def of_environment(cls, environment: Mapping[str, str]) -> EntryPointInvocation:
+        """
+        :param environment: The environment the hook runs in.
+        :return: The invocation of the plugin that environment exports.
+        :raises basstler.exceptions.PluginRootUnsetError: If no plugin root is exported.
+        """
+        return cls(PluginRoot.locate(environment))
 
     @classproperty
     def entry_point(cls) -> str:
@@ -81,9 +100,9 @@ class EntryPointInvocation:
     def plugin_root_path(cls) -> str:
         """
         The plugin root once expanded, a plain path with nothing the shell would
-        interpret, as a pattern.
+        interpret, as a pattern whose group is that path.
         """
-        return r"/[^\s\"'`$;&|<>()\\]+"
+        return r"(?P<expanded_root>/[^\s\"'`$;&|<>()\\]+)"
 
     @classproperty
     def arguments(cls) -> str:
@@ -102,16 +121,21 @@ class EntryPointInvocation:
         script = rf'"?{root}/{cls.entry_point}"?'
         return re.compile(rf"\s*{script}{cls.arguments}\s*")
 
-    @classmethod
-    def matches(cls, command: str) -> bool:
+    def matches(self, command: str) -> bool:
         """
         :param command: The command line a session is about to run.
-        :return: Whether it is this invocation, with nothing chained to it.
+        :return: Whether it is this invocation, with nothing chained to it, and an
+            expanded path names this plugin's own root.
         """
-        return cls.command_line.fullmatch(command) is not None
+        match = self.command_line.fullmatch(command)
+        if match is None:
+            return False
+        expanded_root = match.group("expanded_root")
+        if expanded_root is None:
+            return True
+        return Path(expanded_root).resolve() == self.plugin_root.directory.resolve()
 
-    @classmethod
-    def permit(cls, call: ShellCall) -> AttachAnswer | None:
+    def permit(self, call: ShellCall) -> AttachAnswer | None:
         """
         :param call: The tool call about to run.
         :return: The answer allowing it when it is this invocation, ``None`` to leave
@@ -119,7 +143,7 @@ class EntryPointInvocation:
         """
         if call.tool_name != SessionTool.RUN_SHELL_COMMAND:
             return None
-        if not cls.matches(call.tool_input.command):
+        if not self.matches(call.tool_input.command):
             return None
         return AttachAnswer(AllowedAttach("this runs the plugin's own entry point"))
 
@@ -141,7 +165,7 @@ def answer_hook() -> StackExitCode:
     :return: :attr:`StackExitCode.SUCCESS`, also when nothing is printed.
     """
     call = ShellCall.from_json(json.loads(sys.stdin.read()))
-    answer = EntryPointInvocation.permit(call)
+    answer = EntryPointInvocation.of_environment(os.environ).permit(call)
     if answer is not None:
         sys.stdout.write(json.dumps(answer.to_json()))
     return StackExitCode.SUCCESS

@@ -31,6 +31,7 @@ from basstler.github.constants import MaintenanceNotice
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
 from basstler.locations import RepositoryStateLocation
 from basstler.maintenance.board import BoardExport
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.upstream_reviews.action.open_pull_requests import (
     OpenPullRequestsAnswer,
     OpenPullRequestsRequest,
@@ -38,6 +39,7 @@ from basstler.upstream_reviews.action.open_pull_requests import (
 )
 from basstler.maintenance.check_overview import CheckOverview
 from basstler.maintenance.fast_forward import fast_forward
+from basstler.maintenance.landed_closing import LandedPullRequestClosing
 from basstler.maintenance.finish_summary import FinishSummary
 from basstler.maintenance.promotion import (
     PromotionSummaries,
@@ -96,6 +98,11 @@ class MaintenancePass:
     action_timeout: float = 480
     """
     How many seconds a read through the fork's Action waits for its run.
+    """
+
+    closing_follow_ups: LandedClosingFollowUps = LandedClosingFollowUps()
+    """
+    What a whole pass runs after closing pull requests whose work landed.
     """
 
     @property
@@ -450,7 +457,7 @@ class PromoteCommand(MaintenanceCommand):
             ),
             promotion_labels_cleared=tuple(clear_spent_promotion_labels(stack, fork)),
             upstream_pull_request_synchronization_changes=tuple(
-                UpstreamPullRequestSynchronization(stack, fork).synchronize()
+                UpstreamPullRequestSynchronization(stack, fork).apply()
             ),
         )
         report.print_summary()
@@ -553,13 +560,23 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
         stack = maintenance.fresh_stack().scoped_to(stacked_on)
         fork = maintenance.fork()
         fast_forward_report = fast_forward(stack.configuration, maintenance.git)
+        restacked = restack(stack, maintenance.git, fork)
+        promoted = promote(stack, fork, summaries)
+        labels_cleared = clear_spent_promotion_labels(stack, fork)
+        synchronization = UpstreamPullRequestSynchronization(stack, fork).apply()
+        closed_as_landed = LandedPullRequestClosing(stack, fork).apply()
+        closing_follow_ups = maintenance.closing_follow_ups.respond_to_closing(
+            closed_as_landed
+        )
         report = MaintenanceReport.of_pass(
             stack,
             fast_forward_report,
-            restack(stack, maintenance.git, fork),
-            promote(stack, fork, summaries),
-            clear_spent_promotion_labels(stack, fork),
-            UpstreamPullRequestSynchronization(stack, fork).synchronize(),
+            restacked,
+            promoted,
+            labels_cleared,
+            synchronization,
+            closed_as_landed,
+            closing_follow_ups,
         )
         maintenance.board.unlink(missing_ok=True)
         maintenance.full_report.write_text(report.as_json() + "\n")

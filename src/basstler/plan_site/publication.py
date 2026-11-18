@@ -29,7 +29,7 @@ from basstler.github.client import (
     GitHubRestClient,
     RetryPolicy,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.run_listing import RunListing
 from basstler.locations import (
@@ -623,7 +623,10 @@ class PlanSitePublication:
             self.rebuild(head, default_tip, workflow, message, report)
         else:
             self.write(head, workflow, message, report)
-        return MergeWorkflowProposal(notes_repository, default_branch.name, head.name)
+        return MergeWorkflowProposal(
+            RepositoryBranch(default_branch.name, notes_repository),
+            RepositoryBranch(head.name, notes_repository),
+        )
 
     def register(self, registry: Repository, report: PublicationReport) -> PlanHub:
         """

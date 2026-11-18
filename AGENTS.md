@@ -89,6 +89,7 @@
 - Make interfaces hard to misuse
 - Model the relationship between related concepts in the source, never only in a test that checks two separate definitions agree: derive one from the other, or unify them into one concept when that is the cleaner design by SOLID and the domain's semantics
 - Before writing a new class, look for an existing class it can hold as a field or subclass, and use it; when related classes share fields or behaviour, give them a common base
+- A field that means the same thing in several classes is declared once, in a mixin or base those classes inherit, never redeclared in each; a set of fields that travels together, such as a pull request's base and head, is one such mixin. Two classes that mean the same thing under different names are one class
 - A model of an external resource or payload is bound to the concept it describes, so every representation of one concept can be found from it: a repository setting's model, the read that parses it and the write that changes it are generic over that setting or hold it as a field, and the step a user takes when the write is refused belongs to the write. Never a free-standing copy of a concept another class already models
 - Every address of an external service - a REST path, a web page - is built by a method of the class of what it addresses (`Repository` for one within a repository), never appended to that class's address by hand where it is used (checked by `basstler code-rules check`)
 
@@ -133,6 +134,7 @@
 ## Type hints
 <!-- from TypeHintsRules in basstler/code_rules/rules/code_quality.py -->
 - Type hints are accurate: `Any` where the value genuinely is anything, never as a shortcut
+- A field, parameter or return value takes the most specific type that is correct for its meaning and every one of its uses - a `Branch`, not the `str` of its name; a `Path`, not a `str` - and a payload converts it to and from its wire form at the boundary
 - When each class in a family declares the type it handles, carry that type as a bound generic parameter, not a `ClassVar`, so it is part of the signature and cannot disagree with a separate attribute: bind it in each member (`class MemberOfFamily(Family[ConcreteType])`)
 
 ## Documentation

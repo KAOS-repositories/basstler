@@ -22,7 +22,7 @@ from basstler.github.client import (
 )
 from basstler.github.file_proposal import FileWrite, NewBranch
 from basstler.github.pull_request import NewPullRequest
-from basstler.github.repository import Repository
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.token_form import (
     PermissionLevel,
@@ -61,9 +61,9 @@ UPSTREAM = Repository("an-organisation", "project")
 The repository the fork was made from, where the pull requests are opened.
 """
 
-STAND_IN_DEFAULT_BRANCH = Branch(
-    RepositoryDetails.from_json(WORKFLOW_REPOSITORY_DETAILS).default_branch
-)
+STAND_IN_DEFAULT_BRANCH = RepositoryDetails.from_json(
+    WORKFLOW_REPOSITORY_DETAILS
+).default_branch
 """
 The default branch of every stand-in repository.
 """
@@ -91,7 +91,7 @@ class Resource:
     PROPOSED_FILE = FORK.contents_path(
         WORKFLOW_FILE_PATH, WORKFLOW_PROPOSAL_BRANCH.name
     )
-    WORKFLOW = FORK.workflow_path(WorkflowLocation.MARK_VIEWED)
+    WORKFLOW = FORK.workflow_resource_path(WorkflowLocation.MARK_VIEWED)
     SECRET = ReviewTriageSecret.VIEWER_TOKEN.path_on(FORK)
 
 
@@ -102,7 +102,10 @@ def fork_details(is_fork: bool = True) -> dict[str, Any]:
     """
     details = dict(WORKFLOW_REPOSITORY_DETAILS, fork=is_fork)
     if is_fork:
-        details["parent"] = {"full_name": UPSTREAM.full_name}
+        details["parent"] = {
+            "full_name": UPSTREAM.full_name,
+            "default_branch": STAND_IN_DEFAULT_BRANCH.name,
+        }
     return details
 
 
@@ -193,7 +196,9 @@ def test_a_fork_s_default_branch_is_never_written():
     client = fork_proposal_answers()
     MarkViewedSetup(FORK).run(client)
     assert [
-        write.branch for write in sent_of(client, FileWrite) if write.repository == FORK
+        write.branch.name
+        for write in sent_of(client, FileWrite)
+        if write.repository == FORK
     ] == [WORKFLOW_PROPOSAL_BRANCH.name]
 
 
@@ -204,10 +209,9 @@ def test_a_fork_s_workflow_is_proposed_to_its_parent_from_a_fork_branch():
     proposal = setup.workflow_proposal(RepositoryDetails.from_json(fork_details()))
     assert sent_of(client, NewPullRequest) == [
         NewPullRequest(
-            UPSTREAM,
+            base=RepositoryBranch(STAND_IN_DEFAULT_BRANCH.name, UPSTREAM),
+            head=RepositoryBranch(WORKFLOW_PROPOSAL_BRANCH.name, FORK),
             title=proposal.commit.message,
-            head=f"{FORK.owner}:{WORKFLOW_PROPOSAL_BRANCH.name}",
-            base=STAND_IN_DEFAULT_BRANCH.name,
             body=proposal.description,
             draft=False,
         )
@@ -221,7 +225,7 @@ def test_a_fork_s_proposal_branch_starts_at_its_parent_s_default_branch():
         NewBranch(
             repository=FORK,
             object_hash=BASE_COMMIT,
-            reference=WORKFLOW_PROPOSAL_BRANCH.reference,
+            name=WORKFLOW_PROPOSAL_BRANCH.name,
         )
     ]
 
@@ -244,9 +248,9 @@ def test_a_fork_holding_another_version_gets_it_proposed_not_replaced():
     )
     setup = MarkViewedSetup(FORK, on_every_pull_request=True)
     setup.run(client)
-    assert [(write.branch, write.text) for write in sent_of(client, FileWrite)] == [
-        (WORKFLOW_PROPOSAL_BRANCH.name, setup.caller_workflow)
-    ]
+    assert [
+        (write.branch.name, write.text) for write in sent_of(client, FileWrite)
+    ] == [(WORKFLOW_PROPOSAL_BRANCH.name, setup.caller_workflow)]
 
 
 # %% a repository that is no fork
@@ -293,14 +297,13 @@ def test_a_repository_that_is_no_fork_gets_a_pull_request_adding_the_workflow():
         NewBranch(
             repository=FORK,
             object_hash=BASE_COMMIT,
-            reference=WORKFLOW_PROPOSAL_BRANCH.reference,
+            name=WORKFLOW_PROPOSAL_BRANCH.name,
         ),
         proposal.commit.write_replacing(None),
         NewPullRequest(
-            FORK,
+            base=RepositoryBranch(STAND_IN_DEFAULT_BRANCH.name, FORK),
+            head=RepositoryBranch(WORKFLOW_PROPOSAL_BRANCH.name, FORK),
             title=proposal.commit.message,
-            head=WORKFLOW_PROPOSAL_BRANCH.name,
-            base=STAND_IN_DEFAULT_BRANCH.name,
             body=proposal.description,
             draft=False,
         ),
@@ -335,7 +338,7 @@ def test_a_proposal_branch_holding_another_version_is_updated():
     )
     setup.run(client)
     assert [
-        (write.branch, write.replaced_object_hash)
+        (write.branch.name, write.replaced_object_hash)
         for write in sent_of(client, FileWrite)
     ] == [(WORKFLOW_PROPOSAL_BRANCH.name, INSTALLED_BLOB)]
 
@@ -346,7 +349,7 @@ def test_a_refused_proposal_leaves_adding_the_workflow_by_hand():
     setup = MarkViewedSetup(FORK)
     setup.run(client)
     by_hand = (
-        setup.workflow_commit(FORK, STAND_IN_DEFAULT_BRANCH.name)
+        setup.workflow_commit(FORK, STAND_IN_DEFAULT_BRANCH)
         .write_replacing(None)
         .manual_step
     )

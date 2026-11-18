@@ -47,7 +47,9 @@ REQUEST = MarkViewedRequest(FORK, PullRequestReference(SAMPLE_REPOSITORY, 7))
 A request for the fork's workflow to mark a pull request of the sample repository.
 """
 
-DEFAULT_BRANCH = RepositoryDetails.from_json(WORKFLOW_REPOSITORY_DETAILS).default_branch
+DEFAULT_BRANCH = RepositoryDetails.from_json(
+    WORKFLOW_REPOSITORY_DETAILS
+).default_branch.name
 """
 The branch the stand-in workflow repository reports as its default.
 """

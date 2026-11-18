@@ -8,7 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import urlsplit
+
+from pydantic import Field
 
 from basstler.git.branch import Branch
 from basstler.git.commands import GitCommandRunner
@@ -55,25 +58,26 @@ class GitHubAddress(StrEnum):
         return cls.WEB
 
 
-class GitHubAccountPage(StrEnum):
+class NewTokenPage(StrEnum):
     """
-    The pages of the signed-in account's own settings, below :attr:`GitHubAddress.WEB`.
-    """
-
-    NEW_FINE_GRAINED_TOKEN = "settings/personal-access-tokens/new"
-    """
-    The form creating a fine-grained personal access token.
+    The signed-in account's forms creating a personal access token, below
+    :attr:`GitHubAddress.WEB`.
     """
 
-    NEW_CLASSIC_TOKEN = "settings/tokens/new"
+    FINE_GRAINED = "settings/personal-access-tokens/new"
     """
-    The form creating a classic personal access token.
+    The form creating a fine-grained token.
+    """
+
+    CLASSIC = "settings/tokens/new"
+    """
+    The form creating a classic token.
     """
 
     @property
     def url(self) -> str:
         """
-        The page's address.
+        The form's address.
         """
         return f"{GitHubAddress.WEB}/{self}"
 
@@ -287,18 +291,13 @@ class Repository:
         """
         return f"{self.url}/blob/{branch.name}/{file_path}"
 
-    def compare_url(
-        self, base: Branch, head: Branch, head_owner: str | None = None
-    ) -> str:
+    def compare_url(self, base: Branch, head: RepositoryBranch) -> str:
         """
-        :param base: The branch the comparison merges into.
+        :param base: The branch of this repository the comparison merges into.
         :param head: The branch compared against it.
-        :param head_owner: The owner of the fork holding *head*, ``None`` when it is on
-            this repository.
         :return: The page comparing the two, from which a pull request is opened.
         """
-        compared = head.name if head_owner is None else f"{head_owner}:{head.name}"
-        return f"{self.url}/compare/{base.name}...{compared}"
+        return f"{self.url}/compare/{base.name}...{head.name_from(self)}"
 
     @property
     def new_actions_secret_url(self) -> str:
@@ -387,7 +386,7 @@ class Repository:
         """
         return f"{self.api_path}/actions/jobs/{job}/logs"
 
-    def workflow_path(self, workflow: Path) -> str:
+    def workflow_resource_path(self, workflow: Path) -> str:
         """
         :param workflow: The workflow's file in the repository.
         :return: The REST path of that workflow, which reads its state.
@@ -399,7 +398,7 @@ class Repository:
         :param workflow: The workflow's file in the repository.
         :return: The REST path that starts a run of that workflow.
         """
-        return f"{self.workflow_path(workflow)}/dispatches"
+        return f"{self.workflow_resource_path(workflow)}/dispatches"
 
     @property
     def actions_permissions_path(self) -> str:
@@ -454,17 +453,48 @@ class Repository:
 
 
 @dataclass(frozen=True)
-class PullRequestReference:
+class RepositoryMember:
+    """
+    Something that belongs to one GitHub repository.
+    """
+
+    repository: Annotated[Repository, Field(exclude=True)]
+    """
+    The repository it belongs to, which a payload written for it leaves out.
+    """
+
+
+@dataclass(frozen=True)
+class RepositoryBranch(RepositoryMember, Branch):
+    """
+    A branch of one GitHub repository.
+    """
+
+    @property
+    def qualified_name(self) -> str:
+        """
+        The ``owner:branch`` form naming the branch among a repository and its forks.
+        """
+        return f"{self.repository.owner}:{self.name}"
+
+    def name_from(self, repository: Repository) -> str:
+        """
+        :param repository: The repository a pull request from this branch is opened on.
+        :return: The branch as that pull request names its head: :attr:`name` on the
+            same repository, else :attr:`qualified_name`.
+        """
+        if repository == self.repository:
+            return self.name
+        return self.qualified_name
+
+
+@dataclass(frozen=True)
+class PullRequestReference(RepositoryMember):
     """
     One pull request, named by the repository it is opened on and its number.
 
     Identity only: what a pull request currently *is* - open, merged, labelled - is read
     into a record of its own by whichever caller needs it.
-    """
-
-    repository: Repository
-    """
-    The repository the pull request is opened on.
     """
 
     number: int

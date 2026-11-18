@@ -9,11 +9,22 @@ from typing import Annotated
 
 from pydantic import Field
 
+from basstler.git.branch import Branch
+from basstler.github.pull_request_state import ForkLineage
 from basstler.github.repository import Repository
 from basstler.github.repository_resources import RepositoryRead
-from basstler.json_model import ValidatedJSONModel
+from basstler.json_model import RawValueReader, ValidatedJSONModel
 
 # %% the repository resource
+
+
+class BranchName(RawValueReader):
+    """
+    Reads a branch's name, as a repository's resource gives it, as the :class:`Branch`.
+    """
+
+    def read(self, value: str) -> Branch:
+        return Branch(value)
 
 
 class ParentRepository(ValidatedJSONModel):
@@ -24,6 +35,11 @@ class ParentRepository(ValidatedJSONModel):
     full_name: str
     """
     The parent's ``owner/name``.
+    """
+
+    default_branch: Annotated[Branch, BranchName()]
+    """
+    The parent's default branch.
     """
 
     @property
@@ -39,7 +55,7 @@ class RepositoryDetails(ValidatedJSONModel):
     One repository, as its REST resource describes it.
     """
 
-    default_branch: str
+    default_branch: Annotated[Branch, BranchName()]
     """
     The branch pull requests target unless told otherwise.
     """
@@ -58,6 +74,19 @@ class RepositoryDetails(ValidatedJSONModel):
     """
     The repository it was forked from, ``None`` when it is no fork.
     """
+
+    @property
+    def lineage(self) -> ForkLineage | None:
+        """
+        What the repository was forked from, ``None`` unless it is a fork.
+        """
+        if self.parent is None:
+            return None
+        return ForkLineage(
+            upstream_repository=self.parent.repository,
+            upstream_default_branch=self.parent.default_branch.name,
+            fork_default_branch=self.default_branch.name,
+        )
 
 
 # %% reading it

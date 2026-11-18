@@ -7,12 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
-from typing import Annotated
 
-from pydantic import Field
 
 from basstler.class_property import classproperty
+from basstler.github.workflows import RepositoryWorkflow
 from basstler.github.actions_secret import ActionsSecret
 from basstler.github.client import HttpMethod
 from basstler.github.repository_resources import RepositoryRead, SettingWrite
@@ -94,29 +92,19 @@ class WorkflowDetails(ValidatedJSONModel):
 
 
 @dataclass(frozen=True)
-class WorkflowRead(RepositoryRead[WorkflowDetails]):
+class WorkflowRead(RepositoryWorkflow, RepositoryRead[WorkflowDetails]):
     """
     Reads one workflow of a repository.
     """
 
-    workflow: Path
-    """
-    The workflow's file in the repository.
-    """
-
     @property
     def path(self) -> str:
-        return self.repository.workflow_path(self.workflow)
+        return self.repository.workflow_resource_path(self.workflow_path)
 
 
-class WorkflowEnabling(SettingWrite[WorkflowDetails]):
+class WorkflowEnabling(RepositoryWorkflow, SettingWrite[WorkflowDetails]):
     """
     Enables one workflow of a repository.
-    """
-
-    workflow: Annotated[Path, Field(exclude=True)]
-    """
-    The workflow's file in the repository.
     """
 
     @classproperty
@@ -125,11 +113,11 @@ class WorkflowEnabling(SettingWrite[WorkflowDetails]):
 
     @property
     def path(self) -> str:
-        return f"{self.repository.workflow_path(self.workflow)}/enable"
+        return f"{self.repository.workflow_resource_path(self.workflow_path)}/enable"
 
     @property
     def manual_step(self) -> UserStep:
-        return EnableWorkflow(self.repository, self.workflow)
+        return EnableWorkflow(self.repository, self.workflow_path)
 
 
 # %% whether one secret is stored

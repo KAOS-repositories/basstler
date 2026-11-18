@@ -10,10 +10,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import urlencode, urlsplit
 
-from basstler.class_property import classproperty
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import NewTokenPage, Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.workflows import (
@@ -134,25 +133,10 @@ class SiteRepository:
             return None
         return cls.from_site_url(hub.site_url)
 
-    @classproperty
-    def token_page(cls) -> str:
-        """
-        Where a fine-grained token is created.
-        """
-        return f"{GitHubAddress.WEB}/settings/personal-access-tokens/new"
-
-    @classproperty
-    def classic_token_page(cls) -> str:
-        """
-        Where a classic token, which may read the repositories of several owners, is
-        created.
-        """
-        return f"{GitHubAddress.WEB}/settings/tokens/new"
-
     def token_form_url(self, token_name: str = "basstler plan site") -> str:
         """
         :param token_name: The name the form fills in.
-        :return: :attr:`token_page` with everything filled in that starting the build
+        :return: :attr:`NewTokenPage.FINE_GRAINED` with everything filled in that starting the build
             needs, except the repository, which the form cannot be given.
         """
         query = urlencode(
@@ -165,7 +149,7 @@ class SiteRepository:
                 TokenFormField.ACTIONS: PermissionLevel.WRITE,
             }
         )
-        return f"{self.token_page}?{query}"
+        return f"{NewTokenPage.FINE_GRAINED.url}?{query}"
 
     def token_use(self, stored_on: Sequence[Repository]) -> token_form.TokenUse:
         """

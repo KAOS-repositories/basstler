@@ -5,6 +5,7 @@
   "state": "open",
   "merged_at": null,
   "head": {
+    "ref": "basstler/plan-site-merge",
     "sha": "0123456789abcdef0123456789abcdef01234567",
     "user": {"login": "a-fork-owner"}
   }

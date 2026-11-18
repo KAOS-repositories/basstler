@@ -148,6 +148,15 @@ def test_a_single_argument_naming_the_pull_request_triages_it(
     )
 
 
+def test_a_repository_without_a_number_asks_for_its_open_pull_requests(
+    installed_triage: InstalledTriage,
+) -> None:
+    completed = installed_triage.run(REPOSITORY)
+
+    assert completed.returncode == 0, completed.stderr
+    assert installed_triage.recorded_arguments() == ["-", REPOSITORY]
+
+
 # %% the clone's origin
 
 

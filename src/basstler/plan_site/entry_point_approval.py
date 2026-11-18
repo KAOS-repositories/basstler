@@ -62,9 +62,10 @@ class ShellCall(ValidatedJSONModel):
 @dataclass(frozen=True)
 class EntryPointInvocation:
     """
-    A command line that runs this plugin's entry point script alone, whether it names the
+    A command line that runs this plugin's entry point script, whether it names the
     plugin root through a variable or by its path, with arguments the shell leaves as
-    they are.
+    they are, optionally after a plain directory change and before a plain exit status
+    report.
     """
 
     plugin_root: PluginRoot
@@ -113,19 +114,38 @@ class EntryPointInvocation:
         return r"(?:\s+[^\s;&|<>`$()\\]+)*"
 
     @classproperty
+    def directory_change(cls) -> str:
+        """
+        What may come before the script, as a pattern: a change into a directory named
+        by one word with nothing the shell would interpret.
+        """
+        return r"(?:cd\s+[^\s\"'`$;&|<>()\\]+\s*(?:&&|;)\s*)?"
+
+    @classproperty
+    def status_report(cls) -> str:
+        """
+        What may follow the arguments, as a pattern: printing plain text and the
+        script's exit status.
+        """
+        return r'(?:\s*;\s*echo\s+"[^"$`\\]*\$\?")?'
+
+    @classproperty
     def command_line(cls) -> re.Pattern[str]:
         """
         What a whole command line has to match.
         """
         root = rf"(?:{cls.plugin_root_variable}|{cls.plugin_root_path})"
         script = rf'"?{root}/{cls.entry_point}"?'
-        return re.compile(rf"\s*{script}{cls.arguments}\s*")
+        return re.compile(
+            rf"\s*{cls.directory_change}{script}{cls.arguments}{cls.status_report}\s*"
+        )
 
     def matches(self, command: str) -> bool:
         """
         :param command: The command line a session is about to run.
-        :return: Whether it is this invocation, with nothing chained to it, and an
-            expanded path names this plugin's own root.
+        :return: Whether it is this invocation, with nothing chained to it but a
+            directory change and a status report, and an expanded path names this
+            plugin's own root.
         """
         match = self.command_line.fullmatch(command)
         if match is None:
@@ -159,8 +179,8 @@ The command, which reads the hook input from standard input.
 @app.default
 def answer_hook() -> StackExitCode:
     """
-    Print the answer allowing the command on standard output, and nothing when it is
-    not the entry point.
+    Print the answer allowing the command on standard output, and nothing when it is not
+    the entry point.
 
     :return: :attr:`StackExitCode.SUCCESS`, also when nothing is printed.
     """

@@ -173,9 +173,10 @@ items:
   - binding-renames
   status: in progress
   recommended_model: opus
-  notes: 'Draft #254 on #253 (d2c3af61 merged in). A document''s python code blocks and MyST
-    {code-cell} ipython3 cells are read as one module and resolved like a Python file. CRAM 527:
-    62 of 335 need review; run there with --mark-viewed. CI not read. Next: indented code
-    blocks in list items, the self_assessment exercises and domain_models READMEs still in
-    review.'
+  notes: 'Draft #254 on #253, pushed at dba4f8b4. A document''s python code blocks and MyST
+    {code-cell} ipython3 cells, after their options, are read as one module and resolved like a
+    Python file. CRAM 527: 58 of 335 need review; run there with --mark-viewed. CI not read.
+    Prose alone never proves a rename (no false positives). Next: indented code blocks in list
+    items, the domain_models READMEs.'
+
 landed_item_count: 1

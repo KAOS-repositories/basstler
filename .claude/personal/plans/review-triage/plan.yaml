@@ -195,8 +195,10 @@ items:
 
 - id: branch-owns-its-repository
   title: "Make every branch hold the repository it belongs to"
-  branch: null
+  branch: claude/ecstatic-carson-fs34i3
   track: triage
+  pull_request_number: 257
+  session: https://claude.ai/code/session_01JxHGiNcmkURK6bxmkkdhe5
   notes: >
     Starts once #215 lands. `Branch` (basstler-git) holds a required repository: add a git-layer
     repository base that GitHub's `Repository` subclasses, and merge `RepositoryBranch` into
@@ -205,6 +207,6 @@ items:
     `Branch`'s wire form; give `PullRequestReference` the same treatment. Comes from the review
     threads on #215 at 39d7cd13.
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: opus
 landed_item_count: 1

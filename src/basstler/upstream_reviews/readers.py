@@ -19,7 +19,7 @@ from basstler.github.pull_request_models import (
     UpstreamPullRequestSnapshot,
 )
 from basstler.github.query_documents import GraphQLDocument, QueryVariable
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.rest_models import (
     RestCheckRunPage,
     RestCombinedStatusPage,
@@ -182,14 +182,9 @@ class UpstreamPullRequestReader(PullRequestSource):
 
 
 @dataclass(frozen=True)
-class UpstreamRestRoute:
+class UpstreamRestRoute(HasRepository):
     """
     The REST paths reading one upstream repository's pull requests takes.
-    """
-
-    repository: Repository
-    """
-    The repository the paths are under.
     """
 
     @classproperty

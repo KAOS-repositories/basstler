@@ -12,7 +12,7 @@ from urllib.parse import urlencode, urlsplit
 
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
-from basstler.github.repository import NewTokenPage, Repository
+from basstler.github.repository import HasRepository, NewTokenPage, Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.workflows import (
@@ -71,14 +71,9 @@ class PermissionLevel(StrEnum):
 
 
 @dataclass(frozen=True)
-class SiteRepository:
+class SiteRepository(HasRepository):
     """
     The repository the user owns that builds and serves the plan site.
-    """
-
-    repository: Repository
-    """
-    The repository on GitHub.
     """
 
     @classmethod

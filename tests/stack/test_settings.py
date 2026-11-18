@@ -180,10 +180,10 @@ def test_the_fork_is_the_remote_that_is_not_the_upstream():
     )
 
     assert resolution.fork == Remote(
-        RemoteName.MINE, StackRepository.SAME_NAMED_FORK.value
+        repository=StackRepository.SAME_NAMED_FORK.value, name=RemoteName.MINE
     )
     assert resolution.upstream == Remote(
-        RemoteName.ORIGIN, StackRepository.UPSTREAM.value
+        repository=StackRepository.UPSTREAM.value, name=RemoteName.ORIGIN
     )
 
 
@@ -196,7 +196,7 @@ def test_the_fork_resolves_the_same_when_origin_happens_to_be_the_fork():
     )
 
     assert resolution.fork == Remote(
-        RemoteName.ORIGIN, StackRepository.SAME_NAMED_FORK.value
+        repository=StackRepository.SAME_NAMED_FORK.value, name=RemoteName.ORIGIN
     )
 
 
@@ -209,7 +209,7 @@ def test_the_fork_resolves_from_a_checkout_that_has_only_the_fork():
     )
 
     assert resolution.fork == Remote(
-        RemoteName.ORIGIN, StackRepository.SAME_NAMED_FORK.value
+        repository=StackRepository.SAME_NAMED_FORK.value, name=RemoteName.ORIGIN
     )
     assert resolution.upstream is None
 
@@ -263,7 +263,7 @@ def test_configuration_disambiguates_two_possible_forks():
     )
 
     assert resolution.fork == Remote(
-        RemoteName.MINE, StackRepository.SAME_NAMED_FORK.value
+        repository=StackRepository.SAME_NAMED_FORK.value, name=RemoteName.MINE
     )
 
 
@@ -279,7 +279,7 @@ def test_a_remote_that_names_no_repository_is_ignored():
     )
 
     assert resolution.fork == Remote(
-        RemoteName.ORIGIN, StackRepository.SAME_NAMED_FORK.value
+        repository=StackRepository.SAME_NAMED_FORK.value, name=RemoteName.ORIGIN
     )
 
 

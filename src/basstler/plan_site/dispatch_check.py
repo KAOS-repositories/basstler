@@ -29,7 +29,7 @@ from basstler.github.exceptions import (
     GitHubCredentialRejected,
     GitHubRequestFailed,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.run_listing import ListedRun, RunListing
 from basstler.github.states import CheckOutcome
 from basstler.json_model import JSONModel
@@ -264,14 +264,9 @@ class DispatchState(StrEnum):
 
 
 @dataclass(frozen=True)
-class DispatchReading(ABC):
+class DispatchReading(HasRepository, ABC):
     """
     What reading one published repository's dispatch from GitHub found.
-    """
-
-    repository: Repository
-    """
-    The repository the plan site publishes.
     """
 
     @property

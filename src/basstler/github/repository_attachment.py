@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository
 
 # %% the session's tools
 
@@ -52,14 +52,9 @@ class SessionProxyAnswer(StrEnum):
 
 
 @dataclass(frozen=True)
-class RepositoryAttachment:
+class RepositoryAttachment(HasRepository):
     """
     How a cloud session gets :attr:`repository` attached, and what it then runs.
-    """
-
-    repository: Repository
-    """
-    The repository the session cannot reach yet.
     """
 
     retry_command: str

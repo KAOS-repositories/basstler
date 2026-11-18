@@ -29,7 +29,7 @@ from basstler.github.pull_request_record import (
     PullRequestRecord,
 )
 from basstler.github.pull_request_state import PullRequestState
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.rest_models import (
     RestCheckRunPage,
     RestCombinedStatusPage,
@@ -299,15 +299,10 @@ class PullRequestListState(PullRequestListingSpecification, Enum):
 
 @dataclass(frozen=True)
 class GitHubRepository(
-    ForkPullRequests, CommitChecks, RepositoryLabels, CredentialHolder
+    HasRepository, ForkPullRequests, CommitChecks, RepositoryLabels, CredentialHolder
 ):
     """
     Every pull-request and label call this tooling makes, against one repository.
-    """
-
-    repository: Repository
-    """
-    The repository to read and write.
     """
 
     client: GitHubClient

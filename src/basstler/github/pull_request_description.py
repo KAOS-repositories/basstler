@@ -8,20 +8,15 @@ import re
 from dataclasses import dataclass
 
 from basstler.github.constants import DescriptionPattern, MaintenanceText
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository
 
 # %% the upstream pull request a description links to
 
 
 @dataclass(frozen=True)
-class UpstreamPullRequestLink:
+class UpstreamPullRequestLink(HasRepository):
     """
     A hyperlink to one upstream pull request.
-    """
-
-    repository: Repository
-    """
-    The upstream repository the pull request is open on.
     """
 
     number: int

@@ -44,7 +44,7 @@ from basstler.bash import Bash
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandFailed, GitCommandRunner
 from basstler.github.remote_branch import GitHubRemoteBranch
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
 from basstler.plugin_root import PluginRoot
@@ -332,14 +332,9 @@ class SetupStep(ABC):
 
 
 @dataclass(frozen=True)
-class ForkLabels(SetupStep):
+class ForkLabels(HasRepository, SetupStep):
     """
     Creating the labels this tooling reads and applies, in the user's fork.
-    """
-
-    repository: Repository
-    """
-    The fork the labels belong in.
     """
 
     @property
@@ -373,15 +368,10 @@ class ForkLabels(SetupStep):
 
 
 @dataclass(frozen=True)
-class RepositoryAccess(SetupStep):
+class RepositoryAccess(HasRepository, SetupStep):
     """
     Giving Claude access to the repository sessions read and open pull requests
     against.
-    """
-
-    repository: Repository
-    """
-    The repository the access has to cover.
     """
 
     @property
@@ -411,14 +401,9 @@ class RepositoryAccess(SetupStep):
 
 
 @dataclass(frozen=True)
-class ForkActions(SetupStep):
+class ForkActions(HasRepository, SetupStep):
     """
     Switching Actions on in a fork, where ``/upstream-reviews``' Action runs.
-    """
-
-    repository: Repository
-    """
-    The fork.
     """
 
     @property
@@ -604,15 +589,10 @@ class PersonalNotesWriteRefusedError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class PersonalUpstream:
+class PersonalUpstream(HasRepository):
     """
     Naming the project's upstream in the user's personal ``stack.toml``, so a project
     that commits nothing of basstler's still has one.
-    """
-
-    repository: Repository
-    """
-    The repository the project's pull requests are reviewed on.
     """
 
     @classproperty

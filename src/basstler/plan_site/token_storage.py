@@ -24,7 +24,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import GitHubAttemptClient, GitHubRestClient
 from basstler.github.constants import GitHubExecutable
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.locations import ClaudeCodeVariable
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.plan_site.build_start import BuildStart
@@ -98,14 +98,9 @@ class GitHubCommandLineSecretStore(SecretStore):
 
 
 @dataclass(frozen=True)
-class StorageResult:
+class StorageResult(HasRepository):
     """
     What storing the token in one repository came to.
-    """
-
-    repository: Repository
-    """
-    The repository.
     """
 
     refusal: str = ""

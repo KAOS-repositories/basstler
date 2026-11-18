@@ -22,9 +22,8 @@ from enum import StrEnum
 from functools import cached_property
 from http import HTTPStatus
 from http.client import HTTPResponse
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
@@ -36,7 +35,7 @@ from basstler.github.exceptions import (
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, HasRepository
 from basstler.json_model import ValidatedJSONModel
 
 # %% the interface
@@ -89,6 +88,13 @@ class GitHubAttemptReader(ABC):
         """
 
 
+class GitHubFullReader(GitHubReader, GitHubAttemptReader, ABC):
+    """
+    Reading REST resources, with a refusal raised or returned on the answer as the
+    caller chooses.
+    """
+
+
 class GitHubWrite(ValidatedJSONModel, ABC):
     """
     A change sent to the REST API, carrying the resource it changes.
@@ -111,14 +117,9 @@ class GitHubWrite(ValidatedJSONModel, ABC):
         """
 
 
-class RepositoryWrite(GitHubWrite, ABC):
+class RepositoryWrite(GitHubWrite, HasRepository, ABC):
     """
     A change to a resource of one repository.
-    """
-
-    repository: Annotated[Repository, Field(exclude=True)]
-    """
-    The repository the resource belongs to.
     """
 
 
@@ -156,7 +157,7 @@ class GitHubClient(GitHubReader, GitHubWriter, ABC):
     """
 
 
-class GitHubFullClient(GitHubClient, GitHubAttemptClient, ABC):
+class GitHubFullClient(GitHubClient, GitHubAttemptClient, GitHubFullReader, ABC):
     """
     Reading and writing REST resources, with a refusal raised or returned on the answer
     as the caller chooses.
@@ -290,6 +291,16 @@ class GitHubResponse:
         return (
             isinstance(self.failure, GitHubRequestFailed)
             and self.failure.status == HTTPStatus.NOT_FOUND
+        )
+
+    @property
+    def is_forbidden(self) -> bool:
+        """
+        :return: Whether GitHub answered 403: the credential may not read the resource.
+        """
+        return (
+            isinstance(self.failure, GitHubRequestFailed)
+            and self.failure.status == HTTPStatus.FORBIDDEN
         )
 
     def raise_if_failed(self) -> Any:

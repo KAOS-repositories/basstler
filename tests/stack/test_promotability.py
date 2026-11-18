@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 
+from basstler.github.repository import RepositoryBranch
 from basstler.stack.model import BranchStatus, PullRequest
 from basstler.stack.promotability import PromotionBlocker, PromotionReadiness
 from basstler.stack.promotion_link import PromotionLink, PromotionTarget
@@ -81,6 +82,16 @@ def test_failed_checks_block_promotion():
     assert readiness.blockers == [PromotionBlocker.CHECKS_FAILED]
 
 
+def test_a_branch_in_review_is_blocked_by_that_alone():
+    readiness = PromotionReadiness(
+        status=BranchStatus.IN_REVIEW,
+        parent_landed=False,
+        withheld=True,
+        checks_failed=True,
+    )
+    assert readiness.blockers == [PromotionBlocker.IN_REVIEW]
+
+
 def test_every_blocker_is_listed_in_declaration_order():
     readiness = PromotionReadiness(
         status=BranchStatus.DRAFT,
@@ -137,12 +148,13 @@ def test_the_stack_promotes_exactly_the_branches_its_rule_finds_promotable():
 # %% the link target
 
 
-def test_the_target_of_a_configuration_names_its_upstream_and_fork_owner():
+def test_the_target_of_a_configuration_names_its_upstream_base_and_fork():
     configuration = make_configuration()
     assert PromotionTarget.from_configuration(configuration) == PromotionTarget(
-        upstream_repository=configuration.upstream_repository,
-        upstream_base=configuration.upstream_base,
-        fork_owner=configuration.fork_repository.owner,
+        upstream_base=RepositoryBranch(
+            configuration.upstream_base, configuration.upstream_repository
+        ),
+        fork=configuration.fork_repository,
     )
 
 

@@ -7,7 +7,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
-from basstler.github.pull_request_changes import PullRequestChanges, RestPullRequest
+from basstler.github.pull_request_changes import (
+    PullRequestChanges,
+    RestPullRequest,
+    StartCommit,
+)
 from basstler.review_triage.base_branch_merges import BaseBranchMergeDetection
 from basstler.review_triage.commit_tree import CommitModules
 from basstler.review_triage.comparison import (
@@ -59,6 +63,11 @@ class TriageOutcome:
     files: tuple[FileVerdict, ...]
     """
     The verdict on each file it changes.
+    """
+
+    start: StartCommit
+    """
+    The commit its changes were triaged from, and why.
     """
 
     @property
@@ -146,4 +155,5 @@ class PullRequestTriager:
             changes.pull_request,
             renames,
             tuple(verdicts[change.path] for change in changes.files),
+            changes.start,
         )

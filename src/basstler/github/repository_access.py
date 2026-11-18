@@ -18,9 +18,10 @@ from enum import Enum, StrEnum
 from typing import Any
 
 from basstler.github.client import GitHubClient, GitHubRestClient
-from basstler.github.issue import IssueComment
+from basstler.github.issue import ClosingReason, IssueClosing, IssueComment
 from basstler.github.label import LabelReplacement, NewLabel, RepositoryLabel
 from basstler.github.pull_request import PullRequestDescription
+from basstler.github.pull_request_ends import PullRequestEnds
 from basstler.github.pull_request_models import CheckStatus
 from basstler.github.pull_request_record import (
     AccountField,
@@ -62,7 +63,7 @@ class PullRequestReader(ABC):
 @dataclass(frozen=True)
 class PullRequestWriter(ABC):
     """
-    The three writes a pass makes, each one probed against the live API first.
+    The writes a pass makes, each one probed against the live API first.
 
     Every one of them is available to the credential a session carries; a pull request's
     *base branch* is the single write that is not, which is why reparenting is the
@@ -84,6 +85,10 @@ class PullRequestWriter(ABC):
     def set_description(self, number: int, body: str) -> None:
         """:param number: The pull request to write.
         :param body: The new description."""
+
+    @abstractmethod
+    def close_pull_request(self, number: int) -> None:
+        """:param number: The pull request to close, as completed."""
 
 
 @dataclass(frozen=True)
@@ -171,6 +176,12 @@ class CommitReport(StrEnum):
     """
 
 
+MAXIMUM_PULL_REQUESTS_PER_PAGE = 100
+"""
+The most pull requests one page of GitHub's pull request listing holds.
+"""
+
+
 class ListingParameter(StrEnum):
     """
     The query parameters a paged listing takes.
@@ -184,6 +195,16 @@ class ListingParameter(StrEnum):
     PAGE_SIZE = "per_page"
     """
     How many entries one page holds.
+    """
+
+    HEAD = "head"
+    """
+    The branch the pull requests are opened from, as ``owner:branch``.
+    """
+
+    BASE = "base"
+    """
+    The branch the pull requests merge into.
     """
 
 
@@ -203,6 +224,46 @@ class PullRequestListingSpecification:
     """
     The pull request states this filter lets through.
     """
+
+    def path_on(self, repository: Repository) -> str:
+        """
+        :param repository: The repository the pull requests are opened on.
+        :return: The REST path listing the first page of its pull requests this filter
+            lets through.
+        """
+        return self._path(repository, {})
+
+    def path_between(self, ends: PullRequestEnds) -> str:
+        """
+        :param ends: The branches the pull requests join.
+        :return: The REST path listing the pull requests from *ends*' head into its base
+            this filter lets through.
+        """
+        return self._path(
+            ends.base.repository,
+            {
+                ListingParameter.HEAD: ends.head.qualified_name,
+                ListingParameter.BASE: ends.base.name,
+            },
+        )
+
+    def _path(
+        self, repository: Repository, filters: Mapping[ListingParameter, str]
+    ) -> str:
+        """
+        :param repository: The repository the pull requests are opened on.
+        :param filters: Further filters of the listing.
+        :return: The REST path listing a full first page of them.
+        """
+        query = urllib.parse.urlencode(
+            {
+                ListingParameter.STATE: self.query,
+                ListingParameter.PAGE_SIZE: MAXIMUM_PULL_REQUESTS_PER_PAGE,
+                **filters,
+            },
+            safe=":",
+        )
+        return f"{repository.pull_requests_path}?{query}"
 
 
 class PullRequestListState(PullRequestListingSpecification, Enum):
@@ -401,3 +462,7 @@ class GitHubRepository(
         :param body: The new description.
         """
         self.client.send(PullRequestDescription(self.repository, number, body))
+
+    def close_pull_request(self, number: int) -> None:
+        """:param number: The pull request to close, as completed."""
+        self.client.send(IssueClosing(self.repository, number, ClosingReason.COMPLETED))

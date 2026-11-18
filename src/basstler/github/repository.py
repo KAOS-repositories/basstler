@@ -8,7 +8,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import urlsplit
+
+from pydantic import Field
+
+from basstler.git.branch import Branch
+from basstler.git.commands import GitCommandRunner
 
 
 class GitHubAddress(StrEnum):
@@ -50,6 +56,30 @@ class GitHubAddress(StrEnum):
         if is_short_ssh_form or urlsplit(remote_url).scheme == urlsplit(cls.SSH).scheme:
             return cls.SSH
         return cls.WEB
+
+
+class NewTokenPage(StrEnum):
+    """
+    The signed-in account's forms creating a personal access token, below
+    :attr:`GitHubAddress.WEB`.
+    """
+
+    FINE_GRAINED = "settings/personal-access-tokens/new"
+    """
+    The form creating a fine-grained token.
+    """
+
+    CLASSIC = "settings/tokens/new"
+    """
+    The form creating a classic token.
+    """
+
+    @property
+    def url(self) -> str:
+        """
+        The form's address.
+        """
+        return f"{GitHubAddress.WEB}/{self}"
 
 
 @dataclass
@@ -97,6 +127,21 @@ class Repository:
             raise MalformedRepositoryError(text)
         owner, _, name = text.partition("/")
         return cls(owner, name)
+
+    @classmethod
+    def from_name_or_remote(
+        cls, name: str | None, git: GitCommandRunner, remote: str = "origin"
+    ) -> Repository:
+        """
+        :param name: A repository as ``owner/name``, or ``None``.
+        :param git: The current checkout.
+        :param remote: The remote whose repository is meant when no name is given.
+        :return: The repository named, else the one *remote* points at.
+        :raises MalformedRepositoryError: If *name* is not ``owner/name``.
+        """
+        if name:
+            return cls.parse(name)
+        return cls.from_remote_url(git.run("remote", "get-url", remote))
 
     @staticmethod
     def is_full_name(text: str) -> bool:
@@ -210,6 +255,36 @@ class Repository:
         return f"{self.url}/actions/runs/{run}"
 
     @property
+    def actions_settings_url(self) -> str:
+        """
+        The settings page that allows or forbids Actions in the repository.
+        """
+        return f"{self.settings_url}/actions"
+
+    def workflow_page_url(self, workflow: Path) -> str:
+        """
+        :param workflow: The workflow's file in the repository.
+        :return: The page listing the workflow's runs, where it is also enabled.
+        """
+        return f"{self.url}/actions/workflows/{workflow.name}"
+
+    def file_url(self, branch: Branch, file_path: str) -> str:
+        """
+        :param branch: The branch holding the file.
+        :param file_path: The file's path from the repository's root.
+        :return: The file's page, rendered.
+        """
+        return f"{self.url}/blob/{branch.name}/{file_path}"
+
+    def compare_url(self, base: Branch, head: RepositoryBranch) -> str:
+        """
+        :param base: The branch of this repository the comparison merges into.
+        :param head: The branch compared against it.
+        :return: The page comparing the two, from which a pull request is opened.
+        """
+        return f"{self.url}/compare/{base.name}...{head.name_from(self)}"
+
+    @property
     def new_actions_secret_url(self) -> str:
         """
         The form on GitHub that adds an Actions secret to the repository.
@@ -274,6 +349,21 @@ class Repository:
         """
         return f"{self.pull_requests_path}/{number}"
 
+    def pull_request_reviews_path(self, number: int) -> str:
+        """
+        :param number: The pull request's number.
+        :return: The REST path listing that pull request's reviews, oldest first.
+        """
+        return f"{self.pull_request_path(number)}/reviews"
+
+    def compare_path(self, base: str) -> str:
+        """
+        :param base: What the head is compared with: a branch, or ``owner:branch`` for
+            one in another repository of the same network.
+        :return: The REST path of the comparison, which the head follows after ``...``.
+        """
+        return f"{self.api_path}/compare/{base}"
+
     def workflow_run_path(self, run: int) -> str:
         """
         :param run: The Actions workflow run's own number.
@@ -288,12 +378,63 @@ class Repository:
         """
         return f"{self.api_path}/actions/jobs/{job}/logs"
 
+    def workflow_resource_path(self, workflow: Path) -> str:
+        """
+        :param workflow: The workflow's file in the repository.
+        :return: The REST path of that workflow, which reads its state.
+        """
+        return f"{self.api_path}/actions/workflows/{workflow.name}"
+
     def workflow_dispatch_path(self, workflow: Path) -> str:
         """
         :param workflow: The workflow's file in the repository.
         :return: The REST path that starts a run of that workflow.
         """
-        return f"{self.api_path}/actions/workflows/{workflow.name}/dispatches"
+        return f"{self.workflow_resource_path(workflow)}/dispatches"
+
+    @property
+    def actions_permissions_path(self) -> str:
+        """
+        The REST path of whether Actions may run in the repository.
+        """
+        return f"{self.api_path}/actions/permissions"
+
+    def actions_secret_path(self, secret: str) -> str:
+        """
+        :param secret: The Actions secret's name.
+        :return: The REST path of its metadata; GitHub never serves its value.
+        """
+        return f"{self.api_path}/actions/secrets/{secret}"
+
+    def contents_path(self, file_path: str, revision: str | None = None) -> str:
+        """
+        :param file_path: The file's path from the repository's root.
+        :param revision: The branch or commit to read it at, ``None`` to write it.
+        :return: The REST path of the file's contents.
+        """
+        path = f"{self.api_path}/contents/{file_path}"
+        return path if revision is None else f"{path}?ref={revision}"
+
+    @property
+    def git_references_path(self) -> str:
+        """
+        The REST path that creates git references, such as a new branch.
+        """
+        return f"{self.api_path}/git/refs"
+
+    def branch_reference_path(self, branch: Branch) -> str:
+        """
+        :param branch: A branch of the repository.
+        :return: The REST path of its git reference.
+        """
+        return f"{self.api_path}/git/ref/{branch.reference.removeprefix('refs/')}"
+
+    def branch_update_path(self, branch: Branch) -> str:
+        """
+        :param branch: A branch of the repository.
+        :return: The REST path that moves its git reference.
+        """
+        return f"{self.git_references_path}/{branch.reference.removeprefix('refs/')}"
 
     def git_requirement(self, distribution: str, reference: str) -> str:
         """
@@ -311,17 +452,48 @@ class Repository:
 
 
 @dataclass(frozen=True)
-class PullRequestReference:
+class HasRepository:
+    """
+    Something that belongs to one GitHub repository.
+    """
+
+    repository: Annotated[Repository, Field(exclude=True)]
+    """
+    The repository it belongs to, which a payload written for it leaves out.
+    """
+
+
+@dataclass(frozen=True)
+class RepositoryBranch(HasRepository, Branch):
+    """
+    A branch of one GitHub repository.
+    """
+
+    @property
+    def qualified_name(self) -> str:
+        """
+        The ``owner:branch`` form naming the branch among a repository and its forks.
+        """
+        return f"{self.repository.owner}:{self.name}"
+
+    def name_from(self, repository: Repository) -> str:
+        """
+        :param repository: The repository a pull request from this branch is opened on.
+        :return: The branch as that pull request names its head: :attr:`name` on the
+            same repository, else :attr:`qualified_name`.
+        """
+        if repository == self.repository:
+            return self.name
+        return self.qualified_name
+
+
+@dataclass(frozen=True)
+class PullRequestReference(HasRepository):
     """
     One pull request, named by the repository it is opened on and its number.
 
     Identity only: what a pull request currently *is* - open, merged, labelled - is read
     into a record of its own by whichever caller needs it.
-    """
-
-    repository: Repository
-    """
-    The repository the pull request is opened on.
     """
 
     number: int

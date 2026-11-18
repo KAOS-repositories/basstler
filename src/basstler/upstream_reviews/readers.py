@@ -224,7 +224,10 @@ class UpstreamRestRoute:
         :param number: The pull request's number.
         :return: Its submitted reviews.
         """
-        return f"{self.pull_request(number)}/reviews?per_page={self.page_size}"
+        return (
+            f"{self.repository.pull_request_reviews_path(number)}"
+            f"?per_page={self.page_size}"
+        )
 
     def review_comments(self, number: int) -> str:
         """
@@ -322,7 +325,7 @@ class RestPullRequestReader(PullRequestSource):
             page_url=pull_request.page_url,
             reviews=self._reviews(pull_request_number),
             threads=self._threads(pull_request_number),
-            checks=self._checks(pull_request.head.sha),
+            checks=self._checks(pull_request.head.object_hash),
         )
 
     def _reviews(self, pull_request_number: int) -> list[Review]:

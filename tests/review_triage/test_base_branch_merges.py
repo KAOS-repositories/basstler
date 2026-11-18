@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePosixPath
+from typing import Any
 
 import pytest
 
@@ -14,15 +15,18 @@ from basstler.github.pull_request_changes import (
     CommitStart,
     ComparisonStart,
     LastCommitsStart,
+    LastReviewStart,
     MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
+    StartCommit,
+    StartReason,
 )
 from basstler.review_triage.comparison import ChangeKinds, MechanicalChange
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from ..scratch_repository import ScratchRepository
-from .conftest import SAMPLE_REPOSITORY, OnePullRequestReader
+from .conftest import SAMPLE_REPOSITORY, ReviewedPullRequestReader
 from .samples import BaseBranchMergeSample, DescriptionSample, PullRequestSample
 
 # %% the history
@@ -55,18 +59,48 @@ class ReviewedHistory:
     The pull request's head commit now.
     """
 
-    def read(self, start: ComparisonStart) -> PullRequestChanges:
+    @property
+    def reviews(self) -> list[dict[str, Any]]:
+        """
+        The sample's reviews, each naming the commit of this history it was submitted
+        against.
+        """
+        commits = {
+            "base_branch_commit": self.base_branch_commit,
+            "reviewed_commit": self.reviewed_commit,
+            "head_commit": self.head_commit,
+        }
+        reviews = BaseBranchMergeSample.REVIEWS.payload()
+        for review in reviews:
+            review["commit_id"] = commits[review["commit_id"]]
+        return reviews
+
+    def read(
+        self,
+        start: ComparisonStart,
+        reviews: list[dict[str, Any]] | None = None,
+        account_refused: bool = False,
+    ) -> PullRequestChanges:
         """
         :param start: Where the changes are read from.
+        :param reviews: The pull request's reviews as REST lists them; none if ``None``.
+        :param account_refused: Whether GitHub refuses to name the credential's account.
         :return: The pull request's changes.
         """
         payload = PullRequestSample.PAYLOAD.payload()
         payload["base"]["sha"] = self.base_branch_commit
         payload["head"]["sha"] = self.head_commit
         payload["body"] = DescriptionSample.WITHOUT_DECLARATION.read()
-        return PullRequestChangesReader(
-            self.repository.git, OnePullRequestReader(payload)
-        ).read(SAMPLE_REPOSITORY, payload["number"], start)
+        reader = ReviewedPullRequestReader(
+            payload,
+            None
+            if account_refused
+            else BaseBranchMergeSample.AUTHENTICATED_USER.payload(),
+            reviews or [],
+        )
+        return PullRequestChangesReader(self.repository.git, reader).read(
+            SAMPLE_REPOSITORY, payload["number"], start
+        )
 
 
 def commit_tree(
@@ -108,6 +142,42 @@ def reviewed_history(scratch_repository: ScratchRepository) -> ReviewedHistory:
 def test_the_changes_start_at_the_commit_given(reviewed_history: ReviewedHistory):
     changes = reviewed_history.read(CommitStart(reviewed_history.reviewed_commit))
     assert changes.commits.base_commit == reviewed_history.reviewed_commit
+
+
+def test_the_changes_start_at_the_viewers_last_submitted_review(
+    reviewed_history: ReviewedHistory,
+):
+    """
+    Another account's later review and the viewer's pending review are passed over.
+    """
+    changes = reviewed_history.read(LastReviewStart(), reviewed_history.reviews)
+    assert changes.start == StartCommit(
+        reviewed_history.reviewed_commit, StartReason.LAST_REVIEW
+    )
+
+
+def test_without_a_review_of_the_viewer_the_changes_start_at_the_merge_base(
+    reviewed_history: ReviewedHistory,
+):
+    changes = reviewed_history.read(LastReviewStart())
+    assert changes.start == StartCommit(
+        reviewed_history.repository.git.merge_base(
+            reviewed_history.base_branch_commit, reviewed_history.head_commit
+        ),
+        StartReason.MERGE_BASE,
+    )
+
+
+def test_a_credential_github_names_no_account_for_starts_at_the_merge_base(
+    reviewed_history: ReviewedHistory,
+):
+    """
+    An Actions token has submitted no review, so the whole change is read.
+    """
+    changes = reviewed_history.read(
+        LastReviewStart(), reviewed_history.reviews, account_refused=True
+    )
+    assert changes.start.reason == StartReason.MERGE_BASE
 
 
 def test_the_last_commits_count_a_merge_as_one(reviewed_history: ReviewedHistory):

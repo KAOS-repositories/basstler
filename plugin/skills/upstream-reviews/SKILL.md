@@ -27,8 +27,9 @@ workflow file that calls basstler's reusable workflow by reference, so a fork of
 any repository can carry it. Each read pushes a request on a branch of its own
 started from it, which starts a run that reads the upstream over GraphQL and
 commits everything it read onto that branch;
-`basstler.upstream_reviews.action` fetches that, deletes the branch and
-replays it through the same reader a direct read uses. It works the same from a
+`basstler.upstream_reviews.action` fetches that and replays it through the same
+reader a direct read uses. A session cannot delete a remote branch, so a later
+run deletes request branches an hour after their last commit. It works the same from a
 cloud session, a terminal or a runner, and the fork's default branch never
 changes. Setup installs it (`basstler.setup.steps install-upstream-reviews-action`); the
 one step no script can do is switching Actions on in a fork, which GitHub starts
@@ -59,9 +60,13 @@ The upstream has to be named somewhere `stack configuration` reads it: the
 project's committed `.claude/basstler/stack.toml`, or the user's own
 `.claude/personal/stack.toml` on the personal-notes branch. Check for it, and
 everything else this skill relies on, first: follow
-`skills/setup-personal-notes/prerequisite-check.md`, passing
-`--require-upstream` to `check-setup.sh` so a missing upstream runs the setup
-(which asks for it) instead of failing in step 1.
+[`prerequisite-check.md`](../setup-personal-notes/prerequisite-check.md) with this skill's gate, whose
+checks include the upstream, so a missing one runs the setup (which asks for it)
+instead of failing in step 1:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate --skill upstream-reviews; echo "setup gate exit status: $?"
+```
 
 ## 1. Resolve the target, the fork and the upstream
 

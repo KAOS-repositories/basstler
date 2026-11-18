@@ -5,29 +5,40 @@ committed to a scratch repository.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from basstler.environment import GitHubCredentialVariable
 from basstler.github.client import (
-    GitHubReader,
+    GitHubAttemptClient,
+    GitHubFullReader,
     GitHubResponse,
     GitHubWrite,
     GitHubWriter,
+    HttpMethod,
 )
 from basstler.git.commit_range import CommitRange
-from basstler.github.repository import Repository
+from basstler.github.credential import CredentialProvider
+from basstler.github.exceptions import GitHubRequestFailed
+from basstler.github.repository_access import GitHubPath
 from basstler.github.pull_request_changes import (
     MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
     RestPullRequest,
+    StartCommit,
+    StartReason,
 )
+from basstler.github.repository import Repository
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameMap
 
+from ..constants.paths import DatasetLocation
 from ..scratch_repository import ScratchRepository
 from .samples import DescriptionSample, PullRequestSample, SampleTrees
 
@@ -40,7 +51,7 @@ The repository the sample pull request is opened on.
 
 
 @dataclass(frozen=True)
-class OnePullRequestReader(GitHubReader):
+class OnePullRequestReader(GitHubFullReader):
     """
     Answers every read with one pull request's payload.
     """
@@ -54,6 +65,49 @@ class OnePullRequestReader(GitHubReader):
         return self.payload
 
     def get_pages(self, path: str) -> list[Any]:
+        return [self.payload]
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        return GitHubResponse(self.payload)
+
+
+@dataclass(frozen=True)
+class ReviewedPullRequestReader(OnePullRequestReader):
+    """
+    Answers the reads of the authenticated account and of the pull request's reviews,
+    and every other read with the pull request's payload.
+    """
+
+    account: dict[str, Any] | None
+    """
+    The account the credential belongs to, as REST describes it; ``None`` for a
+    credential GitHub names no account for, whose read of it is refused.
+    """
+
+    reviews: list[dict[str, Any]]
+    """
+    The pull request's reviews, as REST lists them on one page.
+    """
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        if path != GitHubPath.AUTHENTICATED_USER:
+            return GitHubResponse(self.payload)
+        if self.account is None:
+            return GitHubResponse(
+                None,
+                failure=GitHubRequestFailed.for_status(
+                    HTTPStatus.FORBIDDEN,
+                    "Resource not accessible by integration",
+                    HttpMethod.GET,
+                    path,
+                    GitHubCredentialVariable.GITHUB_TOKEN,
+                ),
+            )
+        return GitHubResponse(self.account)
+
+    def get_pages(self, path: str) -> list[Any]:
+        if path == SAMPLE_REPOSITORY.pull_request_reviews_path(self.payload["number"]):
+            return [self.reviews]
         return [self.payload]
 
 
@@ -76,6 +130,81 @@ class RecordingWriter(GitHubWriter):
     def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
         self.sent.append(write)
         return GitHubResponse(self.answer)
+
+
+def refusal(status: HTTPStatus, method: HttpMethod, path: str) -> GitHubResponse:
+    """
+    :param status: The status GitHub refuses the call with.
+    :param method: The call's method.
+    :param path: The call's path.
+    :return: GitHub's answer refusing the call.
+    """
+    return GitHubResponse(
+        None,
+        failure=GitHubRequestFailed(
+            status=status,
+            detail="",
+            method=method,
+            path=path,
+            credential_origin=CredentialProvider.CALLER,
+        ),
+    )
+
+
+@dataclass
+class RefusingWriter(GitHubWriter):
+    """
+    Refuses every write with one status.
+    """
+
+    status: HTTPStatus
+    """
+    The status every write is refused with.
+    """
+
+    def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
+        return refusal(self.status, write.method, write.path)
+
+
+WORKFLOW_REPOSITORY_DETAILS: dict[str, Any] = json.loads(
+    DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text()
+)
+"""
+The resource the stand-in workflow repository answers with.
+"""
+
+
+@dataclass
+class WorkflowRepositoryClient(GitHubAttemptClient):
+    """
+    Answers a repository's resource and records every write, refusing either when told.
+    """
+
+    read_refusal: HTTPStatus | None = None
+    """
+    The status reading the repository is refused with, ``None`` to answer it.
+    """
+
+    write_refusal: HTTPStatus | None = None
+    """
+    The status every write is refused with, ``None`` to accept it.
+    """
+
+    sent: list[GitHubWrite] = field(default_factory=list)
+    """
+    Every write sent, oldest first.
+    """
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        if self.read_refusal is not None:
+            return refusal(self.read_refusal, HttpMethod.GET, path)
+        return GitHubResponse(WORKFLOW_REPOSITORY_DETAILS)
+
+    def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
+        self.sent.append(write)
+        if self.write_refusal is not None:
+            return refusal(self.write_refusal, write.method, write.path)
+        return GitHubResponse(None)
 
 
 # %% fixtures
@@ -129,7 +258,10 @@ def committed_pull_request(
     payload["base"]["sha"] = commits.base_commit
     payload["head"]["sha"] = commits.head_commit
     return PullRequestChanges(
-        RestPullRequest.from_json(payload), commits, commits.file_versions()
+        RestPullRequest.from_json(payload),
+        commits,
+        commits.file_versions(),
+        StartCommit(commits.base_commit, StartReason.MERGE_BASE),
     )
 
 

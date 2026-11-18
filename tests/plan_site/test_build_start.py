@@ -16,10 +16,12 @@ from basstler.github.repository_attachment import SessionTool
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.plan_site.build_start import (
     BUILD_START_COMMAND,
     BuildStart,
     CodeFence,
+    PlanSiteRebuild,
     SiteAccess,
 )
 from basstler.plan_site.site_repository import SiteRepository
@@ -52,7 +54,7 @@ def test_the_build_is_dispatched_on_the_site_s_default_branch():
         WorkflowDispatch(
             SITE.repository,
             WorkflowLocation.PLAN_SITE,
-            RepositoryDetails.from_json(SITE_DETAILS).default_branch,
+            RepositoryDetails.from_json(SITE_DETAILS).default_branch.name,
         )
     ]
 
@@ -165,3 +167,10 @@ def test_a_cloud_session_that_cannot_read_the_site_repository_is_told_to_attach_
     missing = SiteAccess(SITE).missing_access(client, in_cloud_session=True)
 
     assert missing.endswith(SiteAccess(SITE).remedy(in_cloud_session=True))
+
+
+# %% after a maintenance pass
+
+
+def test_the_plan_site_rebuild_is_installed_as_a_follow_up_to_closing():
+    assert PlanSiteRebuild() in LandedClosingFollowUps.installed().follow_ups

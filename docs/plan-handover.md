@@ -52,7 +52,7 @@ Either way the handover holds:
 
 | Path | What it is |
 | --- | --- |
-| `HANDOVER.md` | The guide: how to take the plans on with or without basstler, and every item's state, branch, pull request, dependencies, notes and blockers. |
+| `HANDOVER.md` | Instructions for the receiver's coding agent: the rules and steps for working an item without basstler, and every item's state, branch, pull request, dependencies, notes and blockers. |
 | `plans/<plan-id>/` | Each plan's `plan.yaml` and `roadmap.md`, as your notes branch holds them. |
 | `pr-progress/<branch>.md` | The progress note of every handed-over item's branch that has one. |
 | `repository-rules.yaml` | The rules every plan of the repository follows, if it has any. |
@@ -77,9 +77,9 @@ requests it already continued. Given a directory instead, `basstler plan-handove
 before saving anything. Items then start with `/plan-item-kickoff` and continue with
 `/plan-item-resolve`, and the plans appear on their plan site.
 
-**Without basstler:** `HANDOVER.md` has a prompt to give Claude Code with any item's
-section, which works the item from its branch, pull request, progress note and the plan's
-standing rules.
+**Without basstler:** point a coding agent at `HANDOVER.md` and an item. It is written
+for the agent: the rules to read first and the steps that work the item from its branch,
+pull request, progress note and the plan's standing rules.
 
 ## 4. Afterwards
 

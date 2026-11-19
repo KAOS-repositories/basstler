@@ -455,8 +455,8 @@ class PlanHandover:
 @dataclass(frozen=True)
 class HandoverGuide(TemplatePage):
     """
-    The guide to a handover: how to take it on with or without basstler, and every
-    item's state, dependencies and next step.
+    The instructions a coding agent continues a handover's plans from without basstler,
+    and every item's state, dependencies and next step.
     """
 
     handover: PlanHandover

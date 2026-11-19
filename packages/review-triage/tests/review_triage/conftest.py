@@ -278,6 +278,7 @@ def commit_trees(
     scratch_repository: ScratchRepository,
     base_files: dict[Path, str],
     head_files: dict[Path, str],
+    head_message: str = "head",
 ) -> CommitRange:
     """
     Commit a base tree, then a head tree replacing it.
@@ -285,6 +286,7 @@ def commit_trees(
     :param scratch_repository: The repository to commit in.
     :param base_files: The base tree's files, by path.
     :param head_files: The head tree's files, by path.
+    :param head_message: The head commit's message.
     :return: The two commits.
     """
     for path, text in base_files.items():
@@ -294,22 +296,35 @@ def commit_trees(
     scratch_repository.run_git("rm", "-r", "--quiet", ".")
     for path, text in head_files.items():
         scratch_repository.write(path, text)
-    scratch_repository.commit_everything("head")
+    scratch_repository.commit_everything(head_message)
     return CommitRange(
         scratch_repository.git, base_commit, scratch_repository.git.commit_at("HEAD")
     )
 
 
 def committed_pull_request(
-    scratch_repository: ScratchRepository, base: SampleTrees, head: SampleTrees
+    scratch_repository: ScratchRepository,
+    base: SampleTrees,
+    head: SampleTrees,
+    head_message: str = "head",
 ) -> PullRequestChanges:
     """
     :param scratch_repository: The repository to commit in.
     :param base: The sample's base tree.
     :param head: The sample's head tree.
+    :param head_message: The head commit's message.
     :return: The sample pull request between the two trees, once committed.
     """
-    commits = commit_trees(scratch_repository, base.files(), head.files())
+    return pull_request_between(
+        commit_trees(scratch_repository, base.files(), head.files(), head_message)
+    )
+
+
+def pull_request_between(commits: CommitRange) -> PullRequestChanges:
+    """
+    :param commits: A base and a head commit.
+    :return: The sample pull request between them.
+    """
     payload = PullRequestSample.PAYLOAD.payload()
     payload["base"]["sha"] = commits.base_commit
     payload["head"]["sha"] = commits.head_commit

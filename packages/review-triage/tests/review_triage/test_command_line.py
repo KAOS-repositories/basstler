@@ -19,6 +19,7 @@ from basstler.review_triage.command_line import (
     review_triage_app,
 )
 from basstler.review_triage.declaration import TriageDeclaration
+from basstler.review_triage.recorded_plans import PlanRecord, RecordedPlan
 
 # %% the start chosen
 
@@ -60,3 +61,33 @@ def test_conflicting_or_empty_starts_are_refused(command, options):
         review_triage_app.parse_args(
             [command, "7", *options], exit_on_error=False, print_error=False
         )
+
+
+# %% the plans named
+
+
+def test_a_plan_argument_is_a_record_of_the_commit_that_applied_it():
+    argument = f"abc123{PlanRecord.separator}{RecordedPlan.WORKSPACE_PACKAGES}"
+
+    publication = TriagePublication.from_arguments(
+        7, None, TriageDeclaration(), None, None, plans=(argument,)
+    )
+
+    assert publication.plan_records == (
+        PlanRecord("abc123", RecordedPlan.WORKSPACE_PACKAGES),
+    )
+
+
+@pytest.mark.parametrize(
+    "command", [ReviewTriageCommand.REPORT, ReviewTriageCommand.MARK_VIEWED]
+)
+def test_the_plan_option_is_repeatable(command):
+    arguments = ("abc123=workspace-packages", "def456=workspace-packages")
+
+    _, bound, _ = review_triage_app.parse_args(
+        [command, "7", "--plan", arguments[0], "--plan", arguments[1]],
+        exit_on_error=False,
+        print_error=False,
+    )
+
+    assert bound.kwargs["plan"] == arguments

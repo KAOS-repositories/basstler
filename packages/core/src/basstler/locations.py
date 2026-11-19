@@ -174,6 +174,85 @@ class WorkspaceLocation(PathEnumeration):
     relative to the root.
     """
 
+    PACKAGE_TESTS = Path("tests")
+    """
+    A distribution's tests, relative to its directory.
+    """
+
+    TEST_SUPPORT = Path("test_support")
+    """
+    The directory the tests of every distribution import shared helpers from, relative
+    to the root.
+    """
+
+    TEST_SUPPORT_PACKAGE = TEST_SUPPORT / "basstler_testing"
+    """
+    The package of the helpers, fixtures and data the tests of several distributions
+    share, relative to the root.
+    """
+
+    SHARED_FIXTURES = TEST_SUPPORT_PACKAGE / "fixtures.py"
+    """
+    The fixtures the tests of every distribution share, relative to the root.
+    """
+
+
+class SinglePackageLocation(PathEnumeration):
+    """
+    Where the package kept its modules and tests before the workspace split it into a
+    directory per distribution, relative to the checkout's root.
+    """
+
+    SOURCE = Path("src") / "basstler"
+    """
+    The package itself.
+    """
+
+    PACKAGE_INITIALIZER = SOURCE / "__init__.py"
+    """
+    The initializer of the package, which a namespace package does without.
+    """
+
+    PACKAGE_MAP = SOURCE / "package_map.py"
+    """
+    The module declaring which distribution ships each module.
+    """
+
+    LOCATIONS = SOURCE / "locations.py"
+    """
+    The module naming every file the package reads, its templates among them.
+    """
+
+    TEMPLATES = SOURCE / "templates"
+    """
+    The templates of every distribution.
+    """
+
+    TESTS = Path("tests")
+    """
+    The tests of every distribution, as one package.
+    """
+
+    TESTS_INITIALIZER = TESTS / "__init__.py"
+    """
+    The initializer of the tests' package.
+    """
+
+    SHARED_FIXTURES = TESTS / "conftest.py"
+    """
+    The fixtures every test can use.
+    """
+
+    DATASET = TESTS / "dataset"
+    """
+    The files the tests read.
+    """
+
+    TEST_CONSTANTS = TESTS / "constants"
+    """
+    The names and paths the tests share.
+    """
+
 
 class PackageLocation(PathEnumeration):
     """

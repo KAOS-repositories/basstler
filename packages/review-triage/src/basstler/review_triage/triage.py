@@ -17,7 +17,6 @@ from basstler.review_triage.commit_tree import CommitModules
 from basstler.review_triage.comparison import (
     FileJudgment,
     FileNeedingReview,
-    FileTriager,
     FileVerdict,
     JudgmentContext,
     MechanicalChange,
@@ -34,6 +33,8 @@ from basstler.review_triage.definition_moves import (
 )
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.module_moves import ModuleMoveDetection
+from basstler.review_triage.plan_replay import PlanReplay, ReplayingFileTriager
+from basstler.review_triage.recorded_plans import PlanRecord
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.rule_fixes import RuleFixComparison
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
@@ -120,11 +121,17 @@ class PullRequestTriager:
     The opt-in rules in force.
     """
 
+    plan_records: tuple[PlanRecord, ...] = ()
+    """
+    Plans commits applied beyond those their messages record.
+    """
+
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
         :return: The verdict on each of its files, a file only merges of the base branch
-            changed mechanical without being judged.
+            changed mechanical without being judged, and a file a recorded plan changed
+            judged against the plan's replay.
         """
         separated = BaseBranchMergeDetection().separate(changes)
         own_changes = separated.own
@@ -132,7 +139,7 @@ class PullRequestTriager:
             source.decisions(own_changes) for source in self.rename_sources
         )
         base_definitions = DefinitionIndex(CommitModules(own_changes.commits.base_tree))
-        triager = FileTriager(
+        triager = ReplayingFileTriager(
             JudgmentContext(
                 renames,
                 base_definitions,
@@ -143,6 +150,10 @@ class PullRequestTriager:
                 self.rules,
             ),
             self.judgments,
+            PlanReplay.from_records(
+                (*PlanRecord.recorded_in(own_changes.commits), *self.plan_records),
+                own_changes.commits,
+            ),
         )
         verdicts: dict[PurePosixPath, FileVerdict] = {
             change.path: MechanicalFile(

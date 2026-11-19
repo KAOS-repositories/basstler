@@ -28,6 +28,7 @@ from basstler.locations import ClaudeCodeVariable
 from basstler.review_triage.command_names import ReviewTriageCommand
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
+from basstler.review_triage.recorded_plans import PlanRecord
 from basstler.review_triage.rules import (
     ReviewTriageSettings,
     RuleSelection,
@@ -100,6 +101,11 @@ class TriagePublication:
     The rules turned on and off on the command line, outranking the project's settings.
     """
 
+    plan_records: tuple[PlanRecord, ...] = ()
+    """
+    Plans commits applied beyond those their messages record.
+    """
+
     @classmethod
     def from_arguments(
         cls,
@@ -111,6 +117,7 @@ class TriagePublication:
         select_rules: tuple[TriageRule, ...] = (),
         ignore_rules: tuple[TriageRule, ...] = (),
         from_merge_base: bool = False,
+        plans: tuple[str, ...] = (),
     ) -> TriagePublication:
         """
         :param pull_request: The pull request's number.
@@ -121,6 +128,7 @@ class TriagePublication:
         :param select_rules: The rules to turn on.
         :param ignore_rules: The rules to turn off.
         :param from_merge_base: Whether to triage the whole change.
+        :param plans: Plans commits applied, each as ``commit=plan``.
         :return: The publication triaging from *since*, else from before the *last*
             commits, else from the merge base if *from_merge_base*, else from the
             viewer's last review.
@@ -141,6 +149,7 @@ class TriagePublication:
             rule_options=RuleSelection(
                 frozenset(select_rules), frozenset(ignore_rules)
             ),
+            plan_records=tuple(PlanRecord.from_argument(plan) for plan in plans),
         )
 
     def outcome(self) -> TriageOutcome:
@@ -164,6 +173,7 @@ class TriagePublication:
             rules=self.rule_options.applied_to(
                 ReviewTriageSettings.from_checkout(checkout).selection
             ),
+            plan_records=self.plan_records,
         )
         return triager.triage(changes)
 
@@ -211,6 +221,7 @@ def report(
     ] = False,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
+    plan: tuple[str, ...] = (),
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown; by default only the
@@ -230,6 +241,8 @@ def report(
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param plan: A code modification plan a commit applied, as ``commit=plan``, for a
+        commit whose message does not record it; repeatable.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -241,6 +254,7 @@ def report(
         select_rule,
         ignore_rule,
         from_merge_base,
+        plan,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -264,6 +278,7 @@ def mark_viewed(
     ] = False,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
+    plan: tuple[str, ...] = (),
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the logged-in account, or, where
@@ -288,6 +303,8 @@ def mark_viewed(
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param plan: A code modification plan a commit applied, as ``commit=plan``, for a
+        commit whose message does not record it; repeatable.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     :raises GraphQLErrorsReturned: If marking them directly, alone, fails.
     :raises FilesNotMarkedViewed: If neither way marks them.
@@ -302,6 +319,7 @@ def mark_viewed(
         select_rule,
         ignore_rule,
         from_merge_base,
+        plan,
     ).outcome()
     MarkdownReport().publish(outcome)
     routes = ViewedMarkingRoutes(

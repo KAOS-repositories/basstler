@@ -262,6 +262,24 @@ TEMPLATE_REINDENTED = (
 The renamed template's head version, its renamed line also indented.
 """
 
+
+# %% the workspace packages plan
+
+
+class WorkspacePackagesSample(SampleTrees):
+    """
+    A pull request splitting one package into a directory per distribution, as the
+    workspace packages plan does.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "workspace-packages"
+
+
 # %% rule settings
 
 RULE_SETTINGS = DatasetLocation.REVIEW_TRIAGE / "rules"

@@ -1,25 +1,46 @@
 # Handing plans over
 
 When someone else takes over a line of work, `basstler plan-handover` moves its plans to
-them: from your personal-notes branch, through a directory you give them, onto theirs.
+them: from your personal-notes branch to theirs, by a pull request on their repository or
+by a directory you send them.
 
-## 1. Give them access to the work
+## 1. Choose where they will work
 
-The items' branches and pull requests stay where they are, so the receiver needs to push
-to them: add them as a collaborator with write access to every repository the plans'
-items are on. Nothing is migrated on GitHub, so pull request numbers, review threads,
-stacked bases and tracking issues all stay valid.
+The items' branches and pull requests stay where they are. The receiver either:
 
-## 2. Export the plans
+- **pushes to your repository**, as a collaborator with write access: they continue every
+  item on its existing branch and pull request, and nothing about the plans changes; or
+- **works in their own fork** of the same upstream: on import, each plan moves onto their
+  fork. Items not started are opened there, items already underway keep naming your
+  repository, where their pull requests are, and the plans' tracking issues, which are
+  numbers on your repository, are dropped. To push to an underway item's branch they
+  still need write access to yours, or they continue it from a branch of their own.
 
-From a checkout of the plans' repository:
+## 2. Hand the plans over
+
+From a checkout of the plans' repository, name every plan the work spans: a plan whose
+items depend on a plan left out is refused.
+
+**As a pull request** (recommended), opened as a draft on the receiver's repository -
+theirs, or yours for a collaborator:
+
+```bash
+basstler plan-handover offer <plan-id> [<plan-id>...] --to <owner>/<repository> [--receiver <login>] [--base <branch>]
+```
+
+It commits the handover under `plan-handover/` on top of the base branch (the
+repository's default branch unless `--base` names another), pushes it to a
+`basstler/plan-handover/...` branch of your `origin`, and opens the pull request,
+mentioning `--receiver`. Its files are what the receiver reviews; it is never merged.
+Offering the same plans again updates the pull request.
+
+**As a directory**, for a receiver without a repository you can open a pull request on:
 
 ```bash
 basstler plan-handover export <plan-id> [<plan-id>...] --output <directory>
 ```
 
-Name every plan the work spans: an export refuses a plan whose items depend on a plan it
-leaves out. The directory holds:
+Either way the handover holds:
 
 | Path | What it is |
 | --- | --- |
@@ -30,23 +51,22 @@ leaves out. The directory holds:
 
 Items' `session` links are left out: only the person who ran a session can open it.
 
-Commit the directory somewhere the receiver can read it, such as a branch of the
-repository, or send it to them.
-
 ## 3. The receiver takes them on
 
 **With basstler** (recommended): after its [setup](SETUP.md), from a checkout of the
-plans' repository:
+repository the pull request is on:
 
 ```bash
-basstler plan-handover import <directory>
+basstler plan-handover import
 ```
 
-That saves each plan onto their notes branch after the plans it depends on, so every
-save is validated as any other is, then their progress notes and rules. It refuses a plan
-their notes branch already holds, before saving anything. Items then start with
-`/plan-item-kickoff` and continue with `/plan-item-resolve`, and the plans appear on
-their plan site.
+It finds the handover pull request open there (name one with `--pull-request <number>`
+when several are), saves each plan onto their notes branch after the plans it depends
+on, so every save is validated as any other is, then their progress notes and rules, and
+closes the pull request. Given a directory instead, `basstler plan-handover import
+<directory>` reads it from there. It refuses a plan their notes branch already holds,
+before saving anything. Items then start with `/plan-item-kickoff` and continue with
+`/plan-item-resolve`, and the plans appear on their plan site.
 
 **Without basstler:** `HANDOVER.md` has a prompt to give Claude Code with any item's
 section, which works the item from its branch, pull request, progress note and the plan's
@@ -54,7 +74,7 @@ standing rules.
 
 ## 4. Afterwards
 
-The export leaves your notes branch as it was. Once the receiver has imported the plans,
-remove them from yours, or keep them to follow along: both of you then see the same
-pull requests' live state. A plan another of your plans depends on cannot be removed
+Handing over leaves your notes branch as it was. Once the receiver has imported the
+plans, remove them from yours, or keep them to follow along: both of you then see the
+same pull requests' live state. A plan another of your plans depends on cannot be removed
 until that dependency is dropped or the item it names is done.

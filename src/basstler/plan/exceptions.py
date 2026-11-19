@@ -725,3 +725,46 @@ class PlanAlreadyTrackedError(DataclassException, FileExistsError):
             "Import into a notes branch without that plan, or edit the plan that is "
             "there instead of importing it again."
         )
+
+
+@dataclass
+class HandoverPullRequestNotChosenError(DataclassException, LookupError):
+    """
+    Raised when the open handover pull requests of a repository do not name exactly one
+    to take over.
+    """
+
+    repository: Repository
+    """
+    The repository the handover pull requests were looked for on.
+    """
+
+    offered_numbers: tuple[int, ...]
+    """
+    The numbers of every handover pull request open there.
+    """
+
+    requested_number: int | None
+    """
+    The pull request asked for, ``None`` when none was.
+    """
+
+    def error_message(self) -> str:
+        offered = ", ".join(f"#{number}" for number in self.offered_numbers) or "none"
+        if self.requested_number is not None:
+            return (
+                f"#{self.requested_number} is no open handover pull request on "
+                f"{self.repository.full_name}; open there: {offered}"
+            )
+        return (
+            f"{self.repository.full_name} has {len(self.offered_numbers)} open handover "
+            f"pull requests, not one: {offered}"
+        )
+
+    def suggest_correction(self) -> str:
+        if not self.offered_numbers:
+            return (
+                "Ask the sender to offer the plans to this repository with "
+                "'basstler plan-handover offer', or import the directory they sent."
+            )
+        return "Name the one to take over with --pull-request."

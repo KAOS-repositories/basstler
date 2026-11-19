@@ -14,12 +14,11 @@ from pathlib import Path, PurePosixPath
 import rustworkx
 
 from basstler.class_property import classproperty
+from basstler.git.commands import GitCommandRunner
+from basstler.github.repository import Repository
 from basstler.locations import PlanHandoverLocation, ProjectLocation
 from basstler.personal_notes.branch import NotesBranchWriter, NotesFileChanges
-from basstler.personal_notes.progress_notes import (
-    ProgressNotesDirectory,
-    ProgressNotesFile,
-)
+from basstler.personal_notes.progress_notes import ProgressNotesFile
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.exceptions import (
     HandoverPlanCycleError,
@@ -117,6 +116,41 @@ class HandoverPlan:
             roadmap_text=self.roadmap_text,
         )
 
+    def rehomed(self, repository: Repository) -> HandoverPlan:
+        """
+        :param repository: The repository the receiver's checkout is a clone of.
+        :return: This plan with *repository* as its default, every item that already
+            has a branch or pull request kept on the repository it is on, and no
+            tracking issue, whose number named one of the old default's issues; the plan
+            itself when *repository* is its default already.
+        """
+        if repository == self.manifest.default_repository:
+            return self
+        items = [
+            {
+                **item.content,
+                ManifestKey.REPOSITORY.key: self.manifest.repository_of(item).full_name,
+            }
+            if item.branch or item.pull_request_number is not None
+            else item.content
+            for item in self.manifest.items
+        ]
+        content = {
+            key: value
+            for key, value in self.manifest.content.items()
+            if key != ManifestKey.TRACKING_ISSUE.key
+        }
+        return HandoverPlan(
+            manifest=PlanManifest(
+                {
+                    **content,
+                    ManifestKey.DEFAULT_REPOSITORY.key: repository.full_name,
+                    ManifestKey.ITEMS.key: items,
+                }
+            ),
+            roadmap_text=self.roadmap_text,
+        )
+
     def item_anchor(self, *, reference_text: str) -> str:
         """
         :param reference_text: An item's id, or a ``depends_on`` entry of this plan.
@@ -124,18 +158,6 @@ class HandoverPlan:
         """
         reference = DependencyReference.from_text(reference_text)
         return f"{reference.plan_id or self.identifier}--{reference.item_identifier}"
-
-    @classmethod
-    def from_directory(cls, directory: Path) -> HandoverPlan:
-        """
-        :param directory: A plan's directory, holding its documents by their
-            :class:`PlanDocument` filenames.
-        :return: The plan the directory holds.
-        """
-        return cls(
-            manifest=PlanManifest.from_file(directory / PlanDocument.MANIFEST),
-            roadmap_text=(directory / PlanDocument.ROADMAP).read_text(),
-        )
 
 
 # %% the handover
@@ -265,64 +287,98 @@ class PlanHandover:
             ).read_fetched(),
         )
 
+    @property
+    def files(self) -> dict[PurePosixPath, str]:
+        """
+        Every file of the handover, its guide included, by its path within the
+        handover's directory.
+        """
+        files = {}
+        for plan in self.plans:
+            plan_directory = PurePosixPath(PlanHandoverLocation.PLANS) / plan.identifier
+            files[plan_directory / PlanDocument.MANIFEST] = plan.manifest.text
+            files[plan_directory / PlanDocument.ROADMAP] = plan.roadmap_text
+        for branch, note in self.progress_notes.items():
+            files[
+                PurePosixPath(PlanHandoverLocation.PULL_REQUEST_PROGRESS)
+                / self.progress_note_path(branch)
+            ] = note
+        if self.repository_rules.rules:
+            files[PurePosixPath(PlanHandoverLocation.REPOSITORY_RULES)] = (
+                self.repository_rules.render()
+            )
+        files[PurePosixPath(PlanHandoverLocation.GUIDE)] = HandoverGuide(
+            handover=self
+        ).render()
+        return files
+
+    @classmethod
+    def from_files(cls, files: Mapping[PurePosixPath, str]) -> PlanHandover:
+        """
+        :param files: The files of a handover, as :attr:`files` names them.
+        :return: The handover they hold.
+        """
+        plans_directory = PurePosixPath(PlanHandoverLocation.PLANS)
+        progress_directory = PurePosixPath(PlanHandoverLocation.PULL_REQUEST_PROGRESS)
+        plan_identifiers = sorted(
+            {
+                path.relative_to(plans_directory).parts[0]
+                for path in files
+                if path.is_relative_to(plans_directory)
+            }
+        )
+        return cls(
+            plans=tuple(
+                HandoverPlan(
+                    manifest=PlanManifest.from_yaml(
+                        files[plans_directory / identifier / PlanDocument.MANIFEST]
+                    ),
+                    roadmap_text=files[
+                        plans_directory / identifier / PlanDocument.ROADMAP
+                    ],
+                )
+                for identifier in plan_identifiers
+            ),
+            progress_notes={
+                path.relative_to(progress_directory).with_suffix("").as_posix(): note
+                for path, note in files.items()
+                if path.is_relative_to(progress_directory)
+            },
+            repository_rules=RepositoryRules.from_yaml(
+                files.get(PurePosixPath(PlanHandoverLocation.REPOSITORY_RULES), "")
+            ),
+        )
+
     @classmethod
     def from_directory(cls, directory: Path) -> PlanHandover:
         """
         :param directory: A directory :meth:`write` wrote.
         :return: The handover it holds.
         """
-        progress_directory = ProgressNotesDirectory(
-            directory / PlanHandoverLocation.PULL_REQUEST_PROGRESS
-        )
-        rules_file = directory / PlanHandoverLocation.REPOSITORY_RULES
-        return cls(
-            plans=tuple(
-                HandoverPlan.from_directory(plan_directory)
-                for plan_directory in sorted(
-                    (directory / PlanHandoverLocation.PLANS).iterdir()
-                )
-            ),
-            progress_notes={
-                branch: (
-                    progress_directory.path / cls.progress_note_path(branch)
-                ).read_text()
-                for branch in progress_directory.branches()
-            },
-            repository_rules=(
-                RepositoryRules.from_file(rules_file)
-                if rules_file.is_file()
-                else RepositoryRules()
-            ),
+        return cls.from_files(
+            {
+                PurePosixPath(path.relative_to(directory).as_posix()): path.read_text()
+                for path in directory.rglob("*")
+                if path.is_file()
+            }
         )
 
     def write(self, directory: Path) -> None:
         """
-        Write the handover and its guide into *directory*.
+        Write :attr:`files` into *directory*.
 
-        :param directory: Where to write it, created if missing.
+        :param directory: Where to write them, created if missing.
         """
-        for plan in self.plans:
-            plan.version.write(directory / PlanHandoverLocation.PLANS / plan.identifier)
-        for branch, note in self.progress_notes.items():
-            path = (
-                directory
-                / PlanHandoverLocation.PULL_REQUEST_PROGRESS
-                / self.progress_note_path(branch)
-            )
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(note)
-        if self.repository_rules.rules:
-            (directory / PlanHandoverLocation.REPOSITORY_RULES).write_text(
-                self.repository_rules.render()
-            )
-        (directory / PlanHandoverLocation.GUIDE).write_text(
-            HandoverGuide(handover=self).render()
-        )
+        for path, text in self.files.items():
+            target = directory / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text)
 
     def save_to_notes_branch(self, *, project_root: Path) -> None:
         """
-        Save every plan onto the notes branch after the plans it depends on, then the
-        progress notes and the repository's rules, merged into those already there.
+        Save every plan onto the notes branch after the plans it depends on, each
+        :meth:`HandoverPlan.rehomed` onto the checkout's repository, then the progress
+        notes and the repository's rules, merged into those already there.
 
         :param project_root: The repository whose notes branch receives the handover.
         :raises PlanAlreadyTrackedError: If the notes branch already holds one of the
@@ -342,9 +398,13 @@ class PlanHandover:
             ):
                 raise PlanAlreadyTrackedError(plan_identifier=plan.identifier)
         read_at = checkout.run_git("rev-parse", FetchedBranchReference.PERSONAL_NOTES)
+        checkout_repository = Repository.from_configured_remote(
+            GitCommandRunner(project_root)
+        )
         for plan in self.plans_in_saving_order:
             PlanSaveScript(plan_identifier=plan.identifier, read_at=read_at).run(
-                version=plan.version, project_root=project_root
+                version=plan.rehomed(checkout_repository).version,
+                project_root=project_root,
             )
         store = RepositoryRulesStore.from_project_root(project_root)
         changes = {

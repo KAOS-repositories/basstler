@@ -143,6 +143,18 @@ class Repository:
             return cls.parse(name)
         return cls.from_remote_url(git.run("remote", "get-url", remote))
 
+    @classmethod
+    def from_configured_remote(
+        cls, git: GitCommandRunner, remote: str = "origin"
+    ) -> Repository:
+        """
+        :param git: A checkout.
+        :param remote: One of its remotes.
+        :return: The repository the URL the checkout configures for *remote* names, not
+            git's rewrite of that URL.
+        """
+        return cls.from_remote_url(git.run("config", "--get", f"remote.{remote}.url"))
+
     @staticmethod
     def is_full_name(text: str) -> bool:
         """

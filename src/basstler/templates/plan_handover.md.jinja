@@ -4,12 +4,7 @@ This directory hands over {{ handover.plans | length }} plan{{ "s" if handover.p
 pull request's worth of work: what it does, where it stands, what it builds on and what
 is already known about it.
 
-| Plan | Items | Underway | Not started |
-| --- | --- | --- | --- |
-{% for plan in handover.plans_in_saving_order %}
-{% set statuses = plan.manifest.items | map(attribute="status") | list %}
-| [{{ plan.manifest.content.title }}](#plan-{{ plan.identifier }}) | {{ statuses | length }} | {{ statuses | select("equalto", status.IN_PROGRESS) | list | length }} | {{ statuses | select("equalto", status.NOT_STARTED) | list | length }} |
-{% endfor %}
+{% include "plan_handover_summary.md.jinja" %}
 
 ## What you need first
 
@@ -29,13 +24,17 @@ open it. What they decided is in each item's notes, its progress note and its pu
 
 basstler tracks the plans for you: dependency readiness, stacked pull requests, the plan
 site and the progress notes. Set it up once, as its `docs/SETUP.md` describes, in a
-checkout of the repository above. Then, from that checkout:
+checkout of your fork of the project, or of the repository above if you push to it.
+Then, from that checkout:
 
 ```bash
-basstler plan-handover import <this directory>
+basstler plan-handover import
 ```
 
-That saves every plan, progress note and rule onto your own personal-notes branch. Start an
+That finds the handover pull request open on the repository (or, given this directory,
+reads it from here). Plans whose repository is not your checkout's move onto it, with
+the items already underway still naming the repository their pull requests are on. It
+saves every plan, progress note and rule onto your own personal-notes branch. Start an
 item that has not started with `/plan-item-kickoff <plan-id> <item-id>`, and continue one
 that is underway with `/plan-item-resolve <plan-id> <item-id>`; both read everything below
 for you.

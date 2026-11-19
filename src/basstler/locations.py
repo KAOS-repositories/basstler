@@ -288,6 +288,18 @@ class PlanHandoverLocation(PathEnumeration):
     The template :attr:`GUIDE` is rendered from.
     """
 
+    PULL_REQUEST_DIRECTORY = Path("plan-handover")
+    """
+    Where a handover pull request's commit holds the handover, relative to its root.
+    """
+
+    PULL_REQUEST_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "plan_handover_pull_request.md.jinja"
+    )
+    """
+    The template a handover pull request's description is rendered from.
+    """
+
 
 class ReviewTriageLocation(PathEnumeration):
     """

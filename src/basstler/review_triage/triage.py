@@ -35,6 +35,7 @@ from basstler.review_triage.definition_moves import (
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
+from basstler.review_triage.rule_fixes import RuleFixComparison
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.rules import TriageRule
@@ -105,7 +106,7 @@ class PullRequestTriager:
     """
 
     judgments: tuple[FileJudgment, ...] = (
-        DefinitionMoveComparison(),
+        RuleFixComparison(DefinitionMoveComparison()),
         ProseComparison(),
         EmptyPackageAddition(),
         RenamedTextComparison(),

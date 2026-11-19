@@ -342,7 +342,12 @@ PACKAGE_MAP = PackageMap(
             Distribution.REVIEW_TRIAGE,
             Layer.COLLABORATION,
             ("review_triage",),
-            (Distribution.CORE, Distribution.GIT, Distribution.GITHUB),
+            (
+                Distribution.CORE,
+                Distribution.GIT,
+                Distribution.RULES,
+                Distribution.GITHUB,
+            ),
         ),
         DistributionDeclaration(
             Distribution.STACK,

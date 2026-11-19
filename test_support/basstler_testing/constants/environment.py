@@ -1,0 +1,232 @@
+"""
+Environment variables and file modes the scratch-environment suites share.
+"""
+
+from __future__ import annotations
+
+from enum import IntEnum, StrEnum
+
+from basstler.environment import EnvironmentVariable
+from basstler.locations import ClaudeCodeVariable
+
+
+class ScrubbedEnvironmentPrefix(StrEnum):
+    """
+    Variables a scratch run must not inherit, by the prefix of their name.
+
+    The session running this suite legitimately has all of them set, and every one of them
+    changes what a hook resolves - so a test asserting the default resolution has to be run
+    without them rather than around them.
+    """
+
+    PERSONAL_NOTES = "CLAUDE_PERSONAL_NOTES_"
+    """
+    The personal-notes remote, branch and path overrides.
+    """
+
+    PROJECT_DIRECTORY = "CLAUDE_PROJECT_DIR"
+    """
+    The project Claude Code names, which the hooks resolve their project from first.
+    """
+
+    ENVIRONMENT_FILE = "CLAUDE_ENV_FILE"
+    """
+    The file a SessionStart hook exports variables to the session through.
+    """
+
+    CLOUD_SESSION = ClaudeCodeVariable.REMOTE.value
+    """
+    Whether the run is in a Claude Code cloud session, which makes the hooks read GitHub.
+    """
+
+    BASSTLER = "BASSTLER_"
+    """
+    The plugin root, the package's home and anything else the configuration exports.
+    """
+
+    GIT_AUTHOR = "GIT_AUTHOR_"
+    """
+    The commit author git would otherwise take from the configuration.
+    """
+
+    GIT_COMMITTER = "GIT_COMMITTER_"
+    """
+    The committer git would otherwise take from the configuration.
+    """
+
+
+class ConfigurationVariable(StrEnum):
+    """
+    The variables of the shell configuration the tests read back, named once.
+    """
+
+    ENVIRONMENT_INTERPRETER = "BASSTLER_ENVIRONMENT_INTERPRETER"
+    """
+    The interpreter of the package's own environment.
+    """
+
+    PYTHON = "BASSTLER_PYTHON"
+    """
+    The interpreter every caller runs a module of the package with.
+    """
+
+    WORKSPACE = "BASSTLER_WORKSPACE"
+    """
+    The workspace the package is installed from: the checkout, or a release's clone.
+    """
+
+    INSTALL_COMMAND = "BASSTLER_INSTALL_COMMAND"
+    """
+    The array holding the command that installs the package into its environment.
+    """
+
+    INSTALLED_SOURCE_FILE = "BASSTLER_INSTALLED_SOURCE_FILE"
+    """
+    The file recording what the environment's package was installed from.
+    """
+
+    INSTALLED_PLUGIN_DIGEST_FILE = "BASSTLER_INSTALLED_PLUGIN_DIGEST_FILE"
+    """
+    The file recording the digest of the plugin the environment's package was installed
+    for.
+    """
+
+    INSTALL_LOCK = "BASSTLER_INSTALL_LOCK"
+    """
+    The directory held while the package's environment is installed into.
+    """
+
+    INSTALL_WAIT_SECONDS = "BASSTLER_INSTALL_WAIT_SECONDS"
+    """
+    How long a caller waits for an install another process holds the lock for.
+    """
+
+    PYTHON_REQUIREMENT = "BASSTLER_PYTHON_REQUIREMENT"
+    """
+    The interpreters the package supports.
+    """
+
+    PYTHON_VERSIONS = "BASSTLER_PYTHON_VERSIONS"
+    """
+    The supported Python versions, newest first, separated by spaces.
+    """
+
+    HOME = "BASSTLER_HOME"
+    """
+    Where the package's environment and its installed ``uv`` live.
+    """
+
+    REPOSITORY_URL = "BASSTLER_REPOSITORY_URL"
+    """
+    The repository an installed plugin's package is installed from.
+    """
+
+    UV_DIRECTORY = "BASSTLER_UV_DIRECTORY"
+    """
+    Where a session start installs ``uv`` when it finds neither ``uv`` nor a supported
+    interpreter.
+    """
+
+    INSTALL_MARKER = "BASSTLER_INSTALL_MARKER"
+    """
+    The file a session start holds its process id in while it installs the package.
+    """
+
+    PERSONAL_NOTES_REFERENCE = "PERSONAL_NOTES_REFERENCE"
+    """
+    The ref the personal-notes branch is fetched into.
+    """
+
+
+class SearchPathVariable(EnvironmentVariable):
+    """
+    The search-path variables a test sets or reads for a subprocess.
+    """
+
+    EXECUTABLE_SEARCH_PATH = "PATH"
+    """
+    The directories a shell searches for a command.
+    """
+
+    IMPORT_PATH = "PYTHONPATH"
+    """
+    The directories an interpreter searches for imports ahead of its installed packages.
+    """
+
+
+class FileMode(IntEnum):
+    """
+    The permission bits a test gives a file it writes.
+    """
+
+    EXECUTABLE = 0o755
+    """
+    Readable and runnable by everyone, writable by its owner.
+    """
+
+    READ_ONLY_DIRECTORY = 0o555
+    """
+    A directory everyone can list and enter but no one can add to or delete from.
+    """
+
+
+class InterpreterName(StrEnum):
+    """
+    The names the hooks run a Python interpreter by.
+    """
+
+    PYTHON3 = "python3"
+    """
+    The name the shell configuration falls back to before the package environment
+    exists, which a Windows virtual environment does not provide.
+    """
+
+
+class BashStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/bash.sh`` reads.
+    """
+
+    CALL_LOG = "STUB_BASH_CALL_LOG"
+    """
+    The file every script the stub is asked to run is recorded in, one per line.
+    """
+
+
+class ShellExitStatus(IntEnum):
+    """
+    Statuses bash itself exits with, rather than a script it runs.
+    """
+
+    COMMAND_NOT_FOUND = 127
+    """
+    A command bash was asked to run does not exist.
+    """
+
+
+class CheckSetupStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/check_setup_fails.sh`` reads.
+    """
+
+    ERROR = "STUB_CHECK_SETUP_ERROR"
+    """
+    What the stub prints to standard error.
+    """
+
+    STATUS = "STUB_CHECK_SETUP_STATUS"
+    """
+    The status the stub exits with.
+    """
+
+
+class PullRequestStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/merged_items_from_recording.py`` reads.
+    """
+
+    RECORDING = "STUB_PULL_REQUESTS"
+    """
+    The ``pr_data.json``-shaped file the pull requests are read from; unset, none exists,
+    and naming a missing file, every read gets no answer.
+    """

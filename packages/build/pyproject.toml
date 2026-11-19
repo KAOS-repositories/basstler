@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.24", "hatch-vcs>=0.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "basstler-build"
+description = "The hatch hook every basstler distribution is built with, pinning its basstler requirements to its own release."
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{name = "Abdelrhman Bassiouny", email = "bido.bassuny@gmail.com"}]
+dependencies = ["hatchling>=1.24", "packaging>=24"]
+dynamic = ["version"]
+
+[project.entry-points.hatch]
+basstler-sibling-pins = "basstler.build.sibling_pins"
+
+[project.urls]
+"Source" = "https://github.com/KAOS-repositories/basstler"
+"Bug Tracker" = "https://github.com/KAOS-repositories/basstler/issues"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0"
+raw-options = {root = "../.."}
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/basstler"]
+
+# What this distribution's tests need besides itself.
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-xdist",
+]

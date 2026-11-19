@@ -297,7 +297,7 @@ def test_the_command_leaves_the_upstream_of_a_forked_plan_repository_unread(
     plan_repository = Repository.parse(
         BRIEFED_MANIFEST.content[ManifestKey.DEFAULT_REPOSITORY.key]
     )
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     upstream = Repository.parse(fork["parent"]["full_name"])
     client = RecordedGitHubClient(
         responses={f"/{plan_repository.api_path}": fork},

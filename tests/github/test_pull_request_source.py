@@ -564,7 +564,7 @@ def test_github_source_records_the_upstream_pull_request_of_each_fork_branch():
 
 
 def test_github_source_reading_no_upstream_pull_requests_leaves_the_upstream_unread():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     upstream = Repository.parse(fork["parent"]["full_name"])
     client = RecordedGitHubClient(
         responses={f"/{PLAN_REPOSITORY.api_path}": fork},

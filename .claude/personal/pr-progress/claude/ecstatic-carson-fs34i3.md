@@ -1,12 +1,13 @@
 ## Plan
-- repository-field-once: every model redeclaring `repository: Repository` inherits `HasRepository`
-- `GitRepository` base in basstler.git; GitHub `Repository` subclasses it; `Remote` for a clone's remote
-- `Branch[RepositoryType]` with required `repository`; merge `RepositoryBranch`; `RemoteBranch` on `Remote`; `GitHubRemote.github_repository`
-- One wire-form reader/writer for `Branch`, repository from the read; REST ends from `repo`; `NewBranch` points at its commit
-- `PullRequestReference` same treatment and unified with GraphQL `PullRequest` models
+- Fold repository-field-once into branch-owns-its-repository; every branch and the GraphQL pull request hold their owner
 
 ## Done
-- Stacked on #215; draft PR #257; both items recorded in progress, repository-field-once folded in the plan
+- 16 models on `HasRepository` (38f504c5)
+- `GitRepository`/`Remote`/`GitHubRemote`, `Branch[RepositoryType]`, `RepositoryBranch` merged, wire forms, REST ends from `repo` (329bb0de)
+- Merge-workflow refresh from the base adapted (96577cea)
+- GraphQL `PullRequest` and snapshot hold `PullRequestReference` (3ab1af97)
+- Full suite 3126 passed at 3ab1af97; PR description current
 
 ## Next
-- Step 1, tests first
+- CI and merge probe on 3ab1af97 not read
+- User calls: merge stack settings' `Remote` with `GitHubRemote`; repository twice on `BranchReferenceRead`/`NewBranch`/`ForkFastForward`; REST pull request models' numbers

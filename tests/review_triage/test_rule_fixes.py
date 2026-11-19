@@ -108,6 +108,20 @@ def test_the_default_triage_proves_a_rule_s_fix_mechanical():
     )
 
 
+def test_the_fixes_of_two_rules_in_one_file_are_mechanical():
+    """
+    A file carrying the UTF-8 fix and the directory removal fix, with the import the
+    latter adds, is both fixes and nothing else.
+    """
+    tree_removal_fix = RuleFixChange[
+        rules.project.PortabilityRules.REMOVE_TREES_THROUGH_DIRECTORY_TREE.name
+    ]
+    change = FileSample.UTF_8_AND_TREE_REMOVAL_FIXES.change()
+    assert triaged(change) == MechanicalFile(
+        change, frozenset({UTF_8_RULE_FIX, tree_removal_fix})
+    )
+
+
 # %% what else the head may differ by
 
 

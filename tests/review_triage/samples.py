@@ -39,6 +39,7 @@ class FileSample(StrEnum):
     RELATIVE_IMPORT_MOVED = "relative-import-moved"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
     TEMPLATE_RENAMED = "template-renamed"
+    UTF_8_AND_TREE_REMOVAL_FIXES = "utf-8-and-tree-removal-fixes"
     UTF_8_FIX_AND_CODE_CHANGED = "utf-8-fix-and-code-changed"
     UTF_8_FIX_PARTIAL = "utf-8-fix-partial"
     UTF_8_FIX_REFORMATTED = "utf-8-fix-reformatted"

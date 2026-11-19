@@ -378,7 +378,9 @@ class PythonComparison(ContentComparison):
         self, base_text: str, head_text: str, context: JudgmentContext
     ) -> ChangeKinds | None:
         return self.source_changes(
-            PythonSource(base_text), PythonSource(head_text), context
+            PythonSource.from_text(base_text),
+            PythonSource.from_text(head_text),
+            context,
         )
 
     def changes(
@@ -390,8 +392,8 @@ class PythonComparison(ContentComparison):
         unless its code uses it and both versions star-import it from one module.
         """
         base_path = change.previous_path or change.path
-        base = PythonSource(change.base_text, base_path.parent.parts)
-        head = PythonSource(change.head_text, change.path.parent.parts)
+        base = PythonSource.from_text(change.base_text, base_path.parent.parts)
+        head = PythonSource.from_text(change.head_text, change.path.parent.parts)
         kinds = self.source_changes(base, head, context)
         if kinds is None or MechanicalChange.IMPORTS not in kinds:
             return kinds
@@ -564,6 +566,13 @@ class FileTriager:
                 change, tuple(dict.fromkeys(context.review_reasons))
             )
         return MechanicalFile(change, kinds)
+
+    def triage_each(self, changes: tuple[FileVersions, ...]) -> tuple[FileVerdict, ...]:
+        """
+        :param changes: Files the pull request changes.
+        :return: :meth:`triage` of each, in their order.
+        """
+        return tuple(self.triage(change) for change in changes)
 
     def member_renamed_changes(
         self, change: FileVersions

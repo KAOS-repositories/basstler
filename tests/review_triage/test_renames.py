@@ -140,6 +140,17 @@ def test_an_old_name_replaced_equally_often_by_two_new_names_is_not_paired():
     )
 
 
+def test_substitutions_seen_in_two_places_add_up():
+    """
+    Recording the substitutions seen elsewhere counts each as often as both saw it.
+    """
+    candidates = substitutions(("Pose", "First", 2), ("Line", "Ray", 1))
+    candidates.add_all(substitutions(("Pose", "First", 1), ("Pose", "Second", 1)))
+    assert candidates == substitutions(
+        ("Pose", "First", 3), ("Line", "Ray", 1), ("Pose", "Second", 1)
+    )
+
+
 # %% applying renames
 
 

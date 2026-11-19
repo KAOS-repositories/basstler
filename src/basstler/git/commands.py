@@ -233,6 +233,13 @@ class ObjectStream:
         """
         return ("cat-file", "--batch")
 
+    def __getstate__(self) -> dict[str, Path]:
+        """
+        :return: The stream without its running command, which a copy of it made in
+            another process starts anew.
+        """
+        return {"working_directory": self.working_directory}
+
     @cached_property
     def process(self) -> subprocess.Popen[bytes]:
         """

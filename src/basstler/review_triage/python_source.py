@@ -13,7 +13,7 @@ from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
-from functools import cached_property
+from functools import cache, cached_property
 
 from basstler.review_triage.name_scopes import STAR_IMPORT
 from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
@@ -245,7 +245,7 @@ class AnnotatedType:
                 return None
             return cls.from_annotation(sides[0], type_variables)
         if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
-            reference = PythonSource(annotation.value)
+            reference = PythonSource.from_text(annotation.value)
             if not (
                 reference.parses
                 and len(reference.tree.body) == 1
@@ -362,6 +362,13 @@ class IdentifierRenamer(ast.NodeVisitor):
     The renames to apply.
     """
 
+    @cached_property
+    def identifier_field_names(self) -> frozenset[str]:
+        """
+        The name of every :class:`IdentifierField`.
+        """
+        return frozenset(IdentifierField)
+
     def generic_visit(self, node: ast.AST) -> None:
         """
         Rename the identifiers *node* holds, then visit its children.
@@ -369,7 +376,7 @@ class IdentifierRenamer(ast.NodeVisitor):
         :param node: The node visited.
         """
         for field_name, value in ast.iter_fields(node):
-            if field_name not in IdentifierField:
+            if field_name not in self.identifier_field_names:
                 continue
             if isinstance(value, str):
                 setattr(node, field_name, self.renames.renamed_identifier(value))
@@ -529,6 +536,17 @@ class PythonSource:
     :meth:`code_tree` under each renames asked for so far.
     """
 
+    @classmethod
+    @cache
+    def from_text(cls, text: str, package: tuple[str, ...] = ()) -> PythonSource:
+        """
+        :param text: The file's content.
+        :param package: As :attr:`package`.
+        :return: The one source of that text in that package for the whole process,
+            so each part of it is read once however often it is asked for.
+        """
+        return cls(text, package)
+
     @cached_property
     def tree(self) -> ast.Module:
         """
@@ -556,7 +574,8 @@ class PythonSource:
         :raises SyntaxError: If the file is not valid Python.
         """
         tree = ast.parse(self.text)
-        IdentifierRenamer(renames).visit(tree)
+        if renames.renames:
+            IdentifierRenamer(renames).visit(tree)
         return tree
 
     def code_tree(self, renames: RenameMap) -> ast.Module:
@@ -920,4 +939,4 @@ class PythonSource:
             for number, text in enumerate(self.text.splitlines(), start=1)
             if number not in removed
         ]
-        return PythonSource("\n".join(kept) + "\n", self.package)
+        return PythonSource.from_text("\n".join(kept) + "\n", self.package)

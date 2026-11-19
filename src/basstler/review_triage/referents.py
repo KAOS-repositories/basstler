@@ -161,7 +161,7 @@ class ModuleNames:
         """
         components = tuple(module.split(DOTTED_NAME_SEPARATOR)) if module else ()
         package = components if is_package else components[:-1]
-        return cls(module, PythonSource(text, package))
+        return cls(module, PythonSource.from_text(text, package))
 
     def overrides_star_imports(
         self, name: str, star_imports: tuple[ast.ImportFrom, ...]
@@ -645,7 +645,7 @@ class MemberResolver:
         """
         unread = tuple(key for key in keys if key not in self.read_files)
         for key, text in self.modules.texts_of(unread).items():
-            source = PythonSource(text)
+            source = PythonSource.from_text(text)
             self.read_files[key] = source.tree if source.parses else None
 
     def file_classes(

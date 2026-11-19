@@ -96,6 +96,21 @@ def test_the_files_changed_only_mechanically_are_found(
     )
 
 
+def test_files_judged_in_other_processes_get_the_same_verdicts(
+    sample_changes: PullRequestChanges,
+):
+    """
+    Judging the files in several processes, a few at a time, gives each the verdict it
+    gets judged in this process.
+    """
+    parallel = replace(
+        PullRequestTriager(), workers=2, files_per_worker=1, files_per_batch=2
+    )
+    assert parallel.triage(sample_changes) == PullRequestTriager(workers=1).triage(
+        sample_changes
+    )
+
+
 def test_the_other_files_need_review(sample_changes: PullRequestChanges):
     """
     The added file and the file whose behaviour changed need review.

@@ -113,6 +113,23 @@ class DescriptionSample(StrEnum):
         return (DatasetLocation.REVIEW_TRIAGE / self).read_text()
 
 
+# %% scopes
+
+
+class ScopeSample(StrEnum):
+    """
+    A module whose scopes bind names in a particular way, by its file name.
+    """
+
+    GLOBAL_IN_NESTED_FUNCTION = "global-in-nested-function.py"
+
+    def read(self) -> str:
+        """
+        :return: The module's text.
+        """
+        return (DatasetLocation.REVIEW_TRIAGE / "scopes" / self).read_text()
+
+
 # %% the pull request
 
 

@@ -284,11 +284,25 @@ class ScopeReader:
                 self.bindings.extend(self.named_bindings(node))
         self.bindings.extend(
             (name, UnknownValue())
-            for root in code
-            for node in ast.walk(root)
+            for node in self.nested_statements(code)
             if isinstance(node, (ast.Global, ast.Nonlocal))
             for name in node.names
         )
+
+    @staticmethod
+    def nested_statements(code: list[ast.AST]) -> Iterator[ast.AST]:
+        """
+        :param code: Some code.
+        :return: Every node of it that is no expression, nested scopes included;
+            no expression holds a statement.
+        """
+        pending = list(code)
+        while pending:
+            node = pending.pop()
+            if isinstance(node, ast.expr):
+                continue
+            yield node
+            pending.extend(ast.iter_child_nodes(node))
 
     @staticmethod
     def scope_nodes(code: list[ast.AST]) -> Iterator[ast.AST]:

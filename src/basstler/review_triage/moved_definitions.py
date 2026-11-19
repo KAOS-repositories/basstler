@@ -62,7 +62,7 @@ class MovedDefinition:
         """
         The base version of the module it left.
         """
-        return PythonSource(self.source_text, self.source_path.parent.parts)
+        return PythonSource.from_text(self.source_text, self.source_path.parent.parts)
 
 
 # %% every moved definition

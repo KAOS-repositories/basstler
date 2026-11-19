@@ -237,6 +237,13 @@ class RenameMap:
     The renames, ordered by their old identifier.
     """
 
+    renamed_identifiers: dict[str, str] = field(
+        default_factory=dict, compare=False, repr=False
+    )
+    """
+    :meth:`renamed_identifier` of each identifier asked for so far.
+    """
+
     @classmethod
     def from_decisions(cls, decisions: Iterable[RenameDecisions]) -> RenameMap:
         """
@@ -333,6 +340,15 @@ class RenameMap:
         :return: It with its longest renamed module prefix replaced, then every
             other component that is renamed.
         """
+        if identifier not in self.renamed_identifiers:
+            self.renamed_identifiers[identifier] = self.identifier_renamed(identifier)
+        return self.renamed_identifiers[identifier]
+
+    def identifier_renamed(self, identifier: str) -> str:
+        """
+        :param identifier: A name, or a dotted path of names.
+        :return: :meth:`renamed_identifier`, worked out anew.
+        """
         prefix = ""
         for module in self.renamed_modules:
             if identifier == module or identifier.startswith(
@@ -413,6 +429,15 @@ class RenameCandidates:
         :param new: The identifier in its place in the head version.
         """
         self.replacements.setdefault(old, Counter())[new] += 1
+
+    def add_all(self, other: RenameCandidates) -> None:
+        """
+        Record every substitution *other* has seen, as often as it has seen it.
+
+        :param other: Substitutions seen elsewhere.
+        """
+        for old, news in other.replacements.items():
+            self.replacements.setdefault(old, Counter()).update(news)
 
     def consistent(self) -> dict[str, str]:
         """

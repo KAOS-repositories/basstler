@@ -664,7 +664,7 @@ class DefinitionIndex:
             dict.fromkeys(file for file in files if file not in self.by_file)
         )
         for file, text in self.search.texts_of(unread).items():
-            source = PythonSource(text)
+            source = PythonSource.from_text(text)
             if not source.parses:
                 self.unparsable_files.add(file)
             self.by_file[file] = (

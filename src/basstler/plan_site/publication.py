@@ -648,7 +648,7 @@ class PlanSitePublication:
         installed = default_tip and self.git.file_at(default_tip, workflow.location)
         if not installed:
             return None
-        notes_details = RepositoryDetails.from_json(
+        notes_details = RepositoryDetailsRead(notes_repository).parse(
             self.github.get(notes_repository.api_path)
         )
         proposal = self.write_merge_workflow(

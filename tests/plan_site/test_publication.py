@@ -1097,10 +1097,11 @@ def test_a_build_starting_workflow_keeps_to_the_actions_budget(
 def stale_merge_workflow(published: Publishing) -> Publishing:
     """:return: A notes repository whose default branch holds the merge workflow as an
     earlier release wrote it."""
-    GitHubRemoteBranch(
+    RemoteBranch(
+        GitHubRemote(
+            GitCommandRunner(published.checkout.project_root), RemoteName.ORIGIN
+        ),
         UPSTREAM_BASE,
-        GitCommandRunner(published.checkout.project_root),
-        RemoteName.ORIGIN,
     ).write(
         {
             MergeWorkflow.location.as_posix(): (

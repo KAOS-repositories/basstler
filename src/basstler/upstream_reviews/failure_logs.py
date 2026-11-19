@@ -5,6 +5,7 @@ quotes.
 
 from __future__ import annotations
 
+import posixpath
 import re
 from dataclasses import dataclass
 from enum import Enum, StrEnum
@@ -16,6 +17,13 @@ from basstler.github.pull_request_models import (
 )
 from basstler.github.repository import Repository
 from basstler.github.states import CheckOutcome
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 from basstler.upstream_reviews.clients import (
     JobLogReader,
 )
@@ -23,17 +31,51 @@ from basstler.upstream_reviews.clients import (
 # %% the log behind a failed check
 
 
+CONTROL_SEQUENCE_INTRODUCER = "\x1b["
+"""
+What starts a terminal escape sequence, such as one setting a colour.
+"""
+
+PARAMETER_SEPARATOR = ";"
+"""
+Separates the numbers a terminal escape sequence carries.
+"""
+
+UTC_DESIGNATOR = "Z"
+"""
+Ends a timestamp given in UTC.
+"""
+
+TIMESTAMP_SEPARATOR = " "
+"""
+Separates a runner's timestamp from the line's text.
+"""
+
+
 class LogFormatting(Enum):
     """
     What gets written around a log line's text that does not survive being quoted.
     """
 
-    TERMINAL_ESCAPE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+    TERMINAL_ESCAPE = RegularExpression.sequence(
+        CONTROL_SEQUENCE_INTRODUCER,
+        CharacterSet.any_of(
+            CharacterRange.ASCII_DIGIT, PARAMETER_SEPARATOR
+        ).zero_or_more(),
+        CharacterSet.any_of(
+            CharacterRange.ASCII_UPPERCASE_LETTER, CharacterRange.ASCII_LOWERCASE_LETTER
+        ),
+    ).compiled()
     """
     The colour a test runner writes around its own output.
     """
 
-    TIMESTAMP = re.compile(r"^\S+Z ")
+    TIMESTAMP = RegularExpression.sequence(
+        Anchor.LINE_START,
+        CharacterClass.NON_WHITESPACE.one_or_more(),
+        UTC_DESIGNATOR,
+        TIMESTAMP_SEPARATOR,
+    ).compiled()
     """
     The timestamp a runner writes in front of every line it records.
     """
@@ -66,6 +108,27 @@ class LogMarker(StrEnum):
     """
 
 
+class JobLinkSegment(StrEnum):
+    """
+    The fixed parts of the path a link to an Actions job takes.
+    """
+
+    ACTIONS = "actions"
+    """
+    The repository's Actions.
+    """
+
+    RUNS = "runs"
+    """
+    Precedes a workflow run's number.
+    """
+
+    JOB = "job"
+    """
+    Precedes the job's number within the run.
+    """
+
+
 @dataclass(frozen=True)
 class FailedJob:
     """
@@ -89,7 +152,18 @@ class FailedJob:
         """
         Where a check's own output link carries the job that produced it.
         """
-        return re.compile(rf"/actions/runs/\d+/job/(?P<{cls.identifier_group}>\d+)")
+        return RegularExpression.sequence(
+            posixpath.sep,
+            JobLinkSegment.ACTIONS,
+            posixpath.sep,
+            JobLinkSegment.RUNS,
+            posixpath.sep,
+            CharacterClass.DIGIT.one_or_more(),
+            posixpath.sep,
+            JobLinkSegment.JOB,
+            posixpath.sep,
+            CharacterClass.DIGIT.one_or_more().captured_as(cls.identifier_group),
+        ).compiled()
 
     @classmethod
     def behind(cls, result: CheckResult) -> FailedJob | None:

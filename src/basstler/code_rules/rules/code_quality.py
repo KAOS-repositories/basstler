@@ -9,10 +9,13 @@ from typing import override
 from basstler.class_property import classproperty
 from basstler.code_rules.address_building import HandBuiltAddressChecker
 from basstler.code_rules.docstring_presence import MissingDocstringChecker
+from basstler.code_rules.pattern_building import HandWrittenPatternChecker
 from basstler.code_rules.prose_length import ProseLengthChecker
 from basstler.code_rules.rule import CodeReference, Section
 from basstler.exceptions import DataclassException
 from basstler.locations import PathEnumeration
+from basstler import regular_expression
+from basstler.regular_expression import RegularExpression
 
 
 class CodeQualityRules(Section):
@@ -656,6 +659,21 @@ class StructuredDataRules(Section):
     NO_POSITIONAL_TUPLES = (
         "A tuple whose positions carry meaning becomes a dataclass, or an enum when"
         " the positions are a fixed set of alternatives rather than fields"
+    )
+
+    PATTERNS_FROM_NAMED_PARTS = (
+        "A regular expression reads as a sentence of what each part means: every "
+        "symbol that carries meaning - a shell operator, a delimiter, a group's name "
+        "- is an enum member or a named part, and the pattern is composed with "
+        f"{CodeReference(RegularExpression).path}"
+    )
+
+    NO_PATTERN_TEXT = (
+        "Never write a regular expression as pattern text: only "
+        f"{CodeReference(regular_expression).path} "
+        "calls the functions of `re` that take one",
+        (),
+        HandWrittenPatternChecker(),
     )
 
     LONG_LITERALS_IN_FILES = (

@@ -11,8 +11,15 @@ Values a program derives for itself belong beside the code that derives them, no
 
 from __future__ import annotations
 
-import re
 from enum import Enum, StrEnum
+
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 
 
 class GitHubExecutable(StrEnum):
@@ -33,23 +40,80 @@ class GitHubExecutable(StrEnum):
     """
 
 
+class MarkdownSyntax(StrEnum):
+    """
+    The Markdown a pull request description is read by.
+    """
+
+    HEADING_MARKER = "#"
+    """
+    Starts a heading, repeated once per level.
+    """
+
+    HEADING_SEPARATOR = " "
+    """
+    Separates a heading's markers from its text.
+    """
+
+    LINK_TARGET_START = "]("
+    """
+    Ends a link's text and opens the URL it points at.
+    """
+
+    LINK_TARGET_END = ")"
+    """
+    Closes the URL a link points at.
+    """
+
+
+SESSION_URL_PREFIX = "https://claude.ai/code/session_"
+"""
+What the link to a Claude Code session starts with, before the session's identifier.
+"""
+
+DEEPEST_HEADING_LEVEL = 6
+"""
+The most heading markers a Markdown heading may have.
+"""
+
+
 class DescriptionPattern(Enum):
     """
     What the tooling looks for in a pull request description.
     """
 
-    SESSION_LINK = re.compile(r"https://claude\.ai/code/session_[A-Za-z0-9_-]+")
+    SESSION_LINK = RegularExpression.sequence(
+        SESSION_URL_PREFIX,
+        CharacterSet.any_of(
+            CharacterRange.ASCII_UPPERCASE_LETTER,
+            CharacterRange.ASCII_LOWERCASE_LETTER,
+            CharacterRange.ASCII_DIGIT,
+            "_-",
+        ).one_or_more(),
+    ).compiled()
     """
     The session link a pull request description carries, which is the only channel for
     telling a branch's owner that their branch needs them.
     """
 
-    HEADING = re.compile(r"^#{1,6} ", re.MULTILINE)
+    HEADING = RegularExpression.sequence(
+        Anchor.LINE_START,
+        RegularExpression.sequence(MarkdownSyntax.HEADING_MARKER).repeated(
+            1, DEEPEST_HEADING_LEVEL
+        ),
+        MarkdownSyntax.HEADING_SEPARATOR,
+    ).compiled()
     """
     The start of a Markdown heading line, which ends the section before it.
     """
 
-    LINK_TARGET = re.compile(r"(?<=\]\()[^)\s]+(?=\))")
+    LINK_TARGET = RegularExpression.sequence(
+        RegularExpression.lookbehind(MarkdownSyntax.LINK_TARGET_START),
+        CharacterSet.any_except(
+            MarkdownSyntax.LINK_TARGET_END, CharacterClass.WHITESPACE
+        ).one_or_more(),
+        RegularExpression.lookahead(MarkdownSyntax.LINK_TARGET_END),
+    ).compiled()
     """
     The URL a Markdown hyperlink points at.
     """

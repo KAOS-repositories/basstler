@@ -13,27 +13,42 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
 
+from basstler.bash import ShellExpansionCharacter, ShellQuote, ShellToken
+from basstler.document_references import MODULE_SEPARATOR, PACKAGE_NAME
 from basstler.environment import GitBashVariable
 from basstler.locations import (
     ClaudeCodeVariable,
     PackageLocation,
     PluginLocation,
     ProjectLocation,
+    WorkflowLocation,
 )
 from basstler.package_layout import (
     PackageModule,
     command_line_entry_points,
     package_modules,
 )
+from basstler.regular_expression import (
+    ANY_CHARACTER_EXCEPT_LINE_BREAK,
+    Anchor,
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 from basstler.setup.steps import PersonalNotesSetting
+from basstler.upstream_reviews.action.branch import ReviewsWorkflowInput
+from basstler.yaml_syntax import YamlSyntax
 from basstler.shell_configuration import FetchedBranchReference
 
 from .constants.environment import ConfigurationVariable, SearchPathVariable
@@ -97,12 +112,87 @@ def run_as_a_caller(*arguments: str) -> subprocess.CompletedProcess[str]:
     ).run(*arguments)
 
 
-MODULE_VARIABLE = re.compile(r'^([A-Z_]+)="(basstler(?:\.[a-z_]+)+)"', re.MULTILINE)
+class ContractGroup(StrEnum):
+    """
+    The parts the contract's patterns read back.
+    """
+
+    VARIABLE = "variable"
+    """
+    A shell variable's name.
+    """
+
+    MODULE_PATH = "module_path"
+    """
+    The dotted path of a module of the package.
+    """
+
+    BRANCH_OR_TAG = "branch_or_tag"
+    """
+    The basstler branch or release tag a caller uses.
+    """
+
+
+class InstallCommand(StrEnum):
+    """
+    The commands that install a package and the dependencies its metadata declares.
+    """
+
+    PIP = "pip install"
+    """
+    pip's own install.
+    """
+
+    UV_PIP = "uv pip install"
+    """
+    uv's pip-compatible install.
+    """
+
+    UV_SYNC = "uv sync"
+    """
+    uv's install of a project's environment.
+    """
+
+
+MODULE_FLAG = "-m"
+"""
+Asks the interpreter to run a module.
+"""
+
+ASSIGNMENT = "="
+"""
+Assigns a shell variable its value.
+"""
+
+LOWERCASE_NAME = CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_")
+"""
+A character of a module's name.
+"""
+
+MODULE_VARIABLE = RegularExpression.sequence(
+    Anchor.LINE_START,
+    CharacterSet.any_of(CharacterRange.ASCII_UPPERCASE_LETTER, "_")
+    .one_or_more()
+    .captured_as(ContractGroup.VARIABLE),
+    ASSIGNMENT,
+    ShellQuote.DOUBLE_QUOTE,
+    RegularExpression.sequence(
+        PACKAGE_NAME,
+        RegularExpression.sequence(
+            MODULE_SEPARATOR, LOWERCASE_NAME.one_or_more()
+        ).one_or_more(),
+    ).captured_as(ContractGroup.MODULE_PATH),
+    ShellQuote.DOUBLE_QUOTE,
+).compiled()
 """
 One ``NAME="basstler.module"`` assignment in the shell configuration.
 """
 
-DEPENDENCY_INSTALL = re.compile(r"(pip install|uv pip install|uv sync)[^\n]*basstler")
+DEPENDENCY_INSTALL = RegularExpression.sequence(
+    RegularExpression.either(*InstallCommand),
+    ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+    PACKAGE_NAME,
+).compiled()
 """
 A step that installs this package, and with it the dependencies its metadata declares,
 however the caller spells the directory.
@@ -120,13 +210,26 @@ def invocation_of(module: PackageModule) -> re.Pattern[str]:
     """
     assignments = MODULE_VARIABLE.findall(SHELL_CONFIGURATION.read_text())
     variables = [
-        rf"\$\{{?{variable}\b"
+        RegularExpression.sequence(
+            RegularExpression.either(
+                ShellToken.BRACED_PARAMETER_START,
+                ShellExpansionCharacter.PARAMETER_EXPANSION,
+            ),
+            variable,
+            Anchor.WORD_BOUNDARY,
+        )
         for variable, path in assignments
         if path == module.command_path
     ]
-    return re.compile(
-        "|".join([rf"-m\s+{re.escape(module.command_path)}(?![\w.])", *variables])
+    module_run = RegularExpression.sequence(
+        MODULE_FLAG,
+        CharacterClass.WHITESPACE.one_or_more(),
+        module.command_path,
+        RegularExpression.negative_lookahead(
+            CharacterSet.any_of(CharacterClass.WORD_CHARACTER, MODULE_SEPARATOR)
+        ),
     )
+    return RegularExpression.either(module_run, *variables).compiled()
 
 
 def installs_the_dependencies(caller_source: str) -> bool:
@@ -203,7 +306,7 @@ def test_every_entry_point_answers_help_through_the_module_runner(
     on ``sys.path`` instead of the repository root, so its absolute imports of its
     siblings would not resolve. Every bash caller invokes them this way.
     """
-    result = run_as_a_caller("-m", module.command_path, "--help")
+    result = run_as_a_caller(MODULE_FLAG, module.command_path, "--help")
 
     assert result.returncode == 0, result.stderr
 
@@ -269,9 +372,29 @@ def test_every_workflow_that_runs_a_module_installs_the_dependencies_first():
     ] == []
 
 
-BASSTLER_REFERENCE = re.compile(
-    r"(?:basstler/\.github/workflows/upstream-reviews\.yml@|basstler_branch_or_tag: )(\S+)"
-)
+VERSION_SEPARATOR = "@"
+"""
+Separates a reusable workflow's path from the branch or tag it is used at.
+"""
+
+BASSTLER_REFERENCE = RegularExpression.sequence(
+    RegularExpression.either(
+        RegularExpression.sequence(
+            PACKAGE_NAME,
+            posixpath.sep,
+            WorkflowLocation.UPSTREAM_REVIEWS.as_posix(),
+            VERSION_SEPARATOR,
+        ),
+        RegularExpression.sequence(
+            ReviewsWorkflowInput.BRANCH_OR_TAG,
+            YamlSyntax.MAPPING_VALUE,
+            YamlSyntax.INDICATOR_SEPARATOR,
+        ),
+    ),
+    CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+        ContractGroup.BRANCH_OR_TAG
+    ),
+).compiled()
 """
 The ``@<branch or tag>`` the caller uses basstler's workflow at, or the
 ``basstler_branch_or_tag: <branch or tag>`` it installs the package at.
@@ -375,7 +498,16 @@ def test_git_bash_passes_a_notes_branch_argument_to_git_as_written(
 # %% what the skill documents name
 
 
-SHELL_VARIABLE_REFERENCE = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
+SHELL_VARIABLE_REFERENCE = RegularExpression.sequence(
+    ShellToken.BRACED_PARAMETER_START,
+    RegularExpression.sequence(
+        CharacterRange.ASCII_UPPERCASE_LETTER,
+        CharacterSet.any_of(
+            CharacterRange.ASCII_UPPERCASE_LETTER, CharacterRange.ASCII_DIGIT, "_"
+        ).zero_or_more(),
+    ).captured_as(ContractGroup.VARIABLE),
+    ShellToken.BRACED_PARAMETER_END,
+).compiled()
 """
 A ``${NAME}`` reference to an upper-case shell variable, as a skill document writes one.
 """

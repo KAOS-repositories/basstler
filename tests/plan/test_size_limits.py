@@ -5,7 +5,6 @@ progress notes are held to.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -406,10 +405,13 @@ def test_too_many_items_are_a_violation():
 
 
 def test_a_roadmap_of_entries_reads_each_entry_whole():
+    """
+    Every line opening an entry becomes one entry, with no line left over.
+    """
     text = DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text()
     roadmap = Roadmap.from_text(text)
     entry_lines = [
-        line for line in text.splitlines() if re.match(RoadmapLine.ENTRY, line)
+        line for line in text.splitlines() if RoadmapLine.ENTRY.matches(line)
     ]
     assert len(roadmap.entries) == len(entry_lines)
     assert roadmap.violations() == []

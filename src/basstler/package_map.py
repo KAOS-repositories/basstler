@@ -306,9 +306,11 @@ PACKAGE_MAP = PackageMap(
                 "package_layout",
                 "package_map",
                 "plugin_root",
+                "regular_expression",
                 "render_common",
                 "shell_configuration",
                 "standard_streams",
+                "yaml_syntax",
             ),
         ),
         DistributionDeclaration(

@@ -13,7 +13,7 @@ document reaches the model as the bare variable name: a document is cited by a l
 from __future__ import annotations
 
 import os
-import re
+import posixpath
 import subprocess
 from dataclasses import dataclass
 from enum import StrEnum
@@ -21,11 +21,33 @@ from pathlib import Path
 
 import pytest
 
-from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
+from basstler.bash import ShellExpansionCharacter, ShellQuote, ShellToken
+from basstler.locations import (
+    BasstlerVariable,
+    ClaudeCodeVariable,
+    PackageLocation,
+    PluginLocation,
+)
+from basstler.regular_expression import (
+    ANY_CHARACTER,
+    ANY_CHARACTER_EXCEPT_LINE_BREAK,
+    LINE_BREAK,
+    Anchor,
+    CharacterClass,
+    CharacterSet,
+    RegularExpression,
+)
+from basstler.render_common import HtmlSyntax
+from basstler.yaml_syntax import YamlSyntax
 
 from ..constants.paths import RepositoryLocation, SkillDirectory
+from ..constants.patterns import (
+    BRACED_SHELL_VARIABLE,
+    SHELL_NAME,
+    markdown_link_target,
+)
 
-LINK_TARGET = re.compile(r"\]\(([^)]+)\)")
+LINK_TARGET = markdown_link_target().compiled()
 """
 Matches the target of a markdown link, whatever it points at.
 """
@@ -51,7 +73,7 @@ def cited_shell_variables(document: Path) -> set[str]:
     :param document: A skill document.
     :return: The name of every shell variable the document references in braces.
     """
-    return set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", document.read_text()))
+    return set(BRACED_SHELL_VARIABLE.findall(document.read_text()))
 
 
 class SkillDocumentName(StrEnum):
@@ -66,12 +88,61 @@ class SkillDocumentName(StrEnum):
     """
 
 
-BASH_BLOCK = re.compile(r"^( *)```bash\n(.*?)^\1```", re.MULTILINE | re.DOTALL)
+class FencedBlock(StrEnum):
+    """
+    The text of a fenced Markdown block holding bash.
+    """
+
+    FENCE = "```"
+    """
+    Opens and closes the block.
+    """
+
+    BASH = "bash"
+    """
+    Names the block's language, after the opening fence.
+    """
+
+    INDENT = " "
+    """
+    One space of the indentation the fences share.
+    """
+
+
+class BashBlockGroup(StrEnum):
+    """
+    The parts of a fenced bash block read back from its match.
+    """
+
+    INDENTATION = "indentation"
+    """
+    The spaces before both fences.
+    """
+
+    COMMANDS = "commands"
+    """
+    The lines between the fences.
+    """
+
+
+BASH_BLOCK = RegularExpression.sequence(
+    Anchor.LINE_START,
+    RegularExpression.sequence(FencedBlock.INDENT)
+    .zero_or_more()
+    .captured_as(BashBlockGroup.INDENTATION),
+    FencedBlock.FENCE,
+    FencedBlock.BASH,
+    LINE_BREAK,
+    ANY_CHARACTER.zero_or_more(shortest=True).captured_as(BashBlockGroup.COMMANDS),
+    Anchor.LINE_START,
+    RegularExpression.backreference(BashBlockGroup.INDENTATION),
+    FencedBlock.FENCE,
+).compiled()
 """
 Matches a fenced bash block, indented or not, capturing its commands.
 """
 
-SHELL_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+SHELL_WORD = SHELL_NAME.compiled()
 """
 Matches every word that could name a shell function.
 """
@@ -82,7 +153,10 @@ def bash_blocks(document: Path) -> list[str]:
     :param document: A skill document.
     :return: The commands of every fenced bash block in it, one entry per block.
     """
-    return [match.group(2) for match in BASH_BLOCK.finditer(document.read_text())]
+    return [
+        match[BashBlockGroup.COMMANDS]
+        for match in BASH_BLOCK.finditer(document.read_text())
+    ]
 
 
 def skill_documents() -> list[Path]:
@@ -167,7 +241,7 @@ class ShellConfiguration:
         :return: Every variable and function of the configuration they use, apart from
             the plugin root the session's environment sets.
         """
-        variables = set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", commands))
+        variables = set(BRACED_SHELL_VARIABLE.findall(commands))
         used = (variables & self.variables.keys()) | (
             set(SHELL_WORD.findall(commands)) & self.functions
         )
@@ -265,7 +339,7 @@ def test_a_command_names_the_plugin_root_as_its_document_receives_it(
     cited = {
         variable
         for commands in bash_blocks(document)
-        for variable in re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", commands)
+        for variable in BRACED_SHELL_VARIABLE.findall(commands)
     }
     unavailable = (
         BasstlerVariable.PLUGIN_ROOT
@@ -329,7 +403,46 @@ def test_the_resolve_skill_links_the_pull_request_rules() -> None:
 
 # %% the interpreter a module is run with
 
-BARE_INTERPRETER_RUN = re.compile(r"(?<![\w/$\"{}-])python3? -m basstler\b")
+
+class InterpreterRun(StrEnum):
+    """
+    The words of a command running a module with an interpreter.
+    """
+
+    PYTHON = "python"
+    """
+    The interpreter's name.
+    """
+
+    MAJOR_VERSION = "3"
+    """
+    The version some systems name the interpreter with.
+    """
+
+    MODULE_FLAG = " -m "
+    """
+    Asks the interpreter to run a module.
+    """
+
+
+BARE_INTERPRETER_RUN = RegularExpression.sequence(
+    RegularExpression.negative_lookbehind(
+        CharacterSet.any_of(
+            CharacterClass.WORD_CHARACTER,
+            posixpath.sep,
+            ShellExpansionCharacter.PARAMETER_EXPANSION,
+            ShellQuote.DOUBLE_QUOTE,
+            ShellToken.BRACED_PARAMETER_START,
+            ShellToken.BRACED_PARAMETER_END,
+            "-",
+        )
+    ),
+    InterpreterRun.PYTHON,
+    RegularExpression.sequence(InterpreterRun.MAJOR_VERSION).optional(),
+    InterpreterRun.MODULE_FLAG,
+    PackageLocation.DIRECTORY.name,
+    Anchor.WORD_BOUNDARY,
+).compiled()
 """
 A module of the package run with whatever ``python``/``python3`` the path finds, which
 in a session is not the package's own environment.
@@ -346,7 +459,22 @@ def test_no_skill_document_runs_the_package_with_a_bare_interpreter(document: Pa
 
 # %% where a skill writes its files
 
-SYSTEM_TEMPORARY_PATH = re.compile(r"(?<![\w.~-])/tmp/")
+HOME_DIRECTORY = "~"
+"""
+What a path under the home directory starts with.
+"""
+
+SYSTEM_TEMPORARY_DIRECTORY = "/tmp/"
+"""
+The system's temporary directory, as a path prefix.
+"""
+
+SYSTEM_TEMPORARY_PATH = RegularExpression.sequence(
+    RegularExpression.negative_lookbehind(
+        CharacterSet.any_of(CharacterClass.WORD_CHARACTER, ".", HOME_DIRECTORY, "-")
+    ),
+    SYSTEM_TEMPORARY_DIRECTORY,
+).compiled()
 """
 A path under the system's temporary directory, which the ``Artifact`` tool refuses to
 publish from.
@@ -362,12 +490,34 @@ def test_no_skill_document_writes_under_the_system_temporary_directory(
 
 # %% the description claude.ai stores
 
-SKILL_DESCRIPTION = re.compile(r"\A---\n(?:.*\n)*?description: (.*)\n", re.MULTILINE)
+FRONT_MATTER_FENCE = "---"
+"""
+Opens and closes a document's YAML front matter.
+"""
+
+DESCRIPTION_KEY = "description"
+"""
+The front matter key holding a skill's description, which it is read back under.
+"""
+
+SKILL_DESCRIPTION = RegularExpression.sequence(
+    Anchor.TEXT_START,
+    FRONT_MATTER_FENCE,
+    LINE_BREAK,
+    RegularExpression.sequence(
+        ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(), LINE_BREAK
+    ).zero_or_more(shortest=True),
+    DESCRIPTION_KEY,
+    YamlSyntax.MAPPING_VALUE,
+    YamlSyntax.INDICATOR_SEPARATOR,
+    ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().captured_as(DESCRIPTION_KEY),
+    LINE_BREAK,
+).compiled()
 """
 Matches a skill's front matter up to its description, capturing the description.
 """
 
-ANGLE_BRACKET = re.compile(r"[<>]")
+ANGLE_BRACKET = CharacterSet.any_of(HtmlSyntax.TAG_START, HtmlSyntax.TAG_END).compiled()
 """
 Matches a character claude.ai strips from a skill's description as part of an XML tag.
 """
@@ -389,4 +539,4 @@ def test_no_skill_description_holds_an_angle_bracket(document: Path) -> None:
     """
     description = SKILL_DESCRIPTION.match(document.read_text())
 
-    assert ANGLE_BRACKET.findall(description.group(1)) == []
+    assert ANGLE_BRACKET.findall(description[DESCRIPTION_KEY]) == []

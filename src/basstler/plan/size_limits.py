@@ -5,7 +5,6 @@ The size limits every plan and every pull request's progress notes are held to o
 from __future__ import annotations
 
 import argparse
-import re
 import shutil
 import sys
 from abc import ABC, abstractmethod
@@ -15,6 +14,7 @@ from pathlib import Path
 
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.model import PlanDocument, PlanItem, PlanManifest
+from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -366,25 +366,59 @@ class MeasuredDocument(ABC):
             raise DocumentOverLimitError(self.limited_document, violations)
 
 
-class RoadmapLine(StrEnum):
+class RoadmapMarker(StrEnum):
+    """
+    What a roadmap line starts with, before its text.
+    """
+
+    TITLE = "# "
+    """
+    Opens the roadmap's heading.
+    """
+
+    ENTRY = "- "
+    """
+    Opens an entry, a Markdown list item.
+    """
+
+    CONTINUATION = "  "
+    """
+    Indents a further line of an entry, below its text.
+    """
+
+
+class RoadmapLine(Enum):
     """
     The shapes a roadmap line may take, as the pattern each one matches.
     """
 
-    TITLE = r"^# \S"
+    TITLE = RegularExpression.sequence(
+        Anchor.LINE_START, RoadmapMarker.TITLE, CharacterClass.NON_WHITESPACE
+    ).compiled()
     """
     The roadmap's one heading, its first line.
     """
 
-    ENTRY = r"^- \S"
+    ENTRY = RegularExpression.sequence(
+        Anchor.LINE_START, RoadmapMarker.ENTRY, CharacterClass.NON_WHITESPACE
+    ).compiled()
     """
     The first line of an entry.
     """
 
-    CONTINUATION = r"^  \S"
+    CONTINUATION = RegularExpression.sequence(
+        Anchor.LINE_START, RoadmapMarker.CONTINUATION, CharacterClass.NON_WHITESPACE
+    ).compiled()
     """
     A further line of the entry above it.
     """
+
+    def matches(self, line: str) -> bool:
+        """
+        :param line: One roadmap line.
+        :return: Whether the line has this shape.
+        """
+        return self.value.match(line) is not None
 
 
 @dataclass(frozen=True)
@@ -415,11 +449,11 @@ class Roadmap:
         for line_number, line in enumerate(text.splitlines(), start=1):
             if not line.strip():
                 continue
-            if line_number == 1 and re.match(RoadmapLine.TITLE, line):
+            if line_number == 1 and RoadmapLine.TITLE.matches(line):
                 continue
-            if re.match(RoadmapLine.ENTRY, line):
-                entries.append(line[2:].strip())
-            elif re.match(RoadmapLine.CONTINUATION, line) and entries:
+            if RoadmapLine.ENTRY.matches(line):
+                entries.append(line.removeprefix(RoadmapMarker.ENTRY).strip())
+            elif RoadmapLine.CONTINUATION.matches(line) and entries:
                 entries[-1] = f"{entries[-1]} {line.strip()}"
             else:
                 format_violations.append(RoadmapFormatViolation(line_number, line))

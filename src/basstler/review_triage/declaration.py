@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from enum import StrEnum
 
 import yaml
 from pydantic import Field
@@ -14,10 +15,28 @@ from pydantic import Field
 from basstler.class_property import classproperty
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.json_model import ValidatedJSONModel
+from basstler.regular_expression import (
+    ANY_CHARACTER,
+    LINE_BREAK,
+    CharacterClass,
+    RegularExpression,
+)
+from basstler.render_common import HtmlSyntax
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import Rename, RenameDecisions
 
 # %% the declaration
+
+
+class DeclarationGroup(StrEnum):
+    """
+    The part of a declaration comment read back from its match.
+    """
+
+    DECLARATION = "declaration"
+    """
+    The YAML below the comment's marker line.
+    """
 
 
 class TriageDeclaration(ValidatedJSONModel):
@@ -58,12 +77,27 @@ class TriageDeclaration(ValidatedJSONModel):
         :raises yaml.YAMLError: If the comment does not hold YAML.
         :raises pydantic.ValidationError: If the YAML does not have the model's shape.
         """
-        match = re.search(
-            rf"<!--\s*{re.escape(cls.marker)}\s*\n(.*?)-->", description, re.DOTALL
-        )
+        match = cls.comment_pattern().search(description)
         if match is None:
             return cls()
-        return cls.from_json(yaml.safe_load(match.group(1)) or {})
+        return cls.from_json(yaml.safe_load(match[DeclarationGroup.DECLARATION]) or {})
+
+    @classmethod
+    def comment_pattern(cls) -> re.Pattern[str]:
+        """
+        :return: The HTML comment holding the declaration, after its marker line.
+        """
+        return RegularExpression.sequence(
+            HtmlSyntax.COMMENT_START,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            cls.marker,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            LINE_BREAK,
+            ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
+                DeclarationGroup.DECLARATION
+            ),
+            HtmlSyntax.COMMENT_END,
+        ).compiled()
 
     @classmethod
     def from_arguments(

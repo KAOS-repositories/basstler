@@ -95,6 +95,19 @@ class PackageLocation(PathEnumeration):
     address within a repository.
     """
 
+    REGULAR_EXPRESSION_MODULE = DIRECTORY / "regular_expression.py"
+    """
+    The module that builds every regular expression from named parts.
+    """
+
+    UPSTREAM_REVIEWS_FETCH_PROGRAM = (
+        DIRECTORY / "upstream_reviews" / "helper" / "fetch.py"
+    )
+    """
+    The program an upstream reviews helper session runs from its source, which imports
+    nothing beyond the standard library.
+    """
+
     PACKAGE_MAP = DIRECTORY / "package_map.py"
     """
     The module declaring which distribution ships each of the package's modules.
@@ -564,6 +577,11 @@ class WorkflowLocation(PathEnumeration):
     """
     The workflow on a notes repository's default branch that starts :attr:`PLAN_SITE`
     whenever a pull request merges.
+    """
+
+    UPSTREAM_REVIEWS = DIRECTORY / "upstream-reviews.yml"
+    """
+    basstler's reusable workflow a project calls to read its upstream's reviews.
     """
 
     REVIEW_TRIAGE_MARK_VIEWED = DIRECTORY / "review-triage-mark-viewed.yml"

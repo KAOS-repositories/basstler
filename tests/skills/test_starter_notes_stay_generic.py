@@ -10,12 +10,20 @@ later is covered without this file being edited.
 
 from __future__ import annotations
 
-import re
+from enum import StrEnum
 
 import pytest
 
-from basstler.document_references import PACKAGE_NAME, CitedNames
+from basstler.document_references import COMMAND_PREFIX, PACKAGE_NAME, CitedNames
+from basstler.github.constants import MarkdownSyntax
 from basstler.locations import PluginLocation
+from basstler.regular_expression import (
+    ANY_CHARACTER_EXCEPT_LINE_BREAK,
+    Anchor,
+    CharacterClass,
+    CharacterSet,
+    RegularExpression,
+)
 
 from ..constants.paths import PersonalNotesPath, RepositoryLocation, SkillDirectory
 
@@ -35,7 +43,31 @@ PULL_REQUEST_RULES = (
 The pull-request rules as shipped, which hold only while a skill linking them runs.
 """
 
-SECTION_HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
+
+class SectionGroup(StrEnum):
+    """
+    The part of a section heading read back from its match.
+    """
+
+    TITLE = "title"
+    """
+    The heading's text.
+    """
+
+
+SECOND_LEVEL_HEADING_PREFIX = (
+    MarkdownSyntax.HEADING_MARKER * 2 + MarkdownSyntax.HEADING_SEPARATOR
+)
+"""
+What a second-level Markdown heading starts with.
+"""
+
+SECTION_HEADING = RegularExpression.sequence(
+    Anchor.LINE_START,
+    SECOND_LEVEL_HEADING_PREFIX,
+    ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(SectionGroup.TITLE),
+    Anchor.LINE_END,
+).compiled()
 """
 Matches a second-level markdown heading, capturing its title.
 """
@@ -63,9 +95,17 @@ def test_the_starter_notes_name_no_script_of_the_plugin():
 
 @pytest.mark.parametrize("skill_name", SKILL_NAMES)
 def test_the_starter_notes_invoke_no_skill_of_the_plugin(skill_name: str):
-    assert not re.search(
-        rf"(?<![\w-])/?{re.escape(skill_name)}(?![\w-])", STARTER_NOTES
+    """
+    A skill's name appears neither as a slash command nor bare.
+    """
+    name_boundary = CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "-")
+    skill_mention = RegularExpression.sequence(
+        RegularExpression.negative_lookbehind(name_boundary),
+        RegularExpression.sequence(COMMAND_PREFIX).optional(),
+        skill_name,
+        RegularExpression.negative_lookahead(name_boundary),
     )
+    assert skill_mention.compiled().search(STARTER_NOTES) is None
 
 
 def test_the_starter_notes_cite_no_module_of_the_package():

@@ -731,6 +731,27 @@ class AddressSnippet(PathEnumeration):
     """
 
 
+class PatternSnippet(PathEnumeration):
+    """
+    Python sources the pattern check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "regular-expressions"
+    """
+    The directory holding them.
+    """
+
+    HAND_WRITTEN = DIRECTORY / "hand-written-patterns.py"
+    """
+    A pattern compiled from text, and one passed as text to a function imported by name.
+    """
+
+    FROM_NAMED_PARTS = DIRECTORY / "patterns-from-named-parts.py"
+    """
+    A pattern built from a named part, annotated with the pattern type of ``re``.
+    """
+
+
 class ProseSnippet(PathEnumeration):
     """
     Python sources the prose length check measures.

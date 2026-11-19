@@ -129,6 +129,8 @@
 - A magic number becomes an enum member, a field default or a named constant; a bare literal that carries meaning is unreadable where it is used and unsearchable everywhere else
 - Data whose shape someone else controls - an API response, a configuration file - is parsed at the boundary into subclasses of `basstler.json_model.ValidatedJSONModel`, so it is validated once and the field names and the access path into the payload are written once. A subclass is a frozen pydantic dataclass already: give it no dataclass decorator, and pass the pydantic settings it needs as the class keyword `config`
 - A tuple whose positions carry meaning becomes a dataclass, or an enum when the positions are a fixed set of alternatives rather than fields
+- A regular expression reads as a sentence of what each part means: every symbol that carries meaning - a shell operator, a delimiter, a group's name - is an enum member or a named part, and the pattern is composed with `basstler.regular_expression.RegularExpression`
+- Never write a regular expression as pattern text: only `basstler.regular_expression` calls the functions of `re` that take one (checked by `basstler code-rules check`)
 - A long literal document - a query, a template, a schema - lives in a file of its own type and is read in, never embedded as a string
 - A path enum subclasses `basstler.locations.PathEnumeration`, so every path derived from a member is a plain `Path`; its members' `name` is the path's last component, so read the member name as `_name_`
 

@@ -5,7 +5,6 @@ draft state, and an override of its failed checks, show in the browser.
 
 from __future__ import annotations
 
-import re
 from http import HTTPStatus
 from pathlib import Path
 
@@ -21,6 +20,7 @@ from basstler.github.pull_request_state import (
 )
 from basstler.plan_site.__main__ import RepositorySite
 from basstler.plan_site.cards import PromotionAttribute
+from basstler.regular_expression import ANY_CHARACTER_EXCEPT_LINE_BREAK
 from basstler.stack.promotability import PromotionBlocker
 
 from ..constants.stack import StackLabel
@@ -28,6 +28,18 @@ from ..github.pull_request_api import api_pull_request
 from ..recorded_pull_requests import RecordedPullRequestSource
 from .first_plan import OPEN_PULL_REQUEST, PLAN_REPOSITORY
 from .test_live_states import answers_with, open_first_plan_page, open_item_card
+
+# %% what a link attribute holds
+
+LINK_PRESENT = ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().compiled()
+"""
+An attribute value that holds something, which a button with a link has.
+"""
+
+ANY_LINK = ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().compiled()
+"""
+Any attribute value at all, which only a button without the attribute lacks.
+"""
 
 # %% a plan in a fork
 
@@ -80,6 +92,9 @@ def test_a_pull_request_marked_ready_since_the_build_enables_its_button(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    The live state the page reads, not the built one, decides the button.
+    """
     site.build(tmp_path)
     ready = api_pull_request(OPEN_PULL_REQUEST, {PullRequestField.DRAFT: False})
 
@@ -87,7 +102,7 @@ def test_a_pull_request_marked_ready_since_the_build_enables_its_button(
 
     button = open_item_card(browser_page).locator(CONTRIBUTE)
     expect(button).not_to_have_class("promote-button promote-button-disabled")
-    expect(button).to_have_attribute("href", re.compile(".+"))
+    expect(button).to_have_attribute("href", LINK_PRESENT)
     expect(open_item_card(browser_page).locator(PROMOTION_REASON)).to_have_text("")
 
 
@@ -165,12 +180,15 @@ def test_overriding_failed_checks_enables_the_button(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    Failed checks are the only blocker, so overriding them leaves none.
+    """
     site.build(tmp_path)
     card = open_failing_item_card(browser_page, tmp_path)
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", re.compile(".+"))
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LINK_PRESENT)
     expect(card.locator(PROMOTION_REASON)).to_have_text("")
 
 
@@ -180,13 +198,16 @@ def test_withdrawing_the_override_disables_the_button_again(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    Unticking the override brings failed checks back as the blocker.
+    """
     site.build(tmp_path)
     card = open_failing_item_card(browser_page, tmp_path)
 
     card.locator(CHECKS_OVERRIDE).check()
     card.locator(CHECKS_OVERRIDE).uncheck()
 
-    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", re.compile(".*"))
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", ANY_LINK)
     expect(card.locator(PROMOTION_REASON)).to_have_text(
         PromotionBlocker.CHECKS_FAILED.value
     )
@@ -198,6 +219,9 @@ def test_overriding_failed_checks_leaves_every_other_blocker(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    The override lifts failed checks alone.
+    """
     a_failing_fork_source.records[OPEN_PULL_REQUEST].labels.append(
         StackLabel.NEEDS_RESOLUTION.value
     )
@@ -206,7 +230,7 @@ def test_overriding_failed_checks_leaves_every_other_blocker(
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", re.compile(".*"))
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", ANY_LINK)
     expect(card.locator(PROMOTION_REASON)).to_have_text(PromotionBlocker.WITHHELD.value)
 
 
@@ -232,6 +256,9 @@ def test_overriding_failed_checks_works_when_github_refuses_the_recheck(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    A recheck GitHub answers as not found still lets the override enable the button.
+    """
     site.build(tmp_path)
     open_first_plan_page(
         browser_page, tmp_path, answers_with((HTTPStatus.NOT_FOUND, {}))
@@ -240,4 +267,4 @@ def test_overriding_failed_checks_works_when_github_refuses_the_recheck(
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", re.compile(".+"))
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LINK_PRESENT)

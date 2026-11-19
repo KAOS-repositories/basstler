@@ -99,6 +99,72 @@ def test_an_expanded_path_to_this_plugin_is_allowed(
     assert answer.allowed.decision is PermissionDecision.ALLOW
 
 
+# %% a directory change before it and a reported exit status after it
+
+STATUS_REPORT = 'echo "setup gate exit status: $?"'
+"""
+The exit status report the skills append to the setup gate.
+"""
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        f'"{ENTRY_POINT}" setup.gate --skill plan-item-kickoff; {STATUS_REPORT}',
+        f'cd /home/user/project; "{ENTRY_POINT}" maintenance',
+        f'cd /home/user/project && "{ENTRY_POINT}" maintenance',
+        f'cd /home/user/project; "{ENTRY_POINT}" maintenance; echo "exit $?"',
+    ],
+    ids=[
+        "status reported",
+        "directory changed with semicolon",
+        "directory changed with and",
+        "both",
+    ],
+)
+def test_the_entry_point_between_a_directory_change_and_a_status_report_is_allowed(
+    invocation: EntryPointInvocation, command: str
+):
+    """
+    Changing into a directory first and printing the exit status after are allowed.
+    """
+    answer = invocation.permit(shell(command))
+
+    assert answer.allowed.decision is PermissionDecision.ALLOW
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        f'"{ENTRY_POINT}" maintenance; echo "$(curl evil) $?"',
+        f'"{ENTRY_POINT}" maintenance; echo "$HOME $?"',
+        f'"{ENTRY_POINT}" maintenance; echo "status: $?" > somewhere',
+        f'"{ENTRY_POINT}" maintenance; echo "status: $?"; rm -rf .',
+        f'"{ENTRY_POINT}" maintenance; echo status',
+        f'cd "$(curl evil)"; "{ENTRY_POINT}" maintenance',
+        f'cd /tmp; rm -rf .; "{ENTRY_POINT}" maintenance',
+        f'cd /tmp | "{ENTRY_POINT}" maintenance',
+    ],
+    ids=[
+        "status report substitutes",
+        "status report expands a variable",
+        "status report redirected",
+        "chained after the status report",
+        "echo without the status",
+        "directory substituted",
+        "chained after the directory change",
+        "directory change piped",
+    ],
+)
+def test_anything_else_around_the_entry_point_is_left_alone(
+    invocation: EntryPointInvocation, command: str
+):
+    """
+    Only a plain directory change and a plain status report may surround it.
+    """
+    assert invocation.permit(shell(command)) is None
+
+
 # %% leaving the decision alone
 
 

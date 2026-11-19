@@ -7,7 +7,6 @@ light core is released, with :attr:`AgentRule.checker` added.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -17,6 +16,11 @@ from typing import Any
 
 from basstler.class_property import classproperty
 from basstler.code_rules.checker import CodeRuleChecker
+from basstler.regular_expression import (
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 
 # %% code named by rules
 
@@ -102,8 +106,20 @@ class Section(AgentRule, Enum):
         The text of the section's heading: the words of the topic in sentence case,
         keeping acronyms such as ``CI`` in capitals.
         """
-        first_word, *other_words = re.findall(
-            r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*", cls.__name__.removesuffix("Rules")
+        acronym = RegularExpression.sequence(
+            CharacterRange.ASCII_UPPERCASE_LETTER.one_or_more(),
+            RegularExpression.negative_lookahead(CharacterRange.ASCII_LOWERCASE_LETTER),
+        )
+        capitalized_word = RegularExpression.sequence(
+            CharacterRange.ASCII_UPPERCASE_LETTER,
+            CharacterSet.any_of(
+                CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT
+            ).zero_or_more(),
+        )
+        first_word, *other_words = (
+            RegularExpression.either(acronym, capitalized_word)
+            .compiled()
+            .findall(cls.__name__.removesuffix("Rules"))
         )
         return " ".join(
             [

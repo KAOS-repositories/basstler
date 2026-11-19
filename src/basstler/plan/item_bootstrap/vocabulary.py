@@ -9,7 +9,16 @@ from enum import Enum, StrEnum
 
 from basstler.exit_codes import ExitCode
 from basstler.plan.model import (
+    PARAGRAPH_BREAK,
     ManifestKey,
+)
+from basstler.yaml_syntax import YamlSyntax
+from basstler.regular_expression import (
+    LINE_BREAK,
+    Anchor,
+    CharacterClass,
+    CharacterSet,
+    RegularExpression,
 )
 
 # %% shared vocabulary
@@ -46,30 +55,46 @@ class ManifestLinePattern(Enum):
     What the item-block patching looks for in a raw ``plan.yaml`` line.
     """
 
-    ITEM_START = re.compile(rf"^\s*- {re.escape(ManifestKey.IDENTIFIER.key)}:")
+    ITEM_START = RegularExpression.sequence(
+        Anchor.LINE_START,
+        CharacterClass.WHITESPACE.zero_or_more(),
+        YamlSyntax.SEQUENCE_ENTRY,
+        YamlSyntax.INDICATOR_SEPARATOR,
+        ManifestKey.IDENTIFIER.key,
+        YamlSyntax.MAPPING_VALUE,
+    ).compiled()
     """
     Matches the first line of an item block, which is always its ``id``.
     """
 
-    SEQUENCE_ENTRY = re.compile(r"^\s*-\s")
+    SEQUENCE_ENTRY = RegularExpression.sequence(
+        Anchor.LINE_START,
+        CharacterClass.WHITESPACE.zero_or_more(),
+        YamlSyntax.SEQUENCE_ENTRY,
+        CharacterClass.WHITESPACE,
+    ).compiled()
     """
     Matches one entry of a block sequence, which YAML lets sit either indented under its
     key or flush with it.
     """
 
-    TOP_LEVEL_KEY = re.compile(r"^[^\s-]")
+    TOP_LEVEL_KEY = RegularExpression.sequence(
+        Anchor.LINE_START,
+        CharacterSet.any_except(CharacterClass.WHITESPACE, YamlSyntax.SEQUENCE_ENTRY),
+    ).compiled()
     """
     Matches a top-level ``plan.yaml`` key, which is where the last item block ends. A
     sequence entry flush with its key starts with ``-`` and is not one.
     """
 
-    BLOCK_VALUE = re.compile(
-        r"^\s*("
-        + "|".join(
-            sorted(manifest_key.key for manifest_key in ManifestKey.block_styled())
-        )
-        + "):"
-    )
+    BLOCK_VALUE = RegularExpression.sequence(
+        Anchor.LINE_START,
+        CharacterClass.WHITESPACE.zero_or_more(),
+        RegularExpression.either(
+            *sorted(manifest_key.key for manifest_key in ManifestKey.block_styled())
+        ),
+        YamlSyntax.MAPPING_VALUE,
+    ).compiled()
     """
     Matches a key whose value may run over the following lines, derived from
     :meth:`ManifestKey.block_styled` rather than listing those keys a second time.
@@ -256,5 +281,5 @@ class BlockScalarStyle(StrEnum):
         What separates two paragraphs in a value of this style once it has been read.
         """
         if self is BlockScalarStyle.LITERAL:
-            return re.compile(r"\n\s*\n")
-        return re.compile(r"\n+")
+            return PARAGRAPH_BREAK
+        return RegularExpression.sequence(LINE_BREAK).one_or_more().compiled()

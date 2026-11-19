@@ -20,6 +20,14 @@ import yaml
 
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
+from basstler.yaml_syntax import YamlSyntax
+from basstler.regular_expression import (
+    ANY_CHARACTER_EXCEPT_LINE_BREAK,
+    LINE_BREAK,
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+)
 
 
 class ItemStatus(StrEnum):
@@ -116,6 +124,24 @@ class PlanDocument(StrEnum):
         return (ProjectLocation.PLANS / plan_identifier / self.value).as_posix()
 
 
+HYPHEN = "-"
+"""
+What joins the parts of a compound word.
+"""
+
+PARAGRAPH_BREAK = RegularExpression.sequence(
+    LINE_BREAK, CharacterClass.WHITESPACE.zero_or_more(), LINE_BREAK
+).compiled()
+"""
+A line holding nothing but whitespace, which separates two paragraphs.
+"""
+
+WRAPPED_HYPHEN = RegularExpression.sequence(HYPHEN, LINE_BREAK).compiled()
+"""
+A hyphen its author wrapped the line right after.
+"""
+
+
 class ItemLayout(StrEnum):
     """
     The whitespace and markers an item block in ``plan.yaml`` is laid out with.
@@ -194,8 +220,8 @@ class Prose:
         space.
         """
         return [
-            re.sub(r"-\n", "-", paragraph.strip())
-            for paragraph in re.split(r"\n\s*\n", self.text.strip())
+            WRAPPED_HYPHEN.sub(HYPHEN, paragraph.strip())
+            for paragraph in PARAGRAPH_BREAK.split(self.text.strip())
         ]
 
     def folded(self, indent: str) -> str:
@@ -502,7 +528,15 @@ class ManifestKey(KeySpecification, Enum):
         """
         Matches this key wherever it already appears in an item block.
         """
-        return re.compile(rf"^\s*{re.escape(self.key)}:\s*.*$")
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            self.key,
+            YamlSyntax.MAPPING_VALUE,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            Anchor.LINE_END,
+        ).compiled()
 
     @property
     def is_block_styled(self) -> bool:

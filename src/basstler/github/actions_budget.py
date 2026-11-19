@@ -38,9 +38,51 @@ from basstler.exceptions import (
 )
 from basstler.github.workflows import ActivityType, Job, TriggerEvent, Workflow
 from basstler.locations import PackageLocation, ProjectLocation
+from basstler.regular_expression import (
+    ANY_CHARACTER_EXCEPT_LINE_BREAK,
+    Anchor,
+    CharacterSet,
+    RegularExpression,
+)
 from basstler.render_common import create_template_environment
 
 # %% vocabulary
+
+
+class WorkflowExpression(StrEnum):
+    """
+    The parts of a workflow's ``if`` condition a budget reads.
+    """
+
+    REPOSITORY = "github.repository"
+    """
+    The repository the run is in, as ``owner/name``.
+    """
+
+    EQUALS = "=="
+    """
+    Compares two values.
+    """
+
+    STRING_QUOTE = "'"
+    """
+    Encloses a string.
+    """
+
+    AND = "&&"
+    """
+    Holds when both conditions hold.
+    """
+
+    OR = "||"
+    """
+    Holds when either condition holds.
+    """
+
+    SEPARATOR = " "
+    """
+    Separates an operator from what it operates on.
+    """
 
 
 class BudgetDefinition(StrEnum):
@@ -113,7 +155,24 @@ class WorkflowLimits:
         """
         A condition that runs a job in one named repository only, which a fork never is.
         """
-        return re.compile(r"^github\.repository == '[^']+'(?: && .*)?$")
+        further_condition = RegularExpression.sequence(
+            WorkflowExpression.SEPARATOR,
+            WorkflowExpression.AND,
+            WorkflowExpression.SEPARATOR,
+            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+        )
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            WorkflowExpression.REPOSITORY,
+            WorkflowExpression.SEPARATOR,
+            WorkflowExpression.EQUALS,
+            WorkflowExpression.SEPARATOR,
+            WorkflowExpression.STRING_QUOTE,
+            CharacterSet.any_except(WorkflowExpression.STRING_QUOTE).one_or_more(),
+            WorkflowExpression.STRING_QUOTE,
+            further_condition.optional(),
+            Anchor.LINE_END,
+        ).compiled()
 
     def skips_forks(self, job: Job) -> bool:
         """
@@ -125,7 +184,7 @@ class WorkflowLimits:
         if self.fork_push_condition in job.condition:
             return True
         return bool(self.repository_pin.match(job.condition)) and (
-            "||" not in job.condition
+            WorkflowExpression.OR not in job.condition
         )
 
     @classproperty

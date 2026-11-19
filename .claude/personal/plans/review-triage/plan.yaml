@@ -173,12 +173,11 @@ items:
   track: triage
   pull_request_number: 257
   session: https://claude.ai/code/session_01JxHGiNcmkURK6bxmkkdhe5
-  notes: 'Starts once #215 lands. `Branch` (basstler-git) holds a required repository: add
-    a git-layer repository base that GitHub''s `Repository` subclasses, and merge `RepositoryBranch`
-    into `Branch`. Payload models naming a branch (`PullRequestEnd`, `ExistingBranch`, the
-    default branches in `repository_details`) take it from the read, with one reader and writer
-    for a `Branch`''s wire form; give `PullRequestReference` the same treatment. Comes from
-    the review threads on #215 at 39d7cd13.
+  notes: 'Implemented on draft #257, stacked on #215''s branch, with repository-field-once
+    folded in: models on HasRepository, Branch[RepositoryType] with GitRepository and Remote,
+    RepositoryBranch merged, one WireForm per payload form, GraphQL PullRequest holding
+    PullRequestReference. Open for the user: merging the stack settings'' Remote with
+    GitHubRemote, and REST pull request models still carrying a bare number.
 
     '
   depends_on: []

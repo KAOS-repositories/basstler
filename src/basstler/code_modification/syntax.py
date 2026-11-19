@@ -1,14 +1,10 @@
 """
 What an expression or a call says, read from its concrete syntax tree without running
 it, and calls changed to pass other arguments.
-
-Modelled on krrood's node factory and name reading :cite:`krrood`, which were never
-released.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -68,14 +64,6 @@ class ExpressionSyntax:
             return ExpressionSyntax(expression.value).final_name
         return None
 
-    def is_name(self, name: str) -> bool:
-        """
-        :return: Whether the expression is the bare name *name*.
-        """
-        return (
-            isinstance(self.expression, libcst.Name) and self.expression.value == name
-        )
-
     @property
     def is_constant(self) -> bool:
         """
@@ -122,28 +110,6 @@ class CallSyntax:
     """
     The call.
     """
-
-    @cached_property
-    def keyword_arguments(self) -> Mapping[str, libcst.Arg]:
-        """
-        The arguments the call passes by keyword, by keyword.
-        """
-        return {
-            argument.keyword.value: argument
-            for argument in self.call.args
-            if argument.keyword is not None
-        }
-
-    @cached_property
-    def positional_arguments(self) -> tuple[libcst.Arg, ...]:
-        """
-        The arguments the call passes by position, ``*`` unpackings included.
-        """
-        return tuple(
-            argument
-            for argument in self.call.args
-            if argument.keyword is None and argument.star != "**"
-        )
 
     @staticmethod
     def keyword_argument(keyword: str, value: libcst.BaseExpression) -> libcst.Arg:
@@ -202,4 +168,42 @@ class CallSyntax:
                 ),
             ),
             libcst.Call,
+        )
+
+
+# %% bodies
+
+
+@dataclass(frozen=True)
+class BodySyntax:
+    """
+    The statements of a module, class or function body, one by one.
+    """
+
+    body: libcst.Module | libcst.BaseSuite
+    """
+    The module, or the suite of a class or function.
+    """
+
+    @cached_property
+    def statements(self) -> tuple[libcst.CSTNode, ...]:
+        """
+        The statements of the body in order, those sharing a line included.
+        """
+        statements: list[libcst.CSTNode] = []
+        for statement in self.body.body:
+            if isinstance(statement, libcst.SimpleStatementLine):
+                statements.extend(statement.body)
+                continue
+            statements.append(statement)
+        return tuple(statements)
+
+    @staticmethod
+    def is_string(statement: libcst.CSTNode) -> bool:
+        """
+        :return: Whether *statement* is a bare string literal.
+        """
+        return (
+            isinstance(statement, libcst.Expr)
+            and ExpressionSyntax(statement.value).literal_text is not None
         )

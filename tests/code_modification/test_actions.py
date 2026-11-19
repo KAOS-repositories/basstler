@@ -10,11 +10,12 @@ import pytest
 
 from basstler.code_modification.actions import (
     ActionPlan,
+    ImportInsertion,
     NodeReplacement,
-    StatementRemoval,
 )
 from basstler.code_modification.exceptions import ActionTargetMissingError
 from basstler.code_modification.positions import PositionedModule
+from basstler.text_file import TextFile
 
 from ..constants.paths import CodeModificationSnippet
 
@@ -27,9 +28,7 @@ def two_calls() -> PositionedModule:
     :return: The module calling :func:`abs` and then :func:`round`.
     """
     return PositionedModule(
-        libcst.parse_module(
-            CodeModificationSnippet.TWO_CALLS.read_text(encoding="utf-8")
-        )
+        libcst.parse_module(TextFile(CodeModificationSnippet.TWO_CALLS).read())
     )
 
 
@@ -56,8 +55,9 @@ def test_a_replacement_changes_only_its_node(two_calls):
     """
     applied = first_call_replacement(two_calls, "float").apply(two_calls.module)
 
-    assert applied.module.code == (
-        CodeModificationSnippet.TWO_CALLS_FIRST_RENAMED.read_text(encoding="utf-8")
+    assert (
+        applied.module.code
+        == TextFile(CodeModificationSnippet.TWO_CALLS_FIRST_RENAMED).read()
     )
 
 
@@ -99,22 +99,64 @@ def test_a_plan_is_undone_in_the_reverse_order_it_was_applied(two_calls):
     assert applied.inverse.apply(applied.module).module.code == two_calls.module.code
 
 
-# %% statements
+# %% inserting an import
 
 
-def test_removing_a_statement_the_module_lacks_raises():
+@pytest.fixture
+def imports() -> libcst.Module:
     """
-    A removal made for another module is refused instead of removing what is there.
+    :return: The module that imports :mod:`os`.
+    """
+    return libcst.parse_module(TextFile(CodeModificationSnippet.IMPORTS).read())
+
+
+def test_an_import_follows_the_last_import_of_the_module(imports):
+    """
+    The statement is inserted right after the module's last import.
+    """
+    applied = ImportInsertion(TextFile).apply(imports)
+
+    assert applied.module.code == (
+        TextFile(CodeModificationSnippet.IMPORTS_WITH_TEXT_FILE).read()
+    )
+
+
+def test_an_import_joins_the_import_of_its_module():
+    """
+    A class of a module the module imports from is added to that import.
     """
     module = libcst.parse_module(
-        CodeModificationSnippet.IMPORTS_BEFORE_CODE.read_text(encoding="utf-8")
+        TextFile(CodeModificationSnippet.IMPORTS_OF_TEXT_FILE_MODULE).read()
     )
-    other = libcst.parse_module(
-        CodeModificationSnippet.IMPORTS_WITH_BASH.read_text(encoding="utf-8")
-    )
-    statement = other.body[2]
 
-    with pytest.raises(ActionTargetMissingError):
-        StatementRemoval(PositionedModule(other).positions[statement], statement).apply(
-            module
-        )
+    assert ImportInsertion(TextFile).apply(module).module.code == (
+        TextFile(CodeModificationSnippet.IMPORTS_OF_TEXT_FILE_MODULE_MERGED).read()
+    )
+
+
+def test_an_import_the_module_already_has_is_not_inserted_again(imports):
+    """
+    Inserting an import twice changes the module once.
+    """
+    once = ImportInsertion(TextFile).apply(imports).module
+
+    assert ImportInsertion(TextFile).apply(once).module.code == once.code
+
+
+def test_the_inverse_of_an_import_restores_the_module_exactly(imports):
+    """
+    Undoing the insertion gives back the source it was applied to.
+    """
+    applied = ImportInsertion(TextFile).apply(imports)
+
+    assert applied.inverse.apply(applied.module).module.code == imports.code
+
+
+def test_the_inverse_of_an_import_already_there_changes_nothing(imports):
+    """
+    An insertion that changed nothing is undone by changing nothing.
+    """
+    once = ImportInsertion(TextFile).apply(imports).module
+    applied = ImportInsertion(TextFile).apply(once)
+
+    assert applied.inverse.apply(applied.module).module.code == once.code

@@ -22,6 +22,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import BasstlerRepositoryLocation
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -160,10 +161,7 @@ class MergedPullRequest(ValidatedJSONModel):
             a pull request reached by several commits appears more than once.
         :return: Each pull request once.
         """
-        parsed = (
-            cls.from_json(entry)
-            for entry in json.loads(path.read_text(encoding="utf-8"))
-        )
+        parsed = (cls.from_json(entry) for entry in json.loads(TextFile(path).read()))
         return tuple({pull.number: pull for pull in parsed}.values())
 
     @property

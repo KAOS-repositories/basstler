@@ -32,8 +32,10 @@ Commands (run from the repo root; ``--help`` on any of them for its flags)::
 The last five exist so the steps most easily got wrong by hand are computed rather than recalled: a
 label write replaces the whole set, a push whose two sides name different branches moves the wrong
 commits, an unencoded compare URL loses its prefill, and a landed parent is decided by git ancestry
-rather than by pull-request state. ``landed`` reports only - GitHub closes a pull request as merged
-by itself once its head is contained in its base, so nothing here has to close one.
+rather than by pull-request state. ``landed`` reports only. GitHub closes a pull request as merged
+by itself only when its head reaches its own base: the upstream's merge does that for a pull
+request based on the base branch, never for one stacked on another branch, which stays open
+and is what ``landed`` lists.
 """
 
 from __future__ import annotations
@@ -46,13 +48,13 @@ from cyclopts import App, Parameter, Token
 
 from basstler.exit_codes import CommandFailure, ExitCode, StackExitCode
 from basstler.git.commands import GitCommandRunner
+from basstler.github.repository import Repository
+from basstler.locations import RepositoryStateLocation
 from basstler.stack.commit_move import (
     CommitMoveAction,
     CommitMoveChecks,
     ProposedCommitMove,
 )
-from basstler.github.repository import Repository
-from basstler.locations import RepositoryStateLocation
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.merge_probe import MergeProbe
 from basstler.stack.model import Stack

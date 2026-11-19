@@ -17,6 +17,7 @@ from basstler.directory_tree import DirectoryTree
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.model import PlanDocument, PlanItem, PlanManifest
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -540,7 +541,7 @@ class ProgressNotes(MeasuredDocument):
         :param path: A file holding a pull request's progress notes.
         :return: The notes it holds.
         """
-        return cls(path.read_text(encoding="utf-8"))
+        return cls(TextFile(path).read())
 
     @property
     def limited_document(self) -> LimitedDocument:
@@ -612,7 +613,7 @@ class PlanFiles:
         )
         plan = Plan(
             manifest,
-            Roadmap.from_text(self.roadmap.read_text(encoding="utf-8")),
+            Roadmap.from_text(TextFile(self.roadmap).read()),
             stored,
         )
         plan.check()

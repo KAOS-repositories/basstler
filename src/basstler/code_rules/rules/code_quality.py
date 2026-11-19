@@ -179,6 +179,13 @@ class AssertionsRules(Section):
         "hardcoding a second copy. Tests are independent of each other"
     )
 
+    SHOW_WHAT_IS_MATCHED = (
+        "A test that asserts where something was found, or which inputs match, "
+        "shows the code itself next to the expectation: assert the source text "
+        "found, never bare line numbers or positions in a file the reader has to "
+        "open, and list each input beside whether it should match"
+    )
+
 
 class ExternalServicesAndCIRules(Section):
     """

@@ -21,6 +21,7 @@ from basstler.render_common import TemplatePage
 from basstler.review_triage.declaration import TriageDeclaration
 from basstler.review_triage.triage import TriageOutcome
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -100,7 +101,7 @@ class ViewedMarking(TriageOutput):
     """
 
     def publish(self, outcome: TriageOutcome) -> None:
-        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text(encoding="utf-8")
+        document = TextFile(ReviewTriageLocation.MARK_FILE_AS_VIEWED).read()
         for file in outcome.mechanical_files:
             variables = ViewedFile(
                 outcome.pull_request.node_identifier, file.change.path

@@ -24,6 +24,7 @@ from basstler.exceptions import (
 from basstler.git.commands import GitCommandRunner
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
+from basstler.text_file import TextFile
 
 NO_HOOKS_DIRECTORY = "/dev/null"
 """
@@ -233,7 +234,7 @@ class NotesFileChanges(NotesEdit):
                 target.unlink(missing_ok=True)
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
+            TextFile(target).write(content)
 
 
 @dataclass(frozen=True)

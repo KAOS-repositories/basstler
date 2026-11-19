@@ -12,8 +12,8 @@ from pathlib import Path
 from cyclopts import App
 
 from basstler.exit_codes import ExitCode
-from basstler.github.client import GitHubRestClient
 from basstler.git.commands import GitCommandRunner
+from basstler.github.client import GitHubRestClient
 from basstler.github.pull_request_changes import PullRequestChangesReader
 from basstler.github.repository import Repository
 from basstler.locations import PackageLocation

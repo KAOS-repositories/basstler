@@ -21,8 +21,30 @@ from basstler.environment import GitVariable
 from basstler.exceptions import ExternalCallFailed, UnresolvableReferenceError
 from basstler.exit_codes import CommandFailure, StackExitCode
 from basstler.locations import CommitScratchFile, RepositoryStateLocation
+from basstler.text_file import TextFile
 
 # %% running git
+
+
+class RemoteSubcommand(StrEnum):
+    """
+    The git subcommands that talk to a remote, whose failure may be the remote's.
+    """
+
+    FETCH = "fetch"
+    """
+    Updates references from a remote.
+    """
+
+    LIST_REMOTE = "ls-remote"
+    """
+    Lists the references a remote has.
+    """
+
+    PUSH = "push"
+    """
+    Publishes references to a remote.
+    """
 
 
 @dataclass
@@ -45,6 +67,14 @@ class GitCommandFailed(CommandFailure, ExternalCallFailed):
     def call(self) -> str:
         """:return: The git command line, as invoked."""
         return f"git {' '.join(self.arguments)}"
+
+    def suggest_correction(self) -> str:
+        if self.arguments and self.arguments[0] in set(RemoteSubcommand):
+            return (
+                f"check that the remote is reachable with this session's credential, "
+                f"then run `{self.call}` to see it succeed"
+            )
+        return f"run `{self.call}` in the checkout to see why git refused it"
 
 
 @dataclass(frozen=True)
@@ -315,7 +345,7 @@ class GitCommandRunner:
             self.run("read-tree", parent or "--empty", environment=index)
             blob_file = Path(scratch) / CommitScratchFile.BLOB
             for path, text in files.items():
-                blob_file.write_text(text + "\n", encoding="utf-8")
+                TextFile(blob_file).write(text + "\n")
                 blob = self.run("hash-object", "-w", str(blob_file))
                 self.run(
                     "update-index",

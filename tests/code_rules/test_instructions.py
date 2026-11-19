@@ -107,6 +107,7 @@ def test_the_checkers_are_those_of_the_checked_rules():
         DocumentationRules.SHORT_DOCSTRINGS.checker,
         PackageAndPluginRules.IMPORT_ONLY_LISTED_PACKAGES.checker,
         PortabilityRules.START_BASH_THROUGH_ITS_LOCATOR.checker,
+        PortabilityRules.READ_AND_WRITE_TEXT_THROUGH_TEXT_FILE.checker,
         PortabilityRules.READ_AND_WRITE_TEXT_AS_UTF_8.checker,
         PortabilityRules.REMOVE_TREES_THROUGH_DIRECTORY_TREE.checker,
     )

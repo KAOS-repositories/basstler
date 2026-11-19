@@ -8,7 +8,7 @@ and holding only a workflow calling basstler's reusable one and a README. Each r
 pushes a branch of its own from it, under :attr:`ActionBranch.REQUESTS`, carrying the
 request; the push starts a run, which commits its recording onto that branch and
 deletes requests no read waits for any more. The session replays the recording through
-:class:`UpstreamPullRequestReader` and deletes its branch.
+:class:`UpstreamPullRequestReader`.
 
 Commands::
 
@@ -30,11 +30,11 @@ import sys
 from enum import StrEnum
 from pathlib import Path
 
-from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandFailed, GitCommandRunner
-from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import GitHubRestClient
+from basstler.github.exceptions import GraphQLErrorsReturned, UpstreamReadError
+from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.repository import Repository
 from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.action.branch import (
@@ -48,7 +48,6 @@ from basstler.upstream_reviews.action.read import (
 )
 from basstler.upstream_reviews.action.run import ActionRun
 from basstler.upstream_reviews.exceptions import ActionUnavailable
-from basstler.github.exceptions import UpstreamReadError
 from basstler.upstream_reviews.request import (
     UpstreamReadRequest,
 )

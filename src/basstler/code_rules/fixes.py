@@ -18,9 +18,9 @@ from basstler.code_modification.actions import (
     Action,
     ActionPlan,
     AppliedAction,
+    ImportInsertion,
     NodeReplacement,
 )
-from basstler.code_modification.imports import ImportedName
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_modification.specification import Specification
@@ -81,11 +81,11 @@ class CodeFix[SpecificationType: Specification](ABC):
         """
 
     @classproperty
-    def imports(cls) -> tuple[ImportedName, ...]:
+    def required_import(cls) -> type | None:
         """
-        The names every replacement of the fix uses, which the fixed module has to import.
+        The class the replacement needs imported in the module, if any.
         """
-        return ()
+        return None
 
     @abstractmethod
     def replacement(self, specification: SpecificationType) -> libcst.CSTNode:
@@ -169,7 +169,16 @@ class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
         :return: Every place in it that breaks the rule.
         """
 
+    def checks(self, path: Path) -> bool:
+        """
+        :param path: A Python source file.
+        :return: Whether the checker reports places in it.
+        """
+        return True
+
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+        if not self.checks(path):
+            return
         module = PositionedModule(PythonSourceFile(path).parse())
         for specification in self.specifications_of_module(module):
             yield CodeRuleViolation(
@@ -227,24 +236,25 @@ class SourceFixer:
     def fix_module(self, source_file: PythonSourceFile) -> AppliedAction:
         """
         :param source_file: The module to fix, which is left as it is.
-        :return: The module with every place the checkers report fixed and the imports
-            the fixes need added, and the action restoring the module exactly.
+        :return: The module with every place the checkers report fixed, and the action
+            restoring the module exactly.
         :raises FixDoesNotConvergeError: If a round of fixes leaves at least as many
             places breaking a rule as there were before it.
         """
         inverses: list[Action] = []
-        imports: list[ImportedName] = []
+        imports: list[type] = []
         module = source_file.parse()
-        places = self.places(module)
+        places = self.places(module, source_file.path)
         while places:
-            chosen = self.chosen_places(places)
-            applied = ActionPlan(
-                tuple(place.action for place in reversed(chosen))
-            ).apply(module)
+            imports.extend(
+                place.fix.required_import
+                for place in places
+                if place.fix.required_import is not None
+            )
+            applied = self.round_of_fixes(places).apply(module)
             module = applied.module
             inverses.append(applied.inverse)
-            imports.extend(name for place in chosen for name in place.fix.imports)
-            remaining = self.places(module)
+            remaining = self.places(module, source_file.path)
             if len(remaining) >= len(places):
                 raise FixDoesNotConvergeError(
                     tuple(
@@ -252,28 +262,33 @@ class SourceFixer:
                     )
                 )
             places = remaining
-        for name in dict.fromkeys(imports):
-            applied = name.addition_to(module).apply(module)
+        for imported in dict.fromkeys(imports):
+            applied = ImportInsertion(imported).apply(module)
             module = applied.module
             inverses.append(applied.inverse)
         return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))
 
-    def places(self, module: libcst.Module) -> list[FixablePlace]:
+    def places(self, module: libcst.Module, path: Path) -> list[FixablePlace]:
         """
-        :return: Every place in *module* that one of :attr:`checkers` reports.
+        :param path: The file *module* was parsed from.
+        :return: Every place in *module* that one of :attr:`checkers` that checks *path*
+            reports.
         """
         positioned = PositionedModule(module)
         return [
             FixablePlace(checker.fix, specification)
             for checker in self.checkers
+            if checker.checks(path)
             for specification in checker.specifications_of_module(positioned)
         ]
 
     @staticmethod
-    def chosen_places(places: list[FixablePlace]) -> list[FixablePlace]:
+    def round_of_fixes(places: list[FixablePlace]) -> ActionPlan:
         """
         :param places: Places breaking a rule, some perhaps inside others.
-        :return: Every place that overlaps no place before it, outermost first.
+        :return: The fixes of every place that overlaps no place before it, outermost
+            first, applied from the end of the module towards its start so that each
+            leaves the location of the next unchanged.
         """
         chosen: list[FixablePlace] = []
         for place in sorted(
@@ -289,4 +304,4 @@ class SourceFixer:
                 place.specification.overlaps(other.specification) for other in chosen
             ):
                 chosen.append(place)
-        return chosen
+        return ActionPlan(tuple(place.action for place in reversed(chosen)))

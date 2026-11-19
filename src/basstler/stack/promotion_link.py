@@ -9,12 +9,12 @@ from enum import StrEnum
 from urllib.parse import quote
 
 from basstler.class_property import classproperty
-from basstler.locations import ProjectLocation
 from basstler.github.repository import Repository
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     MissingUpstreamRepositoryError,
 )
+from basstler.locations import ProjectLocation
 from basstler.stack.exceptions import PromotionLinkTooLongError
 from basstler.stack.settings import Configuration
 from basstler.standard_streams import StandardStreamHandler

@@ -5,7 +5,6 @@ and fixes those that have an environment to locate it in.
 
 from __future__ import annotations
 
-import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -13,13 +12,15 @@ from pathlib import Path
 from typing import override
 
 import libcst
-from libcst.metadata import CodeRange
+from libcst import matchers
 
 from basstler.bash import Bash, LocatedProgram
 from basstler.class_property import classproperty
-from basstler.code_modification.imports import ImportedName
+from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_modification.specification import Specification
+from basstler.code_modification.syntax import ExpressionSyntax
 from basstler.code_rules.checker import CodeRuleViolation
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.fixes import (
@@ -28,8 +29,9 @@ from basstler.code_rules.fixes import (
     CodeFix,
     FixableChecker,
 )
+from basstler.code_rules.subprocess_function import SubprocessFunction
 
-# %% the places
+# %% the patterns
 
 
 class ScopedName(StrEnum):
@@ -43,28 +45,83 @@ class ScopedName(StrEnum):
     """
 
 
-@dataclass(frozen=True)
-class BashCommandLine(Specification):
+class BashCommandLine(CodePattern):
     """
-    A command line starting with bash given by its name, in a function that has the
-    environment to locate bash in.
+    A list or tuple whose first element is the bare name of bash.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        bash_first = [
+            matchers.Element(
+                value=matchers.MatchIfTrue(
+                    lambda value: (
+                        ExpressionSyntax(value).literal_text == LocatedProgram.BASH
+                    )
+                )
+            ),
+            matchers.ZeroOrMore(),
+        ]
+        return matchers.OneOf(
+            matchers.List(elements=bash_first), matchers.Tuple(elements=bash_first)
+        )
+
+
+class BashStarted(CodePattern):
+    """
+    A call to a :mod:`subprocess` function, or a return, that hands on a command line
+    starting bash by its name; the command line is saved as :attr:`saved_command_name`.
+    """
+
+    @classproperty
+    def saved_command_name(cls) -> str:
+        """
+        The name the command line is saved under when the pattern matches.
+        """
+        return "command"
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        command = matchers.SaveMatchedNode(
+            BashCommandLine.matcher, cls.saved_command_name
+        )
+        return matchers.OneOf(
+            matchers.Return(value=command),
+            matchers.Call(
+                func=SubprocessFunction.matcher,
+                args=[matchers.Arg(value=command), matchers.ZeroOrMore()],
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class StartedCommandLine:
+    """
+    A command line starting bash by its name, and whether the function around it can
+    locate bash.
     """
 
     node: libcst.List | libcst.Tuple
     """
-    The command line, whose first element is the name of bash.
+    The command line.
+    """
+
+    has_environment: bool
+    """
+    Whether the innermost function around the command line has an environment
+    parameter.
     """
 
 
 @dataclass
 class CommandLineFinder(libcst.CSTVisitor):
     """
-    Collects the command lines a module runs or returns that start with bash by name.
+    Collects the command lines a module starts bash by its name with.
     """
 
-    found: list[tuple[libcst.List | libcst.Tuple, bool]] = field(default_factory=list)
+    found: list[StartedCommandLine] = field(default_factory=list)
     """
-    Each command line, and whether the function around it has an environment parameter.
+    Each command line, in the order of the source.
     """
 
     scopes: list[bool] = field(default_factory=list)
@@ -96,41 +153,35 @@ class CommandLineFinder(libcst.CSTVisitor):
         """
         Collect the command line a :mod:`subprocess` function runs.
         """
-        function = node.func
-        if (
-            isinstance(function, libcst.Attribute)
-            and isinstance(function.value, libcst.Name)
-            and function.value.value == subprocess.__name__
-            and node.args
-        ):
-            self.collect(node.args[0].value)
+        self.collect(node)
 
     @override
     def visit_Return(self, node: libcst.Return) -> None:
         """
         Collect the command line a function returns.
         """
-        if node.value is not None:
-            self.collect(node.value)
+        self.collect(node)
 
-    def collect(self, command: libcst.BaseExpression) -> None:
+    def collect(self, node: libcst.CSTNode) -> None:
         """
-        Keep *command* when it is a list or tuple starting with the name of bash.
+        Keep the command line *node* hands on when it starts bash by its name.
         """
-        if not isinstance(command, libcst.List | libcst.Tuple) or not command.elements:
+        captures = BashStarted.captures(node)
+        if captures is None:
             return
-        first = command.elements[0].value
-        if (
-            isinstance(first, libcst.SimpleString)
-            and first.evaluated_value == LocatedProgram.BASH
-        ):
-            self.found.append((command, bool(self.scopes) and self.scopes[-1]))
+        command = captures[BashStarted.saved_command_name]
+        self.found.append(
+            StartedCommandLine(
+                libcst.ensure_type(command, libcst.List | libcst.Tuple),
+                bool(self.scopes) and self.scopes[-1],
+            )
+        )
 
 
 # %% the fix
 
 
-class LocatedBashFix(CodeFix[BashCommandLine]):
+class LocatedBashFix(CodeFix[Specification]):
     """
     Builds the command line with the bash :class:`basstler.bash.Bash` locates in the
     environment.
@@ -146,20 +197,21 @@ class LocatedBashFix(CodeFix[BashCommandLine]):
         )
 
     @classproperty
-    def imports(cls) -> tuple[ImportedName, ...]:
+    def required_import(cls) -> type:
         """
-        The import of :class:`basstler.bash.Bash`.
+        :class:`~basstler.bash.Bash`.
         """
-        return (ImportedName(Bash.__module__, Bash.__name__),)
+        return Bash
 
-    def replacement(self, specification: BashCommandLine) -> libcst.CSTNode:
+    def replacement(self, specification: Specification) -> libcst.Call:
+        command = libcst.ensure_type(specification.node, libcst.List | libcst.Tuple)
         arguments = [
             libcst.Arg(
                 value=element.value,
                 star="*" if isinstance(element, libcst.StarredElement) else "",
                 comma=element.comma,
             )
-            for element in specification.node.elements[1:]
+            for element in command.elements[1:]
         ]
         locate = libcst.Call(
             func=libcst.Attribute(
@@ -180,14 +232,14 @@ class LocatedBashFix(CodeFix[BashCommandLine]):
 
 
 @dataclass(frozen=True)
-class BashByNameChecker(FixableChecker[BashCommandLine]):
+class BashByNameChecker(FixableChecker[Specification]):
     """
     Finds command lines whose program is bash given by its name, which Windows resolves
     to WSL's launcher: those passed to a :mod:`subprocess` function, and those returned.
     """
 
     @classproperty
-    def fix(cls) -> CodeFix[BashCommandLine]:
+    def fix(cls) -> CodeFix[Specification]:
         return LocatedBashFix()
 
     @classproperty
@@ -201,20 +253,23 @@ class BashByNameChecker(FixableChecker[BashCommandLine]):
     @override
     def specifications_of_module(
         self, module: PositionedModule
-    ) -> Iterator[BashCommandLine]:
-        for command, location in self.command_lines(module, with_environment=True):
-            yield BashCommandLine(location, command)
+    ) -> Iterator[Specification]:
+        for command in self.command_lines(module):
+            if command.has_environment:
+                yield Specification(module.positions[command.node], command.node)
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         """
-        Also report the command lines with no environment in scope, which no fix covers.
-
-        See :meth:`basstler.code_rules.fixes.FixableChecker.violations`.
+        Also reports the command lines with no environment in scope, which no fix
+        covers; :meth:`FixableChecker.violations`.
         """
         yield from super().violations(path)
-        module = PositionedModule(libcst.parse_module(path.read_text(encoding="utf-8")))
-        for _, location in self.command_lines(module, with_environment=False):
+        module = PositionedModule(PythonSourceFile(path).parse())
+        for command in self.command_lines(module):
+            if command.has_environment:
+                continue
+            location = module.positions[command.node]
             yield CodeRuleViolation(
                 path,
                 location.start.line,
@@ -224,17 +279,10 @@ class BashByNameChecker(FixableChecker[BashCommandLine]):
             )
 
     @staticmethod
-    def command_lines(
-        module: PositionedModule, with_environment: bool
-    ) -> Iterator[tuple[libcst.List | libcst.Tuple, CodeRange]]:
+    def command_lines(module: PositionedModule) -> list[StartedCommandLine]:
         """
-        :param with_environment: Whether to find the command lines in a function with
-            an environment parameter, or those with none.
-        :return: The command lines of *module* starting with the name of bash, with
-            their code ranges.
+        :return: The command lines of *module* starting bash by its name.
         """
         finder = CommandLineFinder()
         module.module.visit(finder)
-        for command, has_environment in finder.found:
-            if has_environment == with_environment:
-                yield command, module.positions[command]
+        return finder.found

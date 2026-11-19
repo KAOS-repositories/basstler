@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -29,6 +30,8 @@ from basstler.github.repository_attachment import RepositoryAttachment
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, WorkflowLocation
+from basstler.maintenance.landed_closing import ClosedAsLanded
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUp
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.workflows import PlanSiteSecret
@@ -194,6 +197,20 @@ class BuildStart:
         )
 
 
+# %% after a maintenance pass
+
+
+@dataclass(frozen=True)
+class PlanSiteRebuild(LandedClosingFollowUp):
+    """
+    Starts the plan site's build once a maintenance pass has closed pull requests, so the
+    site shows their items done.
+    """
+
+    def respond_to_closing(self, closed: Sequence[ClosedAsLanded]) -> str | None:
+        return start_recorded_build()
+
+
 # %% the command line
 
 app = App(help=__doc__)
@@ -216,6 +233,19 @@ def recorded_site() -> SiteRepository | None:
     )
 
 
+def start_recorded_build() -> str | None:
+    """
+    Start the build of the plan site this clone's notes branch records.
+
+    :return: What happened, ``None`` when no plan site lists this repository.
+    """
+    site = recorded_site()
+    if site is None:
+        return None
+    attempt = BuildStart.attempt(site, GitHubRestClient())
+    return attempt.describe(ClaudeCodeVariable.REMOTE.is_true())
+
+
 @app.default
 def start_build() -> StackExitCode:
     """
@@ -223,12 +253,11 @@ def start_build() -> StackExitCode:
 
     :return: :attr:`StackExitCode.SUCCESS`, also when the build did not start: the notes were saved either way.
     """
-    site = recorded_site()
-    if site is None:
+    outcome = start_recorded_build()
+    if outcome is None:
         logger.info("No plan site lists this repository, so no build was started.")
         return StackExitCode.SUCCESS
-    attempt = BuildStart.attempt(site, GitHubRestClient())
-    logger.info(attempt.describe(ClaudeCodeVariable.REMOTE.is_true()))
+    logger.info(outcome)
     return StackExitCode.SUCCESS
 
 

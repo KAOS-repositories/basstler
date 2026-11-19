@@ -17,6 +17,7 @@ from basstler.github.pull_request_state import LivePullRequests, LiveState
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.plan.model import PlanDocument, PlanManifest
 from basstler.plan.structure import Item, Plan
+from basstler.text_file import TextFile
 
 # %% references
 
@@ -312,9 +313,7 @@ class PlanDirectory:
         manifest_path = self.directory / plan_id / PlanDocument.MANIFEST
         if not manifest_path.is_file():
             return None
-        plan = Plan.from_mapping(
-            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        )
+        plan = Plan.from_mapping(yaml.safe_load(TextFile(manifest_path).read()))
         self.plans_by_id[plan_id] = plan
         return plan
 
@@ -338,6 +337,24 @@ class PlanDirectory:
                         )
                     )
         return references
+
+    def items_naming(self, reference_text: str) -> list[str]:
+        """
+        :param reference_text: An item, as ``<plan-id>/<item-id>``.
+        :return: Every item of a plan in the directory whose ``depends_on`` holds it, as
+            ``<plan-id>/<item-id>``.
+        """
+        naming = []
+        for manifest_path in sorted(self.directory.glob(f"*/{PlanDocument.MANIFEST}")):
+            manifest = PlanManifest.from_file(manifest_path)
+            if not isinstance(manifest.content, dict):
+                continue
+            naming.extend(
+                DependencyReference(item.identifier, manifest.identifier).text
+                for item in manifest.items
+                if reference_text in item.dependencies
+            )
+        return naming
 
     def resolve(self, reference: DependencyReference) -> Dependency:
         """

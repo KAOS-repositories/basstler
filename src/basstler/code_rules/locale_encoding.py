@@ -5,18 +5,18 @@ cannot encode most of Unicode, and fixes it to UTF-8.
 
 from __future__ import annotations
 
-import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import override
 
 import libcst
-from libcst.metadata import CodeRange
+from libcst import matchers
 
 from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.syntax import CallSyntax, ConstantName, ExpressionSyntax
+from basstler.code_modification.patterns import CodePattern
+from basstler.code_modification.syntax import ConstantName, ExpressionSyntax
 from basstler.code_rules.fixes import (
     BehaviourDeclaration,
     BehaviourEffect,
@@ -25,6 +25,7 @@ from basstler.code_rules.fixes import (
     FixableChecker,
     KeywordArgumentFix,
 )
+from basstler.code_rules.subprocess_function import SubprocessFunction
 from basstler.text_file import UTF_8
 
 # %% what reads and writes text
@@ -106,6 +107,177 @@ class UTF8EncodingFix(KeywordArgumentFix):
         return libcst.SimpleString(f'"{UTF_8}"')
 
 
+# %% the patterns
+
+
+class NonEncodingArgument(CodePattern):
+    """
+    An argument that is not the encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Arg:
+        return matchers.Arg(
+            keyword=matchers.DoesNotMatch(matchers.Name(TextKeyword.ENCODING))
+        )
+
+
+class ConstantPositionalArgument(CodePattern):
+    """
+    A positional argument given a constant, as :meth:`pathlib.Path.open` is.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Arg:
+        return matchers.Arg(
+            keyword=None,
+            star="",
+            value=matchers.MatchIfTrue(
+                lambda value: ExpressionSyntax(value).is_constant
+            ),
+        )
+
+
+class SubprocessTextSwitch(CodePattern):
+    """
+    A call of a :mod:`subprocess` function that decodes its output in the locale
+    encoding; the ``text=True`` argument is saved as :attr:`saved_switch_name`.
+    """
+
+    @classproperty
+    def saved_switch_name(cls) -> str:
+        """
+        The name the ``text=True`` argument is saved under when the pattern matches.
+        """
+        return "switch"
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        others = matchers.ZeroOrMore(NonEncodingArgument.matcher)
+        switch = matchers.Arg(
+            keyword=matchers.Name(TextKeyword.TEXT),
+            value=matchers.Name(ConstantName.TRUE),
+        )
+        return matchers.Call(
+            func=SubprocessFunction.matcher,
+            args=[
+                others,
+                matchers.SaveMatchedNode(switch, cls.saved_switch_name),
+                others,
+            ],
+        )
+
+
+class BinaryModeArgument(CodePattern):
+    """
+    An argument that names a binary mode.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Arg:
+        return matchers.Arg(
+            value=matchers.MatchIfTrue(
+                lambda value: (
+                    BINARY_MODE in (ExpressionSyntax(value).literal_text or "")
+                )
+            )
+        )
+
+
+class BinaryOpen(CodePattern):
+    """
+    A call of :func:`open` or :meth:`pathlib.Path.open` that names a binary mode: by
+    keyword, as the second argument of the function or the first of the method.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        binary = BinaryModeArgument.matcher
+        by_keyword = matchers.Arg(
+            keyword=matchers.Name(TextKeyword.MODE), value=binary.value
+        )
+        function = matchers.Name(TextFunction.OPEN)
+        method = matchers.Attribute(attr=matchers.Name(TextFunction.OPEN))
+        return matchers.OneOf(
+            matchers.Call(
+                func=matchers.OneOf(function, method),
+                args=[matchers.ZeroOrMore(), by_keyword, matchers.ZeroOrMore()],
+            ),
+            matchers.Call(
+                func=function,
+                args=[matchers.Arg(keyword=None), binary, matchers.ZeroOrMore()],
+            ),
+            matchers.Call(func=method, args=[binary, matchers.ZeroOrMore()]),
+        )
+
+
+class FileOpen(CodePattern):
+    """
+    A call of :func:`open`, or of a method named so that is given nothing but constants
+    as :meth:`pathlib.Path.open` is, unlike an opener handed a request; unless it names
+    its encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        keyword = matchers.Arg(
+            keyword=matchers.AllOf(
+                matchers.Name(),
+                matchers.DoesNotMatch(matchers.Name(TextKeyword.ENCODING)),
+            )
+        )
+        unpacked_keywords = matchers.Arg(keyword=None, star="**")
+        return matchers.OneOf(
+            matchers.Call(
+                func=matchers.Name(TextFunction.OPEN),
+                args=[matchers.ZeroOrMore(NonEncodingArgument.matcher)],
+            ),
+            matchers.Call(
+                func=matchers.Attribute(attr=matchers.Name(TextFunction.OPEN)),
+                args=[
+                    matchers.ZeroOrMore(
+                        matchers.OneOf(
+                            keyword,
+                            ConstantPositionalArgument.matcher,
+                            unpacked_keywords,
+                        )
+                    )
+                ],
+            ),
+        )
+
+
+class PathReadOrWrite(CodePattern):
+    """
+    A call of ``read_text`` or ``write_text`` that names no encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        text_function = matchers.OneOf(
+            matchers.Name(TextFunction.READ_TEXT),
+            matchers.Name(TextFunction.WRITE_TEXT),
+        )
+        return matchers.Call(
+            func=matchers.OneOf(text_function, matchers.Attribute(attr=text_function)),
+            args=[matchers.ZeroOrMore(NonEncodingArgument.matcher)],
+        )
+
+
+class LocaleTextCall(CodePattern):
+    """
+    A call that reads or writes text without naming its encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        return matchers.OneOf(
+            SubprocessTextSwitch.matcher,
+            FileOpen.matcher,
+            PathReadOrWrite.matcher,
+        )
+
+
 # %% the check
 
 
@@ -131,78 +303,13 @@ class LocaleEncodingChecker(FixableChecker[CallLackingKeywordArgument]):
     def specifications_of_module(
         self, module: PositionedModule
     ) -> Iterator[CallLackingKeywordArgument]:
-        for node, location in module.positions.items():
-            if not isinstance(node, libcst.Call):
+        for occurrence in LocaleTextCall.found_in(module):
+            call = libcst.ensure_type(occurrence.node, libcst.Call)
+            if BinaryOpen.matches(call):
                 continue
-            specification = self.locale_text_call(CallSyntax(node), location)
-            if specification is not None:
-                yield specification
-
-    def locale_text_call(
-        self, call: CallSyntax, location: CodeRange
-    ) -> CallLackingKeywordArgument | None:
-        """
-        :param location: The code range of *call*.
-        :return: *call* as a place breaking the rule, superseding its ``text=True`` where
-            it is a :mod:`subprocess` call; ``None`` when it names its encoding or
-            handles no text.
-        """
-        keywords = call.keyword_arguments
-        if TextKeyword.ENCODING in keywords:
-            return None
-        if self.is_subprocess_call(call):
-            switch = keywords.get(TextKeyword.TEXT)
-            if switch is None or not ExpressionSyntax(switch.value).is_name(
-                ConstantName.TRUE
-            ):
-                return None
-            return CallLackingKeywordArgument(location, call.call, switch)
-        name = ExpressionSyntax(call.call.func).final_name
-        if name == TextFunction.OPEN:
-            if not self.opens_a_file(call) or self.opens_bytes(call):
-                return None
-            return CallLackingKeywordArgument(location, call.call)
-        if name in (TextFunction.READ_TEXT, TextFunction.WRITE_TEXT):
-            return CallLackingKeywordArgument(location, call.call)
-        return None
-
-    @staticmethod
-    def is_subprocess_call(call: CallSyntax) -> bool:
-        """
-        :return: Whether *call* calls a function of :mod:`subprocess`.
-        """
-        function = call.call.func
-        return isinstance(function, libcst.Attribute) and ExpressionSyntax(
-            function.value
-        ).is_name(subprocess.__name__)
-
-    @staticmethod
-    def opens_a_file(call: CallSyntax) -> bool:
-        """
-        :return: Whether *call*, an :data:`TextFunction.OPEN`, opens a file: a call of
-            :func:`open`, or a method call given nothing but constants, as
-            :meth:`pathlib.Path.open` is, unlike an opener handed a request.
-        """
-        if isinstance(call.call.func, libcst.Name):
-            return True
-        return all(
-            argument.star == "" and ExpressionSyntax(argument.value).is_constant
-            for argument in call.positional_arguments
-        )
-
-    @staticmethod
-    def opens_bytes(call: CallSyntax) -> bool:
-        """
-        :return: Whether *call*, an :data:`TextFunction.OPEN`, names a binary mode: by
-            keyword, as the second argument of :func:`open` or the first of
-            :meth:`pathlib.Path.open`.
-        """
-        mode_position = 0 if isinstance(call.call.func, libcst.Attribute) else 1
-        positional = call.positional_arguments
-        mode_argument = call.keyword_arguments.get(TextKeyword.MODE)
-        if mode_argument is None and len(positional) > mode_position:
-            mode_argument = positional[mode_position]
-        if mode_argument is None:
-            return False
-        mode = ExpressionSyntax(mode_argument.value).literal_text
-        return mode is not None and BINARY_MODE in mode
+            captured = LocaleTextCall.captures(call)
+            yield CallLackingKeywordArgument(
+                occurrence.location,
+                call,
+                captured.get(SubprocessTextSwitch.saved_switch_name),
+            )

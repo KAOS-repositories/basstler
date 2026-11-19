@@ -145,6 +145,11 @@ class DatasetLocation(PathEnumeration):
     indented under it.
     """
 
+    SHARED_IDENTIFIER_PLAN = DIRECTORY / "shared-identifier-plan.yaml"
+    """
+    A plan whose only wave, track and item all carry the id ``experiment``.
+    """
+
     BOOTSTRAP_ROADMAP = DIRECTORY / "bootstrap-roadmap.md"
     """
     The item-bootstrap fixture plan's roadmap.
@@ -847,6 +852,37 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
     """
 
+    BODY = DIRECTORY / "body.py.txt"
+    """
+    A module of a docstring, an assignment with a string below it, two statements on one
+    line and a compound statement.
+    """
+
+    IMPORTS = DIRECTORY / "imports.py.txt"
+    """
+    A module that imports :mod:`os` and calls nothing from it but :data:`os.name`.
+    """
+
+    IMPORTS_WITH_TEXT_FILE = DIRECTORY / "imports-with-text-file.py.txt"
+    """
+    :attr:`IMPORTS` with :class:`~basstler.text_file.TextFile` imported after
+    :mod:`os`.
+    """
+
+    IMPORTS_OF_TEXT_FILE_MODULE = DIRECTORY / "imports-of-text-file-module.py.txt"
+    """
+    A module that imports :data:`~basstler.text_file.UTF_8` and nothing else from
+    :mod:`basstler.text_file`.
+    """
+
+    IMPORTS_OF_TEXT_FILE_MODULE_MERGED = (
+        DIRECTORY / "imports-of-text-file-module-merged.py.txt"
+    )
+    """
+    :attr:`IMPORTS_OF_TEXT_FILE_MODULE` with :class:`~basstler.text_file.TextFile`
+    imported in the same statement.
+    """
+
     NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
     """
     A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`
@@ -856,22 +892,6 @@ class CodeModificationSnippet(PathEnumeration):
     PRINT_CALL = DIRECTORY / "print-call.py"
     """
     One call of :func:`print`.
-    """
-
-    IMPORTS_BEFORE_CODE = DIRECTORY / "imports-before-code.py"
-    """
-    Two imports after the future import, then code.
-    """
-
-    IMPORTS_WITH_BASH = DIRECTORY / "imports-with-bash.py"
-    """
-    An import of :class:`basstler.bash.Bash` among other names.
-    """
-
-    NO_IMPORTS = DIRECTORY / "no-imports.txt"
-    """
-    A docstring and one statement, with no import; plain text, because the repository
-    requires the future import in every Python file.
     """
 
     CALLED_NAMES = DIRECTORY / "called-names.py"
@@ -939,6 +959,29 @@ class RuleFixExampleFile(StrEnum):
     """
 
 
+class TextFileUsageSnippet(PathEnumeration):
+    """
+    Source files the check for text read or written without a text file reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "text-file-usage"
+    """
+    The directory holding them.
+    """
+
+    PATH_TEXT_CALLS = DIRECTORY / "path-text-calls.py"
+    """
+    Four reads and writes of a path's text, one per line from line 10: each as UTF-8
+    and in the locale encoding.
+    """
+
+    KEPT_CALLS = DIRECTORY / "kept-calls.py"
+    """
+    Reads and writes a text file cannot do: another encoding, error handling and
+    newline translation, and a read of bytes.
+    """
+
+
 class LocaleEncodingSnippet(PathEnumeration):
     """
     Source files the check for text read or written in the locale encoding reads.
@@ -959,6 +1002,12 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
     Text read and written as UTF-8, bytes read and written without an encoding, and a
     request opened, which is no file.
+    """
+
+    OTHER_CALLS = DIRECTORY / "other-calls.py"
+    """
+    A function and a method that are not :func:`open`, given a file name and a binary
+    mode.
     """
 
 

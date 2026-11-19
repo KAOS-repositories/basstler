@@ -8,6 +8,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import libcst
+from libcst.codemod import CodemodContext
+from libcst.codemod.visitors import AddImportsVisitor
 from libcst.metadata import CodeRange
 
 from basstler.code_modification.exceptions import ActionTargetMissingError
@@ -90,65 +92,58 @@ class NodeReplacement(Action):
         )
 
 
-# %% statements
+# %% imports
+
+
+class ModuleTransformation(Action, ABC):
+    """
+    Changes a whole module, which the action that restores the module undoes.
+    """
+
+    @abstractmethod
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        """
+        :param module: The module the action is applied to.
+        :return: The module with the change made.
+        """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        return AppliedAction(self.transform(module), ModuleReplacement(module))
 
 
 @dataclass(frozen=True)
-class StatementInsertion(Action):
+class ModuleReplacement(ModuleTransformation):
     """
-    Inserts a statement into the body of a module.
-    """
-
-    index: int
-    """
-    The position in the module's body the statement gets.
+    Replaces a module with another one.
     """
 
-    statement: libcst.BaseStatement
+    replacement: libcst.Module
     """
-    The statement inserted.
+    The module that takes the place of the one the action is applied to.
     """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        body = [*module.body[: self.index], self.statement, *module.body[self.index :]]
-        changed = module.with_changes(body=body)
-        location = PositionedModule(changed).positions[self.statement]
-        return AppliedAction(changed, StatementRemoval(location, self.statement))
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        return self.replacement
 
 
 @dataclass(frozen=True)
-class StatementRemoval(Action):
+class ImportInsertion(ModuleTransformation):
     """
-    Removes a statement from the body of a module.
-    """
-
-    location: CodeRange
-    """
-    The code range of :attr:`statement` in the module the action is applied to.
+    Imports a class in a module, merged into an import of its module where there is one
+    and left out where the module imports the class already.
     """
 
-    statement: libcst.BaseStatement
+    imported: type
     """
-    The statement removed, which the module's body must hold at :attr:`location`.
+    The class to import.
     """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        positions = PositionedModule(module).positions
-        index = next(
-            (
-                index
-                for index, statement in enumerate(module.body)
-                if positions[statement] == self.location
-                and statement.deep_equals(self.statement)
-            ),
-            None,
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        context = CodemodContext()
+        AddImportsVisitor.add_needed_import(
+            context, self.imported.__module__, self.imported.__name__
         )
-        if index is None:
-            raise ActionTargetMissingError(self.location, type(self.statement).__name__)
-        changed = module.with_changes(
-            body=[*module.body[:index], *module.body[index + 1 :]]
-        )
-        return AppliedAction(changed, StatementInsertion(index, self.statement))
+        return AddImportsVisitor(context).transform_module(module)
 
 
 # %% plans

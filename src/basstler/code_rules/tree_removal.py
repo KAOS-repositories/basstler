@@ -13,12 +13,13 @@ from pathlib import Path
 from typing import override
 
 import libcst
-from libcst.metadata import CodeRange
+from libcst import matchers
 
 from basstler import directory_tree
 from basstler.class_property import classproperty
-from basstler.code_modification.imports import ImportedName
+from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_modification.specification import Specification
 from basstler.code_rules.checker import CodeRuleViolation
 from basstler.code_rules.commands import CodeRulesCommand
@@ -30,7 +31,7 @@ from basstler.code_rules.fixes import (
 )
 from basstler.directory_tree import DirectoryTree
 
-# %% the places
+# %% the patterns
 
 
 class RemovalKeyword(StrEnum):
@@ -44,23 +45,44 @@ class RemovalKeyword(StrEnum):
     """
 
 
-@dataclass(frozen=True)
-class TreeRemovalCall(Specification):
+class TreeRemovalCall(CodePattern):
     """
-    A call of :func:`shutil.rmtree` that :class:`DirectoryTree` can take over.
+    A call to :func:`shutil.rmtree`.
     """
 
-    node: libcst.Call
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        return matchers.Call(
+            func=matchers.Attribute(
+                value=matchers.Name(shutil.__name__),
+                attr=matchers.Name(shutil.rmtree.__name__),
+            )
+        )
+
+
+class ReplaceableTreeRemovalCall(CodePattern):
     """
-    The call, which has the directory as its one positional argument and at most the
-    ``ignore_errors`` keyword.
+    A call to :func:`shutil.rmtree` passing the directory by position and nothing else
+    but ``ignore_errors``, which is all :class:`DirectoryTree` can take over.
     """
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        return matchers.Call(
+            func=TreeRemovalCall.matcher.func,
+            args=[
+                matchers.Arg(keyword=None, star=""),
+                matchers.ZeroOrOne(
+                    matchers.Arg(keyword=matchers.Name(RemovalKeyword.IGNORE_ERRORS))
+                ),
+            ],
+        )
 
 
 # %% the fix
 
 
-class DirectoryTreeFix(CodeFix[TreeRemovalCall]):
+class DirectoryTreeFix(CodeFix[Specification]):
     """
     Removes the directory through :class:`DirectoryTree`, which keeps ignoring errors
     where the call ignored them.
@@ -76,11 +98,14 @@ class DirectoryTreeFix(CodeFix[TreeRemovalCall]):
         )
 
     @classproperty
-    def imports(cls) -> tuple[ImportedName, ...]:
-        return (ImportedName(DirectoryTree.__module__, DirectoryTree.__name__),)
+    def required_import(cls) -> type:
+        """
+        :class:`~basstler.directory_tree.DirectoryTree`.
+        """
+        return DirectoryTree
 
-    def replacement(self, specification: TreeRemovalCall) -> libcst.CSTNode:
-        call = specification.node
+    def replacement(self, specification: Specification) -> libcst.Call:
+        call = libcst.ensure_type(specification.node, libcst.Call)
         tree = call.with_changes(func=libcst.Name(DirectoryTree.__name__))
         return libcst.Call(
             func=libcst.Attribute(
@@ -93,14 +118,14 @@ class DirectoryTreeFix(CodeFix[TreeRemovalCall]):
 
 
 @dataclass(frozen=True)
-class TreeRemovalChecker(FixableChecker[TreeRemovalCall]):
+class TreeRemovalChecker(FixableChecker[Specification]):
     """
     Finds calls to :func:`shutil.rmtree` outside :mod:`basstler.directory_tree`; they stop
     at the read-only object files git leaves on Windows.
     """
 
     @classproperty
-    def fix(cls) -> CodeFix[TreeRemovalCall]:
+    def fix(cls) -> CodeFix[Specification]:
         return DirectoryTreeFix()
 
     @classproperty
@@ -112,64 +137,37 @@ class TreeRemovalChecker(FixableChecker[TreeRemovalCall]):
         )
 
     @override
+    def checks(self, path: Path) -> bool:
+        """
+        Skips :mod:`basstler.directory_tree`; :meth:`FixableChecker.checks`.
+        """
+        return path.resolve() != Path(directory_tree.__file__).resolve()
+
+    @override
     def specifications_of_module(
         self, module: PositionedModule
-    ) -> Iterator[TreeRemovalCall]:
-        for node, location in self.rmtree_calls(module):
-            if self.is_replaceable(node):
-                yield TreeRemovalCall(location, node)
+    ) -> Iterator[Specification]:
+        for occurrence in ReplaceableTreeRemovalCall.found_in(module):
+            yield Specification(occurrence.location, occurrence.node)
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        if path.resolve() == Path(directory_tree.__file__).resolve():
-            return
+        """
+        Also reports the calls passing more than the fix takes over, which no fix
+        covers; :meth:`FixableChecker.violations`.
+        """
         yield from super().violations(path)
-        module = PositionedModule(libcst.parse_module(path.read_text(encoding="utf-8")))
-        for node, location in self.rmtree_calls(module):
-            if self.is_replaceable(node):
+        if not self.checks(path):
+            return
+        module = PositionedModule(PythonSourceFile(path).parse())
+        for occurrence in TreeRemovalCall.found_in(module):
+            if ReplaceableTreeRemovalCall.matches(occurrence.node):
                 continue
             yield CodeRuleViolation(
                 path,
-                location.start.line,
-                location.end.line,
+                occurrence.location.start.line,
+                occurrence.location.end.line,
                 f"{self.violation_description}; it passes more than the directory "
                 f"and {RemovalKeyword.IGNORE_ERRORS}, so "
                 f"`{CodeRulesCommand.FIX.invocation}` leaves it",
             )
-
-    @staticmethod
-    def rmtree_calls(
-        module: PositionedModule,
-    ) -> Iterator[tuple[libcst.Call, CodeRange]]:
-        """
-        :return: Every call to :func:`shutil.rmtree` in *module*, with its code range.
-        """
-        for node, location in module.positions.items():
-            if (
-                isinstance(node, libcst.Call)
-                and isinstance(node.func, libcst.Attribute)
-                and node.func.attr.value == shutil.rmtree.__name__
-                and isinstance(node.func.value, libcst.Name)
-                and node.func.value.value == shutil.__name__
-            ):
-                yield node, location
-
-    @staticmethod
-    def is_replaceable(call: libcst.Call) -> bool:
-        """
-        :return: Whether *call* passes the directory by position and nothing else but
-            ``ignore_errors``, which is all :class:`DirectoryTree` can take over.
-        """
-        if not call.args:
-            return False
-        first, *others = call.args
-        return (
-            first.keyword is None
-            and not first.star
-            and all(
-                argument.keyword is not None
-                and argument.keyword.value == RemovalKeyword.IGNORE_ERRORS
-                for argument in others
-            )
-            and len(others) <= 1
-        )

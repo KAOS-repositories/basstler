@@ -48,15 +48,22 @@ class RecordedGitHubClient(GitHubFullClient):
     Every write sent, oldest first.
     """
 
+    reads: list[str] = field(default_factory=list)
+    """
+    The path of every read asked for, recorded or not, oldest first.
+    """
+
     def get(self, path: str) -> Any:
         return self.attempt_get(path).raise_if_failed()
 
     def attempt_get(self, path: str) -> GitHubResponse:
+        self.reads.append(path)
         if path not in self.responses:
             return GitHubResponse(None, failure=self._refusal_of(HttpMethod.GET, path))
         return GitHubResponse(self.responses[path])
 
     def get_pages(self, path: str) -> list[Any]:
+        self.reads.append(path)
         if path not in self.pages:
             raise self._refusal_of(HttpMethod.GET, path)
         return self.pages[path]

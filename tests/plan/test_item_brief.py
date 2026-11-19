@@ -14,6 +14,7 @@ import yaml
 
 from basstler.github import pull_request_source as pull_request_source_module
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
+from basstler.github.repository_access import PullRequestListState
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import PluginLocation, ProjectLocation
@@ -292,13 +293,14 @@ def test_the_command_leaves_the_upstream_of_a_forked_plan_repository_unread(
     plan_repository = Repository.parse(
         BRIEFED_MANIFEST.content[ManifestKey.DEFAULT_REPOSITORY.key]
     )
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    upstream = Repository.parse(fork["parent"]["full_name"])
     client = RecordedGitHubClient(
-        responses={
-            f"/{plan_repository.api_path}": json.loads(
-                DatasetLocation.REPOSITORY_FORK.read_text()
-            )
+        responses={f"/{plan_repository.api_path}": fork},
+        pages={
+            listing_path(plan_repository): [[]],
+            listing_path(upstream, PullRequestListState.OPEN): [[]],
         },
-        pages={listing_path(plan_repository): [[]]},
     )
     monkeypatch.setattr(pull_request_source_module, "GitHubRestClient", lambda: client)
     monkeypatch.setattr(
@@ -314,4 +316,8 @@ def test_the_command_leaves_the_upstream_of_a_forked_plan_repository_unread(
     )
     monkeypatch.chdir(briefed_repository.project_root)
 
-    assert main() == 0
+    main()
+
+    assert [
+        path for path in client.reads if path.startswith(f"/{upstream.api_path}/")
+    ] == []

@@ -1,12 +1,12 @@
-## Plan
-- Resolve #222's conflict with its base `fix-windows-test-failures` (in `src/basstler/maintenance/commands.py`) and hand it back for review.
+<!-- BEGIN-PR-PROGRESS -->
+**Plan**
+- Merge the moved base `fix-windows-test-failures` (e6871da0) into this branch; keep the base's listed-file marking and read its new documents through `TextFile`.
 
-## Done
-- Merged the base into the branch at 293015cf; the merge probe against base commit 00660775 is CLEAN at head 293015cf.
-- Resolved the import conflict, keeping the base's `LandedClosingFollowUps` import.
-- `ruff check .` and `basstler code-rules fix` (no change) pass. Tests excluding `tests/plan_site` and `tests/plan/item_bootstrap`: 2425 passed, 1 skipped. Those two directories fail here only for environment reasons: libcst is not in the plugin interpreter, and Playwright is unavailable.
-- All 21 review threads read as resolved at 539e4ffa; no unresolved thread. No upstream is named, so there is no upstream review.
+**Done**
+- Merged at 6ed0232c and pushed; merge probe clean against the base. Ruff, format and the suite pass locally (2580 passed), except `tests/plan_site` and `tests/plan/item_bootstrap`, which were not run.
+- Item blockers and the pull request description updated. The PR stays ready for review, as the user chose.
 
-## Next
-- Read CI at 293015cf (not read yet; Windows run at 539e4ffa was cancelled).
-- Owner decides whether #222 stays ready; this resolve left it as it was.
+**Next**
+- Read CI at 6ed0232c.
+- #220 (the base) conflicts with `main` in `plan/item_bootstrap/documents.py` and `plan/model.py`, and is withheld by the maintenance pass; resolve it on its own pull request, then run the pass again.
+<!-- END-PR-PROGRESS -->

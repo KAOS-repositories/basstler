@@ -127,6 +127,11 @@ class ConfigurationVariable(StrEnum):
     The ref the personal-notes branch is fetched into.
     """
 
+    PULL_REQUEST_PROGRESS_DIRECTORY = "PR_PROGRESS_DIRECTORY"
+    """
+    The notes branch's directory of progress notes.
+    """
+
 
 class SearchPathVariable(EnvironmentVariable):
     """

@@ -649,3 +649,79 @@ class PlanValidationError(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+# %% handing plans over
+
+
+@dataclass
+class PlanOutsideHandoverError(DataclassException, ValueError):
+    """
+    Raised when a handed-over plan depends on an item of a plan the handover leaves out,
+    which the receiver could then never resolve.
+    """
+
+    plan_identifier: str
+    """
+    The handed-over plan holding the dependency.
+    """
+
+    missing_plan_identifiers: tuple[str, ...]
+    """
+    Every plan its items depend on that the handover leaves out.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"plan {self.plan_identifier!r} depends on items of plans the handover "
+            f"leaves out: {', '.join(self.missing_plan_identifiers)}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Hand those plans over together with it."
+
+
+@dataclass
+class HandoverPlanCycleError(DataclassException, ValueError):
+    """
+    Raised when handed-over plans depend on each other in a cycle, so no plan can be
+    saved before the others it names.
+    """
+
+    plan_identifiers: tuple[str, ...]
+    """
+    The handed-over plans.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "the handed-over plans depend on each other in a cycle: "
+            f"{', '.join(self.plan_identifiers)}"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Move the items that close the cycle into one plan, then hand the plans "
+            "over again."
+        )
+
+
+@dataclass
+class PlanAlreadyTrackedError(DataclassException, FileExistsError):
+    """
+    Raised when the receiving notes branch already holds a plan the handover carries.
+    """
+
+    plan_identifier: str
+    """
+    The plan both hold.
+    """
+
+    def error_message(self) -> str:
+        return f"the notes branch already holds plan {self.plan_identifier!r}"
+
+    def suggest_correction(self) -> str:
+        return (
+            "Import into a notes branch without that plan, or edit the plan that is "
+            "there instead of importing it again."
+        )

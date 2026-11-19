@@ -258,6 +258,37 @@ class InstructionsTemplate(PathEnumeration):
     """
 
 
+class PlanHandoverLocation(PathEnumeration):
+    """
+    The files a plan handover holds, relative to its directory.
+    """
+
+    GUIDE = Path("HANDOVER.md")
+    """
+    The instructions a coding agent continues the handed-over plans from without basstler.
+    """
+
+    PLANS = Path("plans")
+    """
+    One directory per plan, holding its documents as the notes branch does.
+    """
+
+    PULL_REQUEST_PROGRESS = Path("pr-progress")
+    """
+    The progress note of each handed-over item's branch, named after the branch.
+    """
+
+    REPOSITORY_RULES = Path("repository-rules.yaml")
+    """
+    The rules every plan of the repository follows, in the notes branch's format.
+    """
+
+    GUIDE_TEMPLATE = PackageLocation.TEMPLATES.value / "plan_handover_guide.md.jinja"
+    """
+    The template :attr:`GUIDE` is rendered from.
+    """
+
+
 class ReviewTriageLocation(PathEnumeration):
     """
     The files the review triage reads beside its modules.
@@ -506,6 +537,14 @@ class ProjectLocation(PathEnumeration):
     PLAN_RULES = PLANS / "_rules.yaml"
     """
     The rules every plan of the repository follows, one entry per rule.
+    """
+
+    PULL_REQUEST_PROGRESS = PERSONAL_NOTES / "pr-progress"
+    """
+    Where the personal-notes branch keeps each branch's progress note, named after the
+    branch.
+
+    Mirrors ``PR_PROGRESS_DIRECTORY`` in ``resolve-personal-notes-config.sh``.
     """
 
     PERSONAL_STACK_CONFIGURATION = PERSONAL_NOTES / "stack.toml"

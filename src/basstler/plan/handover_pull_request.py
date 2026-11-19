@@ -12,7 +12,7 @@ import hashlib
 import os
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandRunner
@@ -26,6 +26,11 @@ from basstler.locations import PlanHandoverLocation
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.plan.exceptions import HandoverPullRequestNotChosenError
 from basstler.plan.handover import PlanHandover
+from basstler.plan.handover_continuation import (
+    ContinuedHandover,
+    HandoverImport,
+    TakenOverComment,
+)
 from basstler.plan.model import ItemStatus
 from basstler.render_common import TemplatePage
 
@@ -328,36 +333,37 @@ class HandoverPullRequests:
         )
 
     def take_over(
-        self, *, client: GitHubClient, requested_number: int | None, project_root: Path
-    ) -> PlanHandover:
+        self, *, importing: HandoverImport, requested_number: int | None
+    ) -> ContinuedHandover:
         """
-        Save the chosen pull request's handover onto the receiver's notes branch, then
-        say so on the pull request and close it.
+        Import the chosen pull request's handover, then say so on the pull request and
+        close it.
 
-        :param client: Reads and writes the repository.
+        :param importing: Saves the handover onto the receiver's notes branch.
         :param requested_number: The pull request asked for, ``None`` for the only one.
-        :param project_root: The receiver's checkout, whose notes branch receives it.
         :raises HandoverPullRequestNotChosenError: If no single offered pull request
             matches.
         :raises PlanAlreadyTrackedError: If the notes branch already holds one of its
             plans; the pull request stays open.
-        :return: The handover taken over.
+        :return: The handover as taken over.
         """
-        pull_request = self.chosen(client=client, requested_number=requested_number)
-        handover = self.handover_carried_by(pull_request)
-        handover.save_to_notes_branch(project_root=project_root)
-        notes_branch = PersonalNotesLocation.resolve(project_root, os.environ).branch
-        client.send(
+        pull_request = self.chosen(
+            client=importing.client, requested_number=requested_number
+        )
+        continued = importing.save(self.handover_carried_by(pull_request))
+        importing.client.send(
             IssueComment(
                 repository=self.repository,
                 number=pull_request.number,
-                body=(
-                    f"Taken over onto `{notes_branch}` with "
-                    "`basstler plan-handover import`."
-                ),
+                body=TakenOverComment(
+                    continued=continued,
+                    notes_branch=PersonalNotesLocation.resolve(
+                        importing.project_root, os.environ
+                    ).branch,
+                ).render(),
             )
         )
-        client.send(
+        importing.client.send(
             IssueClosing(repository=self.repository, number=pull_request.number)
         )
-        return handover
+        return continued

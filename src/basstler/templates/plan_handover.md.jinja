@@ -32,9 +32,9 @@ basstler plan-handover import
 ```
 
 That finds the handover pull request open on the repository (or, given this directory,
-reads it from here). Plans whose repository is not your checkout's move onto it, with
-the items already underway still naming the repository their pull requests are on. It
-saves every plan, progress note and rule onto your own personal-notes branch. Start an
+reads it from here). Plans whose repository is not your checkout's move onto it: each item
+whose pull request is still open is continued there, its branch pushed to your fork and
+its pull request opened again as a draft. It saves every plan, progress note and rule onto your own personal-notes branch. Start an
 item that has not started with `/plan-item-kickoff <plan-id> <item-id>`, and continue one
 that is underway with `/plan-item-resolve <plan-id> <item-id>`; both read everything below
 for you.

@@ -19,6 +19,7 @@ from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.locations import PlanHandoverLocation
 from basstler.plan.handover import PlanHandover
+from basstler.plan.handover_continuation import HandoverImport
 from basstler.plan.handover_pull_request import HandoverOffer, HandoverPullRequests
 from basstler.standard_streams import StandardStreamHandler
 
@@ -122,32 +123,42 @@ def import_plans(
     ] = None,
     *,
     pull_request: Annotated[int | None, Parameter(group=import_source)] = None,
+    leave_underway_work: bool = False,
 ) -> PlanHandoverExitCode:
     """
-    Save a handover's plans, progress notes and rules onto this repository's notes
-    branch: from the handover pull request open on it, which is then closed, or from a
-    directory ``basstler plan-handover export`` wrote.
+    Save a handover onto this repository's notes branch, from the handover pull
+    request open here, which is then closed, or from an exported directory. Plans on
+    another repository move here, and their items with open pull requests continue in
+    pull requests opened here.
 
     :param directory: A handover directory to read instead of a pull request.
     :param pull_request: The number of the handover pull request to take over, when
         several are open.
+    :param leave_underway_work: Leave underway items naming their pull requests on the
+        other repository instead of continuing them here.
     :raises HandoverPullRequestNotChosenError: If no single open handover pull request
         matches.
     :raises PlanAlreadyTrackedError: If the notes branch already holds one of its plans.
     """
-    project_root = Path.cwd()
+    importing = HandoverImport(
+        project_root=Path.cwd(),
+        client=GitHubRestClient(),
+        continues_underway_work=not leave_underway_work,
+    )
     if directory is not None:
-        handover = PlanHandover.from_directory(directory)
-        handover.save_to_notes_branch(project_root=project_root)
+        continued = importing.save(PlanHandover.from_directory(directory))
     else:
-        handover = HandoverPullRequests(git=GitCommandRunner(project_root)).take_over(
-            client=GitHubRestClient(),
-            requested_number=pull_request,
-            project_root=project_root,
+        continued = HandoverPullRequests(
+            git=GitCommandRunner(importing.project_root)
+        ).take_over(importing=importing, requested_number=pull_request)
+    for continuation in continued.continuations:
+        logger.info(
+            f"{continuation.plan_identifier}/{continuation.item_identifier} continues "
+            f"in {continuation.continued.url}."
         )
     logger.info(
         "Took over plans "
-        f"{', '.join(plan.identifier for plan in handover.plans_in_saving_order)} "
-        f"and {len(handover.progress_notes)} progress notes."
+        f"{', '.join(plan.identifier for plan in continued.handover.plans_in_saving_order)} "
+        f"and {len(continued.handover.progress_notes)} progress notes."
     )
     return PlanHandoverExitCode.SUCCESS

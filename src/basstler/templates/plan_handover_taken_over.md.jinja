@@ -1,0 +1,12 @@
+Taken over onto `{{ notes_branch }}` with `basstler plan-handover import`.
+{% if continued.continuations %}
+
+Underway items continue in these pull requests, which their items now name; the
+originals keep their review threads and can be closed:
+
+| Item | Original | Continued in |
+| --- | --- | --- |
+{% for continuation in continued.continuations %}
+| `{{ continuation.plan_identifier }}/{{ continuation.item_identifier }}` | {{ continuation.original.page_url }} | {{ continuation.continued.url }} |
+{% endfor %}
+{% endif %}

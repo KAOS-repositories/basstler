@@ -151,6 +151,32 @@ class HandoverPlan:
             roadmap_text=self.roadmap_text,
         )
 
+    def with_pull_requests(self, numbers: Mapping[str, int]) -> HandoverPlan:
+        """
+        :param numbers: A pull request on the plan's default repository for some of its
+            items, by item id.
+        :return: This plan with each of those items naming its pull request there.
+        """
+        items = [
+            {
+                **{
+                    key: value
+                    for key, value in item.content.items()
+                    if key != ManifestKey.REPOSITORY.key
+                },
+                ManifestKey.PULL_REQUEST_NUMBER.key: numbers[item.identifier],
+            }
+            if item.identifier in numbers
+            else item.content
+            for item in self.manifest.items
+        ]
+        return HandoverPlan(
+            manifest=PlanManifest(
+                {**self.manifest.content, ManifestKey.ITEMS.key: items}
+            ),
+            roadmap_text=self.roadmap_text,
+        )
+
     def item_anchor(self, *, reference_text: str) -> str:
         """
         :param reference_text: An item's id, or a ``depends_on`` entry of this plan.

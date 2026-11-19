@@ -11,10 +11,15 @@ The items' branches and pull requests stay where they are. The receiver either:
 - **pushes to your repository**, as a collaborator with write access: they continue every
   item on its existing branch and pull request, and nothing about the plans changes; or
 - **works in their own fork** of the same upstream: on import, each plan moves onto their
-  fork. Items not started are opened there, items already underway keep naming your
-  repository, where their pull requests are, and the plans' tracking issues, which are
-  numbers on your repository, are dropped. To push to an underway item's branch they
-  still need write access to yours, or they continue it from a branch of their own.
+  fork, and every item whose pull request is still open on yours continues there. Its
+  branch, and the branch its pull request stacks on where their fork lacks it, are
+  pushed to their fork, its pull request is opened again there as a draft with the same
+  title and base, linking the original, and the item names the new one. The original
+  keeps its review threads and checks; the handover pull request's closing comment lists
+  each original beside its continuation, so you can close yours. Items not started are
+  opened on their fork, and the plans' tracking issues, which are numbers on your
+  repository, are dropped. `--leave-underway-work` keeps the underway items on your pull
+  requests instead.
 
 ## 2. Hand the plans over
 
@@ -63,7 +68,8 @@ basstler plan-handover import
 It finds the handover pull request open there (name one with `--pull-request <number>`
 when several are), saves each plan onto their notes branch after the plans it depends
 on, so every save is validated as any other is, then their progress notes and rules, and
-closes the pull request. Given a directory instead, `basstler plan-handover import
+closes the pull request. Running it again after a failure reuses the branches and pull
+requests it already continued. Given a directory instead, `basstler plan-handover import
 <directory>` reads it from there. It refuses a plan their notes branch already holds,
 before saving anything. Items then start with `/plan-item-kickoff` and continue with
 `/plan-item-resolve`, and the plans appear on their plan site.

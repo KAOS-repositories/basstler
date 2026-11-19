@@ -5,27 +5,37 @@ request on the receiver's repository, and taking it over from there.
 
 from __future__ import annotations
 
+import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubClient, GitHubResponse, GitHubWrite
 from basstler.github.issue import IssueClosing, IssueComment
 from basstler.github.pull_request import NewPullRequest, PullRequestDescription
 from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository_access import ListingParameter
 from basstler.plan.exceptions import HandoverPullRequestNotChosenError
-from basstler.plan.handover import PlanHandover
+from basstler.plan.dependencies import DependencyReference
+from basstler.plan.handover import HandoverPlan, PlanHandover
+from basstler.plan.handover_continuation import ContinuedHandover, HandoverImport
 from basstler.plan.handover_pull_request import (
     HandoverOffer,
     HandoverPullRequestDescription,
     HandoverPullRequests,
 )
-from basstler.plan.model import PlanDocument, PlanManifest
+from basstler.plan.model import ManifestKey, PlanDocument, PlanItem, PlanManifest
+from basstler.plan.repository_rules import RepositoryRules
 
 from ..scratch_repository import ScratchRepository
-from .conftest import RECEIVERS_FORK, HandedOverPlan
+from .conftest import (
+    RECEIVERS_FORK,
+    HandedOverPlan,
+    plans_repository as sender_repository,
+)
 
 # %% a stand-in for GitHub
 
@@ -33,23 +43,29 @@ from .conftest import RECEIVERS_FORK, HandedOverPlan
 @dataclass
 class PullRequestHostingClient(GitHubClient):
     """
-    Hosts the pull requests of one repository: opening one keeps its head commit under
-    ``refs/pull/<number>/head`` of that repository's bare remote, as GitHub does.
+    Serves the sender's pull requests and hosts the receiver's: opening one keeps its
+    head commit under ``refs/pull/<number>/head`` of the receiver's bare remote, as
+    GitHub does.
     """
 
     sender: ScratchRepository
     """
-    The clone the opened pull requests' heads are pushed from.
+    The sender's clone, whose bare remote holds the sender's repository's branches.
     """
 
     host: ScratchRepository
     """
-    The clone of the repository the pull requests are opened on.
+    The receiver's clone, whose bare remote holds the receiver's repository's branches.
+    """
+
+    sender_pull_requests: dict[str, dict[str, Any]] = field(default_factory=dict)
+    """
+    The sender's pull requests as REST describes them, by their REST path.
     """
 
     pull_requests: list[dict[str, Any]] = field(default_factory=list)
     """
-    Every pull request opened, as REST describes it.
+    Every pull request opened on the receiver's repository, as REST describes it.
     """
 
     sent: list[GitHubWrite] = field(default_factory=list)
@@ -58,13 +74,21 @@ class PullRequestHostingClient(GitHubClient):
     """
 
     def get(self, path: str) -> Any:
-        pytest.fail(f"read {path}, which a handover pull request never needs")
+        return self.sender_pull_requests[path]
 
     def get_pages(self, path: str) -> list[Any]:
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
+        heads = query.get(ListingParameter.HEAD.value)
         return [
             pull_request
             for pull_request in self.pull_requests
             if pull_request["state"] == "open"
+            and (
+                heads is None
+                or f"{pull_request['head']['user']['login']}:"
+                f"{pull_request['head']['ref']}"
+                in heads
+            )
         ]
 
     def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
@@ -80,16 +104,23 @@ class PullRequestHostingClient(GitHubClient):
             numbered[write.number]["state"] = "closed"
         return GitHubResponse(None)
 
+    def bare_remote_of(self, repository: Repository) -> GitCommandRunner:
+        """
+        :param repository: The sender's or the receiver's repository.
+        :return: The bare repository standing in for it.
+        """
+        clone = self.host if repository == RECEIVERS_FORK else self.sender
+        return GitCommandRunner(clone.work_remote_path)
+
     def open(self, opening: NewPullRequest) -> dict[str, Any]:
         """
         :param opening: The pull request to open.
         :return: It, as REST describes it.
         """
         number = len(self.pull_requests) + 1
-        commit = self.sender.git.run(
-            "ls-remote", "origin", f"refs/heads/{opening.head.name}"
-        ).split()[0]
-        self.sender.run_git(
+        head_remote = self.bare_remote_of(opening.head.repository)
+        commit = head_remote.commit_at(f"refs/heads/{opening.head.name}")
+        head_remote.run(
             "push",
             "--quiet",
             str(self.host.work_remote_path),
@@ -102,7 +133,11 @@ class PullRequestHostingClient(GitHubClient):
             "state": "open",
             "body": opening.body,
             "base": {"sha": commit, "ref": opening.base.name},
-            "head": {"sha": commit, "ref": opening.head.name},
+            "head": {
+                "sha": commit,
+                "ref": opening.head.name,
+                "user": {"login": opening.head.repository.owner},
+            },
         }
         self.pull_requests.append(pull_request)
         return pull_request
@@ -149,15 +184,91 @@ def offer_to_receiver(
     return offer
 
 
+def underway_pull_request(
+    sender: ScratchRepository, plan: HandoverPlan, item: PlanItem
+) -> dict[str, Any]:
+    """
+    Publish an underway item's branch, one commit on the branch it stacks on, and
+    describe its open pull request.
+
+    :param sender: The sender's clone.
+    :param plan: The plan holding the item.
+    :param item: An item naming a branch and a pull request.
+    :return: The pull request as REST describes it.
+    """
+    (dependency, *_) = item.dependencies or [None]
+    base = "main"
+    if dependency is not None:
+        reference = DependencyReference.from_text(dependency)
+        base = next(
+            other.branch
+            for other_plan in sender_plans(sender)
+            if other_plan.identifier == (reference.plan_id or plan.identifier)
+            for other in other_plan.manifest.items
+            if other.identifier == reference.item_identifier
+        )
+    sender.run_git("checkout", "--quiet", "-B", item.branch, f"origin/{base}")
+    sender.run_git("commit", "--quiet", "--allow-empty", "-m", item.identifier)
+    sender.run_git("push", "--quiet", "origin", f"HEAD:refs/heads/{item.branch}")
+    sender.run_git("fetch", "--quiet", "origin")
+    commit = sender.git.commit_at("HEAD")
+    repository = plan.manifest.repository_of(item)
+    return {
+        "number": item.pull_request_number,
+        "html_url": repository.pull_request_url(item.pull_request_number),
+        "title": item.content[ManifestKey.TITLE.key],
+        "state": "open",
+        "merged_at": None,
+        "head": {
+            "sha": commit,
+            "ref": item.branch,
+            "user": {"login": repository.owner},
+        },
+        "base": {"sha": commit, "ref": base},
+    }
+
+
+def sender_plans(sender: ScratchRepository) -> tuple[HandoverPlan, ...]:
+    """
+    :param sender: The sender's clone.
+    :return: The dataset's plans as the sender hands them over.
+    """
+    return PlanHandover.from_notes_branch(
+        project_root=sender.project_root, plan_identifiers=list(HandedOverPlan)
+    ).plans
+
+
 @pytest.fixture
 def hosting_client(
     sender_reaching_the_receiver: ScratchRepository, receivers_fork: ScratchRepository
 ) -> PullRequestHostingClient:
     """
-    :return: GitHub, hosting the receiver's fork's pull requests.
+    :return: GitHub, serving the sender's underway pull requests, in dependency order
+        so a stacked branch is published after the one it stacks on, and hosting the
+        receiver's.
     """
+    sender = sender_reaching_the_receiver
+    sender.run_git("fetch", "--quiet", "origin")
+    receivers_fork.run_git(
+        "config",
+        receivers_fork.url_rewriting_key(str(sender.work_remote_path)),
+        sender_repository().clone_url,
+    )
+    sender_pull_requests = {}
+    for plan in PlanHandover(
+        plans=sender_plans(sender),
+        progress_notes={},
+        repository_rules=RepositoryRules(),
+    ).plans_in_saving_order:
+        for item in plan.manifest.items:
+            if item.branch and item.pull_request_number is not None:
+                sender_pull_requests[
+                    plan.manifest.repository_of(item).pull_request_path(
+                        item.pull_request_number
+                    )
+                ] = underway_pull_request(sender, plan, item)
     return PullRequestHostingClient(
-        sender=sender_reaching_the_receiver, host=receivers_fork
+        sender=sender, host=receivers_fork, sender_pull_requests=sender_pull_requests
     )
 
 
@@ -221,31 +332,64 @@ def test_the_offered_commit_stands_on_the_receivers_branch(
 # %% taking it over
 
 
-def test_a_handover_is_taken_over_from_its_pull_request_onto_the_receivers_fork(
+def take_over(
+    receiver: ScratchRepository,
+    client: PullRequestHostingClient,
+    *,
+    continues_underway_work: bool = True,
+    requested_number: int | None = None,
+) -> ContinuedHandover:
+    """
+    :param receiver: The receiver's clone.
+    :param client: GitHub, hosting the receiver's pull requests.
+    :param continues_underway_work: Whether underway items are continued on the fork.
+    :param requested_number: The handover pull request asked for.
+    :return: The handover as taken over.
+    """
+    return HandoverPullRequests(git=receiver.git).take_over(
+        importing=HandoverImport(
+            project_root=receiver.project_root,
+            client=client,
+            continues_underway_work=continues_underway_work,
+        ),
+        requested_number=requested_number,
+    )
+
+
+def saved_manifests(
+    receiver: ScratchRepository, plans: tuple[HandoverPlan, ...], tmp_path: Path
+) -> dict[str, dict[str, Any]]:
+    """
+    :param receiver: The receiver's clone.
+    :param plans: The plans taken over.
+    :param tmp_path: Where to check the receiver's notes branch out.
+    :return: Each plan's manifest as the receiver's notes branch holds it, by id.
+    """
+    checkout = receiver.clone_notes_branch(tmp_path / "receiver-notes")
+    return {
+        plan.identifier: PlanManifest.from_file(
+            checkout / PlanDocument.MANIFEST.path_within_notes_branch(plan.identifier)
+        ).content
+        for plan in plans
+    }
+
+
+def test_a_handover_left_underway_is_rehomed_onto_the_receivers_fork(
     sender_reaching_the_receiver: ScratchRepository,
     receivers_fork: ScratchRepository,
     hosting_client: PullRequestHostingClient,
     tmp_path: Path,
 ):
     """
-    The receiver's notes branch holds every plan rehomed onto their fork, and the pull
-    request is answered and closed.
+    Taken over without continuing its work, every plan moves onto the receiver's fork
+    with its underway items still naming the sender's pull requests, and the handover
+    pull request is answered and closed.
     """
     offered = offer_to_receiver(sender_reaching_the_receiver, hosting_client)
 
-    HandoverPullRequests(git=receivers_fork.git).take_over(
-        client=hosting_client,
-        requested_number=None,
-        project_root=receivers_fork.project_root,
-    )
+    take_over(receivers_fork, hosting_client, continues_underway_work=False)
 
-    checkout = receivers_fork.clone_notes_branch(tmp_path / "receiver-notes")
-    assert {
-        plan.identifier: PlanManifest.from_file(
-            checkout / PlanDocument.MANIFEST.path_within_notes_branch(plan.identifier)
-        ).content
-        for plan in offered.handover.plans
-    } == {
+    assert saved_manifests(receivers_fork, offered.handover.plans, tmp_path) == {
         plan.identifier: plan.rehomed(RECEIVERS_FORK).manifest.content
         for plan in offered.handover.plans
     }
@@ -258,6 +402,89 @@ def test_a_handover_is_taken_over_from_its_pull_request_onto_the_receivers_fork(
     ]
 
 
+def test_underway_items_continue_in_pull_requests_on_the_receivers_fork(
+    sender_reaching_the_receiver: ScratchRepository,
+    receivers_fork: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+    tmp_path: Path,
+):
+    """
+    Each underway item's branch is on the receiver's fork at the sender's commit, its
+    pull request is opened again there against the same base, and the item names it.
+    """
+    offered = offer_to_receiver(sender_reaching_the_receiver, hosting_client)
+
+    continued = take_over(receivers_fork, hosting_client)
+
+    receivers_remote = hosting_client.bare_remote_of(RECEIVERS_FORK)
+    assert {
+        continuation.original.head.name: receivers_remote.commit_at(
+            f"refs/heads/{continuation.original.head.name}"
+        )
+        for continuation in continued.continuations
+    } == {
+        continuation.original.head.name: continuation.original.head.object_hash
+        for continuation in continued.continuations
+    }
+    reopened = {
+        pull_request["number"]: pull_request
+        for pull_request in hosting_client.pull_requests
+    }
+    assert [
+        (
+            reopened[continuation.continued.number]["head"]["ref"],
+            reopened[continuation.continued.number]["base"]["ref"],
+        )
+        for continuation in continued.continuations
+    ] == [
+        (continuation.original.head.name, continuation.original.base.name)
+        for continuation in continued.continuations
+    ]
+    assert saved_manifests(receivers_fork, offered.handover.plans, tmp_path) == {
+        plan.identifier: plan.manifest.content for plan in continued.handover.plans
+    }
+    assert {
+        (continuation.plan_identifier, continuation.item_identifier)
+        for continuation in continued.continuations
+    } == {
+        (plan.identifier, item.identifier)
+        for plan in offered.handover.plans
+        for item in plan.manifest.items
+        if item.branch and item.pull_request_number is not None
+    }
+
+
+def test_a_continued_item_names_its_new_pull_request_on_the_receivers_fork(
+    sender_reaching_the_receiver: ScratchRepository,
+    receivers_fork: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    A continued item's pull request is read from the plan's default repository, the
+    receiver's fork, under its new number.
+    """
+    offer_to_receiver(sender_reaching_the_receiver, hosting_client)
+
+    continued = take_over(receivers_fork, hosting_client)
+
+    plans = {plan.identifier: plan for plan in continued.handover.plans}
+    assert [
+        (
+            plans[continuation.plan_identifier].manifest.repository_of(item),
+            item.pull_request_number,
+        )
+        for continuation in continued.continuations
+        for item in [
+            plans[continuation.plan_identifier].manifest.item_named(
+                continuation.item_identifier
+            )
+        ]
+    ] == [
+        (RECEIVERS_FORK, continuation.continued.number)
+        for continuation in continued.continuations
+    ]
+
+
 def test_an_import_with_no_handover_pull_request_open_names_none(
     receivers_fork: ScratchRepository,
     hosting_client: PullRequestHostingClient,
@@ -266,11 +493,7 @@ def test_an_import_with_no_handover_pull_request_open_names_none(
     With nothing offered, the import says so rather than saving nothing silently.
     """
     with pytest.raises(HandoverPullRequestNotChosenError) as refusal:
-        HandoverPullRequests(git=receivers_fork.git).take_over(
-            client=hosting_client,
-            requested_number=None,
-            project_root=receivers_fork.project_root,
-        )
+        take_over(receivers_fork, hosting_client)
 
     assert refusal.value.offered_numbers == ()
 
@@ -288,10 +511,8 @@ def test_an_import_of_a_pull_request_not_offered_is_refused(
     (offered,) = hosting_client.pull_requests
 
     with pytest.raises(HandoverPullRequestNotChosenError) as refusal:
-        HandoverPullRequests(git=receivers_fork.git).take_over(
-            client=hosting_client,
-            requested_number=offered["number"] + 1,
-            project_root=receivers_fork.project_root,
+        take_over(
+            receivers_fork, hosting_client, requested_number=offered["number"] + 1
         )
 
     assert refusal.value.offered_numbers == (offered["number"],)

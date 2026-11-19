@@ -1,0 +1,19 @@
+"""
+A subclass a merge left conflicted, so it does not parse.
+"""
+
+from __future__ import annotations
+
+from shape import Shape
+
+
+class Triangle(Shape):
+<<<<<<< reviewed
+    """
+    Inherits from :class:`Shape`.
+    """
+=======
+    """
+    Inherits from :class:`Shape`, with three sides.
+    """
+>>>>>>> base

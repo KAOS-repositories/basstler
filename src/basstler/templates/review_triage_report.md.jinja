@@ -2,7 +2,8 @@
 
 Changes since {{ outcome.start.reason }}.
 
-**{{ outcome.files_needing_review | length }} of {{ outcome.files | length }} files need review**; the other {{ outcome.mechanical_files | length }} change only mechanically.
+{% include "review_triage_summary.md.jinja" %}
+
 
 {% if outcome.renames.identifier_renames %}
 Renames applied - check them once here instead of in every file:
@@ -18,6 +19,9 @@ Renames applied - check them once here instead of in every file:
 
 {% for file in outcome.files_needing_review %}
 - `{{ file.change.path }}`
+{% for reason in file.reasons %}
+  - line {{ reason.line }}: {{ reason.explanation }}
+{% endfor %}
 {% else %}
 Nothing.
 {% endfor %}

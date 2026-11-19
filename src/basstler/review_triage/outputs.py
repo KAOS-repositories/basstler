@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Annotated, Any
 
@@ -19,6 +20,7 @@ from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.github.review_models import PageInfo
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ReviewTriageLocation
+from basstler.progress import ProgressStep, ProgressUnit
 from basstler.render_common import TemplatePage
 from basstler.review_triage.declaration import TriageDeclaration
 from basstler.review_triage.exceptions import PullRequestHeadMoved
@@ -71,7 +73,35 @@ class MarkdownReport(TriageOutput, TemplatePage):
         logger.info(self.render(outcome))
 
 
+class TriageSummary(MarkdownReport):
+    """
+    Prints only the sentence of :class:`MarkdownReport` counting the files that need
+    review.
+    """
+
+    @classproperty
+    def template(cls) -> str:
+        return ReviewTriageLocation.SUMMARY_TEMPLATE.name
+
+
 # %% marking files viewed
+
+
+class ViewedFilesVariable(StrEnum):
+    """
+    The variables of the mutation marking files of a pull request viewed.
+    """
+
+    PULL_REQUEST = "pullRequestId"
+    """
+    What GitHub's GraphQL API identifies the pull request by.
+    """
+
+    PATH_PREFIX = "file"
+    """
+    What the variable holding each file's path, and the mutation marking it, is named
+    by, followed by the file's position in the request.
+    """
 
 
 class PullRequestVariables(ValidatedJSONModel):
@@ -79,21 +109,11 @@ class PullRequestVariables(ValidatedJSONModel):
     The variables of a GraphQL document about one pull request.
     """
 
-    pull_request_node_identifier: Annotated[str, Field(alias="pullRequestId")]
+    pull_request_node_identifier: Annotated[
+        str, Field(alias=ViewedFilesVariable.PULL_REQUEST)
+    ]
     """
     What GitHub's GraphQL API identifies the pull request by.
-    """
-
-
-class ViewedFile(PullRequestVariables):
-    """
-    The variables of the mutation marking one file of a pull request viewed.
-    """
-
-    path: PurePosixPath
-    """
-    The file's path in the pull request's head commit, which GitHub separates with
-    forward slashes on every platform.
     """
 
 
@@ -180,6 +200,43 @@ class AttemptedRequest:
 
 
 @dataclass(frozen=True)
+class ViewedFiles:
+    """
+    Files of one pull request to mark viewed with one request.
+    """
+
+    pull_request_node_identifier: str
+    """
+    What GitHub's GraphQL API identifies the pull request by.
+    """
+
+    paths: tuple[PurePosixPath, ...]
+    """
+    The files' paths in the pull request's head commit.
+    """
+
+    def request(self) -> GraphQLRequest:
+        """
+        :return: The mutation marking every file of :attr:`paths` viewed, each path
+            sent with forward slashes, as GitHub separates them on every platform.
+        """
+        paths = {
+            f"{ViewedFilesVariable.PATH_PREFIX}{position}": path.as_posix()
+            for position, path in enumerate(self.paths)
+        }
+        document = TemplatePage.render_named_template(
+            ReviewTriageLocation.MARK_FILES_AS_VIEWED_TEMPLATE.name,
+            pull_request_variable=ViewedFilesVariable.PULL_REQUEST,
+            path_variables=tuple(paths),
+        )
+        return GraphQLRequest(
+            document,
+            {ViewedFilesVariable.PULL_REQUEST: self.pull_request_node_identifier}
+            | paths,
+        )
+
+
+@dataclass(frozen=True)
 class ViewedMarking(TriageOutput):
     """
     Marks every mechanical file GitHub lists in the pull request viewed, for the account
@@ -193,6 +250,11 @@ class ViewedMarking(TriageOutput):
     github: GitHubWriter
     """
     The writer the requests are sent through.
+    """
+
+    files_per_request: int = 50
+    """
+    How many files one request marks at most.
     """
 
     def publish(self, outcome: TriageOutcome) -> None:
@@ -218,14 +280,16 @@ class ViewedMarking(TriageOutput):
                 "Not marked viewed, as GitHub does not list them in pull request "
                 f"{outcome.pull_request.number}: {', '.join(map(str, unlisted))}"
             )
-        document = TextFile(ReviewTriageLocation.MARK_FILE_AS_VIEWED).read()
-        for path in mechanical:
-            if path not in listing.result:
-                continue
-            variables = ViewedFile(outcome.pull_request.node_identifier, path)
-            marking = self.attempt(GraphQLRequest(document, variables.to_json()))
-            if marking.refusals:
-                return marking.refusals
+        paths = tuple(path for path in mechanical if path in listing.result)
+        with ProgressStep.MARKING_VIEWED.bar(len(paths), ProgressUnit.FILE) as progress:
+            for start in range(0, len(paths), self.files_per_request):
+                batch = paths[start : start + self.files_per_request]
+                marking = self.attempt(
+                    ViewedFiles(outcome.pull_request.node_identifier, batch).request()
+                )
+                if marking.refusals:
+                    return marking.refusals
+                progress.update(len(batch))
         return ()
 
     def listed_paths(self, outcome: TriageOutcome) -> AttemptedRequest:

@@ -10,11 +10,11 @@ from typing import Annotated, Any
 from pydantic import Field
 
 from basstler.class_property import classproperty
-from basstler.github.client import GitHubWrite, HttpMethod
+from basstler.github.workflows import RepositoryWorkflow
+from basstler.github.client import HttpMethod, RepositoryWrite
 from basstler.github.repository import Repository
 from basstler.github.states import CheckOutcome, ConclusionOutcome
 from basstler.json_model import JSONModel, ValidatedJSONModel
-from basstler.locations import WorkflowLocation
 
 # %% a run
 
@@ -107,19 +107,9 @@ class RunJobPage(JSONModel):
 # %% starting a run
 
 
-class WorkflowDispatch(GitHubWrite):
+class WorkflowDispatch(RepositoryWorkflow, RepositoryWrite):
     """
     A request to run a workflow.
-    """
-
-    repository: Annotated[Repository, Field(exclude=True)]
-    """
-    The repository the workflow belongs to.
-    """
-
-    workflow: Annotated[WorkflowLocation, Field(exclude=True)]
-    """
-    The workflow to run.
     """
 
     branch: Annotated[str, Field(alias="ref")]
@@ -133,4 +123,4 @@ class WorkflowDispatch(GitHubWrite):
 
     @property
     def path(self) -> str:
-        return self.repository.workflow_dispatch_path(self.workflow)
+        return self.repository.workflow_dispatch_path(self.workflow_path)

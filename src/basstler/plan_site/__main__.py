@@ -524,7 +524,9 @@ def main() -> int:
         return 1
     site = HubSite(
         address=SiteAddress(site_url),
-        pull_request_source=GitHubPullRequestSource.from_environment(),
+        pull_request_source=GitHubPullRequestSource.from_environment(
+            reads_mergeable_states=True
+        ),
         hub=hub,
         remote_root=arguments.remote_root,
     )

@@ -385,6 +385,7 @@ PACKAGE_MAP = PackageMap(
                 Distribution.GIT,
                 Distribution.GITHUB,
                 Distribution.REVIEWS,
+                Distribution.REVIEW_TRIAGE,
                 Distribution.STACK,
                 Distribution.PLAN,
                 Distribution.NOTES,

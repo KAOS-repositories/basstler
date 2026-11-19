@@ -36,18 +36,21 @@ items:
   branch: ccr-6ee4aeab-7j9mi2
   pull_request_number: 223
   session: https://claude.ai/code/session_01JxHGiNXmsDWbDmd81sWCfP
+  blockers:
+    - >-
+      #222, which this branch is stacked on, sits on #220, and #220 conflicts with main in
+      review_triage/outputs.py and test_pull_request_triage.py (maintenance comment on #220); the
+      stack pass leaves #222 and #223 unpublished until #220 is resolved.
   depends_on:
   - code-rule-fixes/rule-fixes
   status: in progress
   recommended_model: sonnet
   notes: >
-    Draft #223, stacked on #222, merged with its base (probe clean at cb13f576). CI at cb13f576
-    failed only in plan: its tests need the installed meta-package; plan's dev group lists basstler
-    at 297ef48f, as notes' does. Next: restack onto #222, which now carries #213; move
-    basstler.review_triage and #213's other new files into packages/ as its own distribution with
-    a replayable code_modification action plan, committing its script for
-    code-rule-fixes/action-plan-triage; then read CI. Open: shared test helpers pull the stack into
-    lower distributions' dev groups; no file is marked viewed yet.
+    Draft #223, stacked on #222, merged with its head 293015cf at 25bbd5ca (pushed); review triage
+    is its own basstler-review-triage. Next: read CI at 25bbd5ca; hub's browser tests were not run
+    locally. Open: confirm dropping main's interpreter-candidate session start for the uv install;
+    commit the move's script for code-rule-fixes/action-plan-triage; shared test helpers pull the
+    stack into lower dev groups.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split

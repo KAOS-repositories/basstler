@@ -164,7 +164,7 @@ class NodeSubstitution(libcst.CSTTransformer):
 # %% imports
 
 
-class ModuleTransformation(Action, ABC):
+class ModuleTransformation(Action[libcst.Module], ABC):
     """
     Changes a whole module, which the action that restores the module undoes.
     """
@@ -176,8 +176,8 @@ class ModuleTransformation(Action, ABC):
         :return: The module with the change made.
         """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        return AppliedAction(self.transform(module), ModuleReplacement(module))
+    def apply(self, target: libcst.Module) -> AppliedAction[libcst.Module]:
+        return AppliedAction(self.transform(target), ModuleReplacement(target))
 
 
 @dataclass(frozen=True)
@@ -237,3 +237,16 @@ class ActionPlan[Target](Action[Target]):
             target = applied.result
             inverses.append(applied.inverse)
         return AppliedAction(target, ActionPlan(tuple(reversed(inverses))))
+
+
+class PlanBuilder[Target](ABC):
+    """
+    Builds the action that changes a target, from the target itself.
+    """
+
+    @abstractmethod
+    def build(self, target: Target) -> Action[Target]:
+        """
+        :param target: What the action is to change.
+        :return: The action, to be applied to *target*.
+        """

@@ -257,6 +257,29 @@ class GitCommandRunner:
             self.attempt(*arguments, environment=environment).raise_if_failed().output
         )
 
+    def run_binary(self, *arguments: str, standard_input: bytes = b"") -> bytes:
+        """
+        Run a command whose output is bytes, such as the content of committed files.
+
+        :param arguments: The git subcommand and its arguments.
+        :param standard_input: What the command reads from its standard input.
+        :return: Git's stdout, unstripped.
+        :raises GitCommandFailed: If git exits non-zero.
+        """
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=self.working_directory,
+            input=standard_input,
+            capture_output=True,
+        )
+        GitCommandResult(
+            arguments=arguments,
+            exit_status=completed.returncode,
+            output="",
+            error_output=completed.stderr.decode(GIT_TEXT_ENCODING).strip(),
+        ).raise_if_failed()
+        return completed.stdout
+
     def repository_state_path(self, location: RepositoryStateLocation) -> Path:
         """
         :param location: Scratch state kept per repository.

@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from basstler.git.remote_branch import RemoteBranch
 from basstler.class_property import classproperty
 from basstler.command_line import Command
 from basstler.exit_codes import StackExitCode
@@ -25,7 +26,7 @@ from basstler.stack.commit_move import (
     CommitMoveChecks,
     ProposedCommitMove,
 )
-from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.remote import GitHubRemote
 from basstler.github.client import GitHubRestClient
 from basstler.github.constants import MaintenanceNotice
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
@@ -135,8 +136,9 @@ class MaintenancePass:
                 self.upstream().open_pull_requests(), fork
             )
         read = ActionRead(
-            GitHubRemoteBranch(
-                ActionBranch.NAME, self.git, self.configuration.fork_remote
+            RemoteBranch(
+                GitHubRemote(self.git, self.configuration.fork_remote),
+                ActionBranch.NAME,
             ),
             OpenPullRequestsRequest.fresh(self.configuration.upstream_repository, fork),
             GitHubRestClient(),

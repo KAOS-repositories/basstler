@@ -297,9 +297,24 @@ def test_a_failing_gh_fails_the_fetch_with_its_error(stubbed_gh):
 def test_only_the_fields_the_models_read_are_kept():
     kept = basstler.upstream_reviews.helper.fetch.Fetch(
         HelperScript(request()).configuration
-    ).kept({"title": "t", "body": "b", "head": {"sha": "s", "repo": {}}, "_links": {}})
+    ).kept(
+        {
+            "title": "t",
+            "body": "b",
+            "head": {
+                "sha": "s",
+                "label": "l",
+                "repo": {"full_name": "f", "watchers": 1},
+            },
+            "_links": {},
+        }
+    )
 
-    assert kept == {"title": "t", "body": "b", "head": {"sha": "s"}}
+    assert kept == {
+        "title": "t",
+        "body": "b",
+        "head": {"sha": "s", "repo": {"full_name": "f"}},
+    }
 
 
 def test_the_kept_fields_read_the_pull_request_the_whole_responses_do():

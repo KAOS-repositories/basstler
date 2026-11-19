@@ -30,10 +30,11 @@ import sys
 from enum import StrEnum
 from pathlib import Path
 
+from basstler.git.remote_branch import RemoteBranch
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandFailed, GitCommandRunner
-from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.remote import GitHubRemote
 from basstler.github.client import GitHubRestClient
 from basstler.github.repository import Repository
 from basstler.standard_streams import StandardStreamHandler
@@ -165,12 +166,12 @@ def main(argv: list[str] | None = None) -> int:
             ActionRun(arguments.request, git, arguments.remote).publish_answer()
             AbandonedRequests(git, arguments.remote).delete()
             return 0
-        branch = GitHubRemoteBranch(ActionBranch.NAME, git, arguments.remote)
+        branch = RemoteBranch(GitHubRemote(git, arguments.remote), ActionBranch.NAME)
         if arguments.command == ActionCommand.INSTALL:
             installation = ActionInstallation(arguments.branch_or_tag)
             changed = installation.install(branch)
             logger.info(
-                f"{ActionBranch.NAME} on {branch.description} "
+                f"{ActionBranch.NAME} on {branch.repository.description} "
                 f"{'now runs' if changed else 'already runs'} basstler {arguments.branch_or_tag}"
             )
             return 0

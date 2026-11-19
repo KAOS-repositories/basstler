@@ -8,6 +8,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from basstler.git.remote import Remote
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.repository_access import GitHubRepository
@@ -73,7 +74,8 @@ class ActionRun:
         """
         answer = self.answer()
         return RemoteBranch(
-            ActionBranch.for_request(answer.request_identifier), self.git, self.remote
+            Remote(self.git, self.remote),
+            ActionBranch.for_request(answer.request_identifier),
         ).write(
             {ActionFile.RESULT: answer},
             ActionBranch.request_commit_message("Answer", answer.request_identifier),

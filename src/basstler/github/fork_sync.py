@@ -13,6 +13,7 @@ from basstler.git.branch import Branch
 from basstler.github.client import HttpMethod
 from basstler.github.file_proposal import ExistingBranch
 from basstler.github.git_objects import GitObject
+from basstler.github.repository import Repository
 from basstler.github.repository_resources import SettingWrite
 from basstler.github.user_steps import SyncFork, UserStep
 
@@ -25,7 +26,7 @@ class ForkFastForward(SettingWrite[ExistingBranch], GitObject):
     GitHub refuses it unless the branch's commit is an ancestor of that commit.
     """
 
-    branch: Annotated[Branch, Field(exclude=True)]
+    branch: Annotated[Branch[Repository], Field(exclude=True)]
     """
     The fork's branch.
     """

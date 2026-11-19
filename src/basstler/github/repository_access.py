@@ -242,7 +242,7 @@ class PullRequestListingSpecification:
         return self._path(
             ends.base.repository,
             {
-                ListingParameter.HEAD: ends.head.qualified_name,
+                ListingParameter.HEAD: ends.head.repository.branch_label(ends.head),
                 ListingParameter.BASE: ends.base.name,
             },
         )

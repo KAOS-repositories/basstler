@@ -40,10 +40,11 @@ from dataclasses import dataclass
 from enum import Enum, StrEnum
 from pathlib import Path
 
+from basstler.git.remote_branch import RemoteBranch
 from basstler.bash import Bash
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandFailed, GitCommandRunner
-from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.remote import GitHubRemote
 from basstler.github.repository import HasRepository, Repository
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
@@ -767,8 +768,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if arguments.command == SetupCommand.INSTALL_UPSTREAM_REVIEWS_ACTION:
         remote = PersonalNotesSetting.REMOTE.resolve(project_root, os.environ)
-        branch = GitHubRemoteBranch(
-            ActionBranch.NAME, GitCommandRunner(project_root), remote
+        branch = RemoteBranch(
+            GitHubRemote(GitCommandRunner(project_root), remote), ActionBranch.NAME
         )
         try:
             changed = ActionInstallation(arguments.branch_or_tag).install(branch)
@@ -776,7 +777,7 @@ def main(argv: list[str] | None = None) -> int:
             logger.error(failure)
             return 1
         logger.info(
-            f"{ActionBranch.NAME} on {branch.description} "
+            f"{ActionBranch.NAME} on {branch.repository.description} "
             f"{'now runs' if changed else 'already runs'} basstler {arguments.branch_or_tag}"
         )
         return 0

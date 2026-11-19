@@ -11,11 +11,17 @@
         "ref": "some-branch",
         "user": {
           "login": "example-fork-owner"
+        },
+        "repo": {
+          "full_name": "example-fork-owner/example-repo"
         }
       },
       "base": {
         "ref": "main",
-        "sha": "89abcdef0123456789abcdef0123456789abcdef"
+        "sha": "89abcdef0123456789abcdef0123456789abcdef",
+        "repo": {
+          "full_name": "example-upstream/example-repo"
+        }
       }
     },
     {
@@ -29,11 +35,17 @@
         "ref": "some-branch",
         "user": {
           "login": "example-fork-owner"
+        },
+        "repo": {
+          "full_name": "example-fork-owner/example-repo"
         }
       },
       "base": {
         "ref": "main",
-        "sha": "89abcdef0123456789abcdef0123456789abcdef"
+        "sha": "89abcdef0123456789abcdef0123456789abcdef",
+        "repo": {
+          "full_name": "example-upstream/example-repo"
+        }
       }
     }
   ]

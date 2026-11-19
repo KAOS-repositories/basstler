@@ -26,10 +26,9 @@ from basstler.github.file_proposal import (
     FileProposal,
     ProposalOutcome,
 )
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import Repository
 from basstler.github.fork_sync import ForkFastForward
 from basstler.github.repository_details import (
-    ParentRepository,
     RepositoryDetails,
     RepositoryDetailsRead,
 )
@@ -201,14 +200,14 @@ class MarkViewedSetup(TemplatePage):
                 self.workflow_repository, read.response.failure.error_message()
             )
         details = read.resource
-        if self.on_every_pull_request and details.parent is not None:
+        if self.on_every_pull_request and details.parent_default_branch is not None:
             self.steps.append(
                 SetupStep(
                     "running on every pull request",
                     SetupState.LEFT_TO_USER,
                     f"{self.workflow_repository.full_name} is a fork, which never sees "
-                    f"{details.parent.full_name}'s pull requests; set the workflow up "
-                    f"there with --workflow-repository {details.parent.full_name}",
+                    f"{details.parent_default_branch.repository.full_name}'s pull requests; set the workflow up "
+                    f"there with --workflow-repository {details.parent_default_branch.repository.full_name}",
                 )
             )
         installed = self.install_workflow(client, details)
@@ -239,7 +238,7 @@ class MarkViewedSetup(TemplatePage):
             f"{self.workflow_repository.full_name}'s {details.default_branch.name}"
         )
         installed = (
-            self.workflow_commit(self.workflow_repository, details.default_branch)
+            self.workflow_commit(details.default_branch)
             .read_at(details.default_branch.name)
             .attempt(client)
             .resource
@@ -247,23 +246,28 @@ class MarkViewedSetup(TemplatePage):
         if installed is not None and installed.text == self.caller_workflow:
             self.steps.append(SetupStep(description, SetupState.ALREADY_DONE))
             return True
-        if details.parent is not None and self.holds_workflow(client, details.parent):
-            return self.fast_forward_fork(client, details.parent, details, description)
+        if details.parent_default_branch is not None and self.holds_workflow(
+            client, details.parent_default_branch
+        ):
+            return self.fast_forward_fork(
+                client, details.parent_default_branch, details, description
+            )
         outcome = self.workflow_proposal(details).propose(client)
         self.report_proposal(description, details, outcome)
         return installed is not None
 
     def holds_workflow(
-        self, client: GitHubAttemptClient, parent: ParentRepository
+        self, client: GitHubAttemptClient, parent_default_branch: Branch[Repository]
     ) -> bool:
         """
         :param client: Reads the parent.
-        :param parent: The workflow repository's parent.
-        :return: Whether the parent's default branch holds the caller workflow.
+        :param parent_default_branch: The default branch of the workflow repository's
+            parent.
+        :return: Whether that branch holds the caller workflow.
         """
         held = (
-            self.workflow_commit(parent.repository, parent.default_branch)
-            .read_at(parent.default_branch.name)
+            self.workflow_commit(parent_default_branch)
+            .read_at(parent_default_branch.name)
             .attempt(client)
             .resource
         )
@@ -272,7 +276,7 @@ class MarkViewedSetup(TemplatePage):
     def fast_forward_fork(
         self,
         client: GitHubAttemptClient,
-        parent: ParentRepository,
+        parent_default_branch: Branch[Repository],
         details: RepositoryDetails,
         description: str,
     ) -> bool:
@@ -281,14 +285,14 @@ class MarkViewedSetup(TemplatePage):
         workflow, leaving the sync to the user where GitHub refuses.
 
         :param client: Reads the parent and writes the fork.
-        :param parent: The fork's parent.
+        :param parent_default_branch: The default branch of the fork's parent.
         :param details: The fork.
         :param description: What installing sets up.
         :return: Whether the fork's default branch holds the workflow now.
         """
-        head = BranchReferenceRead(parent.repository, parent.default_branch).attempt(
-            client
-        )
+        head = BranchReferenceRead(
+            parent_default_branch.repository, parent_default_branch
+        ).attempt(client)
         if head.resource is None:
             self.steps.append(
                 SetupStep(
@@ -313,19 +317,19 @@ class MarkViewedSetup(TemplatePage):
             SetupStep(
                 description,
                 SetupState.DONE,
-                f"fast-forwarded to {parent.full_name}'s {parent.default_branch.name}",
+                f"fast-forwarded to {parent_default_branch.repository.full_name}'s "
+                f"{parent_default_branch.name}",
             )
         )
         return True
 
-    def workflow_commit(self, repository: Repository, branch: Branch) -> FileCommit:
+    def workflow_commit(self, branch: Branch[Repository]) -> FileCommit:
         """
-        :param repository: The repository the caller workflow is committed to.
-        :param branch: The branch it is committed on.
+        :param branch: The branch the caller workflow is committed on.
         :return: The caller workflow, committed there.
         """
         return FileCommit(
-            RepositoryBranch(branch.name, repository),
+            branch,
             WorkflowLocation.MARK_VIEWED.as_posix(),
             self.caller_workflow,
             "Mark pull requests' mechanical files viewed from Actions",
@@ -337,9 +341,9 @@ class MarkViewedSetup(TemplatePage):
         :return: The repository the workflow is proposed to: a fork's parent, whose
             default branch the fork follows, else the workflow repository itself.
         """
-        if details.parent is None:
+        if details.parent_default_branch is None:
             return self.workflow_repository
-        return details.parent.repository
+        return details.parent_default_branch.repository
 
     def workflow_proposal(self, details: RepositoryDetails) -> FileProposal:
         """
@@ -349,11 +353,9 @@ class MarkViewedSetup(TemplatePage):
         """
         return FileProposal(
             commit=self.workflow_commit(
-                self.workflow_repository, Branch(ProposalBranch.MARK_VIEWED)
+                Branch(self.workflow_repository, ProposalBranch.MARK_VIEWED)
             ),
-            base=RepositoryBranch(
-                details.default_branch.name, self.proposal_repository(details)
-            ),
+            base=Branch(self.proposal_repository(details), details.default_branch.name),
             description=f"Installed by `basstler review-triage set-up-mark-viewed` "
             f"({self.branch_or_tag}). Merging it lets the workflow mark files viewed "
             f"for the owner of the token stored as `{ReviewTriageSecret.VIEWER_TOKEN}`.",
@@ -626,6 +628,6 @@ class MarkViewedSetup(TemplatePage):
         """
         if self.pull_request_repository is not None:
             return self.pull_request_repository
-        if details.parent is not None:
-            return details.parent.repository
+        if details.parent_default_branch is not None:
+            return details.parent_default_branch.repository
         return self.workflow_repository

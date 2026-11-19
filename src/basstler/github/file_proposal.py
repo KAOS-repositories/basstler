@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
-from pydantic import Field, PlainSerializer
+from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.git.branch import Branch
@@ -22,11 +22,12 @@ from basstler.github.client import (
 from basstler.github.git_objects import EncodedContent, GitObject
 from basstler.github.pull_request import NewPullRequest
 from basstler.github.pull_request_form import PullRequestForm
-from basstler.github.repository import RepositoryBranch
+from basstler.github.branch_wire_form import BranchFullReference, BranchName
+from basstler.github.repository import Repository
 from basstler.github.repository_access import PullRequestListState
 from basstler.github.repository_resources import RepositoryRead, ResourceWrite
 from basstler.github.rest_models import PullRequestPage, RestPullRequestSummary
-from basstler.json_model import RawValueReader, ValidatedJSONModel
+from basstler.json_model import ValidatedJSONModel
 
 # %% the contents API
 
@@ -77,7 +78,7 @@ class FileWrite(ResourceWrite[RepositoryFile], EncodedContent):
     The commit's message.
     """
 
-    branch: Annotated[Branch, PlainSerializer(lambda branch: branch.name)]
+    branch: Annotated[Branch[Repository], BranchName()]
     """
     The branch the commit is made on.
     """
@@ -105,7 +106,7 @@ class FileCommit:
     One file's whole content, committed to a branch of a repository.
     """
 
-    branch: RepositoryBranch
+    branch: Branch[Repository]
     """
     The branch holding the file.
     """
@@ -152,28 +153,14 @@ class FileCommit:
 # %% branches and pull requests
 
 
-class FullReferenceName(RawValueReader):
+class BranchReference(ValidatedJSONModel):
     """
-    Reads a branch's full reference as the branch's name.
-    """
-
-    def read(self, value: str) -> str:
-        return value.removeprefix(f"{Branch.namespace}/")
-
-
-class BranchReference(ValidatedJSONModel, Branch):
-    """
-    A branch as the git references API names it: by its full reference.
+    A git reference naming one branch, as the git references API reads and writes it.
     """
 
-    name: Annotated[
-        str,
-        Field(alias="ref"),
-        FullReferenceName(),
-        PlainSerializer(lambda name: Branch(name).reference),
-    ]
+    branch: Annotated[Branch[Repository], Field(alias="ref"), BranchFullReference()]
     """
-    The branch's name, read and written as its full reference.
+    The branch the reference names.
     """
 
 
@@ -194,7 +181,7 @@ class BranchReferenceRead(RepositoryRead[ExistingBranch]):
     Reads where one branch of a repository points.
     """
 
-    branch: Branch
+    branch: Branch[Repository]
     """
     The branch.
     """
@@ -204,9 +191,14 @@ class BranchReferenceRead(RepositoryRead[ExistingBranch]):
         return self.repository.branch_reference_path(self.branch)
 
 
-class NewBranch(RepositoryWrite, GitObject, BranchReference):
+class NewBranch(RepositoryWrite, BranchReference):
     """
-    A branch that does not exist yet, starting at one commit, the object it stands for.
+    A branch that does not exist yet, starting at one commit.
+    """
+
+    start_commit: Annotated[str, Field(alias="sha")]
+    """
+    The hash of the commit the branch starts at.
     """
 
     @classproperty
@@ -248,7 +240,7 @@ class ProposalOutcome:
     holds the file but the pull request could not be opened; empty otherwise.
     """
 
-    merges_into: Branch | None = None
+    merges_into: Branch[Repository] | None = None
     """
     The branch the pull request merges into, when it is another than the base; ``None``
     otherwise.
@@ -269,7 +261,7 @@ class FileProposal:
     request's title.
     """
 
-    base: RepositoryBranch
+    base: Branch[Repository]
     """
     The default branch the file is proposed for, on the repository the pull request is
     opened on.
@@ -379,7 +371,7 @@ class FileProposal:
         held = FileRead(
             self.base.repository,
             self.commit.file_path_from_repository_root,
-            pull_request.head.object_hash,
+            pull_request.head.commit,
         ).attempt(client)
         return held.resource is not None and held.resource.text == self.commit.text
 
@@ -411,8 +403,8 @@ class FileProposal:
         created = client.attempt_send(
             NewBranch(
                 repository=carrier,
-                object_hash=base.resource.target.object_hash,
-                name=self.commit.branch.name,
+                branch=self.commit.branch,
+                start_commit=base.resource.target.object_hash,
             )
         )
         return created if created.failure is not None else None

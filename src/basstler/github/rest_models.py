@@ -5,8 +5,9 @@ read builds.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -22,9 +23,11 @@ from basstler.github.review_models import (
 )
 from basstler.github.states import ConclusionOutcome, PullRequestState, ReviewState
 from basstler.git.branch import Branch
-from basstler.github.git_objects import GitObject
+from basstler.github.branch_wire_form import BranchWireForm
+from basstler.github.exceptions import BranchOwnerUnknown
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.web_page import AbsentAsEmpty, WebPage
-from basstler.json_model import ValidatedJSONModel
+from basstler.json_model import ObjectReader, ValidatedJSONModel
 
 # %% models mirroring the REST data
 
@@ -44,28 +47,42 @@ class RestPullRequestState(StrEnum):
     CLOSED = "closed"
 
 
-class PullRequestEnd(GitObject, Branch):
+@dataclass(frozen=True)
+class PullRequestEnd(Branch[Repository]):
     """
-    One end of a pull request - the branch it is opened from or merges into - standing
-    for the commit the branch points at.
-    """
-
-    name: Annotated[str, Field(alias="ref")]
-    """
-    The branch's name.
+    One end of a pull request - the branch it is opened from or merges into - at the
+    commit the branch pointed at when it was read.
     """
 
-
-class RestPullRequestHead(PullRequestEnd):
+    commit: str
     """
-    The branch a pull request was opened from, whose commit the checks are reported
-    against.
+    The hash of the commit the branch pointed at.
     """
 
-    owner: Annotated[Author, Field(alias="user")]
+
+class PullRequestEndForm(BranchWireForm[PullRequestEnd], ObjectReader):
     """
-    Whoever owns the branch.
+    A pull request's end, written as the object REST names it with: the branch, its
+    commit and the repository it is of, ``null`` once that repository is deleted.
     """
+
+    @property
+    def read_keys(self) -> frozenset[str]:
+        return frozenset({"ref", "sha", "repo", "full_name"})
+
+    def read(self, value: Any, read: HasRepository | None) -> PullRequestEnd:
+        if value["repo"] is None:
+            raise BranchOwnerUnknown(value["ref"])
+        return PullRequestEnd(
+            Repository.parse(value["repo"]["full_name"]), value["ref"], value["sha"]
+        )
+
+    def write(self, branch: PullRequestEnd) -> dict[str, Any]:
+        return {
+            "ref": branch.name,
+            "sha": branch.commit,
+            "repo": {"full_name": branch.repository.full_name},
+        }
 
 
 class PullRequestPage(WebPage):
@@ -99,12 +116,12 @@ class RestPullRequestSummary(RestResponse, PullRequestPage):
     When it merged, as an ISO 8601 timestamp, absent unless it closed by merging.
     """
 
-    head: RestPullRequestHead
+    head: Annotated[PullRequestEnd, PullRequestEndForm()]
     """
     The branch it was opened from.
     """
 
-    base: PullRequestEnd
+    base: Annotated[PullRequestEnd, PullRequestEndForm()]
     """
     The branch it merges into.
     """
@@ -124,7 +141,9 @@ class RestPullRequestSummary(RestResponse, PullRequestPage):
         else:
             state = PullRequestState[self.state.name]
         return BranchPullRequest(
-            number=self.number, state=state, head_owner=self.head.owner
+            number=self.number,
+            state=state,
+            head_owner=Author(login=self.head.repository.owner),
         )
 
 

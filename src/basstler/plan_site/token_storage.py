@@ -20,6 +20,7 @@ from pathlib import Path
 
 from cyclopts import App
 
+from basstler.git.remote import Remote
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import GitHubAttemptClient, GitHubRestClient
@@ -236,7 +237,7 @@ def store_token() -> int:
     if notes_repository is None:
         raise NotesRepositoryUnresolvedError(location.remote)
     notes_branch = RemoteBranch(
-        location.branch, GitCommandRunner(project_root), location.remote
+        Remote(GitCommandRunner(project_root), location.remote), location.branch
     )
     site = SiteRepository.recorded_on(notes_branch)
     if site is None:

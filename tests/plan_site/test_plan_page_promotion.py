@@ -10,6 +10,7 @@ from html import escape
 
 import pytest
 
+from basstler.git.branch import Branch
 from basstler.github.states import CombinedCheckState
 from basstler.maintenance.promotion import PromotionSummary
 from basstler.plan.model import ItemStatus
@@ -22,7 +23,7 @@ from basstler.github.pull_request_state import (
     PullRequestRecord,
     PullRequestState,
 )
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import Repository
 from basstler.stack.promotability import PromotionBlocker
 from basstler.stack.promotion_link import PromotionLink, PromotionTarget
 
@@ -119,8 +120,8 @@ def test_a_promotable_item_links_to_the_prefilled_upstream_form():
         promotion.url
         == PromotionLink.for_target(
             PromotionTarget(
-                upstream_base=RepositoryBranch(
-                    LINEAGE.upstream_default_branch, LINEAGE.upstream_repository
+                upstream_base=Branch(
+                    LINEAGE.upstream_repository, LINEAGE.upstream_default_branch
                 ),
                 fork=FORK,
             ),

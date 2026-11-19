@@ -10,44 +10,13 @@ from typing import Annotated
 from pydantic import Field
 
 from basstler.git.branch import Branch
+from basstler.github.branch_wire_form import BranchName, RepositoryDefaultBranch
 from basstler.github.pull_request_state import ForkLineage
 from basstler.github.repository import Repository
 from basstler.github.repository_resources import RepositoryRead
-from basstler.json_model import RawValueReader, ValidatedJSONModel
+from basstler.json_model import ValidatedJSONModel
 
 # %% the repository resource
-
-
-class BranchName(RawValueReader):
-    """
-    Reads a branch's name, as a repository's resource gives it, as the :class:`Branch`.
-    """
-
-    def read(self, value: str) -> Branch:
-        return Branch(value)
-
-
-class ParentRepository(ValidatedJSONModel):
-    """
-    The repository a fork was made from, as the fork's resource names it.
-    """
-
-    full_name: str
-    """
-    The parent's ``owner/name``.
-    """
-
-    default_branch: Annotated[Branch, BranchName()]
-    """
-    The parent's default branch.
-    """
-
-    @property
-    def repository(self) -> Repository:
-        """
-        The parent itself.
-        """
-        return Repository.parse(self.full_name)
 
 
 class RepositoryDetails(ValidatedJSONModel):
@@ -55,7 +24,7 @@ class RepositoryDetails(ValidatedJSONModel):
     One repository, as its REST resource describes it.
     """
 
-    default_branch: Annotated[Branch, BranchName()]
+    default_branch: Annotated[Branch[Repository], BranchName()]
     """
     The branch pull requests target unless told otherwise.
     """
@@ -70,9 +39,12 @@ class RepositoryDetails(ValidatedJSONModel):
     Whether only the people and tokens granted access can read it.
     """
 
-    parent: ParentRepository | None = None
+    parent_default_branch: Annotated[
+        Branch[Repository] | None, Field(alias="parent"), RepositoryDefaultBranch()
+    ] = None
     """
-    The repository it was forked from, ``None`` when it is no fork.
+    The default branch of the repository it was forked from, ``None`` when it is no
+    fork.
     """
 
     @property
@@ -80,11 +52,11 @@ class RepositoryDetails(ValidatedJSONModel):
         """
         What the repository was forked from, ``None`` unless it is a fork.
         """
-        if self.parent is None:
+        if self.parent_default_branch is None:
             return None
         return ForkLineage(
-            upstream_repository=self.parent.repository,
-            upstream_default_branch=self.parent.default_branch.name,
+            upstream_repository=self.parent_default_branch.repository,
+            upstream_default_branch=self.parent_default_branch.name,
             fork_default_branch=self.default_branch.name,
         )
 

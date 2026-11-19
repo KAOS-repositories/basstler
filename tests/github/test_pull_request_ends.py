@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
+from basstler.git.branch import Branch
 from basstler.github.pull_request_ends import PullRequestEnds
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import Repository
 from basstler.github.repository_access import ListingParameter, PullRequestListState
 
 # %% the ends
@@ -19,8 +20,8 @@ The repository the pull requests are opened on.
 """
 
 ENDS = PullRequestEnds(
-    RepositoryBranch("main", REPOSITORY),
-    RepositoryBranch("topic", Repository("a-forker", REPOSITORY.name)),
+    Branch(REPOSITORY, "main"),
+    Branch(Repository("a-forker", REPOSITORY.name), "topic"),
 )
 """
 A branch of a fork, proposed to the repository's ``main``.
@@ -43,7 +44,7 @@ def test_the_listing_between_the_ends_filters_on_both():
         query[ListingParameter.BASE],
     ) == (
         REPOSITORY.pull_requests_path,
-        [ENDS.head.qualified_name],
+        [ENDS.head.repository.branch_label(ENDS.head)],
         [ENDS.base.name],
     )
 

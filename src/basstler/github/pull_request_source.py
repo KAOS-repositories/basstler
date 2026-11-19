@@ -28,7 +28,7 @@ from basstler.github.pull_request_state import (
     PullRequestState,
 )
 from basstler.github.repository import PullRequestReference, Repository
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.repository_access import GitHubRepository
 from basstler.standard_streams import StandardStreamHandler
 
@@ -207,9 +207,11 @@ class GitHubPullRequestSource(PullRequestSource):
     def fork_lineage_of(self, repository: Repository) -> ForkLineage | None:
         if self.read_failure_of(repository) is not None:
             return None
-        return RepositoryDetails.from_json(
-            self.repository_details[repository].body
-        ).lineage
+        return (
+            RepositoryDetailsRead(repository)
+            .parse(self.repository_details[repository].body)
+            .lineage
+        )
 
     def upstream_pull_requests_of(
         self, fork: Repository, lineage: ForkLineage

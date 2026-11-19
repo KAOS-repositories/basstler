@@ -1,8 +1,13 @@
 # Plan handover
 
-This directory hands over {{ handover.plans | length }} plan{{ "s" if handover.plans | length != 1 }} and every item in them. Each item is one
-pull request's worth of work: what it does, where it stands, what it builds on and what
-is already known about it.
+Instructions for continuing {{ handover.plans | length }} handed-over plan{{ "s" if handover.plans | length != 1 }}. Each item below is one pull
+request's worth of work: what it does, where it stands, what it builds on and what is
+already known about it.
+
+If `basstler` is installed, do not follow this file: run
+`basstler plan-handover import <this directory>` from a checkout of the repository, then
+continue each item with `/plan-item-kickoff <plan-id> <item-id>` if it has not started, or
+`/plan-item-resolve <plan-id> <item-id>` if it is underway.
 
 | Plan | Items | Underway | Not started |
 | --- | --- | --- | --- |
@@ -11,55 +16,32 @@ is already known about it.
 | [{{ plan.manifest.content.title }}](#plan-{{ plan.identifier }}) | {{ statuses | length }} | {{ statuses | select("equalto", status.IN_PROGRESS) | list | length }} | {{ statuses | select("equalto", status.NOT_STARTED) | list | length }} |
 {% endfor %}
 
-## What you need first
+## Rules
 
-- **Write access to the repositories the items' branches and pull requests are on:**
+- Read the project's `AGENTS.md` (else `CLAUDE.md`) before changing anything.
+- Follow the standing rules of the item's plan{% if handover.repository_rules.rules %} and the repository's rules in
+  [`{{ location.REPOSITORY_RULES }}`]({{ location.REPOSITORY_RULES }}){% endif %}. They bind every item as much as its own notes.
+- Work one item per session. Plans are listed after the plans they depend on.
+- Underway items live on branches of
 {% for repository in handover.plans | map(attribute="manifest") | map(attribute="repositories") | sum(start=[]) | unique(attribute="full_name") %}
   [{{ repository.full_name }}]({{ repository.url }}){{ "," if not loop.last else "." }}
 {% endfor %}
-  The work in progress lives on branches there, so continuing it means pushing to them.
-- **The project's own rules:** its `AGENTS.md` (else `CLAUDE.md`), and the standing rules
-  of each plan below{% if handover.repository_rules.rules %} and of the repository, in
-  [`{{ location.REPOSITORY_RULES }}`]({{ location.REPOSITORY_RULES }}){% endif %}. They bind every item as much as its own notes.
+  Continuing one means pushing there; without write access, stop and ask the user for it.
+- The sessions that started these items cannot be opened. What they decided is in each
+  item's notes, its progress note and its pull request.
 
-The sessions that started these items are left out: only the person who ran a session can
-open it. What they decided is in each item's notes, its progress note and its pull request.
+## Working an item
 
-## Taking it over with basstler
-
-basstler tracks the plans for you: dependency readiness, stacked pull requests, the plan
-site and the progress notes. Set it up once, as its `docs/SETUP.md` describes, in a
-checkout of the repository above. Then, from that checkout:
-
-```bash
-basstler plan-handover import <this directory>
-```
-
-That saves every plan, progress note and rule onto your own personal-notes branch. Start an
-item that has not started with `/plan-item-kickoff <plan-id> <item-id>`, and continue one
-that is underway with `/plan-item-resolve <plan-id> <item-id>`; both read everything below
-for you.
-
-## Taking it over without basstler
-
-Work one item per session. Give Claude Code, or yourself, this prompt with the item's
-section of this guide pasted below it:
-
-```text
-Work the plan item below. Before changing anything:
-1. Read the project's AGENTS.md (else CLAUDE.md) and the plan's standing rules in this guide.
-2. If the item has a branch, check it out and build on what is on it; read its pull request,
-   its description and every unresolved review thread, and its progress note in this guide's
-   pr-progress directory.
-3. If it has no branch, cut one from the branch of the dependency it stacks on that has not
-   merged yet, else from the default branch, and open a draft pull request.
-4. Read the comments on the plan's tracking issue: structural changes to the plan are posted there.
-Then plan the change with tests first, implement it, and keep the pull request's description
-and the progress note true to the work.
-```
-
-The plans come after the plans they depend on. Each item links the items it depends on:
-start it once they have merged, or stack it on the branch of the one that has not.
+1. Check its dependencies: start it once they have merged, else stack it on the branch of
+   the one that has not.
+2. If it has a branch, check it out and build on it. Read its pull request, its
+   description, every unresolved review thread, and its progress note.
+3. If it has no branch, cut one from that unmerged dependency's branch, else from the
+   default branch, and open a draft pull request.
+4. Read the comments on the plan's tracking issue: structural changes to the plan are
+   posted there.
+5. Plan the change with tests first, implement it, and keep the pull request's
+   description and the progress note true to the work.
 
 {% for plan in handover.plans_in_saving_order %}
 {% set manifest = plan.manifest %}

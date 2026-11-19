@@ -265,7 +265,7 @@ class PlanHandoverLocation(PathEnumeration):
 
     GUIDE = Path("HANDOVER.md")
     """
-    The guide a reader works the handed-over plans from, with or without basstler.
+    The instructions a coding agent continues the handed-over plans from without basstler.
     """
 
     PLANS = Path("plans")
@@ -283,7 +283,7 @@ class PlanHandoverLocation(PathEnumeration):
     The rules every plan of the repository follows, in the notes branch's format.
     """
 
-    GUIDE_TEMPLATE = PackageLocation.TEMPLATES.value / "plan_handover.md.jinja"
+    GUIDE_TEMPLATE = PackageLocation.TEMPLATES.value / "plan_handover_guide.md.jinja"
     """
     The template :attr:`GUIDE` is rendered from.
     """

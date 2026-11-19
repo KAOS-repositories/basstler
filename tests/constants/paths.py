@@ -895,6 +895,12 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
     """
 
+    TWO_CALLS_BOTH_RENAMED = DIRECTORY / "two-calls-both-renamed.py"
+    """
+    :attr:`TWO_CALLS` with :func:`float` and :func:`int` called in place of
+    :func:`abs` and :func:`round`.
+    """
+
     BODY = DIRECTORY / "body.py.txt"
     """
     A module of a docstring, an assignment with a string below it, two statements on one

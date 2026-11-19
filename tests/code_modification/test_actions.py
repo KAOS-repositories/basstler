@@ -12,6 +12,7 @@ from basstler.code_modification.actions import (
     ActionPlan,
     ImportInsertion,
     NodeReplacement,
+    NodeReplacements,
 )
 from basstler.code_modification.exceptions import ActionTargetMissingError
 from basstler.code_modification.positions import PositionedModule
@@ -80,6 +81,53 @@ def test_a_replacement_whose_node_is_gone_raises(two_calls):
 
     with pytest.raises(ActionTargetMissingError):
         replacement.apply(applied.module)
+
+
+# %% replacing several nodes at once
+
+
+def call_replacements(
+    module: PositionedModule, names: tuple[str, ...]
+) -> NodeReplacements:
+    """
+    :param module: A module whose calls are to be renamed.
+    :param names: The name each call's function gets, in the order of the calls.
+    :return: The replacements of those calls by calls of *names* with their arguments.
+    """
+    calls = [
+        (node, location)
+        for node, location in module.positions.items()
+        if isinstance(node, libcst.Call)
+    ]
+    return NodeReplacements(
+        tuple(
+            NodeReplacement(location, call, call.with_changes(func=libcst.Name(name)))
+            for (call, location), name in zip(calls, names, strict=True)
+        )
+    )
+
+
+def test_replacements_made_at_once_change_each_of_their_nodes(two_calls):
+    """
+    Both calls are replaced, and nothing else changes.
+    """
+    applied = call_replacements(two_calls, ("float", "int")).apply(two_calls.module)
+
+    assert (
+        applied.module.code
+        == TextFile(CodeModificationSnippet.TWO_CALLS_BOTH_RENAMED).read()
+    )
+
+
+def test_the_inverse_of_replacements_made_at_once_restores_the_module_exactly(
+    two_calls,
+):
+    """
+    Undoing the replacements gives back the source they were applied to.
+    """
+    applied = call_replacements(two_calls, ("float", "int")).apply(two_calls.module)
+
+    assert applied.inverse.apply(applied.module).module.code == two_calls.module.code
 
 
 # %% plans

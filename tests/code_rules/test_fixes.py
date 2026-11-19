@@ -47,10 +47,9 @@ def fixed(example: FixExample) -> libcst.Module:
     """
     :return: The example's code breaking the rule, fixed.
     """
+    before = PythonSourceFile(example.before)
     return (
-        SourceFixer((example.checker,))
-        .fix_module(PythonSourceFile(example.before))
-        .module
+        SourceFixer((example.checker,)).fix_module(before.parse(), before.path).module
     )
 
 
@@ -81,7 +80,7 @@ def test_undoing_a_fix_restores_each_example_exactly(example):
     The inverse of a fix turns the fixed code back into the code it fixed.
     """
     before = PythonSourceFile(example.before)
-    applied = SourceFixer((example.checker,)).fix_module(before)
+    applied = SourceFixer((example.checker,)).fix_module(before.parse(), before.path)
 
     assert applied.inverse.apply(applied.module).module.code == before.read()
 
@@ -140,9 +139,10 @@ def test_a_fix_leaving_its_rule_broken_raises():
     A round of fixes that removes no place stops with an error instead of repeating
     forever.
     """
+    source_file = PythonSourceFile(CodeModificationSnippet.PRINT_CALL)
     with pytest.raises(FixDoesNotConvergeError):
         SourceFixer((PrintCallChecker(),)).fix_module(
-            PythonSourceFile(CodeModificationSnippet.PRINT_CALL)
+            source_file.parse(), source_file.path
         )
 
 
@@ -155,6 +155,8 @@ def test_a_checker_that_skips_a_file_fixes_nothing_in_it():
     """
     source_file = PythonSourceFile(PackageLocation.UPSTREAM_REVIEWS_FETCH)
 
-    fixed = SourceFixer((TextFileChecker(),)).fix_module(source_file)
+    fixed = SourceFixer((TextFileChecker(),)).fix_module(
+        source_file.parse(), source_file.path
+    )
 
     assert fixed.module.code == source_file.read()

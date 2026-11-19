@@ -5,6 +5,7 @@ Actions that change a module and know their exact inverse, and plans composing t
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import libcst
@@ -71,7 +72,17 @@ class NodeReplacement(Action):
     """
 
     def apply(self, module: libcst.Module) -> AppliedAction:
-        positions = PositionedModule(module).positions
+        return NodeReplacements((self,)).apply(module)
+
+    def target_in(
+        self, positions: Mapping[libcst.CSTNode, CodeRange]
+    ) -> libcst.CSTNode:
+        """
+        :param positions: The code range of each node of a module.
+        :return: The node of that module the replacement replaces.
+        :raises ActionTargetMissingError: If the module lacks :attr:`original` at
+            :attr:`location`.
+        """
         target = next(
             (
                 node
@@ -82,14 +93,71 @@ class NodeReplacement(Action):
         )
         if target is None:
             raise ActionTargetMissingError(self.location, type(self.original).__name__)
-        replaced = libcst.ensure_type(
-            module.deep_replace(target, self.replacement), libcst.Module
+        return target
+
+
+@dataclass(frozen=True)
+class NodeReplacements(Action):
+    """
+    Makes replacements whose locations do not overlap, all in one pass over the module.
+    """
+
+    replacements: tuple[NodeReplacement, ...]
+    """
+    The replacements, each located in the module the action is applied to.
+    """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        positions = PositionedModule(module).positions
+        substitution = NodeSubstitution(
+            {
+                replacement.target_in(positions): replacement.replacement
+                for replacement in self.replacements
+            }
         )
-        replacement_location = PositionedModule(replaced).positions[self.replacement]
+        replaced = libcst.ensure_type(module.visit(substitution), libcst.Module)
+        replaced_positions = PositionedModule(replaced).positions
         return AppliedAction(
             replaced,
-            NodeReplacement(replacement_location, self.replacement, self.original),
+            NodeReplacements(
+                tuple(
+                    NodeReplacement(
+                        replaced_positions[replacement.replacement],
+                        replacement.replacement,
+                        replacement.original,
+                    )
+                    for replacement in self.replacements
+                )
+            ),
         )
+
+
+@dataclass
+class NodeSubstitution(libcst.CSTTransformer):
+    """
+    Puts a node in the place of each node of a module it is given one for.
+    """
+
+    substitutes: Mapping[libcst.CSTNode, libcst.CSTNode]
+    """
+    The node to put in the place of each node, which is identified by identity.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Initialise the transformer, which the dataclass's generated initialiser skips.
+        """
+        super().__init__()
+
+    def on_leave(
+        self, original_node: libcst.CSTNode, updated_node: libcst.CSTNode
+    ) -> libcst.CSTNode:
+        """
+        :param original_node: A node of the module visited.
+        :param updated_node: That node with its children substituted.
+        :return: The substitute of *original_node*, else *updated_node*.
+        """
+        return self.substitutes.get(original_node, updated_node)
 
 
 # %% imports

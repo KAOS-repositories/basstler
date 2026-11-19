@@ -92,7 +92,7 @@ def fix(paths: list[Path] | None = None) -> CodeRulesExitCode:
     """
     fixer = SourceFixer(RuleModule(rules).fixable_checkers)
     fixed_sources = {
-        source_file: fixer.fix_module(source_file).module.code
+        source_file: fixer.fix_module(source_file.parse(), source_file.path).module.code
         for source_file in map(PythonSourceFile, paths or [])
     }
     changed = {

@@ -37,7 +37,10 @@ It commits the handover under `plan-handover/` on top of the base branch (the
 repository's default branch unless `--base` names another), pushes it to a
 `basstler/plan-handover/...` branch of your `origin`, and opens the pull request,
 mentioning `--receiver`. Its files are what the receiver reviews; it is never merged.
-Offering the same plans again updates the pull request.
+Offering the same plans again updates the pull request. With `--close-pull-requests`,
+the open pull requests of the plans' underway items on your repository are closed, each
+with a comment linking the handover pull request; the receiver's import continues them
+all the same. Nothing is closed when the receiver pushes to your repository.
 
 **As a directory**, for a receiver without a repository you can open a pull request on:
 
@@ -81,6 +84,18 @@ standing rules.
 ## 4. Afterwards
 
 Handing over leaves your notes branch as it was. Once the receiver has imported the
-plans, remove them from yours, or keep them to follow along: both of you then see the
-same pull requests' live state. A plan another of your plans depends on cannot be removed
+plans into their fork, delete your copies of the underway items' branches:
+
+```bash
+basstler plan-handover delete-branches <plan-id> [<plan-id>...] --to <owner>/<repository>
+```
+
+It deletes the branch of every unmerged pull request of those items on your repository
+whose commit the receiver's repository holds on a branch of the same name, closing the
+pull request first if it is still open, and keeps the others, naming each. GitHub
+cannot delete a pull request: closed, it stays listed with its review threads. Run it
+before removing the plans, since it reads them from your notes branch.
+
+Then remove the plans from your notes branch, or keep them to follow along: both of you
+then see the same pull requests' live state. A plan another of your plans depends on cannot be removed
 until that dependency is dropped or the item it names is done.

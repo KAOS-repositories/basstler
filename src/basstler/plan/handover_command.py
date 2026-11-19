@@ -20,6 +20,7 @@ from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.locations import PlanHandoverLocation
 from basstler.plan.handover import PlanHandover
 from basstler.plan.handover_continuation import HandoverImport
+from basstler.plan.handover_originals import OriginalPullRequests
 from basstler.plan.handover_pull_request import HandoverOffer, HandoverPullRequests
 from basstler.standard_streams import StandardStreamHandler
 
@@ -79,6 +80,7 @@ def offer_plans(
     to: str,
     base: str | None = None,
     receiver: str | None = None,
+    close_pull_requests: bool = False,
 ) -> PlanHandoverExitCode:
     """
     Offer plans of this repository's notes branch to another person as a draft pull
@@ -90,23 +92,66 @@ def offer_plans(
     :param base: The branch the pull request is opened against; the repository's
         default branch when not given.
     :param receiver: The receiver's GitHub login, mentioned in the pull request.
+    :param close_pull_requests: Close the open pull requests of the plans' underway
+        items on this repository, which the receiver continues on theirs.
     :raises PlanOutsideHandoverError: If a plan depends on a plan not named.
     """
     project_root = Path.cwd()
     client = GitHubRestClient()
+    git = GitCommandRunner(project_root)
     target = Repository.parse(to)
     if base is None:
         details = RepositoryDetailsRead(target)
         base = details.parse(client.get(details.path)).default_branch.name
+    handover = PlanHandover.from_notes_branch(
+        project_root=project_root, plan_identifiers=plans
+    )
     offered = HandoverOffer(
+        handover=handover,
+        base=RepositoryBranch(repository=target, name=base),
+        receiver=receiver,
+        git=git,
+    ).offer(client=client)
+    logger.info(f"Offered the plans in {offered.url}.")
+    if not close_pull_requests:
+        return PlanHandoverExitCode.SUCCESS
+    closed = OriginalPullRequests(
+        handover=handover, receiver=target, git=git, client=client
+    ).close(handover_pull_request=offered)
+    for original in closed:
+        logger.info(f"Closed {original.summary.page_url}.")
+    return PlanHandoverExitCode.SUCCESS
+
+
+@plan_handover_app.command(name="delete-branches")
+def delete_branches(plans: list[str], *, to: str) -> PlanHandoverExitCode:
+    """
+    Delete this repository's branches of handed-over plans' unmerged pull requests once
+    the receiver's repository holds each one's work, closing any still open. Pull
+    requests themselves cannot be deleted on GitHub; closed, they stay listed.
+
+    :param plans: The ids of the plans handed over, as offered.
+    :param to: The receiver's repository as ``owner/name``, as offered.
+    :raises PlanOutsideHandoverError: If a plan depends on a plan not named.
+    """
+    project_root = Path.cwd()
+    deletions = OriginalPullRequests(
         handover=PlanHandover.from_notes_branch(
             project_root=project_root, plan_identifiers=plans
         ),
-        base=RepositoryBranch(repository=target, name=base),
-        receiver=receiver,
+        receiver=Repository.parse(to),
         git=GitCommandRunner(project_root),
-    ).offer(client=client)
-    logger.info(f"Offered the plans in {offered.url}.")
+        client=GitHubRestClient(),
+    ).delete_branches()
+    for original in deletions.deleted:
+        logger.info(
+            f"Deleted {original.summary.head.name} of {original.summary.page_url}."
+        )
+    for original in deletions.kept:
+        logger.info(
+            f"Kept {original.summary.head.name} of {original.summary.page_url}: "
+            f"{to} does not hold its commit on a branch of that name."
+        )
     return PlanHandoverExitCode.SUCCESS
 
 

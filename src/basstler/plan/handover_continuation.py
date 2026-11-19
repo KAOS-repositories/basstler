@@ -1,6 +1,6 @@
 """
 Continuing a handover's underway items on the receiver's own repository: each item whose
-pull request is still open has its branch, and the branch it stacks on, pushed there, and
+pull request has not merged has its branch, and the branch it stacks on, pushed there, and
 its pull request opened again from them.
 """
 
@@ -16,7 +16,7 @@ from basstler.github.issue import Issue
 from basstler.github.pull_request import NewPullRequest
 from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.repository_access import PullRequestListState
-from basstler.github.rest_models import RestPullRequestState, RestPullRequestSummary
+from basstler.github.rest_models import RestPullRequestSummary
 from basstler.plan.handover import HandoverPlan, PlanHandover
 from basstler.plan.model import PlanItem
 from basstler.render_common import TemplatePage
@@ -93,7 +93,7 @@ class UnderwayWork:
     Continues the underway items of handed-over plans on the receiver's repository.
 
     An item is continued when its plan is on another repository and it names a branch
-    and a pull request still open there. Running it again reuses the branches and pull
+    and a pull request not merged there. Running it again reuses the branches and pull
     requests already continued.
     """
 
@@ -166,13 +166,13 @@ class UnderwayWork:
         :param item: An item naming a branch and a pull request.
         :raises GitCommandFailedError: If the receiver's repository has the item's branch
             at another commit.
-        :return: The continuation, ``None`` when the pull request is no longer open.
+        :return: The continuation, ``None`` when the pull request has merged.
         """
         source = plan.manifest.repository_of(item)
         original = RestPullRequestSummary.from_json(
             self.client.get(source.pull_request_path(item.pull_request_number))
         )
-        if original.state != RestPullRequestState.OPEN:
+        if original.merged:
             return None
         self.push_branch(source=source, branch=original.head.name, replace=True)
         self.push_branch(source=source, branch=original.base.name, replace=False)

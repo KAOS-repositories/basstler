@@ -22,6 +22,7 @@ from basstler.plan.exceptions import HandoverPullRequestNotChosenError
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.handover import HandoverPlan, PlanHandover
 from basstler.plan.handover_continuation import ContinuedHandover, HandoverImport
+from basstler.plan.handover_originals import OriginalPullRequests
 from basstler.plan.handover_pull_request import (
     HandoverOffer,
     HandoverPullRequestDescription,
@@ -100,8 +101,12 @@ class PullRequestHostingClient(GitHubClient):
         }
         if isinstance(write, PullRequestDescription):
             numbered[write.number]["body"] = write.body
-        if isinstance(write, IssueClosing):
+        if isinstance(write, IssueClosing) and write.repository == RECEIVERS_FORK:
             numbered[write.number]["state"] = "closed"
+        if isinstance(write, IssueClosing) and write.repository != RECEIVERS_FORK:
+            self.sender_pull_requests[write.repository.pull_request_path(write.number)][
+                "state"
+            ] = "closed"
         return GitHubResponse(None)
 
     def bare_remote_of(self, repository: Repository) -> GitCommandRunner:
@@ -162,13 +167,17 @@ def sender_reaching_the_receiver(
 
 
 def offer_to_receiver(
-    sender: ScratchRepository, client: PullRequestHostingClient
+    sender: ScratchRepository,
+    client: PullRequestHostingClient,
+    *,
+    closes_pull_requests: bool = False,
 ) -> HandoverOffer:
     """
     Offer the dataset's plans from the sender's notes branch to the receiver's fork.
 
     :param sender: The sender's clone.
     :param client: Hosts the receiver's pull requests.
+    :param closes_pull_requests: Whether the sender's underway pull requests are closed.
     :return: The offer made.
     """
     offer = HandoverOffer(
@@ -180,8 +189,24 @@ def offer_to_receiver(
         receiver=RECEIVERS_FORK.owner,
         git=sender.git,
     )
-    offer.offer(client=client)
+    offered = offer.offer(client=client)
+    if closes_pull_requests:
+        originals(sender, client, offer.handover).close(handover_pull_request=offered)
     return offer
+
+
+def originals(
+    sender: ScratchRepository, client: PullRequestHostingClient, handover: PlanHandover
+) -> OriginalPullRequests:
+    """
+    :param sender: The sender's clone.
+    :param client: Serves the sender's pull requests.
+    :param handover: The handover offered.
+    :return: The sender's pull requests of its underway items.
+    """
+    return OriginalPullRequests(
+        handover=handover, receiver=RECEIVERS_FORK, git=sender.git, client=client
+    )
 
 
 def underway_pull_request(
@@ -530,3 +555,160 @@ def test_the_receivers_repository_is_the_one_its_origin_configures(
         == Repository.from_configured_remote(receivers_fork.git)
         == RECEIVERS_FORK
     )
+
+
+# %% the sender's originals
+
+
+def underway_items(handover: PlanHandover) -> set[tuple[str, str]]:
+    """
+    :param handover: A handover of the dataset's plans.
+    :return: Every item naming a branch and a pull request, by plan and item id.
+    """
+    return {
+        (plan.identifier, item.identifier)
+        for plan in handover.plans
+        for item in plan.manifest.items
+        if item.branch and item.pull_request_number is not None
+    }
+
+
+def sender_branches(client: PullRequestHostingClient) -> set[str]:
+    """
+    :param client: GitHub, serving the sender's pull requests.
+    :return: The heads of the sender's underway pull requests still on its repository.
+    """
+    remote = client.bare_remote_of(sender_repository())
+    return {
+        pull_request["head"]["ref"]
+        for pull_request in client.sender_pull_requests.values()
+        if remote.commit_or_none(f"refs/heads/{pull_request['head']['ref']}")
+    }
+
+
+def test_an_offer_closing_pull_requests_closes_every_underway_original(
+    sender_reaching_the_receiver: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    Each underway item's open pull request on the sender's repository gets a comment
+    naming the handover pull request, then is closed.
+    """
+    offer_to_receiver(
+        sender_reaching_the_receiver, hosting_client, closes_pull_requests=True
+    )
+
+    (handover_pull_request,) = hosting_client.pull_requests
+    comments = [
+        write for write in hosting_client.sent if isinstance(write, IssueComment)
+    ]
+    assert {comment.number for comment in comments} == {
+        pull_request["number"]
+        for pull_request in hosting_client.sender_pull_requests.values()
+    }
+    assert all(
+        handover_pull_request["html_url"] in comment.body for comment in comments
+    )
+    assert {
+        pull_request["state"]
+        for pull_request in hosting_client.sender_pull_requests.values()
+    } == {"closed"}
+
+
+def test_items_whose_originals_were_closed_on_offering_still_continue(
+    sender_reaching_the_receiver: ScratchRepository,
+    receivers_fork: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    A pull request closed unmerged by the handover is continued like an open one.
+    """
+    offered = offer_to_receiver(
+        sender_reaching_the_receiver, hosting_client, closes_pull_requests=True
+    )
+
+    continued = take_over(receivers_fork, hosting_client)
+
+    assert {
+        (continuation.plan_identifier, continuation.item_identifier)
+        for continuation in continued.continuations
+    } == underway_items(offered.handover)
+
+
+def test_no_original_is_closed_when_the_receiver_works_in_the_senders_repository(
+    sender_reaching_the_receiver: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    A collaborator continues the items on their existing pull requests, so none of them
+    counts as an original to close or delete.
+    """
+    handover = PlanHandover.from_notes_branch(
+        project_root=sender_reaching_the_receiver.project_root,
+        plan_identifiers=list(HandedOverPlan),
+    )
+
+    assert (
+        OriginalPullRequests(
+            handover=handover,
+            receiver=sender_repository(),
+            git=sender_reaching_the_receiver.git,
+            client=hosting_client,
+        ).unmerged()
+        == []
+    )
+
+
+def test_branches_are_deleted_once_the_receivers_fork_holds_them(
+    sender_reaching_the_receiver: ScratchRepository,
+    receivers_fork: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    After the import continued every underway item, each original's branch is gone from
+    the sender's repository and each original is closed.
+    """
+    offered = offer_to_receiver(sender_reaching_the_receiver, hosting_client)
+    take_over(receivers_fork, hosting_client)
+
+    deletions = originals(
+        sender_reaching_the_receiver, hosting_client, offered.handover
+    ).delete_branches()
+
+    assert {
+        (original.plan_identifier, original.item_identifier)
+        for original in deletions.deleted
+    } == underway_items(offered.handover)
+    assert deletions.kept == ()
+    assert sender_branches(hosting_client) == set()
+    assert {
+        pull_request["state"]
+        for pull_request in hosting_client.sender_pull_requests.values()
+    } == {"closed"}
+
+
+def test_branches_the_receivers_fork_lacks_are_kept(
+    sender_reaching_the_receiver: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    Before the receiver imports, their fork holds none of the work, so every branch
+    stays and no original is closed.
+    """
+    offered = offer_to_receiver(sender_reaching_the_receiver, hosting_client)
+    branches = sender_branches(hosting_client)
+
+    deletions = originals(
+        sender_reaching_the_receiver, hosting_client, offered.handover
+    ).delete_branches()
+
+    assert deletions.deleted == ()
+    assert {
+        (original.plan_identifier, original.item_identifier)
+        for original in deletions.kept
+    } == underway_items(offered.handover)
+    assert sender_branches(hosting_client) == branches
+    assert {
+        pull_request["state"]
+        for pull_request in hosting_client.sender_pull_requests.values()
+    } == {"open"}

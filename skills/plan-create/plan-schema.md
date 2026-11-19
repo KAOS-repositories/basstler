@@ -80,6 +80,8 @@ items:                         # the actual trackable units of work - flat,
                                    # an item of this plan, <plan-id>/<item-id> for
                                    # one in another plan (see below)
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
+    recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
+                                               # difficulty; see "Choosing the recommended model"
     session: <url or omitted>
     notes: "short, freeform"
     blockers: ["freeform reasons", ...]   # optional, defaults to []
@@ -89,6 +91,26 @@ Validation is not documentation-only: `plan/validation.py` enforces this
 schema on every plan site build and every `save-plan.sh`, and `/plan-create` drafts against the
 same checks. If this document and that module ever disagree, the module is
 the authority.
+
+### Choosing the recommended model
+
+The skill that creates an item sets its `recommended_model` from how hard the task is,
+and the plan site preselects it on the item's action buttons. The values are the Claude
+Code aliases, which always resolve to the newest model of the family:
+
+- `haiku` - mechanical, well-specified edits that follow a pattern already in the code.
+- `sonnet` - ordinary implementation: a feature or fix whose design the item's `notes`
+  already settle.
+- `opus` - design-heavy, cross-cutting or ambiguous work, where the item must decide how
+  something should be built.
+
+Every new item carries one: `save-plan.sh` refuses an item the saved plan does not hold yet
+unless it has a `recommended_model`, `item_bootstrap record` refuses a new item without
+`--recommended-model`, and `/plan-create` and `/add-plan-item` set it from the task's
+difficulty. An item saved before the field existed may keep none, and nothing fills in a
+default for it. Session start names the branch's plan's items that have none (the
+`recommended models` line): judge each by difficulty and set it with `item_bootstrap update
+--recommended-model`.
 
 ### Why `status` is deliberately thin
 
@@ -135,6 +157,11 @@ Four rules, each rejected outright rather than passed over:
   manifest carrying one is refused when the tooling was given no directory
   (`--plans-dir`, see [`SKILL.md`](./SKILL.md)). Accepting it unchecked is how
   an unresolvable dependency used to count as *ready*.
+
+A save also refuses removing an item that another plan's item still names. To
+move items into another plan, save them there first, then every plan that names
+them with their new `<plan-id>/<item-id>`, and only then the plan they leave. A
+finished item is marked done instead of removed.
 
 The cycle check runs over the resulting union graph, so a loop that closes
 through another plan is caught even though neither manifest can see it alone.

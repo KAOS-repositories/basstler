@@ -1,13 +1,12 @@
-### Plan
-- Read CI on 4ddeda0b: per-distribution test job, lint (uv lock --check, new-crossings prints a notice since #222's base has no workspace), Windows setup
-- Untangle shared test helpers so lower distributions' dev groups need fewer siblings (scratch_repository pulls in notes via setup.steps); propose as a new item on #151
-- Final PR description pass, then mark ready only when the owner says so
-### Done
-- Stacked on #222; code actions generic (AppliedAction.result); SourceTree, file actions and ModuleRelocation, keeping executable bits
-- One ActionPlan moved sources and tests into packages/<part>; shared helpers into test_support/basstler_testing
-- Workspace pyprojects, basstler-build sibling-pin hook, uv.lock; map read from each package's folder and pyproject
-- Session start: uv sync --frozen (checkout editable, release from a shallow tag clone); py -3.X candidates; requirements from declarations in a checkout
-- CI and every workflow install from uv.lock; rules, AGENTS.md, READMEs updated
-- Local at 4ddeda0b: every distribution's suite passes; hub has only the 32 sandbox Playwright errors; meta-package last seen 681 passed
-### Next
-- Check CI, fix what it reports
+## Plan
+- Restack #223 onto #222's head, placing the files #222 and main added in their distributions.
+
+## Done
+- Merged 293015cf into the branch (25bbd5ca, pushed): review triage became basstler-review-triage, text_file and class_name went to core, fix_module and the tests use `.result`, uv.lock regenerated.
+- Per-distribution tests passed locally; hub's 40 browser tests not run (no Playwright browser here).
+- PR description and plan record updated.
+
+## Next
+- Read CI at 25bbd5ca (not read yet).
+- Owner to confirm dropping main's interpreter-candidate session start for the uv install.
+- #220 (below #222) conflicts with main; resolve it on its own branch.

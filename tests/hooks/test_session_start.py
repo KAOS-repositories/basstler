@@ -42,6 +42,7 @@ from basstler.plan.merged_items.every_plan import (
     MergedItemsSummary,
 )
 from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan_site import merge_workflow_refresh
 from basstler.plan_site.hub import SiteAddress
 from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
@@ -51,6 +52,7 @@ from ..bash_path import BashPath
 from ..constants.environment import (
     ConfigurationVariable,
     FileMode,
+    MergeWorkflowRefreshStubVariable,
     PullRequestStubVariable,
     ScrubbedEnvironmentPrefix,
     SearchPathVariable,
@@ -79,6 +81,7 @@ from .session_start_summary import (
     summary_message,
     summary_value,
 )
+from basstler.text_file import TextFile
 
 
 class StubVariable(StrEnum):
@@ -166,11 +169,11 @@ class PackageManager(StrEnum):
     """
 
 
-PLAN_MANIFEST = (DatasetLocation.DIRECTORY / "plan.yaml").read_text(encoding="utf-8")
+PLAN_MANIFEST = TextFile(DatasetLocation.DIRECTORY / "plan.yaml").read()
 
-PLAN_MANIFEST_WITH_TRACKING_ISSUE = (
+PLAN_MANIFEST_WITH_TRACKING_ISSUE = TextFile(
     DatasetLocation.DIRECTORY / "plan-with-tracking-issue.yaml"
-).read_text(encoding="utf-8")
+).read()
 
 TRACKING_ISSUE = "55"
 
@@ -219,6 +222,9 @@ def session_start_repository(
     scratch_repository.install_package()
     scratch_repository.replace_package_module(
         merged_items_command, DatasetLocation.MERGED_ITEMS_STUB
+    )
+    scratch_repository.replace_package_module(
+        merge_workflow_refresh, DatasetLocation.MERGE_WORKFLOW_REFRESH_STUB
     )
     scratch_repository.install_package_environment()
     scratch_repository.write_setup_prerequisites()
@@ -309,12 +315,13 @@ def test_every_session_loads_the_session_rules(
     """
     result = publish_and_run(session_start_repository)
     assert result.returncode == 0, result.stderr
-    claude_local = (
+    claude_local = TextFile(
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
-    ).read_text(encoding="utf-8")
-    assert ClaudeLocalSection.SESSION_RULES.within(claude_local) == (
-        RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name
-    ).read_text(encoding="utf-8")
+    ).read()
+    assert (
+        ClaudeLocalSection.SESSION_RULES.within(claude_local)
+        == TextFile(RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name).read()
+    )
 
 
 def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
@@ -328,12 +335,13 @@ def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
     )
     result = run_session_start(session_start_repository)
     assert result.returncode == 0, result.stderr
-    claude_local = (
+    claude_local = TextFile(
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
-    ).read_text(encoding="utf-8")
-    assert ClaudeLocalSection.SESSION_RULES.within(claude_local) == (
-        RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name
-    ).read_text(encoding="utf-8")
+    ).read()
+    assert (
+        ClaudeLocalSection.SESSION_RULES.within(claude_local)
+        == TextFile(RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name).read()
+    )
 
 
 # %% the names the personal notes cite
@@ -357,7 +365,7 @@ def test_every_name_the_notes_cite_that_is_no_longer_shipped_is_listed(
     Notes outlive the release they were written against, so a session is told up front
     which of their commands would fail, and what replaced each.
     """
-    notes = DatasetLocation.NOTES_CITING_RETIRED_NAMES.read_text(encoding="utf-8")
+    notes = TextFile(DatasetLocation.NOTES_CITING_RETIRED_NAMES).read()
     stale = CitedNames.in_text(notes).stale(ShippedModules.installed())
 
     result = publish_and_run(
@@ -658,13 +666,10 @@ def publish_tracked_plan_and_run(
             PersonalNotesPath.BRANCH_INDEX: branch_index(
                 {ScratchBranch.WORK: manifest.identifier}
             ),
-            plan_directory / PlanDocument.MANIFEST: manifest_path.read_text(
-                encoding="utf-8"
-            ),
-            plan_directory
-            / PlanDocument.ROADMAP: DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(
-                encoding="utf-8"
-            ),
+            plan_directory / PlanDocument.MANIFEST: TextFile(manifest_path).read(),
+            plan_directory / PlanDocument.ROADMAP: TextFile(
+                DatasetLocation.ROADMAP_OF_STANDING_RULES
+            ).read(),
         },
         environment,
     )
@@ -681,9 +686,9 @@ def run_on_tracked_branch(
     """
     result = publish_tracked_plan_and_run(repository, manifest, scratch_directory)
     assert result.returncode == 0, result.stderr
-    return (repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS).read_text(
-        encoding="utf-8"
-    )
+    return TextFile(
+        repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
+    ).read()
 
 
 def published_manifest(repository: ScratchRepository, plan_identifier: str) -> Path:
@@ -718,10 +723,7 @@ def test_a_tracked_branch_loads_the_plan_s_standing_rules(
     claude_local = run_on_tracked_branch(
         session_start_repository, tracked_plan.manifest, tmp_path
     )
-    assert (
-        DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
-        in claude_local
-    )
+    assert TextFile(DatasetLocation.ROADMAP_OF_STANDING_RULES).read() in claude_local
 
 
 # %% branches no plan item can ever track
@@ -800,13 +802,10 @@ def test_a_merged_item_of_a_plan_no_branch_here_tracks_is_recorded_done_and_drop
     result = publish_and_run(
         session_start_repository,
         {
-            plan_directory / PlanDocument.MANIFEST: manifest_path.read_text(
-                encoding="utf-8"
-            ),
-            plan_directory
-            / PlanDocument.ROADMAP: DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(
-                encoding="utf-8"
-            ),
+            plan_directory / PlanDocument.MANIFEST: TextFile(manifest_path).read(),
+            plan_directory / PlanDocument.ROADMAP: TextFile(
+                DatasetLocation.ROADMAP_OF_STANDING_RULES
+            ).read(),
         },
         {
             PullRequestStubVariable.RECORDING: str(
@@ -1083,12 +1082,11 @@ def require_the_uninstallable(repository: ScratchRepository) -> None:
 
     :param repository: The fixture-built scratch repository.
     """
-    declaration_file(repository).write_text(
+    TextFile(declaration_file(repository)).write(
         ProjectDeclaration(
             name=ProjectDeclaration.of_this_package().name,
             dependencies=(UNINSTALLABLE_REQUIREMENT,),
-        ).as_toml(),
-        encoding="utf-8",
+        ).as_toml()
     )
 
 
@@ -1194,7 +1192,7 @@ def test_installs_the_package_with_pip_when_a_requirement_is_missing(
         UNINSTALLABLE_REQUIREMENT,
         environment_directory(session_start_repository),
     )
-    assert call_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(call_log).read().splitlines() == [
         pip_installer_call(session_start_repository)
     ]
 
@@ -1229,7 +1227,7 @@ def test_marks_the_install_in_progress_only_while_it_runs(
     )
 
     assert result.returncode == 0, result.stderr
-    assert marker_during_install.read_text(encoding="utf-8").strip().isdigit()
+    assert TextFile(marker_during_install).read().strip().isdigit()
     assert not marker.exists()
 
 
@@ -1263,7 +1261,7 @@ def test_installs_the_package_with_uv_where_there_is_one(
         UNINSTALLABLE_REQUIREMENT,
         environment_directory(session_start_repository),
     )
-    assert install_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(install_log).read().splitlines() == [
         uv_installer_call(session_start_repository)
     ]
     assert not pip_log.exists()
@@ -1318,9 +1316,7 @@ def test_reports_that_it_could_not_check_when_the_declaration_will_not_parse(
     with nothing missing - which is what an empty answer means, and would install
     nothing while saying everything was already there.
     """
-    declaration_file(session_start_repository).write_text(
-        "this is not toml\n", encoding="utf-8"
-    )
+    TextFile(declaration_file(session_start_repository)).write("this is not toml\n")
 
     result = publish_and_run(session_start_repository)
 
@@ -1367,11 +1363,13 @@ def test_reinstalls_the_package_when_the_plugin_names_another_source(
     A plugin update names a new source for the package; the environment, installed from
     the old one, is installed into again so the hooks and the package stay one release.
     """
-    Path(
-        session_start_repository.configuration_value(
-            ConfigurationVariable.INSTALLED_SOURCE_FILE
+    TextFile(
+        Path(
+            session_start_repository.configuration_value(
+                ConfigurationVariable.INSTALLED_SOURCE_FILE
+            )
         )
-    ).write_text("an earlier release\n", encoding="utf-8")
+    ).write("an earlier release\n")
     stub_bin.install(PackageManager.PIP)
     call_log = tmp_path / "pip-calls"
 
@@ -1391,7 +1389,7 @@ def test_reinstalls_the_package_when_the_plugin_names_another_source(
         package_source(session_start_repository),
         environment_directory(session_start_repository),
     )
-    assert call_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(call_log).read().splitlines() == [
         pip_installer_call(session_start_repository)
     ]
 
@@ -1639,7 +1637,7 @@ def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
     )
 
     manifest = PluginManifest.of_this_plugin()
-    assert call_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(call_log).read().splitlines() == [
         f"--python {environment_interpreter(session_start_repository)} install "
         f"{manifest.name} @ git+{tagged_release_repository}@{SampleReleaseTag.OLDER}"
     ]
@@ -1847,7 +1845,7 @@ def test_creates_the_environment_with_uv_and_installs_the_package_into_it(
         environment_directory(session_start_repository),
         package_source(session_start_repository),
     )
-    assert environment_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(environment_log).read().splitlines() == [
         environment_call(session_start_repository),
         uv_installer_call(session_start_repository),
     ]
@@ -1982,12 +1980,12 @@ def test_installs_uv_when_no_supported_interpreter_is_on_the_path(
         environment_directory(session_start_repository),
         package_source(session_start_repository),
     )
-    assert install_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(install_log).read().splitlines() == [
         "install --target "
         f"{session_start_repository.configuration_value(ConfigurationVariable.UV_DIRECTORY)} "
         f"{PackageManager.UV}"
     ]
-    assert environment_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(environment_log).read().splitlines() == [
         environment_call(session_start_repository),
         uv_installer_call(session_start_repository),
     ]
@@ -2030,7 +2028,7 @@ def test_reuses_the_uv_it_installed_before(
         environment_directory(session_start_repository),
         package_source(session_start_repository),
     )
-    assert uv_log.read_text(encoding="utf-8").splitlines() == [
+    assert TextFile(uv_log).read().splitlines() == [
         environment_call(session_start_repository),
         uv_installer_call(session_start_repository),
     ]
@@ -2101,7 +2099,7 @@ def test_installs_into_the_interpreter_a_windows_environment_was_created_with(
         f"{environment_directory(session_start_repository)}"
         f"/{EnvironmentInterpreterLayout.WINDOWS}"
     )
-    assert environment_log.read_text(encoding="utf-8").splitlines()[-1] == (
+    assert TextFile(environment_log).read().splitlines()[-1] == (
         f"{PackageManager.PIP} install --python {windows_interpreter} --editable "
         f"{package_source(session_start_repository)}"
     )
@@ -2230,6 +2228,71 @@ def test_links_the_plan_under_the_notes_repository_the_site_lists(
         SITE_URL,
         SiteAddress(SITE_URL).plan_url(SiteRepository.NOTES.value, PLAN_IDENTIFIER),
     )
+
+
+# %% the plan site's merge workflow
+
+
+def publish_hub_and_run(
+    repository: ScratchRepository, environment: Mapping[str, str]
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run session-start.sh against a notes branch that lists a plan site.
+
+    :param repository: The fixture-built scratch repository.
+    :param environment: Variables to set for the hook's run.
+    :return: The finished session-start.sh process.
+    """
+    return publish_and_run(
+        repository, {ProjectLocation.PLAN_HUB: HUB_FILE}, environment
+    )
+
+
+def test_says_the_pull_request_that_brings_the_merge_workflow_up_to_date(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A merge workflow older than the release starts no build for some pull request
+    changes, so the session says what to merge instead of leaving the site stale.
+    """
+    result = publish_hub_and_run(
+        session_start_repository,
+        {
+            MergeWorkflowRefreshStubVariable.OUTPUT: str(
+                DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        TextFile(DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT).read().rstrip("\n")
+        in result.stdout
+    )
+
+
+def test_says_nothing_of_the_merge_workflow_when_it_is_current(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_hub_and_run(session_start_repository, {})
+
+    assert result.returncode == 0, result.stderr
+    assert "merge workflow" not in result.stdout
+
+
+def test_says_how_to_check_the_merge_workflow_by_hand_when_the_check_fails(
+    session_start_repository: ScratchRepository,
+):
+    failure = "GitHub refused the read"
+
+    result = publish_hub_and_run(
+        session_start_repository,
+        {MergeWorkflowRefreshStubVariable.FAILURE: failure},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert merge_workflow_refresh.__name__ in result.stdout
+    assert failure in result.stdout
 
 
 # %% the upstream-reviews Action line
@@ -2523,7 +2586,7 @@ def test_keeps_the_environment_a_live_install_holds(
         )
     )
     marker.parent.mkdir(parents=True)
-    marker.write_text(f"{running_shell_process_id}\n", encoding="utf-8")
+    TextFile(marker).write(f"{running_shell_process_id}\n")
     DirectoryTree(project).remove()
 
     result = publish_and_run(session_start_repository)

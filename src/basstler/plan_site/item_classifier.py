@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_state import (
     ForkLineage,
@@ -14,7 +15,11 @@ from basstler.github.pull_request_state import (
     LiveState,
     PullRequestRecord,
 )
-from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository import (
+    PullRequestReference,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
@@ -137,9 +142,10 @@ class ItemClassifier:
         fork = Repository.parse(self._repository_of(item))
         link = PromotionLink.for_target(
             PromotionTarget(
-                upstream_repository=lineage.upstream_repository,
-                upstream_base=lineage.upstream_default_branch,
-                fork_owner=fork.owner,
+                upstream_base=RepositoryBranch(
+                    lineage.upstream_default_branch, lineage.upstream_repository
+                ),
+                fork=fork,
             ),
             item.branch,
             record.title or item.title,
@@ -153,13 +159,15 @@ class ItemClassifier:
         self, item: Item, record: PullRequestRecord, lineage: ForkLineage
     ) -> PromotionReadiness:
         """
-        :return: What decides whether the item's pull request may be promoted, read as
-            the stack reads it; an open upstream pull request is found from its
-            description's link or from the upstream's own listing.
+        :return: What decides whether the item's pull request may be promoted; an open
+            upstream pull request is found from its description's link or from the
+            upstream's own listing, and a conflict from GitHub's mergeable state, the
+            withholding label deciding only while that is unread.
         """
         upstream_pull_requests = self.live_pull_requests.upstream_pull_requests.get(
             self._repository_of(item), {}
         )
+        conflict_unread = record.mergeable_state in (None, MergeableState.UNKNOWN)
         return PromotionReadiness(
             status=BranchStatus.derive(
                 draft=record.draft,
@@ -168,7 +176,8 @@ class ItemClassifier:
                 or item.branch in upstream_pull_requests,
             ),
             parent_landed=self._base_has_landed(record, lineage),
-            withheld=self.needs_resolution_label in record.labels,
+            withheld=record.mergeable_state is MergeableState.DIRTY
+            or (conflict_unread and self.needs_resolution_label in record.labels),
             checks_failed=record.check_state is not None and record.check_state.failed,
         )
 

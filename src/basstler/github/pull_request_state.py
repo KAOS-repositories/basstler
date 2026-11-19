@@ -17,6 +17,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_description import PullRequestDescription
 from basstler.github.pull_request_record import (
@@ -209,6 +210,12 @@ class PullRequestRecord:
     read.
     """
 
+    mergeable_state: MergeableState | None = None
+    """
+    GitHub's verdict on whether the pull request conflicts with its base, ``None`` while
+    it was not read.
+    """
+
     @property
     def identified_labels(self) -> frozenset[GitHubLabel]:
         """The subset of :attr:`labels` that match a known
@@ -273,8 +280,12 @@ class PullRequestRecord:
                 )
             }
         )
+        mergeable_state = PullRequestField.MERGEABLE_STATE.read(api_record, number)
         return dataclasses.replace(
             record,
+            mergeable_state=(
+                None if mergeable_state is None else MergeableState(mergeable_state)
+            ),
             head_commit=PullRequestHead.commit_in(api_record),
             assignees=PullRequestField.ASSIGNEES.read(api_record, number) or [],
             base=PullRequestField.BASE.read(api_record, number),
@@ -290,6 +301,18 @@ class PullRequestRecord:
             self.state is PullRequestState.OPEN
             and self.head_commit is not None
             and self.check_state is None
+        )
+
+    @property
+    def has_unread_mergeable_state(self) -> bool:
+        """
+        Whether the pull request is open and out of draft with its mergeable state not
+        read.
+        """
+        return (
+            self.state is PullRequestState.OPEN
+            and not self.draft
+            and self.mergeable_state is None
         )
 
     @property

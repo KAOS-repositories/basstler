@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import override
 
 from basstler.class_property import classproperty
+from basstler.code_rules.address_building import HandBuiltAddressChecker
 from basstler.code_rules.docstring_presence import MissingDocstringChecker
 from basstler.code_rules.prose_length import ProseLengthChecker
 from basstler.code_rules.rule import CodeReference, Section
@@ -343,8 +344,9 @@ class NamingRules(Section):
 
     VERB_AND_NOUN_PHRASES = (
         "Methods are verb phrases for what they do; classes and attributes are noun"
-        " phrases for what they are. Name a field for its subject, not for the "
-        "shape of its value"
+        " phrases for what they are, except a mixin that only adds one field, which "
+        "is named `Has<Field>`, as in `HasRepository`. Name a field for its subject, "
+        "not for the shape of its value"
     )
 
     ONE_NAME_PER_OPERATION = (
@@ -432,10 +434,43 @@ class DesignPrinciplesRules(Section):
         "SOLID and the domain's semantics"
     )
 
+    OWNER_AS_A_REQUIRED_FIELD = (
+        "A thing that always belongs to another - a branch to its repository, a pull "
+        "request to the repository it is opened on - holds its owner as a required "
+        "field of its own class: never an optional field, and never a subclass that "
+        "adds the owner to an ownerless original"
+    )
+
     ASSOCIATE_OR_SUBCLASS_FIRST = (
         "Before writing a new class, look for an existing class it can hold as a "
         "field or subclass, and use it; when related classes share fields or "
         "behaviour, give them a common base"
+    )
+
+    SHARED_FIELDS_IN_ONE_MIXIN = (
+        "A field that means the same thing in several classes is declared once, in a "
+        "mixin or base those classes inherit, never redeclared in each; a set of "
+        "fields that travels together, such as a pull request's base and head, is "
+        "one such mixin. Two classes that mean the same thing under different names "
+        "are one class"
+    )
+
+    MODELS_BOUND_TO_THEIR_CONCEPT = (
+        "A model of an external resource or payload is bound to the concept it "
+        "describes, so every representation of one concept can be found from it: a "
+        "repository setting's model, the read that parses it and the write that "
+        "changes it are generic over that setting or hold it as a field, and the "
+        "step a user takes when the write is refused belongs to the write. Never a "
+        "free-standing copy of a concept another class already models"
+    )
+
+    ADDRESSES_ON_THEIR_SUBJECT = (
+        "Every address of an external service - a REST path, a web page - is built "
+        "by a method of the class of what it addresses (`Repository` for one within "
+        "a repository), never appended to that class's address by hand where it is "
+        "used",
+        (),
+        HandBuiltAddressChecker(),
     )
 
 
@@ -655,6 +690,13 @@ class TypeHintsRules(Section):
     ACCURATE_TYPE_HINTS = (
         "Type hints are accurate: `Any` where the value genuinely is anything, "
         "never as a shortcut"
+    )
+
+    MOST_SPECIFIC_TYPE = (
+        "A field, parameter or return value takes the most specific type that is "
+        "correct for its meaning and every one of its uses - a `Branch`, not the "
+        "`str` of its name; a `Path`, not a `str` - and a payload converts it to and "
+        "from its wire form at the boundary"
     )
 
     BOUND_GENERIC_PARAMETERS = (

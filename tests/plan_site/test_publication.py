@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum, StrEnum
 from http import HTTPStatus
@@ -45,8 +45,14 @@ from basstler.github.exceptions import (
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import (
+    GitHubAddress,
+    NewTokenPage,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.github.rest_models import RestPullRequestSummary
+from basstler.github.token_form import CreateToken, StoreToken, TokenStep
 from basstler.github.run_listing import ListedRun, RunListing
 from basstler.github.states import CheckOutcome
 from basstler.github.workflows import TriggerEvent, Workflow
@@ -92,6 +98,7 @@ from basstler.plan_site.workflows import (
     WorkflowFile,
     WorkflowStep,
 )
+from basstler.review_triage.viewed_request import ReviewTriageSecret
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
@@ -100,6 +107,7 @@ from ..constants.paths import DatasetLocation
 from ..constants.stack import RemoteName
 from ..maintenance.fork import UPSTREAM_BASE, ForkCheckout
 from ..upstream_reviews.replay import ReplayingRestClient
+from basstler.text_file import TextFile
 
 BRANCH_OR_TAG = "v9.9.9"
 """
@@ -324,26 +332,25 @@ class Publishing:
             {
                 **{
                     Repository(path.parent.name, path.stem).api_path: json.loads(
-                        DatasetLocation.REPOSITORY_NOT_FORK.read_text(encoding="utf-8")
+                        TextFile(DatasetLocation.REPOSITORY_NOT_FORK).read()
                     )
                     for path in self.root.glob("*/*.git")
                 },
                 RunListing.path(self.site.repository, site_branch): json.loads(
-                    site_listing.read_text(encoding="utf-8")
+                    TextFile(site_listing).read()
                 ),
                 RunListing.path(self.notes_repository, NOTES_BRANCH): json.loads(
-                    notes_listing.read_text(encoding="utf-8")
+                    TextFile(notes_listing).read()
                 ),
                 self.notes_repository.api_path: json.loads(
-                    notes_details.read_text(encoding="utf-8")
+                    TextFile(notes_details).read()
                 ),
                 proposal.open_pull_requests_path: [
-                    json.loads(listed.read_text(encoding="utf-8"))
-                    for listed in open_pull_requests
+                    json.loads(TextFile(listed).read()) for listed in open_pull_requests
                 ],
             },
             opened=json.loads(
-                DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST.read_text(encoding="utf-8")
+                TextFile(DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST).read()
             ),
             refusals=site_refusals,
         )
@@ -354,7 +361,10 @@ class Publishing:
         :return: The merge workflow as publishing proposes it into *base*.
         """
         return MergeWorkflowProposal(
-            self.notes_repository, base, PlanSitePublication.merge_workflow_branch
+            RepositoryBranch(base, self.notes_repository),
+            RepositoryBranch(
+                PlanSitePublication.merge_workflow_branch, self.notes_repository
+            ),
         )
 
     @property
@@ -561,7 +571,7 @@ class SiteReadCase(Enum):
         lambda path: refusal_of(
             path,
             HTTPStatus.FORBIDDEN,
-            DatasetLocation.SESSION_PROXY_REFUSAL.read_text(encoding="utf-8"),
+            TextFile(DatasetLocation.SESSION_PROXY_REFUSAL).read(),
         ),
         lambda read: RepositoryAttachmentFix(read.access),
     )
@@ -663,7 +673,7 @@ def test_a_site_repository_git_cannot_reach_is_not_left_to_the_user_to_create(
     path = publishing.site.repository.api_path
     del runs.refusals[path]
     runs.responses[path] = json.loads(
-        DatasetLocation.REPOSITORY_NOT_FORK.read_text(encoding="utf-8")
+        TextFile(DatasetLocation.REPOSITORY_NOT_FORK).read()
     )
 
     with pytest.raises(GitCommandFailed):
@@ -1038,7 +1048,7 @@ def test_the_merge_workflow_runs_on_every_pull_request_state_change(tmp_path):
     the token too.
     """
     path = tmp_path / MergeWorkflow.location.name
-    path.write_text(MergeWorkflow(a_dispatch_workflow()).text, encoding="utf-8")
+    TextFile(path).write(MergeWorkflow(a_dispatch_workflow()).text)
 
     trigger = Workflow.at(path).trigger(TriggerEvent.PULL_REQUEST_TARGET)
 
@@ -1083,9 +1093,108 @@ def test_a_build_starting_workflow_keeps_to_the_actions_budget(
     workflow: PlanSiteWorkflow, tmp_path
 ):
     path = tmp_path / workflow.location.name
-    path.write_text(workflow.text, encoding="utf-8")
+    TextFile(path).write(workflow.text)
 
     assert ActionsBudget().violations_of(Workflow.at(path)) == ()
+
+
+# %% refreshing an installed merge workflow
+
+
+@pytest.fixture
+def stale_merge_workflow(published: Publishing) -> Publishing:
+    """:return: A notes repository whose default branch holds the merge workflow as an
+    earlier release wrote it."""
+    GitHubRemoteBranch(
+        UPSTREAM_BASE,
+        GitCommandRunner(published.checkout.project_root),
+        RemoteName.ORIGIN,
+    ).write(
+        {
+            MergeWorkflow.location.as_posix(): (
+                TextFile(DatasetLocation.STALE_MERGE_WORKFLOW).read().rstrip("\n")
+            )
+        },
+        "Start the plan site build on every merge",
+    )
+    return published
+
+
+def test_a_stale_merge_workflow_is_proposed_again_as_a_pull_request(
+    stale_merge_workflow,
+):
+    client = stale_merge_workflow.runs_none()
+    publication = stale_merge_workflow.publication(client)
+
+    publication.refresh_merge_workflow()
+
+    assert client.writes == [stale_merge_workflow.merge_workflow_proposal.opening]
+    assert (
+        stale_merge_workflow.file(
+            stale_merge_workflow.notes_repository,
+            publication.merge_workflow_branch,
+            MergeWorkflow.location.as_posix(),
+        )
+        == MergeWorkflow(publication.dispatch_workflow).text
+    )
+
+
+def test_refreshing_a_stale_merge_workflow_leaves_merging_it_to_the_user(
+    stale_merge_workflow,
+):
+    pull_request = RestPullRequestSummary.from_json(
+        json.loads(TextFile(DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST).read())
+    )
+
+    step = stale_merge_workflow.publication(
+        stale_merge_workflow.runs_none()
+    ).refresh_merge_workflow()
+
+    assert step == MergeWorkflowProposal.merging(pull_request)
+
+
+def test_a_stale_merge_workflow_whose_pull_request_is_open_is_not_proposed_again(
+    stale_merge_workflow,
+):
+    client = stale_merge_workflow.runs(
+        DatasetLocation.WORKFLOW_RUNS_NONE,
+        DatasetLocation.WORKFLOW_RUNS_NONE,
+        open_pull_requests=(DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST,),
+    )
+
+    stale_merge_workflow.publication(client).refresh_merge_workflow()
+
+    assert client.writes == []
+
+
+def test_a_current_merge_workflow_needs_no_refresh(published):
+    published.merge_the_workflow()
+    client = published.runs_none()
+
+    step = published.publication(client).refresh_merge_workflow()
+
+    assert (step, client.writes) == (None, [])
+
+
+def test_a_default_branch_without_the_merge_workflow_is_left_to_publication(published):
+    """
+    Writing it the first time also needs the token, which only publishing walks through.
+    """
+    client = published.runs_none()
+
+    step = published.publication(client).refresh_merge_workflow()
+
+    assert (step, client.writes) == (None, [])
+
+
+def test_a_fork_s_stale_merge_workflow_is_left_as_its_upstream_has_it(
+    stale_merge_workflow,
+):
+    client = stale_merge_workflow.fork_runs()
+
+    step = stale_merge_workflow.publication(client).refresh_merge_workflow()
+
+    assert (step, client.writes) == (None, [])
 
 
 # %% a private repository the build reads
@@ -1117,7 +1226,7 @@ def private_runs(
     secret_path = PlanSiteSecret.READ_TOKEN.path_on(publishing.site.repository)
     if secret_refusal is None:
         client.responses[secret_path] = json.loads(
-            DatasetLocation.PLAN_SITE_READ_TOKEN_STORED.read_text(encoding="utf-8")
+            TextFile(DatasetLocation.PLAN_SITE_READ_TOKEN_STORED).read()
         )
     else:
         client.refusals[secret_path] = secret_refusal
@@ -1250,7 +1359,7 @@ def test_a_private_repository_a_plan_names_without_a_read_token_writes_nothing(
     plan_naming(private_publishing, WORK_REPOSITORY)
     runs = private_publishing.runs_none()
     runs.responses[WORK_REPOSITORY.api_path] = json.loads(
-        DatasetLocation.REPOSITORY_PRIVATE.read_text(encoding="utf-8")
+        TextFile(DatasetLocation.REPOSITORY_PRIVATE).read()
     )
     runs.refusals[
         PlanSiteSecret.READ_TOKEN.path_on(private_publishing.site.repository)
@@ -1286,7 +1395,7 @@ def registering_beside_private_work(
     second_publishing = Publishing(second, published.root)
     runs = second_publishing.runs_none()
     runs.responses[WORK_REPOSITORY.api_path] = json.loads(
-        DatasetLocation.REPOSITORY_PRIVATE.read_text(encoding="utf-8")
+        TextFile(DatasetLocation.REPOSITORY_PRIVATE).read()
     )
     runs.refusals[
         PlanSiteSecret.READ_TOKEN.path_on(second_publishing.site.repository)
@@ -1374,9 +1483,7 @@ def test_private_repositories_of_several_owners_need_a_classic_token():
         site, (Repository("an-owner", "notes"), WORK_REPOSITORY)
     )
 
-    assert access.pending.browser_steps[0] == (
-        f"Open {SiteRepository.classic_token_page}."
-    )
+    assert access.pending.browser_steps[0] == (f"Open {NewTokenPage.CLASSIC.url}.")
 
 
 def test_a_classic_token_is_asked_for_with_a_warning_that_it_can_also_write():
@@ -1541,9 +1648,7 @@ def test_an_open_pull_request_for_the_workflow_is_not_opened_again(protected):
 def test_merging_the_workflow_merges_its_pull_request(protected):
     report = protected.publication(protected.runs_none()).publish()
     pull_request = RestPullRequestSummary.from_json(
-        json.loads(
-            DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST.read_text(encoding="utf-8")
-        )
+        json.loads(TextFile(DatasetLocation.MERGE_WORKFLOW_PULL_REQUEST).read())
     )
 
     assert pending_step(report, UserStep.ADD_MERGE_WORKFLOW) == (
@@ -1560,7 +1665,7 @@ def pull_request_failures(
     return [
         GitHubRequestFailed(
             status=HTTPStatus.FORBIDDEN,
-            detail=DatasetLocation.PULL_REQUEST_REFUSED.read_text(encoding="utf-8"),
+            detail=TextFile(DatasetLocation.PULL_REQUEST_REFUSED).read(),
             method=HttpMethod.POST,
             path=path,
             credential_origin=CredentialProvider.CALLER,
@@ -1589,11 +1694,12 @@ def test_an_unopened_pull_request_leaves_opening_it_to_the_user_with_the_reason(
 
     assert pending.failure == str(failed_opening.failure)
     assert pending.line == (
-        f"gh pr create --repo {notes.full_name} --base {proposal.base} "
-        f"--head {proposal.head} --fill, then merge it"
+        f"gh pr create --repo {notes.full_name} --base {proposal.base.name} "
+        f"--head {proposal.head.name} --fill, then merge it"
     )
     assert pending.browser_steps[0] == (
-        f"Open {notes.url}/compare/{proposal.base}...{proposal.head}?expand=1."
+        f"Open {notes.url}/compare/{proposal.base.name}...{proposal.head.name}"
+        "?expand=1."
     )
 
 
@@ -1865,7 +1971,7 @@ def run_cloud_store_command(
         RecordingGitHubVariable.WORKFLOW_RUN_STATUS, str(workflow_run_status)
     )
     subprocess.run(["sh", "-c", command], input=f"{TYPED_TOKEN}\n", encoding="utf-8")
-    return calls.read_text(encoding="utf-8").splitlines()
+    return TextFile(calls).read().splitlines()
 
 
 def test_a_cloud_session_s_store_command_runs_without_this_session_s_python(published):
@@ -2042,7 +2148,7 @@ def refused_push(error_output: DatasetLocation) -> PublicationPushRefusedError:
             arguments=("push",),
             exit_status=1,
             output="",
-            error_output=error_output.read_text(encoding="utf-8").strip(),
+            error_output=TextFile(error_output).read().strip(),
         ),
         notes_remote=RemoteName.ORIGIN,
         notes_repository=REFUSED_NOTES_REPOSITORY,
@@ -2145,3 +2251,70 @@ def test_the_command_takes_every_option_it_names(option):
     _, bound, _ = publication_app.parse_args([option, "a-value"])
 
     assert list(bound.arguments.values()) == ["a-value"]
+
+
+# %% marking files viewed with the build's token
+
+
+@dataclass
+class UnsetUpClient(PullRequestOpeningClient):
+    """
+    Answers like :class:`PullRequestOpeningClient`, and every path it holds no
+    recording for as missing.
+    """
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        if path in self.responses or path in self.refusals:
+            return super().attempt_get(path)
+        self.calls.append(path)
+        return GitHubResponse(None, failure=refusal_of(path, HTTPStatus.NOT_FOUND))
+
+
+def published_marking_viewed(published: Publishing):
+    """
+    :param published: A notes repository published once, without marking files viewed.
+    :return: The report of publishing it again, also setting up marking files viewed.
+    """
+    runs = published.runs_none()
+    client = UnsetUpClient(runs.responses, opened=runs.opened, refusals=runs.refusals)
+    return replace(
+        published.publication(client), mark_viewed_on=published.notes_repository
+    ).publish()
+
+
+def test_one_owner_s_build_and_marking_files_viewed_leave_one_pair_of_token_steps(
+    published,
+):
+    """
+    The plan site's own token steps are left out, and the mark-viewed part creates and
+    stores the one token both jobs share.
+    """
+    report = published_marking_viewed(published)
+    assert (
+        [
+            pending.step
+            for pending in report.pending
+            if pending.step in (UserStep.CREATE_TOKEN, UserStep.STORE_TOKEN)
+        ],
+        [
+            (type(step), len(step.token.uses))
+            for step in report.mark_viewed.user_steps
+            if isinstance(step, TokenStep)
+        ],
+    ) == ([], [(CreateToken, 2), (StoreToken, 2)])
+
+
+def test_the_shared_token_is_stored_as_both_secrets(published):
+    report = published_marking_viewed(published)
+    (command,) = [
+        step.command for step in report.mark_viewed.user_steps if step.command
+    ]
+    assert all(
+        f"gh secret set {secret}" in command
+        for secret in (PlanSiteSecret.TOKEN, ReviewTriageSecret.VIEWER_TOKEN)
+    )
+
+
+def test_marking_files_viewed_is_reported_after_the_plan_site(published):
+    report = published_marking_viewed(published)
+    assert report.render().endswith(report.mark_viewed_report)

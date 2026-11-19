@@ -88,10 +88,13 @@ items:
   title: Prove a file mechanical when replaying a recorded code modification plan reproduces
     the head
   track: pattern-fixes
+  branch: claude/code-rule-fixes-action-plan-qafasv
+  pull_request_number: 271
+  session: https://claude.ai/code/session_01JxHGiKYVhhFPDBc4ZnnE7y
   depends_on:
   - rule-fix-triage
   - basstler-packages/uv-workspace
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'Done when #223''s moved files are marked mechanical. A new change kind names the
     plan. Next: decide how a commit records the plan it applied; nothing stores #223''s

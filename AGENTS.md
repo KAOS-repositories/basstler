@@ -69,7 +69,7 @@
 - Never abbreviate an identifier
 - A name says *what* a thing is or does - never *how* it does it, *when* it runs, or the layer or mechanism it is built on. Keep it short
 - A name whose meaning has to be looked up elsewhere is wrong. Never adopt another system's vocabulary as an identifier of ours: name the thing for what it is here, and explain a foreign shape in the docstring
-- Methods are verb phrases for what they do; classes and attributes are noun phrases for what they are. Name a field for its subject, not for the shape of its value
+- Methods are verb phrases for what they do; classes and attributes are noun phrases for what they are, except a mixin that only adds one field, which is named `Has<Field>`, as in `HasRepository`. Name a field for its subject, not for the shape of its value
 - One operation has one name throughout a module. Where callers depend on that name, declare it in a base class instead of leaving it a convention each class is trusted to follow
 - Name an enum member for the situation it means, not for the function it dispatches to or the text it renders
 - Never repeat the enclosing type's name in its members, or the same word twice within one name
@@ -89,7 +89,11 @@
 - Eliminate YAGNI smells
 - Make interfaces hard to misuse
 - Model the relationship between related concepts in the source, never only in a test that checks two separate definitions agree: derive one from the other, or unify them into one concept when that is the cleaner design by SOLID and the domain's semantics
+- A thing that always belongs to another - a branch to its repository, a pull request to the repository it is opened on - holds its owner as a required field of its own class: never an optional field, and never a subclass that adds the owner to an ownerless original
 - Before writing a new class, look for an existing class it can hold as a field or subclass, and use it; when related classes share fields or behaviour, give them a common base
+- A field that means the same thing in several classes is declared once, in a mixin or base those classes inherit, never redeclared in each; a set of fields that travels together, such as a pull request's base and head, is one such mixin. Two classes that mean the same thing under different names are one class
+- A model of an external resource or payload is bound to the concept it describes, so every representation of one concept can be found from it: a repository setting's model, the read that parses it and the write that changes it are generic over that setting or hold it as a field, and the step a user takes when the write is refused belongs to the write. Never a free-standing copy of a concept another class already models
+- Every address of an external service - a REST path, a web page - is built by a method of the class of what it addresses (`Repository` for one within a repository), never appended to that class's address by hand where it is used (checked by `basstler code-rules check`)
 
 ### Methods
 <!-- from MethodsRules in basstler/code_rules/rules/code_quality.py -->
@@ -132,6 +136,7 @@
 ## Type hints
 <!-- from TypeHintsRules in basstler/code_rules/rules/code_quality.py -->
 - Type hints are accurate: `Any` where the value genuinely is anything, never as a shortcut
+- A field, parameter or return value takes the most specific type that is correct for its meaning and every one of its uses - a `Branch`, not the `str` of its name; a `Path`, not a `str` - and a payload converts it to and from its wire form at the boundary
 - When each class in a family declares the type it handles, carry that type as a bound generic parameter, not a `ClassVar`, so it is part of the signature and cannot disagree with a separate attribute: bind it in each member (`class MemberOfFamily(Family[ConcreteType])`)
 
 ## Documentation

@@ -96,9 +96,10 @@ items:
   - basstler-packages/uv-workspace
   status: in progress
   recommended_model: opus
-  notes: 'Done when #223''s moved files are marked mechanical. A new change kind names the
-    plan. Next: decide how a commit records the plan it applied; nothing stores #223''s
-    relocation plan replayably yet. uv-workspace supplies the file actions it replays.'
+  notes: 'Draft #271 on #270 with #223 merged. A Code-Modification-Plan trailer names the
+    plan and the basstler release; --plan commit=plan for older commits. The triage rebuilds
+    and replays it on the base (ReplayedPlanChange); on #223 685 files are proven and 118 need
+    review, each moved one edited by #223 itself. Replay 30 s, triage 1m26s.'
 - id: mark-223-viewed
   title: 'Mark #223''s mechanical files viewed'
   track: pattern-fixes
@@ -117,3 +118,25 @@ items:
     moved files are mechanical, and before you review #223. It waits for uv-workspace''s last push to
     be recorded (goal pushes-done), and again after any later push to #223. The report lists what will
     be marked; read it before marking.'
+
+- id: recorded-release-replay
+  title: Replay a recorded plan with the basstler release its trailer names
+  track: pattern-fixes
+  depends_on:
+  - action-plan-triage
+  status: not started
+  recommended_model: opus
+  notes: 'When a Code-Modification-Plan trailer names a release other than the running one,
+    install that tagged release into a cached environment and replay the plan with its
+    builder, so a later builder change cannot unmake an older proof.'
+
+- id: verified-action-commits
+  title: Trust a plan's commit without replay when the tool's own verified identity made it
+  track: pattern-fixes
+  depends_on:
+  - action-plan-triage
+  status: not started
+  recommended_model: opus
+  notes: 'Commits made and signed by an identity only the tool holds (a key or a CI app),
+    verified by the triage before it trusts them, so nobody can fake one; replay stays the
+    proof for every other commit. Decide the identity and how it is verified.'

@@ -653,15 +653,22 @@ class PlanManifest:
         """
         return cls(yaml.safe_load(text) or {})
 
+    @property
+    def text(self) -> str:
+        """
+        The manifest as YAML in block style, its keys in their order.
+        """
+        return yaml.safe_dump(
+            self.content, sort_keys=False, allow_unicode=True, width=88
+        )
+
     def write(self, path: Path) -> None:
         """
-        Write the manifest in block style, keeping its keys in their order.
+        Write the manifest as :attr:`text`.
 
         :param path: Where to write it.
         """
-        path.write_text(
-            yaml.safe_dump(self.content, sort_keys=False, allow_unicode=True, width=88)
-        )
+        path.write_text(self.text)
 
     @property
     def identifier(self) -> str:

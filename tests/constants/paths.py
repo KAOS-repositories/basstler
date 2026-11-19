@@ -345,6 +345,18 @@ class DatasetLocation(PathEnumeration):
     :class:`ProgressBranch` that has one.
     """
 
+    HANDOVER = DIRECTORY / "handover"
+    """
+    A plan handover: two plans, one depending on the other's item, the progress notes
+    of their items' branches and the repository's rules, laid out as
+    :class:`basstler.locations.PlanHandoverLocation` names them.
+    """
+
+    UNRELATED_PROGRESS_NOTE = DIRECTORY / "handover-notes" / "unrelated-branch.md"
+    """
+    The progress note of a branch no plan of :attr:`HANDOVER` tracks.
+    """
+
     PLANS = DIRECTORY / "plans"
     """
     A plans directory the cross-plan reference tests resolve against: one subdirectory

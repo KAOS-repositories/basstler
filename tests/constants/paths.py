@@ -295,6 +295,12 @@ class DatasetLocation(PathEnumeration):
     The REST response for the pull request proposing the plan site's merge workflow.
     """
 
+    STALE_MERGE_WORKFLOW = DIRECTORY / "plan-site-merge-workflow-closed-only.yml"
+    """
+    The plan site's merge workflow as an earlier release wrote it, starting the build
+    only when a pull request closes.
+    """
+
     PULL_REQUEST_REFUSED = DIRECTORY / "pull-request-refused.json"
     """
     GitHub's answer refusing to open a pull request for a token without the right.
@@ -385,6 +391,17 @@ class DatasetLocation(PathEnumeration):
     FAILING_CHECK_SETUP_STUB = STUBS / "check_setup_fails.sh"
     """
     A script standing in for check-setup.sh, failing before it prints a report.
+    """
+
+    MERGE_WORKFLOW_REFRESH_STUB = STUBS / "merge_workflow_refresh_from_environment.py"
+    """
+    A module standing in for :mod:`basstler.plan_site.merge_workflow_refresh`'s command,
+    printing what the environment says.
+    """
+
+    MERGE_WORKFLOW_REFRESH_OUTPUT = DIRECTORY / "merge-workflow-refresh-output.txt"
+    """
+    What the real command prints once it proposed the current merge workflow.
     """
 
     MERGED_ITEMS_STUB = STUBS / "merged_items_from_recording.py"

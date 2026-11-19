@@ -306,6 +306,7 @@ PACKAGE_MAP = PackageMap(
                 "package_layout",
                 "package_map",
                 "plugin_root",
+                "progress",
                 "render_common",
                 "shell_configuration",
                 "standard_streams",

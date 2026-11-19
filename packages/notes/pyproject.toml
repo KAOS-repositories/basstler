@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.24", "hatch-vcs>=0.4", "basstler-build"]
+build-backend = "hatchling.build"
+
+[project]
+name = "basstler-notes"
+description = "Personal notes, pull request progress notes and their setup."
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{name = "Abdelrhman Bassiouny", email = "bido.bassuny@gmail.com"}]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+"Source" = "https://github.com/KAOS-repositories/basstler"
+"Bug Tracker" = "https://github.com/KAOS-repositories/basstler/issues"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0"
+raw-options = {root = "../.."}
+
+# Built with every basstler requirement pinned to this release.
+[tool.hatch.metadata.hooks.basstler-sibling-pins]
+dependencies = [
+    "cyclopts>=5.3",
+    "basstler-core",
+    "basstler-git",
+    "basstler-github",
+    "basstler-reviews",
+    "basstler-stack",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/basstler"]
+
+# What this distribution's tests need besides itself.
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-xdist",
+    "basstler",
+    "basstler-core",
+    "basstler-git",
+    "basstler-github",
+    "basstler-plan",
+    "basstler-reviews",
+    "basstler-stack",
+]

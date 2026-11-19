@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 from typing import Any
@@ -308,6 +308,24 @@ class PullRequestHead:
         if not isinstance(head, Mapping):
             return None
         return head.get(PullRequestHeadKey.COMMIT)
+
+    @classmethod
+    def numbers_by_branch(
+        cls, records: Iterable[PullRequestRecord], repository: str
+    ) -> dict[str, int]:
+        """
+        :param records: Fetched pull requests.
+        :param repository: The ``owner/name`` of a repository their heads may live in.
+        :return: The number of the pull request opened from each branch of *repository*.
+        :raises MissingPullRequestFieldError: If a record omits its number or its head.
+        """
+        numbers_by_branch = {}
+        for record in records:
+            number = int(PullRequestField.NUMBER.read(record))
+            head = cls.from_record(record, number)
+            if head.repository == repository:
+                numbers_by_branch[head.branch] = number
+        return numbers_by_branch
 
     @classmethod
     def from_record(cls, record: PullRequestRecord, number: int) -> PullRequestHead:

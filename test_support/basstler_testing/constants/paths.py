@@ -145,6 +145,11 @@ class DatasetLocation(PathEnumeration):
     indented under it.
     """
 
+    SHARED_IDENTIFIER_PLAN = DIRECTORY / "shared-identifier-plan.yaml"
+    """
+    A plan whose only wave, track and item all carry the id ``experiment``.
+    """
+
     BOOTSTRAP_ROADMAP = DIRECTORY / "bootstrap-roadmap.md"
     """
     The item-bootstrap fixture plan's roadmap.
@@ -432,6 +437,11 @@ class DatasetLocation(PathEnumeration):
     """
     A module standing in for :mod:`basstler.personal_notes.access`, saying nothing: the
     session reaches the notes repository.
+    """
+
+    REVIEW_TRIAGE = DIRECTORY / "review-triage"
+    """
+    The file versions, descriptions and pull request the review triage is tested on.
     """
 
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
@@ -842,6 +852,37 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
     """
 
+    BODY = DIRECTORY / "body.py.txt"
+    """
+    A module of a docstring, an assignment with a string below it, two statements on one
+    line and a compound statement.
+    """
+
+    IMPORTS = DIRECTORY / "imports.py.txt"
+    """
+    A module that imports :mod:`os` and calls nothing from it but :data:`os.name`.
+    """
+
+    IMPORTS_WITH_TEXT_FILE = DIRECTORY / "imports-with-text-file.py.txt"
+    """
+    :attr:`IMPORTS` with :class:`~basstler.text_file.TextFile` imported after
+    :mod:`os`.
+    """
+
+    IMPORTS_OF_TEXT_FILE_MODULE = DIRECTORY / "imports-of-text-file-module.py.txt"
+    """
+    A module that imports :data:`~basstler.text_file.UTF_8` and nothing else from
+    :mod:`basstler.text_file`.
+    """
+
+    IMPORTS_OF_TEXT_FILE_MODULE_MERGED = (
+        DIRECTORY / "imports-of-text-file-module-merged.py.txt"
+    )
+    """
+    :attr:`IMPORTS_OF_TEXT_FILE_MODULE` with :class:`~basstler.text_file.TextFile`
+    imported in the same statement.
+    """
+
     NESTED_AND_ADJACENT_CALLS = DIRECTORY / "nested-and-adjacent-calls.py"
     """
     A call of :func:`round` inside a call of :func:`abs`, and a call of :func:`len`
@@ -851,6 +892,42 @@ class CodeModificationSnippet(PathEnumeration):
     PRINT_CALL = DIRECTORY / "print-call.py"
     """
     One call of :func:`print`.
+    """
+
+    CALLED_NAMES = DIRECTORY / "called-names.py"
+    """
+    Calls of a name, an attribute, a subscript and the result of another call.
+    """
+
+    EXPRESSIONS = DIRECTORY / "expressions.py"
+    """
+    A tuple of constants followed by a variable and a formatted string.
+    """
+
+    CALL_ARGUMENTS = DIRECTORY / "call-arguments.py"
+    """
+    Calls without arguments, with one argument, and with a trailing comma.
+    """
+
+    CALL_ARGUMENTS_WITH_CHECK = DIRECTORY / "call-arguments-with-check.py"
+    """
+    :attr:`CALL_ARGUMENTS` with ``check=True`` passed to every call.
+    """
+
+
+class TextFileSnippet(PathEnumeration):
+    """
+    Text files the UTF-8 text file tests read.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "text-file"
+    """
+    The directory holding them.
+    """
+
+    NON_ASCII = DIRECTORY / "non-ascii.txt"
+    """
+    One line of text no single-byte code page encodes.
     """
 
 
@@ -913,6 +990,29 @@ class RuleFixExampleFile(StrEnum):
     """
 
 
+class TextFileUsageSnippet(PathEnumeration):
+    """
+    Source files the check for text read or written without a text file reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "text-file-usage"
+    """
+    The directory holding them.
+    """
+
+    PATH_TEXT_CALLS = DIRECTORY / "path-text-calls.py"
+    """
+    Four reads and writes of a path's text, one per line from line 10: each as UTF-8
+    and in the locale encoding.
+    """
+
+    KEPT_CALLS = DIRECTORY / "kept-calls.py"
+    """
+    Reads and writes a text file cannot do: another encoding, error handling and
+    newline translation, and a read of bytes.
+    """
+
+
 class LocaleEncodingSnippet(PathEnumeration):
     """
     Source files the check for text read or written in the locale encoding reads.
@@ -933,6 +1033,12 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
     Text read and written as UTF-8, bytes read and written without an encoding, and a
     request opened, which is no file.
+    """
+
+    OTHER_CALLS = DIRECTORY / "other-calls.py"
+    """
+    A function and a method that are not :func:`open`, given a file name and a binary
+    mode.
     """
 
 

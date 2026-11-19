@@ -18,12 +18,14 @@ items:
   pull_request_number: 1
   track: track-1
   status: done
+  recommended_model: sonnet
 - id: open-item
   title: Open Item
   branch: open-item
   pull_request_number: 2
   track: track-1
   status: in progress
+  recommended_model: sonnet
 - id: elsewhere-item
   title: Item In Another Repository
   branch: elsewhere-item
@@ -31,3 +33,4 @@ items:
   pull_request_number: 7
   track: track-1
   status: in progress
+  recommended_model: sonnet

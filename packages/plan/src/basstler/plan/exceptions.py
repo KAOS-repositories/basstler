@@ -269,6 +269,32 @@ class SharedBranch(ValidationProblem):
 
 
 @dataclass
+class RemovedItemStillNamed(ValidationProblem):
+    """
+    A save removes an item that another plan's item still names.
+    """
+
+    reference_text: str
+    """
+    The removed item, as ``<plan-id>/<item-id>``.
+    """
+
+    named_by: list[str]
+    """
+    Each other plan's item naming it, as ``<plan-id>/<item-id>``.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.reference_text!r} is removed but still named by {self.named_by}"
+
+    def suggest_correction(self) -> str:
+        return (
+            "point each of them at the item's new <plan-id>/<item-id>, or drop it "
+            "there, and save them before removing it; mark a finished item done instead"
+        )
+
+
+@dataclass
 class UnknownTrack(ValidationProblem):
     """
     An item's ``track`` doesn't resolve to a declared track.
@@ -306,6 +332,52 @@ class UnknownStatus(ValidationProblem):
 
     def error_message(self) -> str:
         return f"item {self.item_identifier!r} has unknown status {self.status!r}"
+
+
+@dataclass
+class UnknownRecommendedModel(ValidationProblem):
+    """
+    An item's ``recommended_model`` isn't one of :class:`ModelAlias`'s values.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    recommended_model: Any
+    """
+    Whatever ``recommended_model`` actually held.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} has unknown recommended_model "
+            f"{self.recommended_model!r}"
+        )
+
+
+@dataclass
+class MissingRecommendedModel(ValidationProblem):
+    """
+    A new item carries no ``recommended_model``.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    def error_message(self) -> str:
+        return f"new item {self.item_identifier!r} has no recommended_model"
+
+    def suggest_correction(self) -> str:
+        return (
+            "give the item the model its difficulty calls for (opus, sonnet or haiku; see "
+            "plugin/skills/plan-create/plan-schema.md, 'Choosing the recommended model'): "
+            "set recommended_model in plan.yaml, or pass --recommended-model to "
+            "basstler.plan.item_bootstrap's record or update"
+        )
 
 
 @dataclass

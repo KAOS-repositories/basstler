@@ -25,11 +25,12 @@ takes a shortcut a hand-written manifest wouldn't also have to clear.
 
 ## 0. Check the setup is in place, and run it if not
 
-Everything below writes to the personal-notes branch, which the user may not
-have set up yet. Follow
-`skills/setup-personal-notes/prerequisite-check.md` before step 1:
-run the check, and if it reports anything missing, run `/setup-personal-notes`
-without asking first, rather than failing partway through drafting a plan.
+Follow [`prerequisite-check.md`](../setup-personal-notes/prerequisite-check.md) before step 1, with this
+skill's gate:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate --skill plan-create; echo "setup gate exit status: $?"
+```
 
 ## 1. Establish the plan id and refuse to silently overwrite
 
@@ -102,6 +103,9 @@ to read it.
 
 For a single piece of work rather than a whole plan, `/add-plan-item` runs that
 same decision on its own and is the lighter-weight way in.
+
+Give every item its `recommended_model` by invoking the `plan-recommend-models` skill (`Skill` tool, `<plan-id>`) on the
+drafted `plan.yaml` before the first save.
 
 Write only what a future session needs to act, whether drafting fresh or
 migrating a source doc. Structured facts (branch, PR, status, blockers)

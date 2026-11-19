@@ -53,6 +53,7 @@ from basstler.upstream_reviews.request import (
     UpstreamReadRequest,
 )
 
+from basstler_testing.executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.upstream_reviews.replay import RecordedRestResponse as Recorded
 from basstler_testing.upstream_reviews.replay import ReplayingRestClient
@@ -187,6 +188,7 @@ def direct_report(include_resolved: bool = False, failure_logs: bool = False) ->
 
 
 @pytest.mark.parametrize("include_resolved", [False, True])
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_helper_read_reports_what_a_direct_read_does(
     stubbed_gh, include_resolved: bool
 ):
@@ -199,6 +201,7 @@ def test_the_helper_read_reports_what_a_direct_read_does(
     )
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_branch_is_chosen_by_the_reader_on_replay(stubbed_gh):
     add_responses(
         stubbed_gh,
@@ -248,6 +251,7 @@ def test_the_helper_reads_the_pull_request_the_reader_chooses(recorded):
     assert fetch.numbers() == chosen
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_branch_never_promoted_replays_into_the_same_answer(stubbed_gh):
     add_responses(
         stubbed_gh,
@@ -265,6 +269,7 @@ def test_a_branch_never_promoted_replays_into_the_same_answer(stubbed_gh):
         recording.report(helper_request, False)
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_log_behind_a_failed_check_is_read_and_quoted(stubbed_gh):
     helper_request = request(failure_logs=True)
 
@@ -274,12 +279,14 @@ def test_the_log_behind_a_failed_check_is_read_and_quoted(stubbed_gh):
     assert recording.report(helper_request, False) == direct_report(failure_logs=True)
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_no_log_is_read_unless_asked_for(stubbed_gh):
     helper_request = request()
 
     assert recording_of(helper_request, run_fetch(helper_request)).job_logs == []
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_helper_records_exactly_the_paths_a_direct_read_asks_for(stubbed_gh):
     helper_request = request()
     client = ReplayingRestClient(pull_request_responses())
@@ -292,6 +299,7 @@ def test_the_helper_records_exactly_the_paths_a_direct_read_asks_for(stubbed_gh)
     assert [response.path for response in recording.responses] == client.calls
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_failing_gh_fails_the_fetch_with_its_error(stubbed_gh):
     stubbed_gh.write_text("{}", encoding="utf-8")
 
@@ -325,6 +333,7 @@ def test_the_kept_fields_read_the_pull_request_the_whole_responses_do():
     ).read_current_state(NUMBER)
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_output_too_long_for_one_command_is_split_into_files(stubbed_gh, monkeypatch):
     monkeypatch.setattr(HelperChunk, "size", 100)
     helper_request = request()
@@ -490,6 +499,7 @@ def test_report_before_any_prompt_says_so(session):
         UpstreamReadRequest.load()
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_prompt_then_report_reads_the_helper_output_from_the_transcript(
     stubbed_gh, session, capsys
 ):

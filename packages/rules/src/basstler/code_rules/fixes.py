@@ -18,10 +18,13 @@ from basstler.code_modification.actions import (
     Action,
     ActionPlan,
     AppliedAction,
+    ImportInsertion,
     NodeReplacement,
 )
 from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_modification.specification import Specification
+from basstler.code_modification.syntax import CallSyntax
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.exceptions import FixDoesNotConvergeError
@@ -77,6 +80,13 @@ class CodeFix[SpecificationType: Specification](ABC):
         How the fixed code behaves compared with the code it replaces.
         """
 
+    @classproperty
+    def required_import(cls) -> type | None:
+        """
+        The class the replacement needs imported in the module, if any.
+        """
+        return None
+
     @abstractmethod
     def replacement(self, specification: SpecificationType) -> libcst.CSTNode:
         """
@@ -84,6 +94,51 @@ class CodeFix[SpecificationType: Specification](ABC):
         :return: The node taking the place of the specification's node, which no
             longer breaks the rule.
         """
+
+
+@dataclass(frozen=True)
+class CallLackingKeywordArgument(Specification):
+    """
+    A call that has to pass one more keyword argument.
+    """
+
+    node: libcst.Call
+    """
+    The call.
+    """
+
+    superseded_argument: libcst.Arg | None = None
+    """
+    The argument of the call the keyword argument takes the place of, if any.
+    """
+
+
+class KeywordArgumentFix(CodeFix[CallLackingKeywordArgument], ABC):
+    """
+    Passes a call one keyword argument, in place of the argument it supersedes where
+    the call has one.
+    """
+
+    @classproperty
+    @abstractmethod
+    def keyword(cls) -> str:
+        """
+        The keyword the argument is passed by.
+        """
+
+    @classproperty
+    @abstractmethod
+    def value(cls) -> libcst.BaseExpression:
+        """
+        The value passed.
+        """
+
+    def replacement(self, specification: CallLackingKeywordArgument) -> libcst.Call:
+        call = CallSyntax(specification.node)
+        argument = CallSyntax.keyword_argument(self.keyword, self.value)
+        if specification.superseded_argument is None:
+            return call.with_argument_appended(argument)
+        return call.with_argument_replaced(specification.superseded_argument, argument)
 
 
 class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
@@ -106,15 +161,26 @@ class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
         """
 
     @abstractmethod
-    def specifications(self, module: PositionedModule) -> Iterator[SpecificationType]:
+    def specifications_of_module(
+        self, module: PositionedModule
+    ) -> Iterator[SpecificationType]:
         """
         :param module: A module to check.
         :return: Every place in it that breaks the rule.
         """
 
+    def checks(self, path: Path) -> bool:
+        """
+        :param path: A Python source file.
+        :return: Whether the checker reports places in it.
+        """
+        return True
+
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = PositionedModule(libcst.parse_module(path.read_text(encoding="utf-8")))
-        for specification in self.specifications(module):
+        if not self.checks(path):
+            return
+        module = PositionedModule(PythonSourceFile(path).parse())
+        for specification in self.specifications_of_module(module):
             yield CodeRuleViolation(
                 path,
                 specification.location.start.line,
@@ -167,21 +233,28 @@ class SourceFixer:
     The checkers whose fixes are applied.
     """
 
-    def fixed(self, module: libcst.Module) -> AppliedAction[libcst.Module]:
+    def fix_module(self, source_file: PythonSourceFile) -> AppliedAction[libcst.Module]:
         """
-        :param module: The module to fix, which is left as it is.
+        :param source_file: The module to fix, which is left as it is.
         :return: The module with every place the checkers report fixed, and the action
-            restoring *module* exactly.
+            restoring the module exactly.
         :raises FixDoesNotConvergeError: If a round of fixes leaves at least as many
             places breaking a rule as there were before it.
         """
         inverses: list[Action[libcst.Module]] = []
-        places = self.places(module)
+        imports: list[type] = []
+        module = source_file.parse()
+        places = self.places(module, source_file.path)
         while places:
+            imports.extend(
+                place.fix.required_import
+                for place in places
+                if place.fix.required_import is not None
+            )
             applied = self.round_of_fixes(places).apply(module)
             module = applied.result
             inverses.append(applied.inverse)
-            remaining = self.places(module)
+            remaining = self.places(module, source_file.path)
             if len(remaining) >= len(places):
                 raise FixDoesNotConvergeError(
                     tuple(
@@ -189,17 +262,24 @@ class SourceFixer:
                     )
                 )
             places = remaining
+        for imported in dict.fromkeys(imports):
+            applied = ImportInsertion(imported).apply(module)
+            module = applied.result
+            inverses.append(applied.inverse)
         return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))
 
-    def places(self, module: libcst.Module) -> list[FixablePlace]:
+    def places(self, module: libcst.Module, path: Path) -> list[FixablePlace]:
         """
-        :return: Every place in *module* that one of :attr:`checkers` reports.
+        :param path: The file *module* was parsed from.
+        :return: Every place in *module* that one of :attr:`checkers` that checks *path*
+            reports.
         """
         positioned = PositionedModule(module)
         return [
             FixablePlace(checker.fix, specification)
             for checker in self.checkers
-            for specification in checker.specifications(positioned)
+            if checker.checks(path)
+            for specification in checker.specifications_of_module(positioned)
         ]
 
     @staticmethod

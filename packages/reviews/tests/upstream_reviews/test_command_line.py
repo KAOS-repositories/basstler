@@ -17,12 +17,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from basstler.github.graphql import GraphQLRequest
 from basstler.exceptions import DataclassException
 from basstler.github.pull_request_models import (
     CheckResult,
     CheckStatus,
     GraphQLCheckStatus,
-    GraphQLRequest,
     UpstreamPullRequestSnapshot,
 )
 from basstler.github.query_documents import QueryVariable
@@ -64,6 +64,7 @@ from basstler.upstream_reviews.report import (
     UpstreamPullRequestReport,
 )
 
+from basstler_testing.executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.upstream_reviews.replay import (
     RecordedCall,
@@ -646,7 +647,7 @@ def test_a_project_naming_no_upstream_is_a_stated_reason_not_a_crash(
     status = main(["--pull-request", "1"])
 
     assert status == 1
-    assert (ProjectLocation.PROJECT_STACK_CONFIGURATION).as_posix() in caplog.text
+    assert str(ProjectLocation.PROJECT_STACK_CONFIGURATION) in caplog.text
 
 
 # %% report rendering
@@ -802,6 +803,7 @@ def stubbed_gh(tmp_path, monkeypatch) -> Path:
     return stub_directory
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_data_is_unwrapped(stubbed_gh, monkeypatch):
     """
     The client returns the response's data, not the whole envelope.
@@ -812,6 +814,7 @@ def test_the_data_is_unwrapped(stubbed_gh, monkeypatch):
     assert GitHubCommandLineClient().execute("query {}", {}) == data
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_query_and_variables_are_sent_as_the_request_body(
     stubbed_gh, monkeypatch, tmp_path
 ):
@@ -840,6 +843,7 @@ def test_a_failing_gh_invocation_is_raised(stubbed_gh, monkeypatch):
     assert raised.value.exit_code == 1
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_graphql_errors_are_raised_rather_than_returned(stubbed_gh, monkeypatch):
     """
     Errors GitHub answers with are raised instead of read as data.
@@ -852,9 +856,10 @@ def test_graphql_errors_are_raised_rather_than_returned(stubbed_gh, monkeypatch)
     with pytest.raises(GraphQLErrorsReturned) as raised:
         GitHubCommandLineClient().execute("query {}", {})
 
-    assert raised.value.messages == [GRAPHQL_ERROR_MESSAGE]
+    assert raised.value.messages == (GRAPHQL_ERROR_MESSAGE,)
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_job_log_is_asked_for_by_the_job_s_own_endpoint(
     stubbed_gh, monkeypatch, tmp_path
 ):
@@ -869,6 +874,7 @@ def test_a_job_log_is_asked_for_by_the_job_s_own_endpoint(
     )
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_job_log_comes_back_as_the_runner_recorded_it(stubbed_gh, monkeypatch):
     recorded = RecordedJobLog.FAILED_JOB_WITHOUT_SUMMARY.load()
     monkeypatch.setenv(StubEnvironmentVariable.JOB_LOG, recorded)
@@ -887,6 +893,7 @@ def test_a_failing_job_log_read_is_raised(stubbed_gh, monkeypatch):
     assert raised.value.exit_code == 1
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_branch_without_an_upstream_pull_request_exits_without_a_traceback(
     stubbed_gh, monkeypatch, capsys
 ):

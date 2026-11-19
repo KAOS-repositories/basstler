@@ -11,6 +11,7 @@ import yaml
 from basstler.locations import PluginLocation
 from basstler.plan.model import PlanDocument, PlanManifest
 
+from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.scratch_repository import ScratchRepository
 from .bootstrap_scenario import (
     INDENTLESS_PLAN_MANIFEST,
@@ -71,3 +72,17 @@ def indentless_plan_repository(
         ``items:``.
     """
     return repository_publishing(scratch_repository, INDENTLESS_PLAN_MANIFEST)
+
+
+@pytest.fixture
+def shared_identifier_plan_repository(
+    scratch_repository: ScratchRepository,
+) -> ScratchRepository:
+    """
+    :return: A scratch repository whose published plan gives its wave, track and item
+        one id.
+    """
+    return repository_publishing(
+        scratch_repository,
+        DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text(encoding="utf-8"),
+    )

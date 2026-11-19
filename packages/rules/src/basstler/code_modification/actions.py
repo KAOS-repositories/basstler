@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import libcst
+from libcst.codemod import CodemodContext
+from libcst.codemod.visitors import AddImportsVisitor
 from libcst.metadata import CodeRange
 
 from basstler.code_modification.exceptions import ActionTargetMissingError
@@ -89,6 +91,60 @@ class NodeReplacement(Action[libcst.Module]):
             replaced,
             NodeReplacement(replacement_location, self.replacement, self.original),
         )
+
+
+# %% imports
+
+
+class ModuleTransformation(Action, ABC):
+    """
+    Changes a whole module, which the action that restores the module undoes.
+    """
+
+    @abstractmethod
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        """
+        :param module: The module the action is applied to.
+        :return: The module with the change made.
+        """
+
+    def apply(self, module: libcst.Module) -> AppliedAction:
+        return AppliedAction(self.transform(module), ModuleReplacement(module))
+
+
+@dataclass(frozen=True)
+class ModuleReplacement(ModuleTransformation):
+    """
+    Replaces a module with another one.
+    """
+
+    replacement: libcst.Module
+    """
+    The module that takes the place of the one the action is applied to.
+    """
+
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        return self.replacement
+
+
+@dataclass(frozen=True)
+class ImportInsertion(ModuleTransformation):
+    """
+    Imports a class in a module, merged into an import of its module where there is one
+    and left out where the module imports the class already.
+    """
+
+    imported: type
+    """
+    The class to import.
+    """
+
+    def transform(self, module: libcst.Module) -> libcst.Module:
+        context = CodemodContext()
+        AddImportsVisitor.add_needed_import(
+            context, self.imported.__module__, self.imported.__name__
+        )
+        return AddImportsVisitor(context).transform_module(module)
 
 
 # %% plans

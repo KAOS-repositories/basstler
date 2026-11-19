@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,8 @@ import pytest
 # basstler.locations reads on import; pinned before anything imports it, so the suite
 # tests this checkout's plugin rather than whichever release that session synced.
 os.environ["BASSTLER_PLUGIN_ROOT"] = str(Path(__file__).resolve().parents[2] / "plugin")
+
+from basstler.bash import Bash
 
 from .constants.environment import (
     ConfigurationVariable,
@@ -70,6 +74,31 @@ def package_environment_of_the_suite(
             [*search_path, os.environ[SearchPathVariable.EXECUTABLE_SEARCH_PATH]]
         ),
     )
+
+
+# %% a live process the hooks can see
+
+
+@pytest.fixture
+def running_shell_process_id() -> Iterator[int]:
+    """
+    The id of a running process as the hooks' ``kill -0`` knows it.
+
+    On Windows that is the id bash gives its own process, which is not the one Python
+    gets for a process it starts, and a Python process has none.
+
+    :return: The id of a bash process that stays alive until the test ends.
+    """
+    process = subprocess.Popen(
+        Bash.locate(os.environ).command("-c", 'printf "%s\n" "$$"; exec sleep 600'),
+        stdout=subprocess.PIPE,
+        encoding="utf-8",
+    )
+    assert process.stdout is not None
+    yield int(process.stdout.readline())
+    process.kill()
+    process.wait()
+    process.stdout.close()
 
 
 # %% stubbed executables

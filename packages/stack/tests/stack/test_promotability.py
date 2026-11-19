@@ -81,6 +81,16 @@ def test_failed_checks_block_promotion():
     assert readiness.blockers == [PromotionBlocker.CHECKS_FAILED]
 
 
+def test_a_branch_in_review_is_blocked_by_that_alone():
+    readiness = PromotionReadiness(
+        status=BranchStatus.IN_REVIEW,
+        parent_landed=False,
+        withheld=True,
+        checks_failed=True,
+    )
+    assert readiness.blockers == [PromotionBlocker.IN_REVIEW]
+
+
 def test_every_blocker_is_listed_in_declaration_order():
     readiness = PromotionReadiness(
         status=BranchStatus.DRAFT,

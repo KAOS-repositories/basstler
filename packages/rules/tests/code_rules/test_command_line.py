@@ -46,9 +46,14 @@ def test_checking_passes_when_nothing_breaks_a_rule():
 @pytest.fixture
 def example() -> FixExample:
     """
-    :return: The first example of the fix to text read and written as UTF-8.
+    :return: The example of the fix to a subprocess decoding its output as UTF-8, which
+        no other rule's fix changes.
     """
-    return FixExample.all_of(LocaleEncodingChecker())[0]
+    return next(
+        example
+        for example in FixExample.all_of(LocaleEncodingChecker())
+        if example.directory.name == "subprocess-text-switch"
+    )
 
 
 def test_fixing_rewrites_a_file_breaking_a_rule_as_its_fix_does(example, tmp_path):

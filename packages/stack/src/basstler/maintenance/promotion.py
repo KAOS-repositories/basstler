@@ -26,9 +26,11 @@ from basstler.github.pull_request_record import (
 )
 from basstler.github.repository_access import ForkPullRequests, PullRequestWriter
 from basstler.github.tooling_labels import GitHubLabel
+from basstler.github.branch_pull_request import BranchPullRequest
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.model import BranchStatus, Stack
 from basstler.stack.promotion_link import PromotionLink
+from basstler.text_file import TextFile
 
 # %% the summaries a caller writes
 
@@ -114,7 +116,7 @@ class PromotionSummaries:
         """
         if path is None:
             return cls()
-        return cls.from_json(json.loads(path.read_text(encoding="utf-8")))
+        return cls.from_json(json.loads(TextFile(path).read()))
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> PromotionSummaries:
@@ -141,19 +143,9 @@ class PromotionSummaries:
 
 
 @dataclass(frozen=True)
-class Promotion:
+class Promotion(BranchPullRequest):
     """
     One branch's compare-and-create link, and where it was recorded.
-    """
-
-    branch: str
-    """
-    The branch promoted.
-    """
-
-    pull_request_number: int
-    """
-    Its fork pull request.
     """
 
     url: str

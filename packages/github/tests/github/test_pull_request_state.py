@@ -151,6 +151,26 @@ def test_from_mapping_accepts_an_open_entry_without_a_merge_timestamp():
     assert record == PullRequestRecord(state=PullRequestState.OPEN, draft=True)
 
 
+# %% PullRequestRecord.was_merged by what GitHub's comparison shows
+
+
+def test_an_open_pull_request_whose_commits_are_in_the_upstream_was_merged():
+    record = PullRequestRecord(state=PullRequestState.OPEN, landed_upstream=True)
+
+    assert record.was_merged
+
+
+@pytest.mark.parametrize("landed_upstream", [False, None])
+def test_an_open_pull_request_not_shown_to_have_landed_was_not_merged(
+    landed_upstream: bool | None,
+):
+    record = PullRequestRecord(
+        state=PullRequestState.OPEN, landed_upstream=landed_upstream
+    )
+
+    assert not record.was_merged
+
+
 # %% PullRequestRecord.identified_labels
 
 

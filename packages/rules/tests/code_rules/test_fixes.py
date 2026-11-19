@@ -12,6 +12,7 @@ import pytest
 
 from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_modification.specification import Specification
 from basstler.code_rules import rules
 from basstler.code_rules.exceptions import FixDoesNotConvergeError
@@ -23,6 +24,8 @@ from basstler.code_rules.fixes import (
     SourceFixer,
 )
 from basstler.code_rules.rule_module import RuleModule
+from basstler.code_rules.text_file_usage import TextFileChecker
+from basstler.locations import PackageLocation
 
 from basstler_testing.constants.paths import CodeModificationSnippet
 from .fix_example import FixExample
@@ -44,8 +47,11 @@ def fixed(example: FixExample) -> libcst.Module:
     """
     :return: The example's code breaking the rule, fixed.
     """
-    before = libcst.parse_module(example.before.read_text(encoding="utf-8"))
-    return SourceFixer((example.checker,)).fixed(before).result
+    return (
+        SourceFixer((example.checker,))
+        .fix_module(PythonSourceFile(example.before))
+        .result
+    )
 
 
 # %% every fix on its examples
@@ -66,7 +72,7 @@ def test_a_fix_turns_each_example_into_its_fixed_code(example):
     """
     Fixing the code breaking the rule gives the fixed code, character for character.
     """
-    assert fixed(example).code == example.after.read_text(encoding="utf-8")
+    assert fixed(example).code == PythonSourceFile(example.after).read()
 
 
 @pytest.mark.parametrize("example", EXAMPLES, ids=lambda example: example.identifier)
@@ -74,10 +80,10 @@ def test_undoing_a_fix_restores_each_example_exactly(example):
     """
     The inverse of a fix turns the fixed code back into the code it fixed.
     """
-    before = libcst.parse_module(example.before.read_text(encoding="utf-8"))
-    applied = SourceFixer((example.checker,)).fixed(before)
+    before = PythonSourceFile(example.before)
+    applied = SourceFixer((example.checker,)).fix_module(before)
 
-    assert applied.inverse.apply(applied.result).result.code == before.code
+    assert applied.inverse.apply(applied.result).result.code == before.read()
 
 
 @pytest.mark.parametrize("example", EXAMPLES, ids=lambda example: example.identifier)
@@ -119,7 +125,9 @@ class PrintCallChecker(FixableChecker[Specification]):
     def violation_description(cls) -> str:
         return "calls print"
 
-    def specifications(self, module: PositionedModule) -> Iterator[Specification]:
+    def specifications_of_module(
+        self, module: PositionedModule
+    ) -> Iterator[Specification]:
         for node, location in module.positions.items():
             if isinstance(node, libcst.Call) and node.func.deep_equals(
                 libcst.Name(print.__name__)
@@ -132,9 +140,21 @@ def test_a_fix_leaving_its_rule_broken_raises():
     A round of fixes that removes no place stops with an error instead of repeating
     forever.
     """
-    module = libcst.parse_module(
-        CodeModificationSnippet.PRINT_CALL.read_text(encoding="utf-8")
-    )
-
     with pytest.raises(FixDoesNotConvergeError):
-        SourceFixer((PrintCallChecker(),)).fixed(module)
+        SourceFixer((PrintCallChecker(),)).fix_module(
+            PythonSourceFile(CodeModificationSnippet.PRINT_CALL)
+        )
+
+
+# %% files a checker skips
+
+
+def test_a_checker_that_skips_a_file_fixes_nothing_in_it():
+    """
+    The program that runs without ``basstler`` keeps the path methods it reads with.
+    """
+    source_file = PythonSourceFile(PackageLocation.UPSTREAM_REVIEWS_FETCH)
+
+    fixed = SourceFixer((TextFileChecker(),)).fix_module(source_file)
+
+    assert fixed.result.code == source_file.read()

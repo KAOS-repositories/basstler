@@ -18,6 +18,7 @@ from basstler.github.pull_request_state import (
     PullRequestsByRepository,
 )
 from basstler.plan.dependencies import PlanDirectory
+from basstler.text_file import TextFile
 
 # %% options
 
@@ -103,7 +104,7 @@ class PlanCommandArguments:
 
     def read_manifest(self) -> Any:
         """The plan.yaml content, as ``yaml.safe_load`` returns it."""
-        return yaml.safe_load(self.plan_path.read_text(encoding="utf-8"))
+        return yaml.safe_load(TextFile(self.plan_path).read())
 
     def read_pull_requests_by_repository(self) -> PullRequestsByRepository:
         """The live pull request state, parsed.
@@ -111,5 +112,5 @@ class PlanCommandArguments:
         :raises MalformedPullRequestDataError: If any entry can't be parsed.
         """
         return PullRequestRecord.parse_by_repository(
-            json.loads(self.pull_request_data_path.read_text(encoding="utf-8"))
+            json.loads(TextFile(self.pull_request_data_path).read())
         )

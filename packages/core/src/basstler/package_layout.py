@@ -11,6 +11,7 @@ from functools import cache
 from pathlib import Path
 
 from basstler.locations import INSTALLED_PACKAGE
+from basstler.text_file import TextFile
 
 
 @dataclass(frozen=True)
@@ -52,7 +53,7 @@ def _has_a_main_block(source: Path) -> bool:
     """
     return any(
         isinstance(node, ast.If) and "__main__" in ast.dump(node.test)
-        for node in ast.parse(source.read_text(encoding="utf-8")).body
+        for node in ast.parse(TextFile(source).read()).body
     )
 
 

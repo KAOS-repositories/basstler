@@ -17,7 +17,6 @@ from basstler.bash import Bash
 from basstler.locations import PluginLocation
 from basstler.shell_configuration import ShellConfigurationFunction
 
-from ..bash_path import BashPath
 from basstler_testing.constants.environment import (
     ConfigurationVariable,
     SearchPathVariable,
@@ -174,12 +173,14 @@ def test_an_install_still_running_is_waited_for_rather_than_repeated(
     running_install = subprocess.Popen(
         Bash.locate(os.environ).command(
             "-c",
-            'sleep 1; printf "%s" "$1" > "$2"; rm -rf "$3"',
+            'printf "%s\n" "$$"; sleep 1; printf "%s" "$1" > "$2"; rm -rf "$3"',
             "running-install",
             source,
             str(source_file),
             str(lock),
-        )
+        ),
+        stdout=subprocess.PIPE,
+        encoding="utf-8",
     )
     hold_install_lock(entry_point_repository, running_install.pid)
     call_log = tmp_path / "uv-calls"
@@ -236,10 +237,10 @@ def test_a_failed_install_is_one_line_naming_what_to_run(
 
 
 def test_an_install_held_by_a_live_process_past_the_wait_is_one_line_naming_the_lock(
-    entry_point_repository: ScratchRepository,
+    entry_point_repository: ScratchRepository, running_shell_process_id: int
 ):
     installed_source_file(entry_point_repository).unlink()
-    lock = hold_install_lock(entry_point_repository, os.getpid())
+    hold_install_lock(entry_point_repository, running_shell_process_id)
 
     result = run_entry_point(
         entry_point_repository,
@@ -250,4 +251,7 @@ def test_an_install_held_by_a_live_process_past_the_wait_is_one_line_naming_the_
 
     assert result.returncode == 1
     (line,) = result.stderr.splitlines()
-    assert BashPath(lock).text in line
+    assert (
+        entry_point_repository.configuration_value(ConfigurationVariable.INSTALL_LOCK)
+        in line
+    )

@@ -22,6 +22,8 @@ from basstler.plan.model import (
     ItemStatus,
     ManifestKey,
 )
+from basstler.plan.model_alias import ModelAlias
+from basstler.text_file import TextFile
 
 # %% commands
 
@@ -75,6 +77,7 @@ class RecordCommand(BootstrapCommand):
         parser.add_argument("--roadmap-entry")
         parser.add_argument("--title")
         parser.add_argument("--track")
+        parser.add_argument("--recommended-model", type=ModelAlias)
 
     def run(self, arguments: argparse.Namespace, project_root: Path) -> BootstrapReport:
         return ItemRecordRequest(
@@ -84,6 +87,7 @@ class RecordCommand(BootstrapCommand):
             roadmap_entry=arguments.roadmap_entry,
             title=arguments.title,
             track=arguments.track,
+            recommended_model=arguments.recommended_model,
         ).record(project_root)
 
 
@@ -129,7 +133,7 @@ class OpenCommand(BootstrapCommand):
                 session_url=arguments.session,
                 pull_request_title=arguments.pull_request_title,
                 pull_request_body=(
-                    arguments.pull_request_body.read_text(encoding="utf-8")
+                    TextFile(arguments.pull_request_body).read()
                     if arguments.pull_request_body
                     else None
                 ),
@@ -155,6 +159,7 @@ class UpdateCommand(BootstrapCommand):
         parser.add_argument("--branch")
         parser.add_argument("--pull-request-number", type=int)
         parser.add_argument("--session")
+        parser.add_argument("--recommended-model", type=ModelAlias)
         notes = parser.add_mutually_exclusive_group()
         notes.add_argument(
             "--notes", type=Path, help="A file whose text becomes the item's notes"
@@ -179,24 +184,22 @@ class UpdateCommand(BootstrapCommand):
                 (ManifestKey.BRANCH, arguments.branch),
                 (ManifestKey.PULL_REQUEST_NUMBER, arguments.pull_request_number),
                 (ManifestKey.SESSION, arguments.session),
+                (ManifestKey.RECOMMENDED_MODEL, arguments.recommended_model),
             )
             if value is not None
         }
         if arguments.notes:
-            values_by_key[ManifestKey.NOTES] = arguments.notes.read_text(
-                encoding="utf-8"
-            )
+            values_by_key[ManifestKey.NOTES] = TextFile(arguments.notes).read()
         if arguments.blockers:
             values_by_key[ManifestKey.BLOCKERS] = [
-                blocker.read_text(encoding="utf-8").strip()
-                for blocker in arguments.blockers
+                TextFile(blocker).read().strip() for blocker in arguments.blockers
             ]
         return ItemUpdateRequest(
             plan_identifier=arguments.plan,
             item_identifier=arguments.item,
             values_by_key=values_by_key,
             notes_to_append=(
-                arguments.append_notes.read_text(encoding="utf-8")
+                TextFile(arguments.append_notes).read()
                 if arguments.append_notes
                 else None
             ),
@@ -267,7 +270,7 @@ class BlockCommand(BootstrapCommand):
         return OwnedBlocker(
             branch=arguments.branch,
             owner=arguments.owner,
-            reason=arguments.reason.read_text(encoding="utf-8").strip(),
+            reason=TextFile(arguments.reason).read().strip(),
         ).write(project_root)
 
 

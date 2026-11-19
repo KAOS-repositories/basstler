@@ -4,15 +4,20 @@ Finds imports that cross from one distribution into another it does not list.
 
 from __future__ import annotations
 
-import ast
 import tempfile
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
 
-from basstler.directory_tree import DirectoryTree
+import libcst
+from libcst.helpers import get_full_name_for_node
+from libcst.metadata import CodeRange
+
+from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.directory_tree import DirectoryTree
 from basstler.git.commands import GitCommandRunner
 from basstler.locations import PackageLocation, WorkspaceLocation
 from basstler.package_map import Workspace
@@ -31,9 +36,9 @@ class ModuleImport:
     The dotted name, within ``basstler``, of the module imported.
     """
 
-    statement: ast.Import | ast.ImportFrom
+    location: CodeRange
     """
-    The import statement.
+    Where the import statement lies in the source.
     """
 
 
@@ -136,8 +141,8 @@ class PackageBoundaryChecker(CodeRuleChecker):
             imported = self.workspace.package_map.claiming(crossing.imported_module)
             yield CodeRuleViolation(
                 path,
-                crossing.statement.lineno,
-                crossing.statement.end_lineno or crossing.statement.lineno,
+                crossing.location.start.line,
+                crossing.location.end.line,
                 f"{importing.distribution} imports basstler.{crossing.imported_module} "
                 f"from {imported.distribution}, which its pyproject.toml does not list; "
                 "move the code or the import",
@@ -236,19 +241,31 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :param path: A Python source file.
         :return: Every import in it of a module of the package.
         """
-        for statement in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(statement, ast.Import):
+        module = PositionedModule(PythonSourceFile(path).parse())
+        for statement, location in module.positions.items():
+            if isinstance(statement, libcst.Import):
                 for alias in statement.names:
-                    root, _, module = alias.name.partition(".")
-                    if root == PackageLocation.DIRECTORY.name and module:
-                        yield ModuleImport(module, statement)
-            if isinstance(statement, ast.ImportFrom) and statement.level == 0:
-                root, _, package = (statement.module or "").partition(".")
-                if root == PackageLocation.DIRECTORY.name:
-                    for alias in statement.names:
-                        yield ModuleImport(
-                            self.imported_name(package, alias.name), statement
-                        )
+                    root, _, imported = self.dotted_name(alias.name).partition(".")
+                    if root == PackageLocation.DIRECTORY.name and imported:
+                        yield ModuleImport(imported, location)
+            if isinstance(statement, libcst.ImportFrom) and not statement.relative:
+                root, _, package = self.dotted_name(statement.module).partition(".")
+                if root != PackageLocation.DIRECTORY.name:
+                    continue
+                names = (
+                    ["*"]
+                    if isinstance(statement.names, libcst.ImportStar)
+                    else [self.dotted_name(alias.name) for alias in statement.names]
+                )
+                for name in names:
+                    yield ModuleImport(self.imported_name(package, name), location)
+
+    @staticmethod
+    def dotted_name(name: libcst.Attribute | libcst.Name | None) -> str:
+        """
+        :return: The dotted name *name* spells; empty where there is none.
+        """
+        return get_full_name_for_node(name) or "" if name is not None else ""
 
     def imported_name(self, package: str, name: str) -> str:
         """

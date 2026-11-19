@@ -5,7 +5,9 @@ labels, comments and its description.
 
 from __future__ import annotations
 
-from basstler.github.constants import MergeableState
+from dataclasses import replace
+
+from basstler.github.constants import MaintenanceText, MergeableState
 from basstler.maintenance.restack_procedure import restack
 from basstler.maintenance.restack_steps import RestackOutcome
 
@@ -61,6 +63,83 @@ def test_a_conflict_labels_the_branch_and_tells_its_owner(
     assert FixtureFile.CONTESTED in comment.body
     assert A_SESSION_LINK in comment.body
     assert child.reported_at == f"{PromotionSampleText.COMMENT_LINK_PREFIX}1"
+
+
+def test_a_conflict_on_a_merged_branch_says_to_merge_the_parent_in_and_push(
+    fork_checkout: ForkCheckout,
+):
+    """
+    Only a rebase needs a force-push, and only a branch labelled for it may have one, so
+    anything else is resolved by a merge that a plain push publishes.
+    """
+    a_parent_and_child(fork_checkout)
+    fork_checkout.commit_on(
+        StackBranch.PARENT, FixtureFile.CONTESTED, "the parent's version\n"
+    )
+    fork_checkout.commit_on(
+        StackBranch.CHILD, FixtureFile.CONTESTED, "the child's version\n"
+    )
+    fork = RecordingPullRequests()
+
+    restack(a_stack(fork_checkout, the_board()), fork_checkout.git, fork)
+
+    assert (
+        MaintenanceText.MERGE_RESOLUTION.format(parent=StackBranch.PARENT)
+        in fork.comments[0].body
+    )
+
+
+def test_a_conflict_on_a_rebase_labelled_branch_says_to_rebase_and_force_with_lease(
+    fork_checkout: ForkCheckout,
+):
+    a_parent_and_child(fork_checkout)
+    fork_checkout.commit_on(
+        StackBranch.PARENT, FixtureFile.CONTESTED, "the parent's version\n"
+    )
+    fork_checkout.commit_on(
+        StackBranch.CHILD, FixtureFile.CONTESTED, "the child's version\n"
+    )
+    fork = RecordingPullRequests()
+
+    restack(
+        a_stack(fork_checkout, the_board(labels=[StackLabel.REBASE])),
+        fork_checkout.git,
+        fork,
+    )
+
+    assert (
+        MaintenanceText.REBASE_RESOLUTION.format(parent=StackBranch.PARENT)
+        in fork.comments[0].body
+    )
+
+
+def test_a_conflict_comment_names_the_configured_needs_resolution_label(
+    fork_checkout: ForkCheckout,
+):
+    """
+    The label is a setting, so the comment has to name the one this project set.
+    """
+    a_parent_and_child(fork_checkout)
+    fork_checkout.commit_on(
+        StackBranch.PARENT, FixtureFile.CONTESTED, "the parent's version\n"
+    )
+    fork_checkout.commit_on(
+        StackBranch.CHILD, FixtureFile.CONTESTED, "the child's version\n"
+    )
+    configuration = replace(
+        make_configuration(),
+        needs_resolution_label=StackLabel.RENAMED_NEEDS_RESOLUTION,
+    )
+    fork = RecordingPullRequests()
+
+    restack(
+        a_stack(fork_checkout, the_board(), configuration),
+        fork_checkout.git,
+        fork,
+    )
+
+    assert f"`{StackLabel.RENAMED_NEEDS_RESOLUTION}`" in fork.comments[0].body
+    assert f"`{StackLabel.NEEDS_RESOLUTION}`" not in fork.comments[0].body
 
 
 def test_a_label_write_keeps_every_label_the_branch_already_carried(

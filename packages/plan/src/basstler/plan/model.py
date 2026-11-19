@@ -20,6 +20,7 @@ import yaml
 
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
+from basstler.text_file import TextFile
 
 
 class ItemStatus(StrEnum):
@@ -351,6 +352,11 @@ class ManifestKey(KeySpecification, Enum):
     The session's own planning assessment - see :class:`ItemStatus`.
     """
 
+    RECOMMENDED_MODEL = ("recommended_model",)
+    """
+    The Claude model suited to the item's difficulty - see :class:`ModelAlias`.
+    """
+
     SESSION = ("session",)
     """
     The session doing the work.
@@ -638,7 +644,7 @@ class PlanManifest:
         :param path: A ``plan.yaml`` file.
         :return: The manifest it holds.
         """
-        return cls.from_yaml(path.read_text(encoding="utf-8"))
+        return cls.from_yaml(TextFile(path).read())
 
     @classmethod
     def from_yaml(cls, text: str) -> PlanManifest:
@@ -654,9 +660,8 @@ class PlanManifest:
 
         :param path: Where to write it.
         """
-        path.write_text(
-            yaml.safe_dump(self.content, sort_keys=False, allow_unicode=True, width=88),
-            encoding="utf-8",
+        TextFile(path).write(
+            yaml.safe_dump(self.content, sort_keys=False, allow_unicode=True, width=88)
         )
 
     @property
@@ -712,6 +717,17 @@ class PlanManifest:
         """
         return [
             PlanItem(item) for item in self.content.get(ManifestKey.ITEMS.key) or []
+        ]
+
+    @property
+    def items_without_recommended_model(self) -> list[PlanItem]:
+        """
+        :return: The items that carry no ``recommended_model``, in manifest order.
+        """
+        return [
+            item
+            for item in self.items
+            if ManifestKey.RECOMMENDED_MODEL.key not in item.content
         ]
 
     @property

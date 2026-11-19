@@ -21,8 +21,30 @@ from basstler.environment import GitVariable
 from basstler.exceptions import ExternalCallFailed, UnresolvableReferenceError
 from basstler.exit_codes import CommandFailure, StackExitCode
 from basstler.locations import CommitScratchFile, RepositoryStateLocation
+from basstler.text_file import TextFile
 
 # %% running git
+
+
+class RemoteSubcommand(StrEnum):
+    """
+    The git subcommands that talk to a remote, whose failure may be the remote's.
+    """
+
+    FETCH = "fetch"
+    """
+    Updates references from a remote.
+    """
+
+    LIST_REMOTE = "ls-remote"
+    """
+    Lists the references a remote has.
+    """
+
+    PUSH = "push"
+    """
+    Publishes references to a remote.
+    """
 
 
 @dataclass
@@ -45,6 +67,14 @@ class GitCommandFailed(CommandFailure, ExternalCallFailed):
     def call(self) -> str:
         """:return: The git command line, as invoked."""
         return f"git {' '.join(self.arguments)}"
+
+    def suggest_correction(self) -> str:
+        if self.arguments and self.arguments[0] in set(RemoteSubcommand):
+            return (
+                f"check that the remote is reachable with this session's credential, "
+                f"then run `{self.call}` to see it succeed"
+            )
+        return f"run `{self.call}` in the checkout to see why git refused it"
 
 
 @dataclass(frozen=True)
@@ -260,6 +290,26 @@ class GitCommandRunner:
         :return: The commit it names."""
         return self.run("rev-parse", reference)
 
+    def local_commit(self, branch: str) -> str | None:
+        """:param branch: A branch name.
+        :return: The commit this checkout's own copy of the branch is at, ``None`` when
+            it has none."""
+        found = self.attempt("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}")
+        return found.output if found.succeeded else None
+
+    def restore_branch(self, branch: str, commit: str | None) -> None:
+        """
+        Put this checkout's own copy of a branch back where it was.
+
+        :param branch: The branch to restore.
+        :param commit: Where it was, or ``None`` to have no copy of it.
+        """
+        reference = f"refs/heads/{branch}"
+        if commit is None:
+            self.run("update-ref", "-d", reference)
+            return
+        self.run("update-ref", reference, commit)
+
     def file_at(self, commit: str, path: str | PurePath) -> str | None:
         """
         :param commit: The commit to read from.
@@ -295,7 +345,7 @@ class GitCommandRunner:
             self.run("read-tree", parent or "--empty", environment=index)
             blob_file = Path(scratch) / CommitScratchFile.BLOB
             for path, text in files.items():
-                blob_file.write_text(text + "\n", encoding="utf-8")
+                TextFile(blob_file).write(text + "\n")
                 blob = self.run("hash-object", "-w", str(blob_file))
                 self.run(
                     "update-index",
@@ -437,6 +487,14 @@ class GitCommandRunner:
         :return: Whether the two commits have a common ancestor.
         """
         return self.attempt("merge-base", first, second).succeeded
+
+    def merge_base(self, first: str, second: str) -> str:
+        """
+        :param first: Any reference git can resolve to a commit.
+        :param second: Another one.
+        :return: The best common ancestor of the two commits.
+        """
+        return self.run("merge-base", first, second)
 
 
 @dataclass(frozen=True)

@@ -35,6 +35,7 @@
 - Assert equality to the expected value whenever it can be determined, never only a weaker check such as not-None or not-empty
 - Assert against the definition, not a retyped copy of it: the enum member, the `classproperty`, or the value from the fixture the code under test consumed. Where a type distinguishes the case - a distinct exception class, an enum member - assert the type instead of matching message text. A retyped literal keeps passing when the original changes
 - Each test checks the one behaviour it names and fails only for its own reason: assert exactly the values that behaviour determines, not incidental output such as the wording of an error message the test is not about. Where another test already asserts a value exactly, derive the expected value from the production code that computes it instead of hardcoding a second copy. Tests are independent of each other
+- A test that asserts where something was found, or which inputs match, shows the code itself next to the expectation: assert the source text found, never bare line numbers or positions in a file the reader has to open, and list each input beside whether it should match
 
 ### External services and CI
 <!-- from ExternalServicesAndCIRules in basstler/code_rules/rules/code_quality.py -->
@@ -62,6 +63,7 @@
 <!-- from NamingRules in basstler/code_rules/rules/code_quality.py -->
 - Names are technically correct, simple and descriptive, in that order. An inaccurate name is worse than a vague one, because a reader who trusts it stops reading
 - A name stays correct and understandable when read on its own, without its class or a keyword argument next to it - after `value = instance.attribute`, in a log line, in a traceback, or when passed on positionally. A `Pipe` field `size` says nothing once it leaves the class; `inner_diameter` does. A generic word that would fit anything never passes this test
+- A method name is never a bare preposition such as `of`, `for` or `with`: it says nothing without its class and its arguments beside it. Name what it builds from or does, as in `RenameMap.from_decisions`
 - Use the plain word every reader already knows. Use a specialist, metaphorical or in-house term only where it is genuinely the precise word, never as shorthand between the people who were in the discussion
 - Where the domain or file format already has a word for something, use that word
 - Never abbreviate an identifier
@@ -170,6 +172,7 @@
 ## Portability
 <!-- from PortabilityRules in basstler/code_rules/rules/project.py -->
 - Start bash through `basstler.bash.Bash`, never by its name: Windows resolves a bare `bash` to WSL's launcher instead of Git Bash (checked by `basstler code-rules check`)
+- Read and write text through `basstler.text_file.TextFile`, never with a path's `read_text` and `write_text`: it is always UTF-8, so no caller spells the encoding (checked by `basstler code-rules check`)
 - Read and write text as UTF-8: pass `encoding="utf-8"` to every `read_text`, `write_text`, text-mode `open` and `subprocess` call that decodes its output, never `text=True`. Windows falls back to a code page that cannot encode most of Unicode (checked by `basstler code-rules check`)
 - Remove a directory through `basstler.directory_tree.DirectoryTree`, never with `shutil.rmtree`: Windows refuses to delete the read-only object files git leaves in a clone (checked by `basstler code-rules check`)
 

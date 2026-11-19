@@ -75,6 +75,16 @@ class ShippedPath(PathEnumeration):
     The GraphQL documents the upstream review reader sends.
     """
 
+    UPSTREAM_REVIEWS_FETCH = Path("upstream_reviews") / "helper" / "fetch.py"
+    """
+    The program a helper session runs without ``basstler``, so it imports nothing of it.
+    """
+
+    MARK_FILE_AS_VIEWED = Path("review_triage") / "mark_file_as_viewed.graphql"
+    """
+    The GraphQL mutation marking one file of a pull request viewed.
+    """
+
     PLAN_ITEM_MODE_DEFAULTS = Path("plan") / "plan-item-modes.toml"
     """
     The shipped plan-item execution modes.
@@ -195,6 +205,13 @@ class PackageLocation(PathEnumeration):
     QUERIES = INSTALLED_PACKAGE.shipped(ShippedPath.QUERIES)
     """
     :attr:`ShippedPath.QUERIES`, where the github distribution ships them.
+    """
+
+    UPSTREAM_REVIEWS_FETCH = INSTALLED_PACKAGE.shipped(
+        ShippedPath.UPSTREAM_REVIEWS_FETCH
+    )
+    """
+    :attr:`ShippedPath.UPSTREAM_REVIEWS_FETCH`, where the reviews distribution ships it.
     """
 
     PLAN_ITEM_MODE_DEFAULTS = INSTALLED_PACKAGE.shipped(
@@ -355,6 +372,24 @@ class InstructionsTemplate(PathEnumeration):
     AGENTS = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "agents.md.jinja")
     """
     The content of ``AGENTS.md``: rules under the headings of their sections.
+    """
+
+
+class ReviewTriageLocation(PathEnumeration):
+    """
+    The files the review triage reads beside its modules.
+    """
+
+    MARK_FILE_AS_VIEWED = INSTALLED_PACKAGE.shipped(ShippedPath.MARK_FILE_AS_VIEWED)
+    """
+    The GraphQL mutation marking one file of a pull request viewed.
+    """
+
+    REPORT_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "review_triage_report.md.jinja"
+    )
+    """
+    The Markdown report of which files of a pull request need review.
     """
 
 

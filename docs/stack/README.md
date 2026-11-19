@@ -99,8 +99,8 @@ next to the workflow it describes, because it is read rather than run.
     that instead; a base whose commits reached nothing is not listed, since no target follows from it
     - the restack hands that branch back to its owner as `parent-gone`.
   - `"$BASSTLER_PYTHON" -m basstler.stack landed` - one `name<TAB>pr` line per open fork PR whose branch
-    is already in the upstream base. Reporting only: fast-forwarding the fork's copy of the
-    upstream base is what actually closes them.
+    is already in the upstream base. Reporting only: `maintenance run-report` closes and labels
+    them, and fast-forwarding the fork's copy of the upstream base closes those based on it.
 - **`basstler.maintenance`** - the executor: the half of a pass that moves commits, where `basstler.stack`
   only derives and prints. `board --write`, `push` (publish the checked-out branch to the fork,
   only once the move checks clear it), `prepare` (the reparents and what each upstream

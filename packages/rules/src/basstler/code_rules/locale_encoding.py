@@ -5,23 +5,28 @@ cannot encode most of Unicode, and fixes it to UTF-8.
 
 from __future__ import annotations
 
-import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import override
 
 import libcst
+from libcst import matchers
 
 from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.specification import Specification
+from basstler.code_modification.patterns import CodePattern
+from basstler.code_modification.syntax import ConstantName, ExpressionSyntax
 from basstler.code_rules.fixes import (
     BehaviourDeclaration,
     BehaviourEffect,
+    CallLackingKeywordArgument,
     CodeFix,
     FixableChecker,
+    KeywordArgumentFix,
 )
+from basstler.code_rules.subprocess_function import SubprocessFunction
+from basstler.text_file import UTF_8
 
 # %% what reads and writes text
 
@@ -75,42 +80,11 @@ BINARY_MODE = "b"
 The letter in a file mode that opens the file for bytes rather than text.
 """
 
-UTF_8 = "utf-8"
-"""
-The encoding every text is read and written in.
-"""
-
-CONSTANT_NAMES = frozenset({"True", "False", "None"})
-"""
-The names that are constants rather than variables.
-"""
-
-
-# %% the places
-
-
-@dataclass(frozen=True)
-class LocaleTextCall(Specification):
-    """
-    A call reading or writing text without naming its encoding.
-    """
-
-    node: libcst.Call
-    """
-    The call.
-    """
-
-    text_switch: libcst.Arg | None = None
-    """
-    The ``text=True`` argument by which a :mod:`subprocess` call decodes its output,
-    which the encoding replaces.
-    """
-
 
 # %% the fix
 
 
-class UTF8EncodingFix(CodeFix[LocaleTextCall]):
+class UTF8EncodingFix(KeywordArgumentFix):
     """
     Names UTF-8 as the encoding, in place of the :mod:`subprocess` text switch where the
     call has one.
@@ -124,41 +98,183 @@ class UTF8EncodingFix(CodeFix[LocaleTextCall]):
             "nothing changes where the locale encoding is UTF-8.",
         )
 
-    def replacement(self, specification: LocaleTextCall) -> libcst.CSTNode:
-        call = specification.node
-        encoding = libcst.Arg(
-            libcst.SimpleString(f'"{UTF_8}"'),
-            keyword=libcst.Name(TextKeyword.ENCODING),
-            equal=libcst.AssignEqual(
-                whitespace_before=libcst.SimpleWhitespace(""),
-                whitespace_after=libcst.SimpleWhitespace(""),
+    @classproperty
+    def keyword(cls) -> str:
+        return TextKeyword.ENCODING
+
+    @classproperty
+    def value(cls) -> libcst.BaseExpression:
+        return libcst.SimpleString(f'"{UTF_8}"')
+
+
+# %% the patterns
+
+
+class NonEncodingArgument(CodePattern):
+    """
+    An argument that is not the encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Arg:
+        return matchers.Arg(
+            keyword=matchers.DoesNotMatch(matchers.Name(TextKeyword.ENCODING))
+        )
+
+
+class ConstantPositionalArgument(CodePattern):
+    """
+    A positional argument given a constant, as :meth:`pathlib.Path.open` is.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Arg:
+        return matchers.Arg(
+            keyword=None,
+            star="",
+            value=matchers.MatchIfTrue(
+                lambda value: ExpressionSyntax(value).is_constant
             ),
         )
-        if specification.text_switch is not None:
-            return call.deep_replace(
-                specification.text_switch,
-                specification.text_switch.with_changes(
-                    keyword=encoding.keyword, value=encoding.value
-                ),
-            )
-        if not call.args or not isinstance(call.args[-1].comma, libcst.Comma):
-            return call.with_changes(args=[*call.args, encoding])
-        last = call.args[-1]
-        whitespace_before_last = (
-            call.args[-2].comma.whitespace_after
-            if len(call.args) > 1
-            else call.whitespace_before_args
+
+
+class SubprocessTextSwitch(CodePattern):
+    """
+    A call of a :mod:`subprocess` function that decodes its output in the locale
+    encoding; the ``text=True`` argument is saved as :attr:`saved_switch_name`.
+    """
+
+    @classproperty
+    def saved_switch_name(cls) -> str:
+        """
+        The name the ``text=True`` argument is saved under when the pattern matches.
+        """
+        return "switch"
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        others = matchers.ZeroOrMore(NonEncodingArgument.matcher)
+        switch = matchers.Arg(
+            keyword=matchers.Name(TextKeyword.TEXT),
+            value=matchers.Name(ConstantName.TRUE),
         )
-        return call.with_changes(
+        return matchers.Call(
+            func=SubprocessFunction.matcher,
             args=[
-                *call.args[:-1],
-                last.with_changes(
-                    comma=last.comma.with_changes(
-                        whitespace_after=whitespace_before_last
+                others,
+                matchers.SaveMatchedNode(switch, cls.saved_switch_name),
+                others,
+            ],
+        )
+
+
+class BinaryModeArgument(CodePattern):
+    """
+    An argument that names a binary mode.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Arg:
+        return matchers.Arg(
+            value=matchers.MatchIfTrue(
+                lambda value: (
+                    BINARY_MODE in (ExpressionSyntax(value).literal_text or "")
+                )
+            )
+        )
+
+
+class BinaryOpen(CodePattern):
+    """
+    A call of :func:`open` or :meth:`pathlib.Path.open` that names a binary mode: by
+    keyword, as the second argument of the function or the first of the method.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        binary = BinaryModeArgument.matcher
+        by_keyword = matchers.Arg(
+            keyword=matchers.Name(TextKeyword.MODE), value=binary.value
+        )
+        function = matchers.Name(TextFunction.OPEN)
+        method = matchers.Attribute(attr=matchers.Name(TextFunction.OPEN))
+        return matchers.OneOf(
+            matchers.Call(
+                func=matchers.OneOf(function, method),
+                args=[matchers.ZeroOrMore(), by_keyword, matchers.ZeroOrMore()],
+            ),
+            matchers.Call(
+                func=function,
+                args=[matchers.Arg(keyword=None), binary, matchers.ZeroOrMore()],
+            ),
+            matchers.Call(func=method, args=[binary, matchers.ZeroOrMore()]),
+        )
+
+
+class FileOpen(CodePattern):
+    """
+    A call of :func:`open`, or of a method named so that is given nothing but constants
+    as :meth:`pathlib.Path.open` is, unlike an opener handed a request; unless it names
+    its encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        keyword = matchers.Arg(
+            keyword=matchers.AllOf(
+                matchers.Name(),
+                matchers.DoesNotMatch(matchers.Name(TextKeyword.ENCODING)),
+            )
+        )
+        unpacked_keywords = matchers.Arg(keyword=None, star="**")
+        return matchers.OneOf(
+            matchers.Call(
+                func=matchers.Name(TextFunction.OPEN),
+                args=[matchers.ZeroOrMore(NonEncodingArgument.matcher)],
+            ),
+            matchers.Call(
+                func=matchers.Attribute(attr=matchers.Name(TextFunction.OPEN)),
+                args=[
+                    matchers.ZeroOrMore(
+                        matchers.OneOf(
+                            keyword,
+                            ConstantPositionalArgument.matcher,
+                            unpacked_keywords,
+                        )
                     )
-                ),
-                encoding.with_changes(comma=last.comma),
-            ]
+                ],
+            ),
+        )
+
+
+class PathReadOrWrite(CodePattern):
+    """
+    A call of ``read_text`` or ``write_text`` that names no encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        text_function = matchers.OneOf(
+            matchers.Name(TextFunction.READ_TEXT),
+            matchers.Name(TextFunction.WRITE_TEXT),
+        )
+        return matchers.Call(
+            func=matchers.OneOf(text_function, matchers.Attribute(attr=text_function)),
+            args=[matchers.ZeroOrMore(NonEncodingArgument.matcher)],
+        )
+
+
+class LocaleTextCall(CodePattern):
+    """
+    A call that reads or writes text without naming its encoding.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        return matchers.OneOf(
+            SubprocessTextSwitch.matcher,
+            FileOpen.matcher,
+            PathReadOrWrite.matcher,
         )
 
 
@@ -166,14 +282,14 @@ class UTF8EncodingFix(CodeFix[LocaleTextCall]):
 
 
 @dataclass(frozen=True)
-class LocaleEncodingChecker(FixableChecker[LocaleTextCall]):
+class LocaleEncodingChecker(FixableChecker[CallLackingKeywordArgument]):
     """
     Finds calls reading or writing text without naming its encoding: file reads and
     writes, files opened in text mode, and :mod:`subprocess` calls decoding their output.
     """
 
     @classproperty
-    def fix(cls) -> CodeFix[LocaleTextCall]:
+    def fix(cls) -> CodeFix[CallLackingKeywordArgument]:
         return UTF8EncodingFix()
 
     @classproperty
@@ -184,120 +300,16 @@ class LocaleEncodingChecker(FixableChecker[LocaleTextCall]):
         )
 
     @override
-    def specifications(self, module: PositionedModule) -> Iterator[LocaleTextCall]:
-        for node, location in module.positions.items():
-            if not isinstance(node, libcst.Call):
+    def specifications_of_module(
+        self, module: PositionedModule
+    ) -> Iterator[CallLackingKeywordArgument]:
+        for occurrence in LocaleTextCall.found_in(module):
+            call = libcst.ensure_type(occurrence.node, libcst.Call)
+            if BinaryOpen.matches(call):
                 continue
-            specification = self.locale_text_call(node, location)
-            if specification is not None:
-                yield specification
-
-    def locale_text_call(
-        self, call: libcst.Call, location: libcst.metadata.CodeRange
-    ) -> LocaleTextCall | None:
-        """
-        :param location: The code range of *call*.
-        :return: *call* as a place breaking the rule, ``None`` when it names its
-            encoding or handles no text.
-        """
-        keywords = {
-            argument.keyword.value: argument
-            for argument in call.args
-            if argument.keyword is not None
-        }
-        if TextKeyword.ENCODING in keywords:
-            return None
-        if self.is_subprocess_call(call):
-            switch = keywords.get(TextKeyword.TEXT)
-            if switch is None or not self.is_name(switch.value, "True"):
-                return None
-            return LocaleTextCall(location, call, switch)
-        function = call.func
-        name = function.attr.value if isinstance(function, libcst.Attribute) else None
-        if isinstance(function, libcst.Name):
-            name = function.value
-        if name == TextFunction.OPEN:
-            if not self.opens_a_file(call) or self.opens_bytes(call, keywords):
-                return None
-            return LocaleTextCall(location, call)
-        if name in (TextFunction.READ_TEXT, TextFunction.WRITE_TEXT):
-            return LocaleTextCall(location, call)
-        return None
-
-    @staticmethod
-    def is_name(expression: libcst.BaseExpression, name: str) -> bool:
-        """
-        :return: Whether *expression* is the bare name *name*.
-        """
-        return isinstance(expression, libcst.Name) and expression.value == name
-
-    def is_subprocess_call(self, call: libcst.Call) -> bool:
-        """
-        :return: Whether *call* calls a function of :mod:`subprocess`.
-        """
-        function = call.func
-        return isinstance(function, libcst.Attribute) and self.is_name(
-            function.value, subprocess.__name__
-        )
-
-    @staticmethod
-    def positional_arguments(call: libcst.Call) -> list[libcst.Arg]:
-        """
-        :return: The arguments *call* passes by position, ``*`` unpackings included.
-        """
-        return [
-            argument
-            for argument in call.args
-            if argument.keyword is None and argument.star != "**"
-        ]
-
-    def opens_a_file(self, call: libcst.Call) -> bool:
-        """
-        :return: Whether *call*, an :data:`TextFunction.OPEN`, opens a file: a call of
-            :func:`open`, or a method call given nothing but constants, as
-            :meth:`pathlib.Path.open` is, unlike an opener handed a request.
-        """
-        if isinstance(call.func, libcst.Name):
-            return True
-        return all(
-            argument.star == "" and self.is_constant(argument.value)
-            for argument in self.positional_arguments(call)
-        )
-
-    @staticmethod
-    def is_constant(expression: libcst.BaseExpression) -> bool:
-        """
-        :return: Whether *expression* is a literal number, string, bytes, ellipsis or
-            one of :data:`CONSTANT_NAMES`.
-        """
-        if isinstance(expression, libcst.Name):
-            return expression.value in CONSTANT_NAMES
-        if isinstance(expression, libcst.ConcatenatedString):
-            return expression.evaluated_value is not None
-        return isinstance(
-            expression,
-            libcst.SimpleString
-            | libcst.Integer
-            | libcst.Float
-            | libcst.Imaginary
-            | libcst.Ellipsis,
-        )
-
-    def opens_bytes(self, call: libcst.Call, keywords: dict[str, libcst.Arg]) -> bool:
-        """
-        :param keywords: The keyword arguments of *call*, by name.
-        :return: Whether *call*, an :data:`TextFunction.OPEN`, names a binary mode: by
-            keyword, as the second argument of :func:`open` or the first of
-            :meth:`pathlib.Path.open`.
-        """
-        mode_position = 0 if isinstance(call.func, libcst.Attribute) else 1
-        positional = self.positional_arguments(call)
-        mode = (
-            keywords[TextKeyword.MODE].value if TextKeyword.MODE in keywords else None
-        )
-        if mode is None and len(positional) > mode_position:
-            mode = positional[mode_position].value
-        if not isinstance(mode, libcst.SimpleString | libcst.ConcatenatedString):
-            return False
-        value = mode.evaluated_value
-        return isinstance(value, str) and BINARY_MODE in value
+            captured = LocaleTextCall.captures(call)
+            yield CallLackingKeywordArgument(
+                occurrence.location,
+                call,
+                captured.get(SubprocessTextSwitch.saved_switch_name),
+            )

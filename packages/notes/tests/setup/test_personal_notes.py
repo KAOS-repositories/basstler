@@ -58,7 +58,10 @@ from basstler_testing.constants.paths import (
     PersonalNotesPath,
     RepositoryLocation,
 )
-from basstler_testing.executable_stubs import ExecutableStubDirectory
+from basstler_testing.executable_stubs import (
+    NEEDS_SCRIPT_AS_EXECUTABLE,
+    ExecutableStubDirectory,
+)
 from basstler_testing.scratch_repository import (
     SCRATCH_IDENTITY,
     GitIdentity,
@@ -301,6 +304,7 @@ def test_completes_a_full_setup(setup_repository: ScratchRepository):
     assert check_setup_report(setup_repository).exit_code == exit_code
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     setup_repository: ScratchRepository, tmp_path: Path
 ):

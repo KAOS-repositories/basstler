@@ -132,6 +132,11 @@ class Distribution(StrEnum):
     Reading an upstream pull request's checks and review threads.
     """
 
+    REVIEW_TRIAGE = "basstler-review-triage", Layer.COLLABORATION
+    """
+    Telling a pull request's mechanical files from those a reviewer has to read.
+    """
+
     STACK = "basstler-stack", Layer.COLLABORATION
     """
     Stacked pull request maintenance.

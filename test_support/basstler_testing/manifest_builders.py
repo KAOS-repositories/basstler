@@ -9,6 +9,7 @@ from typing import Any
 
 from basstler.plan.exceptions import InvalidSchemaVersion
 from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model_alias import ModelAlias
 
 from .fixture_plans import (
     PLAN_UNDER_TEST_ID,
@@ -64,6 +65,7 @@ def manifest_item(identifier: str, **overrides: Any) -> dict[str, Any]:
         ManifestKey.BRANCH.key: identifier,
         ManifestKey.TRACK.key: "track-1",
         ManifestKey.STATUS.key: ItemStatus.NOT_STARTED.value,
+        ManifestKey.RECOMMENDED_MODEL.key: ModelAlias.SONNET.value,
     }
     entry.update(
         {

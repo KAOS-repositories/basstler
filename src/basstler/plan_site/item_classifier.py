@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_state import (
     ForkLineage,
@@ -14,20 +15,29 @@ from basstler.github.pull_request_state import (
     LiveState,
     PullRequestRecord,
 )
-from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository import (
+    PullRequestReference,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.plan.dependencies import DependencyResolver
 from basstler.plan.model import ItemStatus
 from basstler.maintenance.promotion import PromotionSummary
+from basstler.plan.structure import Item, Plan
 from basstler.plan_site.cards import (
+    DependencyChip,
     ItemAction,
+    ItemCard,
     PromotionButton,
     ResolveAction,
     StartNowAction,
 )
-from basstler.plan_site.plan import Item, Plan
 from basstler.plan_site.workflows import PlanSiteSecret
 from basstler.stack.branch_status import BranchStatus
-from basstler.stack.configuration import CommittedStackConfiguration, StackSetting
+from basstler.github.stack_configuration import (
+    CommittedStackConfiguration,
+    StackSetting,
+)
 from basstler.stack.promotability import PromotionReadiness
 from basstler.stack.promotion_link import PromotionLink, PromotionTarget
 
@@ -37,8 +47,8 @@ from basstler.stack.promotion_link import PromotionLink, PromotionTarget
 @dataclass
 class ItemClassifier:
     """
-    Fills in every item's live state, pull request, drift, dependency chips and action,
-    and shows an item whose pull request merged as done.
+    Fills in every item's live state, pull request and drift, shows an item whose pull
+    request merged as done, and builds each item's card.
     """
 
     plan: Plan
@@ -71,21 +81,29 @@ class ItemClassifier:
     The pull request label withholding a branch from promotion.
     """
 
-    def classify(self) -> None:
+    def classify(self) -> dict[str, ItemCard]:
         """
         Fill in every item of :attr:`plan` in place.
+
+        :return: Each item's card, by item id.
         """
         self.dependencies.classify_live_states(self.live_pull_requests)
         for item in self.plan.items:
             self._classify_pull_request(item)
+        cards = {}
         for item in self.plan.items:
-            item.dependency_chips = [
-                dependency.chip(self.locate_plan_page)
-                for dependency in self.dependencies.dependencies_of(item)
-            ]
-            item.action = self._action_for(item)
-            item.pending_start_action = self._pending_start_action_for(item)
-            item.promotion = self._promotion_for(item)
+            card = ItemCard(
+                item=item,
+                dependency_chips=[
+                    DependencyChip.of(dependency, self.locate_plan_page)
+                    for dependency in self.dependencies.dependencies_of(item)
+                ],
+                action=self._action_for(item),
+                promotion=self._promotion_for(item),
+            )
+            card.pending_start_action = self._pending_start_action_for(card)
+            cards[item.identifier] = card
+        return cards
 
     def _classify_pull_request(self, item: Item) -> None:
         """
@@ -120,15 +138,14 @@ class ItemClassifier:
         record = item.pull_request_record
         if lineage is None or record is None or not item.has_open_pull_request:
             return None
-        blockers = self._readiness_of(record, lineage).blockers
-        if blockers:
-            return PromotionButton(lineage.upstream_repository, None, blockers)
+        blockers = self._readiness_of(item, record, lineage).blockers
         fork = Repository.parse(self._repository_of(item))
         link = PromotionLink.for_target(
             PromotionTarget(
-                upstream_repository=lineage.upstream_repository,
-                upstream_base=lineage.upstream_default_branch,
-                fork_owner=fork.owner,
+                upstream_base=RepositoryBranch(
+                    lineage.upstream_default_branch, lineage.upstream_repository
+                ),
+                fork=fork,
             ),
             item.branch,
             record.title or item.title,
@@ -136,23 +153,31 @@ class ItemClassifier:
                 fork.pull_request_url(item.pull_request_number)
             ),
         )
-        return PromotionButton(lineage.upstream_repository, link.url, [])
+        return PromotionButton(lineage.upstream_repository, link.url, blockers)
 
     def _readiness_of(
-        self, record: PullRequestRecord, lineage: ForkLineage
+        self, item: Item, record: PullRequestRecord, lineage: ForkLineage
     ) -> PromotionReadiness:
         """
-        :return: What decides whether the pull request may be promoted, read as the
-            stack reads it.
+        :return: What decides whether the item's pull request may be promoted; an open
+            upstream pull request is found from its description's link or from the
+            upstream's own listing, and a conflict from GitHub's mergeable state, the
+            withholding label deciding only while that is unread.
         """
+        upstream_pull_requests = self.live_pull_requests.upstream_pull_requests.get(
+            self._repository_of(item), {}
+        )
+        conflict_unread = record.mergeable_state in (None, MergeableState.UNKNOWN)
         return PromotionReadiness(
             status=BranchStatus.derive(
                 draft=record.draft,
                 merged=record.was_merged,
-                in_review=record.upstream_link is not None,
+                in_review=record.upstream_link is not None
+                or item.branch in upstream_pull_requests,
             ),
             parent_landed=self._base_has_landed(record, lineage),
-            withheld=self.needs_resolution_label in record.labels,
+            withheld=record.mergeable_state is MergeableState.DIRTY
+            or (conflict_unread and self.needs_resolution_label in record.labels),
             checks_failed=record.check_state is not None and record.check_state.failed,
         )
 
@@ -208,7 +233,10 @@ class ItemClassifier:
             case ItemStatus.DEFERRED:
                 label = "Reconsider"
         return ResolveAction(
-            label=label, plan_id=self.plan.id, item_identifier=item.identifier
+            label=label,
+            plan_id=self.plan.id,
+            item_identifier=item.identifier,
+            recommended_model=item.recommended_model,
         )
 
     def _start_action_for(self, item: Item) -> StartNowAction:
@@ -219,25 +247,25 @@ class ItemClassifier:
             label="Start now",
             plan_id=self.plan.id,
             item_identifier=item.identifier,
+            recommended_model=item.recommended_model,
         )
 
-    def _pending_start_action_for(self, item: Item) -> StartNowAction | None:
+    def _pending_start_action_for(self, card: ItemCard) -> StartNowAction | None:
         """
         Build the start action of a not-started item that only open draft dependencies
         hold back, or ``None`` for any other item.
 
-        Reads :attr:`Item.action` and :attr:`Item.dependency_chips`, so runs after both
-        are filled in.
+        Reads :attr:`ItemCard.action` and :attr:`ItemCard.dependency_chips`.
         """
-        if item.status is not ItemStatus.NOT_STARTED or item.action is not None:
+        if card.item.status is not ItemStatus.NOT_STARTED or card.action is not None:
             return None
         if not all(
             chip.dependency.is_ready_to_unblock_dependents()
             or chip.draft_pull_request is not None
-            for chip in item.dependency_chips
+            for chip in card.dependency_chips
         ):
             return None
-        return self._start_action_for(item)
+        return self._start_action_for(card.item)
 
     @staticmethod
     def access_warning_of(repository: Repository, refusal: GitHubRequestFailed) -> str:

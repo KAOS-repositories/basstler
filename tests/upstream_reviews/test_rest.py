@@ -57,7 +57,7 @@ ROUTE = UpstreamRestRoute(UPSTREAM)
 NUMBER = 513
 HEAD_SHA = RestPullRequestSummary.from_json(
     RecordedRestResponse.PULL_REQUEST.load()
-).head.sha
+).head.object_hash
 
 
 def pull_request_responses(

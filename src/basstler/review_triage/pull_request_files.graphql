@@ -1,0 +1,16 @@
+query PullRequestFiles($pullRequestId: ID!, $after: String) {
+  node(id: $pullRequestId) {
+    ... on PullRequest {
+      headRefOid
+      files(first: 100, after: $after) {
+        nodes {
+          path
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+}

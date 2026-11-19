@@ -40,6 +40,7 @@ from basstler.plan.merged_items.every_plan import (
     MergedItemsSummary,
 )
 from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan_site import merge_workflow_refresh
 from basstler.plan_site.hub import SiteAddress
 from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
@@ -48,6 +49,7 @@ from basstler.upstream_reviews.action.branch import InstallationState
 from ..constants.environment import (
     ConfigurationVariable,
     FileMode,
+    MergeWorkflowRefreshStubVariable,
     PullRequestStubVariable,
     ScrubbedEnvironmentPrefix,
     SearchPathVariable,
@@ -216,6 +218,9 @@ def session_start_repository(
     scratch_repository.install_package()
     scratch_repository.replace_package_module(
         merged_items_command, DatasetLocation.MERGED_ITEMS_STUB
+    )
+    scratch_repository.replace_package_module(
+        merge_workflow_refresh, DatasetLocation.MERGE_WORKFLOW_REFRESH_STUB
     )
     scratch_repository.install_package_environment()
     scratch_repository.write_setup_prerequisites()
@@ -537,6 +542,78 @@ def test_reports_a_tracked_branch_whose_manifest_is_missing(
         PLAN_IDENTIFIER,
         str(MANIFEST_PATH),
         ScratchBranch.PERSONAL_NOTES,
+    )
+
+
+# %% the recommended models line
+
+
+def test_reports_recommended_models_as_not_applicable_when_no_plan_tracks_the_branch(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(SummaryMessage.RECOMMENDED_MODELS_NOT_APPLICABLE)
+
+
+def without_recommended_model(
+    manifest: PlanManifest, item_identifier: str
+) -> PlanManifest:
+    """
+    :return: *manifest* with the named item's ``recommended_model`` removed.
+    """
+    items = [
+        (
+            {
+                key: value
+                for key, value in item.content.items()
+                if key != ManifestKey.RECOMMENDED_MODEL.key
+            }
+            if item.identifier == item_identifier
+            else item.content
+        )
+        for item in manifest.items
+    ]
+    return PlanManifest({**manifest.content, ManifestKey.ITEMS.key: items})
+
+
+def test_reports_every_item_of_the_tracked_plan_as_having_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    result = publish_tracked_plan_and_run(
+        session_start_repository, tracked_plan.manifest, tmp_path
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_ALL_SET, tracked_plan.manifest.identifier
+    )
+
+
+def test_names_the_items_of_the_tracked_plan_without_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    queued_item = tracked_plan.item_with_status(ItemStatus.NOT_STARTED)
+    manifest = without_recommended_model(tracked_plan.manifest, queued_item.identifier)
+
+    result = publish_tracked_plan_and_run(session_start_repository, manifest, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_UNSET,
+        manifest.identifier,
+        queued_item.identifier,
     )
 
 
@@ -1809,6 +1886,38 @@ def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
     assert version.stdout.strip() == str(True)
 
 
+def test_skips_an_interpreter_on_the_path_that_cannot_run_when_creating_the_environment(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A first candidate that cannot run does not stop the next one from being tried.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.PIP)
+    newest_candidate = configuration_value(
+        ConfigurationVariable.INTERPRETER_CANDIDATES
+    ).split()[0]
+    stub_bin.install(newest_candidate, "unusable_interpreter")
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_hiding_executables(tmp_path, PackageManager.UV)
+            ),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
+        environment_directory(session_start_repository),
+        package_source(session_start_repository),
+    )
+
+
 def path_without_a_supported_interpreter(mirror_parent: Path) -> str:
     """
     :param mirror_parent: Where to build the mirror directories.
@@ -2109,6 +2218,71 @@ def test_links_the_plan_under_the_notes_repository_the_site_lists(
         SITE_URL,
         SiteAddress(SITE_URL).plan_url(SiteRepository.NOTES.value, PLAN_IDENTIFIER),
     )
+
+
+# %% the plan site's merge workflow
+
+
+def publish_hub_and_run(
+    repository: ScratchRepository, environment: Mapping[str, str]
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run session-start.sh against a notes branch that lists a plan site.
+
+    :param repository: The fixture-built scratch repository.
+    :param environment: Variables to set for the hook's run.
+    :return: The finished session-start.sh process.
+    """
+    return publish_and_run(
+        repository, {ProjectLocation.PLAN_HUB: HUB_FILE}, environment
+    )
+
+
+def test_says_the_pull_request_that_brings_the_merge_workflow_up_to_date(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A merge workflow older than the release starts no build for some pull request
+    changes, so the session says what to merge instead of leaving the site stale.
+    """
+    result = publish_hub_and_run(
+        session_start_repository,
+        {
+            MergeWorkflowRefreshStubVariable.OUTPUT: str(
+                DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT.read_text().rstrip("\n")
+        in result.stdout
+    )
+
+
+def test_says_nothing_of_the_merge_workflow_when_it_is_current(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_hub_and_run(session_start_repository, {})
+
+    assert result.returncode == 0, result.stderr
+    assert "merge workflow" not in result.stdout
+
+
+def test_says_how_to_check_the_merge_workflow_by_hand_when_the_check_fails(
+    session_start_repository: ScratchRepository,
+):
+    failure = "GitHub refused the read"
+
+    result = publish_hub_and_run(
+        session_start_repository,
+        {MergeWorkflowRefreshStubVariable.FAILURE: failure},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert merge_workflow_refresh.__name__ in result.stdout
+    assert failure in result.stdout
 
 
 # %% the upstream-reviews Action line

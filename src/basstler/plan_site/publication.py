@@ -21,18 +21,15 @@ from cyclopts import App, Parameter
 
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure
-from basstler.git.commands import (
-    GitCommandResult,
-    GitCommandRunner,
-    GitHubLoginLendingRunner,
-)
-from basstler.git.remote_branch import RemoteBranch
+from basstler.git.commands import GitCommandResult, GitCommandRunner
+from basstler.github.login_lending import GitHubLoginLendingRunner
+from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import (
     GitHubFullClient,
     GitHubRestClient,
     RetryPolicy,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.run_listing import RunListing
 from basstler.locations import (
@@ -65,6 +62,7 @@ from basstler.plan_site.workflows import (
     PlanSiteWorkflow,
     SiteWorkflow,
 )
+from basstler.review_triage.viewed_setup import MarkViewedSetup
 from basstler.setup.steps import PersonalNotesSetting, resolve_repository
 from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.action.branch import BasstlerSource
@@ -111,10 +109,23 @@ class PublicationReport:
     What was left out on purpose, one line each, with why.
     """
 
+    mark_viewed: MarkViewedSetup | None = None
+    """
+    Setting the notes repository's Actions up to mark files viewed, once run; ``None``
+    when that was not asked for.
+    """
+
+    mark_viewed_report: str = ""
+    """
+    What setting it up came to, as Markdown, empty when it was not asked for.
+    """
+
     @property
     def complete(self) -> bool:
         """:return: Whether nothing is left to the user."""
-        return not self.pending
+        return not self.pending and not (
+            self.mark_viewed is not None and self.mark_viewed.user_steps
+        )
 
     def render(self) -> str:
         """:return: The report as it is printed."""
@@ -124,6 +135,8 @@ class PublicationReport:
         if self.pending:
             lines.append("Left to you - run this command again once they are done:")
             lines.extend(step.render() for step in self.pending)
+        if self.mark_viewed_report:
+            lines.extend(["", self.mark_viewed_report])
         return "\n".join(lines)
 
 
@@ -182,6 +195,12 @@ class PlanSitePublication:
     Whether this runs in a Claude Code cloud session, whose user has no terminal on it.
     """
 
+    mark_viewed_on: Repository | None = None
+    """
+    The repository whose pull requests' mechanical files the notes repository's
+    Actions are also set up to mark viewed, ``None`` to set nothing up for it.
+    """
+
     github_retry_policy: RetryPolicy = RetryPolicy(
         retries=4, first_delay=timedelta(seconds=2)
     )
@@ -210,7 +229,7 @@ class PlanSitePublication:
             "push to the notes branch"
         )
 
-    def notes_branch_of(self, repository: Repository) -> RemoteBranch:
+    def notes_branch_of(self, repository: Repository) -> GitHubRemoteBranch:
         """
         :param repository: A repository the site publishes.
         :return: Its notes branch.
@@ -220,9 +239,9 @@ class PlanSitePublication:
             if repository == self.dispatch_workflow.notes_repository
             else repository.clone_url_under(self.remote_root)
         )
-        return RemoteBranch(self.dispatch_workflow.notes_branch, self.git, remote)
+        return GitHubRemoteBranch(self.dispatch_workflow.notes_branch, self.git, remote)
 
-    def default_branch_of(self, remote: str) -> RemoteBranch:
+    def default_branch_of(self, remote: str) -> GitHubRemoteBranch:
         """
         :param remote: A remote, as a remote name or a URL.
         :return: Its default branch, :attr:`initial_branch` when it has none yet.
@@ -232,11 +251,11 @@ class PlanSitePublication:
         match = re.search(
             r"^ref: refs/heads/(?P<branch>\S+)\s+HEAD$", listed, re.MULTILINE
         )
-        return RemoteBranch(
+        return GitHubRemoteBranch(
             match["branch"] if match else self.initial_branch, self.git, remote
         )
 
-    def site_branch(self) -> RemoteBranch | None:
+    def site_branch(self) -> GitHubRemoteBranch | None:
         """
         :return: The site repository's default branch, ``None`` when GitHub has no such
             repository.
@@ -308,8 +327,13 @@ class PlanSitePublication:
             report,
         )
         proposal = self.write_merge_workflow(notes_details, report)
+        viewed = self.set_up_mark_viewed(notes_details, hub, report)
         user_steps = UserSteps(
-            notes_repository, site, hub.repositories, self.in_cloud_session
+            notes_repository,
+            site,
+            hub.repositories,
+            self.in_cloud_session,
+            () if viewed is None else (viewed.token_use(notes_details),),
         )
         if access is not None:
             report.pending.append(access.pending)
@@ -319,7 +343,19 @@ class PlanSitePublication:
                     UserStep.TURN_ON_PAGES, site_runs.latest(SiteWorkflow.location)
                 )
             )
-        if not notes_runs.succeeded(DispatchWorkflow.location):
+        token_in_viewed_steps = (
+            viewed is not None
+            and viewed.token_left
+            and user_steps.shared_token is not None
+        )
+        if token_in_viewed_steps:
+            report.skipped.append(
+                "the plan site's token steps, because one token starts the build and "
+                "marks files viewed: its steps are in the mark-viewed part below"
+            )
+        if not token_in_viewed_steps and not notes_runs.succeeded(
+            DispatchWorkflow.location
+        ):
             latest_dispatch = notes_runs.latest(DispatchWorkflow.location)
             report.pending.extend(
                 user_steps.pending(step, latest_dispatch)
@@ -328,6 +364,32 @@ class PlanSitePublication:
         if proposal is not None:
             report.pending.append(proposal.pending(self.github))
         return report
+
+    def set_up_mark_viewed(
+        self, notes_details: RepositoryDetails, hub: PlanHub, report: PublicationReport
+    ) -> MarkViewedSetup | None:
+        """
+        Set the notes repository's Actions up to mark files viewed on
+        :attr:`mark_viewed_on`'s pull requests, when given, sharing the token that starts the build where one token can do both.
+
+        :param notes_details: The notes repository.
+        :param hub: The repositories the site publishes, which store the build's token.
+        :param report: Where the setup's report goes.
+        :return: The setup once run, ``None`` when it was not asked for.
+        """
+        if self.mark_viewed_on is None:
+            return None
+        site = self.dispatch_workflow.site
+        setup = MarkViewedSetup(
+            self.dispatch_workflow.notes_repository,
+            self.mark_viewed_on,
+            shared_uses=(
+                site.token_use([Repository.parse(name) for name in hub.repositories]),
+            ),
+        )
+        report.mark_viewed = setup
+        report.mark_viewed_report = setup.run(self.github)
+        return setup
 
     def site_repository_creation(
         self, access: PrivateRepositoryAccess | None
@@ -363,7 +425,7 @@ class PlanSitePublication:
 
     def write(
         self,
-        branch: RemoteBranch,
+        branch: GitHubRemoteBranch,
         workflow: PlanSiteWorkflow,
         message: str,
         report: PublicationReport,
@@ -383,7 +445,7 @@ class PlanSitePublication:
         report.written.append(f"{workflow.location} on {branch.description}")
 
     def write_file(
-        self, branch: RemoteBranch, path: str, text: str, message: str
+        self, branch: GitHubRemoteBranch, path: str, text: str, message: str
     ) -> None:
         """
         Commit one file onto a branch and push it.
@@ -398,7 +460,7 @@ class PlanSitePublication:
 
     def rebuild(
         self,
-        branch: RemoteBranch,
+        branch: GitHubRemoteBranch,
         parent: str,
         workflow: PlanSiteWorkflow,
         message: str,
@@ -551,7 +613,9 @@ class PlanSitePublication:
             workflow.text
         ):
             return None
-        head = RemoteBranch(self.merge_workflow_branch, self.git, self.notes_remote)
+        head = GitHubRemoteBranch(
+            self.merge_workflow_branch, self.git, self.notes_remote
+        )
         head_tip = head.fetch()
         if default_tip and not (
             head_tip and self.git.share_history(head_tip, default_tip)
@@ -559,7 +623,33 @@ class PlanSitePublication:
             self.rebuild(head, default_tip, workflow, message, report)
         else:
             self.write(head, workflow, message, report)
-        return MergeWorkflowProposal(notes_repository, default_branch.name, head.name)
+        return MergeWorkflowProposal(
+            RepositoryBranch(default_branch.name, notes_repository),
+            RepositoryBranch(head.name, notes_repository),
+        )
+
+    def refresh_merge_workflow(self) -> PendingStep | None:
+        """
+        Propose the current merge workflow in place of an older one the notes
+        repository's default branch holds, as :meth:`write_merge_workflow` does.
+
+        :return: The step merging the proposal, ``None`` when the default branch holds
+            no merge workflow (writing the first one is publishing's), already holds the
+            current one, or belongs to a fork.
+        """
+        notes_repository = self.dispatch_workflow.notes_repository
+        default_tip = self.default_branch_of(self.notes_remote).fetch()
+        workflow = MergeWorkflow(self.dispatch_workflow)
+        installed = default_tip and self.git.file_at(default_tip, workflow.location)
+        if not installed:
+            return None
+        notes_details = RepositoryDetails.from_json(
+            self.github.get(notes_repository.api_path)
+        )
+        proposal = self.write_merge_workflow(
+            notes_details, PublicationReport(self.dispatch_workflow.site.site_url)
+        )
+        return proposal.pending(self.github) if proposal else None
 
     def register(self, registry: Repository, report: PublicationReport) -> PlanHub:
         """
@@ -612,6 +702,12 @@ class PublicationOption(StrEnum):
     branch records when not given.
     """
 
+    MARK_VIEWED_ON = "--mark-viewed-on"
+    """
+    The ``owner/name`` repository whose pull requests' mechanical files the notes
+    repository's Actions also mark viewed; nothing is set up for it when not given.
+    """
+
 
 app = App(help=__doc__)
 """
@@ -619,23 +715,19 @@ The command.
 """
 
 
-@app.default
-def publish(
-    *,
-    branch_or_tag: Annotated[
-        str, Parameter(name=PublicationOption.BRANCH_OR_TAG)
-    ] = BasstlerSource.LATEST_RELEASE.value,
-    site_repository: Annotated[
-        str | None, Parameter(name=PublicationOption.SITE_REPOSITORY)
-    ] = None,
-) -> int:
+def clone_publication(
+    branch_or_tag: str,
+    site_repository: str | None = None,
+    mark_viewed_on: str | None = None,
+) -> PlanSitePublication:
     """
-    Publish this clone's notes repository on the plan site. See the module docstring.
-
     :param branch_or_tag: The basstler branch or release tag the site's build runs.
     :param site_repository: The ``owner/name`` repository that builds and serves the
         site, the one the notes branch records when not given.
-    :return: The status :meth:`PlanSitePublication.run` ends with.
+    :param mark_viewed_on: The ``owner/name`` repository whose pull requests' files
+        the notes repository's Actions also mark viewed, with one token for that and
+        the build where the owners match.
+    :return: Publishing this clone's notes repository on its site.
     :raises NotesRepositoryUnresolvedError: If the notes remote is not on GitHub.
     """
     project_root = Path(
@@ -646,7 +738,7 @@ def publish(
     if notes_repository is None:
         raise NotesRepositoryUnresolvedError(notes_remote)
     git = GitHubLoginLendingRunner(project_root)
-    notes_branch = RemoteBranch(
+    notes_branch = GitHubRemoteBranch(
         PersonalNotesSetting.BRANCH.resolve(project_root, os.environ), git, notes_remote
     )
     site = (
@@ -662,7 +754,36 @@ def publish(
         GitHubRestClient(retry_policy=PlanSitePublication.github_retry_policy),
         remote_root=GitHubAddress.clone_root_for(notes_branch.url),
         in_cloud_session=ClaudeCodeVariable.REMOTE.is_true(),
-    ).run()
+        mark_viewed_on=Repository.parse(mark_viewed_on) if mark_viewed_on else None,
+    )
+
+
+@app.default
+def publish(
+    *,
+    branch_or_tag: Annotated[
+        str, Parameter(name=PublicationOption.BRANCH_OR_TAG)
+    ] = BasstlerSource.LATEST_RELEASE.value,
+    site_repository: Annotated[
+        str | None, Parameter(name=PublicationOption.SITE_REPOSITORY)
+    ] = None,
+    mark_viewed_on: Annotated[
+        str | None, Parameter(name=PublicationOption.MARK_VIEWED_ON)
+    ] = None,
+) -> int:
+    """
+    Publish this clone's notes repository on the plan site. See the module docstring.
+
+    :param branch_or_tag: The basstler branch or release tag the site's build runs.
+    :param site_repository: The ``owner/name`` repository that builds and serves the
+        site, the one the notes branch records when not given.
+    :param mark_viewed_on: The ``owner/name`` repository whose pull requests' files
+        the notes repository's Actions also mark viewed, with one token for that and
+        the build where the owners match.
+    :return: The status :meth:`PlanSitePublication.run` ends with.
+    :raises NotesRepositoryUnresolvedError: If the notes remote is not on GitHub.
+    """
+    return clone_publication(branch_or_tag, site_repository, mark_viewed_on).run()
 
 
 if __name__ == "__main__":

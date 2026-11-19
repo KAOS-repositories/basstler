@@ -16,5 +16,6 @@ items:
   branch: unstarted-item
   track: track-1
   status: not started
+  recommended_model: sonnet
   depends_on:
   - first-plan/open-item

@@ -24,11 +24,12 @@ There are exactly four outcomes, and step 6 picks one:
 
 ## 0. Check the setup is in place, and run it if not
 
-Every plan's manifest lives on the personal-notes branch, which the user may not
-have set up yet. Follow
-`skills/setup-personal-notes/prerequisite-check.md` before step 1: run
-the check, and if it reports anything missing, run `/setup-personal-notes`
-without asking first, rather than failing on a branch that isn't there.
+Follow [`prerequisite-check.md`](../setup-personal-notes/prerequisite-check.md) before step 1, with this
+skill's gate:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate --skill add-plan-item; echo "setup gate exit status: $?"
+```
 
 ## 1. Pin down what the work actually touches
 
@@ -142,7 +143,9 @@ the plan's `tracking_issue` — `${PLANS_DIR}/README.md`'s "Proposing structural
 changes" section governs. Either way the proposal ends with `save-plan.sh`
 in the same turn, whose push rebuilds the plan's page on the plan site.
 
-**If the outcome is a new item**, the `record` operation of
+**If the outcome is a new item**, invoke the `plan-recommend-models` skill (`Skill` tool) for the item to get the `recommended_model`
+its difficulty calls for, and pass it as
+`--recommended-model <alias>`, which `record` requires for a new item. The `record` operation of
 `"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" plan.item_bootstrap` writes its `plan.yaml` entry and `roadmap.md` section and runs the save
 for you — `record` only, never `open`, which creates the branch and pull request
 this skill does not.

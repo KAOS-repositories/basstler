@@ -15,17 +15,16 @@ from urllib.parse import urlencode
 from basstler.class_property import classproperty
 from basstler.github.client import PageParameter
 from basstler.github.repository import GitHubAddress
-from basstler.github.repository_access import ListingParameter, PullRequestListState
+from basstler.github.repository_access import (
+    MAXIMUM_PULL_REQUESTS_PER_PAGE,
+    ListingParameter,
+    PullRequestListState,
+)
 from basstler.locations import SiteTemplate
 from basstler.plan.model import ItemStatus
-from basstler.plan_site.plan import Item, Plan, ProgressStage
+from basstler.plan.structure import Item, Plan, ProgressStage
 from basstler.plan_site.site_vocabulary import LiveStateVocabulary
 from basstler.render_common import TemplatePage
-
-MAXIMUM_PULL_REQUESTS_PER_PAGE = 100
-"""
-The most pull requests one page of GitHub's pull request listing holds.
-"""
 
 # %% what a card's script reads
 

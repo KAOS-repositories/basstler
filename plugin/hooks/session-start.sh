@@ -218,6 +218,7 @@ if git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${PLANS_DIR}" 2>/dev/null; then
   fi
 fi
 
+SUMMARY_RECOMMENDED_MODELS="$(recommended_models_line_not_applicable)"
 PLAN_ID="$(plan_id_for_branch "${CURRENT_BRANCH}" || true)"
 
 # No plan item: say which case (untrackable branch, no item here, no plans).
@@ -255,6 +256,16 @@ mailbox for structural changes yet - edit the manifest directly as usual."
     if ! PLAN_ITEM="$("${BASSTLER_PYTHON}" -m "${PLAN_MANIFEST_TOOLS_MODULE}" item \
         "${MANIFEST_COPY}" --branch "${CURRENT_BRANCH}" 2>&1)"; then
       PLAN_ITEM="(could not read this branch's item: ${PLAN_ITEM})"
+    fi
+    if UNMODELLED_ITEMS="$("${BASSTLER_PYTHON}" -m "${PLAN_MANIFEST_TOOLS_MODULE}" \
+        "${PLAN_UNMODELLED_ITEMS_COMMAND}" "${MANIFEST_COPY}")"; then
+      if [ -n "${UNMODELLED_ITEMS}" ]; then
+        SUMMARY_RECOMMENDED_MODELS="$(recommended_models_line_unset "${PLAN_ID}" "${UNMODELLED_ITEMS}")"
+      else
+        SUMMARY_RECOMMENDED_MODELS="$(recommended_models_line_all_set "${PLAN_ID}")"
+      fi
+    else
+      SUMMARY_RECOMMENDED_MODELS="$(recommended_models_line_not_checked)"
     fi
     rm -f "${MANIFEST_COPY}"
     cat <<PLAN_HEADER >> "${OUTPUT_FILE}"
@@ -301,6 +312,19 @@ if SITE_URL="$(recorded_site_url)"; then
   if SITE_ACCESS="$("${BASSTLER_PYTHON}" -m "${PLAN_SITE_BUILD_START_MODULE}" \
       check-access 2>/dev/null)" && [ -n "${SITE_ACCESS}" ]; then
     SUMMARY_HUB="$(printf '%s\n    %s' "${SUMMARY_HUB}" "${SITE_ACCESS}")"
+  fi
+  # A merge workflow older than this release's starts no build for some pull request
+  # changes, so it is proposed again now and the pull request to merge is said here.
+  if MERGE_WORKFLOW_REFRESH="$("${BASSTLER_PYTHON}" \
+      -m "${PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE}" 2>&1)"; then
+    MERGE_WORKFLOW_REFRESH_LINE="${MERGE_WORKFLOW_REFRESH}"
+  else
+    MERGE_WORKFLOW_REFRESH_LINE="$(merge_workflow_refresh_line_failed \
+      "$(printf '%s\n' "${MERGE_WORKFLOW_REFRESH}" | tail -n 1)" \
+      "\"\${BASSTLER_PYTHON}\" -m ${PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE}")"
+  fi
+  if [ -n "${MERGE_WORKFLOW_REFRESH_LINE}" ]; then
+    SUMMARY_HUB="$(printf '%s\n    %s' "${SUMMARY_HUB}" "${MERGE_WORKFLOW_REFRESH_LINE}")"
   fi
 fi
 
@@ -429,6 +453,7 @@ session-start.sh summary:
   PR progress:     ${SUMMARY_PROGRESS}
   plan:            ${SUMMARY_PLAN}
   merged items:    ${SUMMARY_MERGED_ITEMS}
+  recommended models: ${SUMMARY_RECOMMENDED_MODELS}
   plan site:       ${SUMMARY_HUB}
   default branch:  ${SUMMARY_DEFAULT_BRANCH}
   git identity:    ${SUMMARY_GIT_IDENTITY}

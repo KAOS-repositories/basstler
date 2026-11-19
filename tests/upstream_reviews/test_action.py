@@ -23,7 +23,7 @@ import basstler.upstream_reviews.action.read
 import basstler.upstream_reviews.action.run
 from basstler.environment import GitVariable
 from basstler.git.commands import GitCommandRunner
-from basstler.git.remote_branch import RemoteBranch
+from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import GitHubReader
 from basstler.github.credential import CredentialProvider
 from basstler.github.exceptions import GitHubRequestFailed
@@ -44,6 +44,10 @@ from basstler.upstream_reviews.action.branch import (
     InstallationState,
 )
 from basstler.upstream_reviews.action.exchange import ActionAnswer
+from basstler.upstream_reviews.action.open_pull_requests import (
+    OpenPullRequestsAnswer,
+    UpstreamPullRequests,
+)
 from basstler.upstream_reviews.action.read import ActionRead
 from basstler.upstream_reviews.action.recording import (
     ActionResult,
@@ -325,9 +329,11 @@ class Fork:
     remote: Path
 
     @property
-    def branch(self) -> RemoteBranch:
+    def branch(self) -> GitHubRemoteBranch:
         """:return: The Action branch on the fork."""
-        return RemoteBranch(ActionBranch.NAME, GitCommandRunner(self.clone), "origin")
+        return GitHubRemoteBranch(
+            ActionBranch.NAME, GitCommandRunner(self.clone), "origin"
+        )
 
     def files(self) -> dict[str, str]:
         """:return: Every file on the remote's Action branch, by path, without its
@@ -340,9 +346,11 @@ class Fork:
             for name in names
         }
 
-    def request_branch(self, identifier: str = REQUEST_IDENTIFIER) -> RemoteBranch:
+    def request_branch(
+        self, identifier: str = REQUEST_IDENTIFIER
+    ) -> GitHubRemoteBranch:
         """:return: The branch of the request with *identifier*."""
-        return RemoteBranch(
+        return GitHubRemoteBranch(
             ActionBranch.for_request(identifier), GitCommandRunner(self.clone), "origin"
         )
 
@@ -461,16 +469,19 @@ def test_the_result_answering_the_request_is_collected(fork):
     assert result == committed(ActionResult.answering(request(), github()))
 
 
-def test_the_request_s_branch_is_deleted_once_its_result_is_collected(fork):
+def test_collecting_a_result_leaves_its_branch_to_the_run_s_pruning(fork):
+    """
+    A cloud session's proxy refuses to delete a remote branch, so the session never
+    tries; the run deletes the branch once it is abandoned.
+    """
     ActionInstallation(BRANCH_OR_TAG).install(fork.branch)
     read = ActionRead(fork.branch, request())
     read.send()
     fork.answer(ActionResult.answering(request(), github()))
-    assert read.request_branch.name in fork.branches()
 
     read.wait(timeout=0)
 
-    assert read.request_branch.name not in fork.branches()
+    assert read.request_branch.name in fork.branches()
 
 
 def test_concurrent_requests_each_collect_their_own_result(fork):
@@ -543,6 +554,23 @@ def test_a_result_answering_another_request_is_not_collected(fork):
 
     assert f"{FORK.url}/actions" in str(raised.value)
     assert "disabled" in str(raised.value)
+
+
+def test_a_result_left_on_the_action_branch_is_not_collected_for_a_new_request(fork):
+    ActionInstallation(BRANCH_OR_TAG).install(fork.branch)
+    fork.branch.write(
+        {
+            ActionFile.RESULT: OpenPullRequestsAnswer(
+                OTHER_REQUEST_IDENTIFIER, UpstreamPullRequests(FORK, {})
+            )
+        },
+        ActionBranch.request_commit_message("Answer", OTHER_REQUEST_IDENTIFIER),
+    )
+    read = ActionRead(fork.branch, request())
+    read.send()
+
+    with pytest.raises(ActionResultMissing):
+        read.wait(timeout=0)
 
 
 @dataclass

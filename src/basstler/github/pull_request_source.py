@@ -5,7 +5,7 @@ Where the live state of the pull requests a plan references is read from.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from typing import Any
@@ -15,19 +15,22 @@ from basstler.github.client import (
     GitHubResponse,
     GitHubRestClient,
 )
+from basstler.github.comparison import Comparison
+from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import (
     PullRequestField,
+    PullRequestHead,
 )
 from basstler.github.pull_request_state import (
     ForkLineage,
     LivePullRequests,
     PullRequestRecord,
+    PullRequestState,
 )
 from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository_details import RepositoryDetails
 from basstler.github.repository_access import GitHubRepository
-from basstler.json_model import ValidatedJSONModel
-from basstler.plan.dependencies import DependencyResolver
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -39,55 +42,6 @@ READ_ACCESS_STATUSES = frozenset({HTTPStatus.NOT_FOUND, HTTPStatus.FORBIDDEN})
 """
 What GitHub answers a token that is not granted a repository.
 """
-
-# %% repository details
-
-
-class UpstreamDetails(ValidatedJSONModel):
-    """
-    The repository a fork was forked from, as a repository's details name it.
-    """
-
-    full_name: str
-    """
-    The upstream's ``owner/name``.
-    """
-
-    default_branch: str
-    """
-    The upstream's default branch.
-    """
-
-
-class RepositoryDetails(ValidatedJSONModel):
-    """
-    What a repository's details say about the repository's own default branch and what
-    it was forked from.
-    """
-
-    default_branch: str
-    """
-    The repository's default branch.
-    """
-
-    parent: UpstreamDetails | None = None
-    """
-    What it was forked from, absent unless it is a fork.
-    """
-
-    @property
-    def lineage(self) -> ForkLineage | None:
-        """
-        :return: What the repository was forked from, ``None`` unless it is a fork.
-        """
-        if self.parent is None:
-            return None
-        return ForkLineage(
-            upstream_repository=Repository.parse(self.parent.full_name),
-            upstream_default_branch=self.parent.default_branch,
-            fork_default_branch=self.default_branch,
-        )
-
 
 # %% live pull request state
 
@@ -128,31 +82,41 @@ class PullRequestSource(ABC):
         """
         return None
 
+    def upstream_pull_requests_of(
+        self, fork: Repository, lineage: ForkLineage
+    ) -> dict[str, int]:
+        """
+        :param fork: A repository that can be read and is a fork.
+        :param lineage: What it was forked from.
+        :return: The number of the open upstream pull request opened from each of its
+            branches; none when the source cannot tell.
+        """
+        return {}
+
     def live_pull_requests_of(
-        self, dependencies: DependencyResolver
+        self, references: Iterable[PullRequestReference]
     ) -> LivePullRequests:
         """
-        :param dependencies: A plan's items, plus the items of other plans it depends
-            on.
-        :return: The live state of every pull request those items name, and why each
-            repository that cannot be read cannot be; a number the repository does not
-            have is left out.
+        :param references: The pull requests to read.
+        :return: The live state of each of them, and why each repository that cannot be
+            read cannot be; a number the repository does not have is left out.
         """
         live_pull_requests = LivePullRequests()
-        for dependency in dependencies.resolved_dependencies:
-            if dependency.item.pull_request_number is None:
-                continue
-            reference = PullRequestReference(
-                Repository.parse(dependency.repository),
-                dependency.item.pull_request_number,
-            )
+        for reference in references:
             failure = self.read_failure_of(reference.repository)
             if failure is not None:
                 live_pull_requests.read_failures[reference.repository] = failure
                 continue
+            repository = str(reference.repository)
             lineage = self.fork_lineage_of(reference.repository)
-            if lineage is not None:
-                live_pull_requests.fork_lineages[str(reference.repository)] = lineage
+            if (
+                lineage is not None
+                and repository not in live_pull_requests.fork_lineages
+            ):
+                live_pull_requests.fork_lineages[repository] = lineage
+                live_pull_requests.upstream_pull_requests[repository] = (
+                    self.upstream_pull_requests_of(reference.repository, lineage)
+                )
             record = self.pull_request(reference)
             if record is not None:
                 live_pull_requests.pull_requests_by_repository.setdefault(
@@ -199,16 +163,40 @@ class GitHubPullRequestSource(PullRequestSource):
     Whether the check state of an open pull request is read; off, it stays unknown.
     """
 
+    reads_mergeable_states: bool = False
+    """
+    Whether the mergeable state of an open pull request out of draft is read, which
+    takes a request of its own; off, it stays unknown.
+    """
+
+    reads_upstream_pull_requests: bool = True
+    """
+    Whether a fork's upstream is listed for the open pull requests opened from the
+    fork's branches; off, none are found and the upstream is never called.
+    """
+
     @classmethod
     def from_environment(
-        cls, reads_check_states: bool = True
+        cls,
+        reads_check_states: bool = True,
+        reads_mergeable_states: bool = False,
+        reads_upstream_pull_requests: bool = True,
     ) -> GitHubPullRequestSource:
         """
         :param reads_check_states: Whether open pull requests' check states are read.
+        :param reads_mergeable_states: Whether open pull requests' mergeable states are
+            read.
+        :param reads_upstream_pull_requests: Whether a fork's upstream pull requests are
+            read.
         :return: A source authenticating with whichever credential the environment
             carries.
         """
-        return cls(client=GitHubRestClient(), reads_check_states=reads_check_states)
+        return cls(
+            client=GitHubRestClient(),
+            reads_check_states=reads_check_states,
+            reads_mergeable_states=reads_mergeable_states,
+            reads_upstream_pull_requests=reads_upstream_pull_requests,
+        )
 
     def client_for(self, repository: Repository) -> GitHubRepository:
         """
@@ -248,18 +236,97 @@ class GitHubPullRequestSource(PullRequestSource):
             self.repository_details[repository].body
         ).lineage
 
+    def upstream_pull_requests_of(
+        self, fork: Repository, lineage: ForkLineage
+    ) -> dict[str, int]:
+        if not self.reads_upstream_pull_requests:
+            return {}
+        return PullRequestHead.numbers_by_branch(
+            self.client_for(lineage.upstream_repository).open_pull_requests(),
+            fork.full_name,
+        )
+
     def pull_request(self, reference: PullRequestReference) -> PullRequestRecord | None:
         record = self.listed_or_read(reference)
-        if (
-            record is None
-            or not self.reads_check_states
-            or not record.has_unread_checks
-        ):
-            return record
-        record.check_state = self.client_for(reference.repository).check_state(
-            record.head_commit
-        )
+        if record is None:
+            return None
+        if self.reads_check_states and record.has_unread_checks:
+            record.check_state = self.client_for(reference.repository).check_state(
+                record.head_commit
+            )
+        if self.reads_mergeable_states and record.has_unread_mergeable_state:
+            record.mergeable_state = self.mergeable_state(reference)
+        if record.landed_upstream is None:
+            record.landed_upstream = self.landed_upstream(reference.repository, record)
         return record
+
+    def mergeable_state(self, reference: PullRequestReference) -> MergeableState | None:
+        """
+        :param reference: An open pull request.
+        :return: What reading it on its own says about its conflicts - a listing leaves
+            that out - or ``None`` when it cannot be read or GitHub reports none.
+        """
+        api_record = self.read_if_present(
+            f"/{reference.repository.pull_request_path(reference.number)}"
+        )
+        if api_record is None:
+            return None
+        return PullRequestRecord.from_api(api_record).mergeable_state
+
+    def landed_upstream(
+        self, repository: Repository, record: PullRequestRecord
+    ) -> bool | None:
+        """
+        Ask GitHub whether an open pull request's work is already in the upstream.
+
+        :param repository: The repository the pull request is opened on.
+        :param record: The pull request.
+        :return: Whether every commit of its head is in the upstream's default branch
+            and it has a commit beyond its own base, which a branch with nothing of its
+            own does not; ``None`` when that is not asked of it, or GitHub cannot say.
+        """
+        lineage = self.fork_lineage_of(repository)
+        if (
+            lineage is None
+            or record.state is not PullRequestState.OPEN
+            or record.head_commit is None
+            or record.base is None
+        ):
+            return None
+        in_upstream = self.comparison(
+            repository,
+            f"{lineage.upstream_repository.owner}:{lineage.upstream_default_branch}",
+            record.head_commit,
+        )
+        if in_upstream is None:
+            return None
+        if not in_upstream.head_is_contained_in_base:
+            return False
+        beyond_base = self.comparison(repository, record.base, record.head_commit)
+        if beyond_base is None:
+            return None
+        return beyond_base.ahead_by > 0
+
+    def comparison(
+        self, repository: Repository, base: str, head: str
+    ) -> Comparison | None:
+        """
+        :param repository: The repository holding the head.
+        :param base: What the head is compared with.
+        :param head: The commit compared.
+        :return: GitHub's comparison, ``None`` when it cannot be read, which is
+            reported.
+        """
+        path = f"/{repository.compare_path(base)}...{head}"
+        answer = self.client.attempt_get(path)
+        if answer.failure is not None:
+            logger.warning(
+                f"cannot compare {head} with {base} in {repository} ({path}), so it "
+                f"is not known whether its pull request has landed: "
+                f"{answer.failure.error_message()}"
+            )
+            return None
+        return Comparison.from_json(answer.body)
 
     def listed_or_read(
         self, reference: PullRequestReference

@@ -284,6 +284,22 @@ regenerates from every manifest on each save, so it can't drift.
 
 Any other label is preserved but not interpreted.
 
+## Attaching your plan repositories without a prompt
+
+A `PreToolUse` hook on `mcp__claude-code-remote__add_repo` ([`basstler.plan_site.attach_approval`](../../src/basstler/plan_site/attach_approval.py))
+allows an attach of the plan site repository and of the personal-notes repository, both read from the clone's
+notes settings, without asking. Any other repository, and any other tool, gets no answer from it, so Claude Code
+asks as before. Whether Claude Code's permission classifier still has the last word over a hook's `allow` is
+Claude Code's own behaviour, not something the hook controls.
+
+## Running basstler commands without a prompt
+
+A second `PreToolUse` hook, on `Bash` ([`basstler.plan_site.entry_point_approval`](../../src/basstler/plan_site/entry_point_approval.py)),
+allows `basstler.sh <module> [arguments...]` without asking, however the skill spells the plugin root. A
+command line that chains, pipes, redirects or substitutes anything (`;`, `&&`, `|`, `<`, `>`, `$(...)`,
+backticks), any other program, and a script path that is not this plugin's own root, gets no answer, so Claude Code asks as before. As with the attach hook,
+Claude Code's own permission classifier may still have the last word.
+
 ## Safety
 
 - Does nothing until you create the notes branch: `git fetch` finds nothing, so `CLAUDE.local.md` is

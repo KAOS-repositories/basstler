@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from basstler.exceptions import PlanValidationError
+from basstler.plan.exceptions import PlanValidationError
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import (
     PullRequestField,
@@ -22,7 +22,7 @@ from basstler.github.pull_request_source import GitHubPullRequestSource
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
 from basstler.github.states import CombinedCheckState
 from basstler.plan.dependencies import DependencyReference, DependencyResolver
-from basstler.plan.model import ItemStatus, PlanDocument
+from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.validation import PlanValidator
 from basstler.plan_site.__main__ import (
@@ -37,7 +37,7 @@ from basstler.plan_site.chip_tone import ChipTone
 from basstler.plan_site.hub import NotesBranch, PlanHub, SiteAddress
 from basstler.plan_site.hub_page import PlanSummary, SiteStylesheet, SkippedPage
 from basstler.plan_site.item_classifier import ItemClassifier
-from basstler.plan_site.plan import Plan
+from basstler.plan.structure import Plan
 
 from ..constants.paths import DatasetLocation
 from ..constants.site import SitePlan, SiteRepository, SiteSampleText
@@ -101,6 +101,30 @@ def test_from_directory_reads_the_roadmap():
     assert source.roadmap_text == (
         (SitePlan.FIRST.directory / PlanDocument.ROADMAP).read_text()
     )
+
+
+def test_from_directory_leaves_an_item_without_a_recommended_model_without_one(
+    tmp_path: Path,
+):
+    manifest = PlanManifest.from_file(SitePlan.SECOND.directory / PlanDocument.MANIFEST)
+    stripped = PlanManifest(
+        {
+            **manifest.content,
+            ManifestKey.ITEMS.key: [
+                {
+                    key: value
+                    for key, value in item.content.items()
+                    if key != ManifestKey.RECOMMENDED_MODEL.key
+                }
+                for item in manifest.items
+            ],
+        }
+    )
+    stripped.write(tmp_path / PlanDocument.MANIFEST)
+
+    source = PlanSource.from_directory(tmp_path)
+
+    assert source.manifest == stripped.content
 
 
 def test_from_directory_without_a_roadmap_reads_it_as_empty(tmp_path: Path):
@@ -253,8 +277,11 @@ def test_build_looks_up_every_referenced_pull_request_in_its_own_repository(
 def test_live_pull_requests_leave_out_a_number_the_repository_does_not_have(
     pull_request_source: RecordedPullRequestSource,
 ):
+    """
+    A pull request number its repository does not have is not in the live state.
+    """
     live_pull_requests = pull_request_source.live_pull_requests_of(
-        DependencyResolver(FIRST_PLAN)
+        DependencyResolver(FIRST_PLAN).pull_request_references
     )
     assert live_pull_requests.pull_requests_by_repository == {
         str(PLAN_REPOSITORY): {

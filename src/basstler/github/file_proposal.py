@@ -22,7 +22,7 @@ from basstler.github.client import (
 from basstler.github.git_objects import EncodedContent, GitObject
 from basstler.github.pull_request import NewPullRequest
 from basstler.github.pull_request_form import PullRequestForm
-from basstler.github.branch_wire_form import BranchFullReference, BranchName
+from basstler.github.wire_form import BranchFullReference, BranchName
 from basstler.github.repository import Repository
 from basstler.github.repository_access import PullRequestListState
 from basstler.github.repository_resources import RepositoryRead, ResourceWrite

@@ -10,7 +10,7 @@ from typing import Annotated
 from pydantic import Field
 
 from basstler.git.branch import Branch
-from basstler.github.branch_wire_form import BranchName, RepositoryDefaultBranch
+from basstler.github.wire_form import BranchName, RepositoryDefaultBranch
 from basstler.github.pull_request_state import ForkLineage
 from basstler.github.repository import Repository
 from basstler.github.repository_resources import RepositoryRead

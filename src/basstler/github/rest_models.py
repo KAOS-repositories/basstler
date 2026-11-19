@@ -23,8 +23,8 @@ from basstler.github.review_models import (
 )
 from basstler.github.states import ConclusionOutcome, PullRequestState, ReviewState
 from basstler.git.branch import Branch
-from basstler.github.branch_wire_form import BranchWireForm
-from basstler.github.exceptions import BranchOwnerUnknown
+from basstler.github.wire_form import WireForm
+from basstler.github.exceptions import RepositoryUnknown
 from basstler.github.repository import HasRepository, Repository
 from basstler.github.web_page import AbsentAsEmpty, WebPage
 from basstler.json_model import ObjectReader, ValidatedJSONModel
@@ -60,7 +60,7 @@ class PullRequestEnd(Branch[Repository]):
     """
 
 
-class PullRequestEndForm(BranchWireForm[PullRequestEnd], ObjectReader):
+class PullRequestEndForm(WireForm[PullRequestEnd], ObjectReader):
     """
     A pull request's end, written as the object REST names it with: the branch, its
     commit and the repository it is of, ``null`` once that repository is deleted.
@@ -72,16 +72,16 @@ class PullRequestEndForm(BranchWireForm[PullRequestEnd], ObjectReader):
 
     def read(self, value: Any, read: HasRepository | None) -> PullRequestEnd:
         if value["repo"] is None:
-            raise BranchOwnerUnknown(value["ref"])
+            raise RepositoryUnknown(value["ref"])
         return PullRequestEnd(
             Repository.parse(value["repo"]["full_name"]), value["ref"], value["sha"]
         )
 
-    def write(self, branch: PullRequestEnd) -> dict[str, Any]:
+    def write(self, owned: PullRequestEnd) -> dict[str, Any]:
         return {
-            "ref": branch.name,
-            "sha": branch.commit,
-            "repo": {"full_name": branch.repository.full_name},
+            "ref": owned.name,
+            "sha": owned.commit,
+            "repo": {"full_name": owned.repository.full_name},
         }
 
 

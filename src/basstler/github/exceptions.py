@@ -229,26 +229,27 @@ class BasstlerSourceUnknown(DataclassException):
         )
 
 
-# %% reading a branch out of a payload
+# %% reading what a repository owns out of a payload
 
 
 @dataclass
-class BranchOwnerUnknown(DataclassException, ValueError):
+class RepositoryUnknown(DataclassException, ValueError):
     """
-    Raised when a payload names a branch but nothing says which repository it is of.
+    Raised when a payload names a branch or a pull request but nothing says which
+    repository it is of.
     """
 
-    branch_text: str
+    owned_text: str
     """
-    The branch as the payload writes it.
+    The branch or pull request as the payload writes it.
     """
 
     def error_message(self) -> str:
-        return f"no repository is known for the branch {self.branch_text!r}"
+        return f"no repository is known for {self.owned_text!r}"
 
     def suggest_correction(self) -> str:
         return (
-            "Parse the payload through the read that was served it, so the branch "
+            "Parse the payload through the read that was served it, so what it names "
             "takes that read's repository; a pull request whose head fork was deleted "
             "names no repository for its head and cannot be read"
         )

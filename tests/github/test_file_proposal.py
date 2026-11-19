@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from basstler.git.branch import Branch
-from basstler.github.exceptions import BranchOwnerUnknown
+from basstler.github.exceptions import RepositoryUnknown
 from basstler.github.file_proposal import (
     BranchReferenceRead,
     ExistingBranch,
@@ -78,4 +78,4 @@ def test_a_branch_read_outside_a_read_has_no_known_repository():
         ExistingBranch.from_json(
             {"ref": f"{Branch.namespace}/a-feature", "object": {"sha": "a-commit"}}
         )
-    assert isinstance(raised.value.errors()[0]["ctx"]["error"], BranchOwnerUnknown)
+    assert isinstance(raised.value.errors()[0]["ctx"]["error"], RepositoryUnknown)

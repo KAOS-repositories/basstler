@@ -59,9 +59,9 @@ class UpstreamPullRequestReport:
     def render(self) -> str:
         """:return: The report as markdown."""
         lines = [
-            f"# Upstream pull request: #{self.snapshot.number} {self.snapshot.title}",
+            f"# Upstream pull request: #{self.snapshot.reference.number} {self.snapshot.title}",
             "",
-            self.snapshot.page_url,
+            self.snapshot.reference.url,
             "",
         ]
         lines.extend(self._render_checks())

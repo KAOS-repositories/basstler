@@ -18,7 +18,7 @@ from basstler.github.client import GitHubAttemptReader, GitHubReader, GitHubResp
 from basstler.github.pull_request_models import (
     ReviewThreadsPageResult,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.upstream_reviews.clients import (
     GraphQLClient,
     JobLogReader,
@@ -48,16 +48,17 @@ class RecordedResponse(StrEnum):
         """:return: The recorded ``data`` object this response holds."""
         return json.loads((RECORDED_RESPONSE_DIRECTORY / f"{self}.json").read_text())
 
-    def recorded(self) -> ReviewThreadsPageResult:
+    def recorded(self, upstream: Repository) -> ReviewThreadsPageResult:
         """
         Read this pull request page through the same model the production code uses.
 
         Lets a test reach recorded values as typed attributes rather than indexing the
         raw data at the call site.
 
+        :param upstream: The repository the page was recorded from.
         :return: The recorded page.
         """
-        return ReviewThreadsPageResult.from_json(self.load())
+        return ReviewThreadsPageResult.from_json(self.load(), HasRepository(upstream))
 
 
 @dataclass(frozen=True)

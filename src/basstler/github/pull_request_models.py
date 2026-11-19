@@ -10,6 +10,8 @@ from typing import Annotated, Literal
 
 from pydantic import AliasPath, Field
 
+from basstler.github.repository import PullRequestReference
+from basstler.github.wire_form import PullRequestNumber
 from basstler.github.graphql import GraphQLConnection
 from basstler.github.review_models import (
     BranchPullRequest,
@@ -182,19 +184,16 @@ class PullRequest(ValidatedJSONModel):
     One upstream pull request, as a single page of the review-threads query reads it.
     """
 
-    number: int
+    reference: Annotated[
+        PullRequestReference, Field(alias="number"), PullRequestNumber()
+    ]
     """
-    Its number on the upstream repository.
+    The pull request, on the repository it was read from.
     """
 
     title: str
     """
     Its title.
-    """
-
-    page_url: Annotated[str, Field(alias="url")]
-    """
-    Its own page on GitHub.
     """
 
     commits: GraphQLConnection[PullRequestCommit]
@@ -232,19 +231,14 @@ class UpstreamPullRequestSnapshot:
     Everything read from one upstream pull request in a single run.
     """
 
-    number: int
+    reference: PullRequestReference
     """
-    The pull request's number on the upstream repository.
+    The pull request, on the upstream repository.
     """
 
     title: str
     """
     The pull request's title.
-    """
-
-    page_url: str
-    """
-    The pull request's own page on GitHub.
     """
 
     reviews: list[Review]
@@ -274,9 +268,8 @@ class UpstreamPullRequestSnapshot:
         :return: The assembled snapshot.
         """
         return cls(
-            number=pull_request.number,
+            reference=pull_request.reference,
             title=pull_request.title,
-            page_url=pull_request.page_url,
             reviews=pull_request.reviews,
             threads=threads,
             checks=pull_request.checks,

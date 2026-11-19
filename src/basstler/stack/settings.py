@@ -17,16 +17,16 @@ from enum import StrEnum
 from pathlib import Path
 
 from basstler.github.repository import Repository
+from basstler.github.stack_configuration import (
+    CommittedStackConfiguration,
+    StackSetting,
+)
 from basstler.locations import PackageLocation, ProjectLocation
 from basstler.shell_configuration import (
     FetchedBranchReference,
     ShellConfigurationFunction,
 )
 from basstler.stack.checkout import CurrentCheckout, GitArgument
-from basstler.github.stack_configuration import (
-    CommittedStackConfiguration,
-    StackSetting,
-)
 from basstler.stack.exceptions import (
     AmbiguousForkRemoteError,
     ForkRemoteNotFoundError,

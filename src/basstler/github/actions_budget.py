@@ -39,6 +39,7 @@ from basstler.exceptions import (
 from basstler.github.workflows import ActivityType, Job, TriggerEvent, Workflow
 from basstler.locations import PackageLocation, ProjectLocation
 from basstler.render_common import create_template_environment
+from basstler.text_file import TextFile
 
 # %% vocabulary
 
@@ -397,7 +398,7 @@ class ActionsBudget:
             raise BudgetFileExists(path=path)
         template = create_template_environment().get_template(BudgetTemplate.FILE.value)
         basstler_defaults = WorkflowLimits()
-        path.write_text(
+        TextFile(path).write(
             template.render(
                 function=BudgetDefinition.FUNCTION,
                 defaults=self.defaults.differences_from(basstler_defaults),
@@ -405,8 +406,7 @@ class ActionsBudget:
                     file_name: limits.differences_from(basstler_defaults)
                     for file_name, limits in sorted(self.overrides.items())
                 },
-            ),
-            encoding="utf-8",
+            )
         )
 
 

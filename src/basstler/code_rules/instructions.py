@@ -16,6 +16,7 @@ from basstler.code_rules.rule import Section
 from basstler.code_rules.rule_module import RuleModule
 from basstler.locations import InstructionsTemplate, ProjectLocation
 from basstler.render_common import create_template_environment
+from basstler.text_file import TextFile
 
 
 @dataclass
@@ -70,10 +71,10 @@ class AgentsInstructions:
         """
         if not self.path.is_file():
             return False
-        return self.path.read_text(encoding="utf-8") == self.text
+        return TextFile(self.path).read() == self.text
 
     def write(self) -> None:
         """
         Write ``AGENTS.md``, replacing whatever it held.
         """
-        self.path.write_text(self.text, encoding="utf-8")
+        TextFile(self.path).write(self.text)

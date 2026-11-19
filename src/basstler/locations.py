@@ -100,6 +100,11 @@ class PackageLocation(PathEnumeration):
     The module declaring which distribution ships each of the package's modules.
     """
 
+    UPSTREAM_REVIEWS_FETCH = DIRECTORY / "upstream_reviews" / "helper" / "fetch.py"
+    """
+    The program a helper session runs without ``basstler``, so it imports nothing of it.
+    """
+
     QUERIES = DIRECTORY / "github" / "queries"
     """
     The GraphQL documents the upstream review reader sends.

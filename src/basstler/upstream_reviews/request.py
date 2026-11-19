@@ -16,6 +16,7 @@ from typing import Any
 
 from basstler.class_property import classproperty
 from basstler.github.repository import Repository
+from basstler.text_file import TextFile
 from basstler.upstream_reviews.action.exchange import (
     ActionRequest,
     ActionRequestKind,
@@ -147,7 +148,7 @@ class UpstreamReadRequest(ActionRequest):
         Record this as the latest request.
         """
         self.location.parent.mkdir(parents=True, exist_ok=True)
-        self.location.write_text(json.dumps(self.to_json()), encoding="utf-8")
+        TextFile(self.location).write(json.dumps(self.to_json()))
 
     @classmethod
     def load(cls) -> UpstreamReadRequest:
@@ -157,7 +158,7 @@ class UpstreamReadRequest(ActionRequest):
         """
         if not cls.location.is_file():
             raise NoRecordedReadRequest(cls.location)
-        return cls.from_json(json.loads(cls.location.read_text(encoding="utf-8")))
+        return cls.from_json(json.loads(TextFile(cls.location).read()))
 
     def report(
         self,

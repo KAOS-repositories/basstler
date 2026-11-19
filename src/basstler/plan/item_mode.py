@@ -77,6 +77,7 @@ from basstler.shell_configuration import (
     ShellConfigurationFunction,
 )
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -271,7 +272,7 @@ class SettingsFile:
         :return: The parsed settings.
         """
         try:
-            return tomllib.loads(self.path.read_text(encoding="utf-8"))
+            return tomllib.loads(TextFile(self.path).read())
         except tomllib.TOMLDecodeError as error:
             raise MalformedModeSettingsError(file=self, detail=str(error)) from None
 
@@ -428,7 +429,7 @@ def personal_settings(project_root: Path) -> dict[str, Any]:
         return {}
     with tempfile.TemporaryDirectory() as scratch_directory:
         scratch_file = Path(scratch_directory) / "personal-plan-item-modes.toml"
-        scratch_file.write_text(shown.stdout, encoding="utf-8")
+        TextFile(scratch_file).write(shown.stdout)
         return SettingsFile(
             path=scratch_file, origin=ProjectLocation.PERSONAL_PLAN_ITEM_MODES
         ).read()
@@ -727,7 +728,7 @@ def write_mode(
     pinned = ", ".join(skill.setting_key for skill in requested)
     with tempfile.TemporaryDirectory() as scratch_directory:
         scratch_file = Path(scratch_directory) / "plan-item-modes.toml"
-        scratch_file.write_text(render_settings(modes), encoding="utf-8")
+        TextFile(scratch_file).write(render_settings(modes))
         written = subprocess.run(
             Bash.locate(os.environ).command(
                 PluginRoot.locate(os.environ).path_of(

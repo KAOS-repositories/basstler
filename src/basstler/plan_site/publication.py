@@ -22,13 +22,13 @@ from cyclopts import App, Parameter
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure
 from basstler.git.commands import GitCommandResult, GitCommandRunner
-from basstler.github.login_lending import GitHubLoginLendingRunner
-from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import (
     GitHubFullClient,
     GitHubRestClient,
     RetryPolicy,
 )
+from basstler.github.login_lending import GitHubLoginLendingRunner
+from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.repository import GitHubAddress, Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.run_listing import RunListing

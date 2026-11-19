@@ -5,9 +5,16 @@ The files changed between two commits, by how many lines and in both their versi
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from pathlib import PurePosixPath
 
 from basstler.git.commands import GitCommandRunner
+from basstler.git.commit_tree import CommitTree
+
+HUNK_HEADER = "@@"
+"""
+What the line opening each hunk of a unified diff starts with.
+"""
 
 # %% one file's change
 
@@ -92,6 +99,20 @@ class CommitRange:
     The commit the change ends at.
     """
 
+    @cached_property
+    def base_tree(self) -> CommitTree:
+        """
+        The files of :attr:`base_commit`.
+        """
+        return CommitTree(self.git, self.base_commit)
+
+    @cached_property
+    def head_tree(self) -> CommitTree:
+        """
+        The files of :attr:`head_commit`.
+        """
+        return CommitTree(self.git, self.head_commit)
+
     def file_changes(self) -> tuple[FileChange, ...]:
         """
         :return: Every file the range changes, in the order git lists them.
@@ -127,9 +148,42 @@ class CommitRange:
             )
         return tuple(changes)
 
-    def file_versions(self) -> tuple[FileVersions, ...]:
+    def edited_lines(self, path: PurePosixPath) -> tuple[str, ...]:
         """
-        :return: Every file the range changes, with its texts read unless it is binary.
+        :param path: A file's path in both commits.
+        :return: The lines the range removes from and adds to the file, each behind its
+            ``-`` or ``+``, in diff order and without line numbers or context.
+        """
+        diff = self.git.run(
+            "diff",
+            "--unified=0",
+            "--no-color",
+            "--no-ext-diff",
+            self.base_commit,
+            self.head_commit,
+            "--",
+            str(path),
+        )
+        lines = diff.splitlines()
+        first_hunk = next(
+            (
+                number
+                for number, line in enumerate(lines)
+                if line.startswith(HUNK_HEADER)
+            ),
+            len(lines),
+        )
+        return tuple(
+            line for line in lines[first_hunk:] if not line.startswith(HUNK_HEADER)
+        )
+
+    def file_versions(
+        self, paths: frozenset[PurePosixPath] | None = None
+    ) -> tuple[FileVersions, ...]:
+        """
+        :param paths: The head paths of the files to read, every changed file when
+            ``None``.
+        :return: Those files the range changes, with their texts read unless binary.
         """
         return tuple(
             FileVersions(**asdict(change))
@@ -142,4 +196,5 @@ class CommitRange:
                 head_text=self.git.file_at(self.head_commit, change.path),
             )
             for change in self.file_changes()
+            if paths is None or change.path in paths
         )

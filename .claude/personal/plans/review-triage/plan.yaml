@@ -71,17 +71,6 @@ items:
     skip the ~20 gh/bash stub tests on win32, naming the limit. Push only through basstler.sh
     maintenance push; a push restacks #222 and clears Viewed. Update these notes per push;
     after this order''s last push, run goal pushes-done on this item.'
-- id: actions-marking
-  title: Install the mark-viewed workflow in this repository
-  track: triage
-  branch: basstler/mark-viewed
-  pull_request_number: 221
-  depends_on: []
-  status: in progress
-  recommended_model: haiku
-  notes: 'Open #221, written by set-up-mark-viewed. Its mark-viewed.yml calls #215''s reusable
-    review-triage-mark-viewed.yml, so the owner merges it only after #215 has merged. Needs
-    the REVIEW_TRIAGE_VIEWER_TOKEN secret stored by the owner.'
 - id: mark-220-viewed
   title: 'Mark #220''s mechanical files viewed'
   track: windows
@@ -175,12 +164,12 @@ items:
   session: https://claude.ai/code/session_01JxHGiNcmkURK6bxmkkdhe5
   notes: 'Implemented on draft #257, stacked on #215''s branch, with repository-field-once
     folded in: models on HasRepository, Branch[RepositoryType] with GitRepository and Remote,
-    RepositoryBranch merged, one WireForm per payload form, GraphQL PullRequest holding
-    PullRequestReference. Open for the user: merging the stack settings'' Remote with
-    GitHubRemote, and REST pull request models still carrying a bare number.
+    RepositoryBranch merged, one WireForm per payload form, GraphQL PullRequest holding PullRequestReference.
+    Open for the user: merging the stack settings'' Remote with GitHubRemote, and REST pull
+    request models still carrying a bare number.
 
     '
   depends_on: []
   status: in progress
   recommended_model: opus
-landed_item_count: 2
+landed_item_count: 3

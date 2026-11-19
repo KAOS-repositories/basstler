@@ -62,10 +62,13 @@ items:
 - id: rule-fix-triage
   title: Prove a file mechanical when recomputing a rule's fix on the base reproduces the head
   track: pattern-fixes
+  branch: claude/awesome-cray-jrpb8w
+  pull_request_number: 270
+  session: https://claude.ai/code/session_01JxHGiP2V2V3B23gZGVSCXY
   depends_on:
   - review-triage/move-triage
   - rule-fixes
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'Done when #220''s rule-fix files (107 of 129 from the UTF-8 fix) are marked mechanical,
     run from this item''s branch. basstler-review-triage depends on basstler-rules; a new

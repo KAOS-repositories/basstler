@@ -12,6 +12,7 @@ from urllib.parse import urlencode, urlsplit
 
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository import NewTokenPage, Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
 from basstler.plan_site.hub import PlanHub
@@ -53,17 +54,6 @@ class TokenFormField(StrEnum):
     ACTIONS = "actions"
     """
     The token's access to repositories' Actions workflows and runs.
-    """
-
-
-class PermissionLevel(StrEnum):
-    """
-    The access a fine-grained token's permission grants.
-    """
-
-    WRITE = "write"
-    """
-    Read and write.
     """
 
 
@@ -159,11 +149,7 @@ class SiteRepository:
         return token_form.TokenUse(
             f"starts the plan site build in {self.repository.full_name}",
             (self.repository,),
-            {
-                token_form.RepositoryPermission.ACTIONS: (
-                    token_form.PermissionLevel.WRITE
-                )
-            },
+            {token_form.RepositoryPermission.ACTIONS: (PermissionLevel.WRITE)},
             PlanSiteSecret.TOKEN,
             tuple(stored_on),
         )

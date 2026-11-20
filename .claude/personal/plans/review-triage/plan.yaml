@@ -66,11 +66,11 @@ items:
   branch: fix-windows-test-failures
   pull_request_number: 220
   notes: >
-    Draft #220 at b15fa66b: main merged, conflicts resolved, merge probe CLEAN, both review threads
-    resolved (portability checkers now on libcst; libcst added). Not checked: CI at b15fa66b, and a
-    Windows run (its job starts when #220 is marked ready). Next: read CI; #222's owner resolves its
-    7-file conflict with the rewritten checkers, with #270, #271, #245, #228 behind it. Any push
-    clears Viewed for mark-220-viewed.
+    Draft #220 at fed0d1b8: main merged, merge probe CLEAN, all review threads resolved (portability
+    checkers on libcst through SourceModule; their tests read the offending lines from `# violation`
+    marks in the snippets). Not checked: CI at fed0d1b8, and a Windows run (its job starts when #220
+    is marked ready). Next: read CI; #222's owner resolves its 7-file conflict with the rewritten
+    checkers, with #270, #271, #245, #228 behind it. Any push clears Viewed for mark-220-viewed.
   pushes_done_at: e6871da0981a6e134f115a9833b2afd8f8c6c5bf
 - id: move-split
   title: Split every proven mechanical change out of a pull request, and leave one sample

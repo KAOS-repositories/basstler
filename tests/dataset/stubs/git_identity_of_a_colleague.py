@@ -7,4 +7,4 @@ from __future__ import annotations
 
 from basstler.locations import ProjectLocation
 
-print(ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES.value / "a-colleague")
+print((ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES / "a-colleague").as_posix())

@@ -416,5 +416,7 @@ def test_the_identity_paths_match_the_shell_configuration_that_owns_them(
     )
 
     owner_path, contributors_directory = resolved.strip().split("\n")
-    assert owner_path == str(ProjectLocation.GIT_IDENTITY)
-    assert contributors_directory == str(ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES)
+    assert owner_path == ProjectLocation.GIT_IDENTITY.as_posix()
+    assert (
+        contributors_directory == ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES.as_posix()
+    )

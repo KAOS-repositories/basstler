@@ -78,12 +78,12 @@ items:
   - rule-fixes
   status: in progress
   recommended_model: opus
-  notes: 'Draft #270 at ff661565, with #227 (a16fe4ba) and #266 (speed, progress bars, batched
-    marking) merged. Proves a file with the UTF-8 and directory removal fixes (test_rule_fixes).
-    #220 at e6871da0: 109 of 173 mechanical, in 29 s (957 s before #266); no file is proven
-    through the directory removal fix, since #220 dropped ignore_errors and the shutil import
-    by hand. Locally: code-rules, code-modification and review-triage tests pass (393), ruff
-    and code-rules check pass; the full suite was not run. #222 has moved to 6ed0232c since.'
+  notes: >
+    Draft #270 at ccf5a768 with #227, #228 and #266 merged. On #220 at 958944a1 (from ff84098e): 121
+    of 183 mechanical, all read back VIEWED; 62 need review. Still in review on purpose:
+    scratch_repository (initial branch, dropped ignore_errors), test_invoking_checkout and
+    progress_notes (paths of unknown type). 440 targeted tests pass; full suite and CI not read.
+    Next: review after #227 and #228.
 - id: reduced-review-diff
   title: Show a reviewer only what is left once rule fixes are reversed
   track: pattern-fixes

@@ -62,7 +62,7 @@ def test_the_fix_leaves_a_call_with_an_error_handler_as_it_is():
     fixed = SourceFixer((TreeRemovalChecker(),)).fix_module(
         source_file.parse(), source_file.path
     )
-    assert fixed.module.code == source_file.read()
+    assert fixed.result.code == source_file.read()
 
 
 def test_the_keyword_the_fix_keeps_is_a_field_of_the_tree():

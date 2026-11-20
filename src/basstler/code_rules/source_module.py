@@ -38,13 +38,6 @@ class QualifiedNameCollector(libcst.CSTVisitor):
     The names each visited node refers to.
     """
 
-    def __post_init__(self) -> None:
-        """
-        Sets up the metadata the visitor reads, which :class:`libcst.CSTVisitor` does in
-        its own initialiser.
-        """
-        super().__init__()
-
     @classproperty
     @override
     def METADATA_DEPENDENCIES(cls) -> tuple[type[QualifiedNameProvider]]:

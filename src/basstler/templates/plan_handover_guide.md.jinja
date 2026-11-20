@@ -4,15 +4,11 @@ Instructions for continuing {{ handover.plans | length }} handed-over plan{{ "s"
 request's worth of work: what it does, where it stands, what it builds on and what is
 already known about it.
 
-If `basstler` is installed, do not follow this file: run
-`basstler plan-handover import <this directory>` from a checkout of the repository instead.
+If `basstler` is installed, do not follow this file: run `basstler plan-handover import`
+from a checkout of your fork of the project, or of the repository below if you push to it,
+instead.
 
-| Plan | Items | Underway | Not started |
-| --- | --- | --- | --- |
-{% for plan in handover.plans_in_saving_order %}
-{% set statuses = plan.manifest.items | map(attribute="status") | list %}
-| [{{ plan.manifest.content.title }}](#plan-{{ plan.identifier }}) | {{ statuses | length }} | {{ statuses | select("equalto", status.IN_PROGRESS) | list | length }} | {{ statuses | select("equalto", status.NOT_STARTED) | list | length }} |
-{% endfor %}
+{% include "plan_handover_summary.md.jinja" %}
 
 ## Rules
 
@@ -24,7 +20,8 @@ If `basstler` is installed, do not follow this file: run
 {% for repository in handover.plans | map(attribute="manifest") | map(attribute="repositories") | sum(start=[]) | unique(attribute="full_name") %}
   [{{ repository.full_name }}]({{ repository.url }}){{ "," if not loop.last else "." }}
 {% endfor %}
-  Continuing one means pushing there; without write access, stop and ask the user for it.
+  Continuing one means pushing there; without write access, push the branch to your fork
+  and open its pull request again from there.
 - The sessions that started these items cannot be opened. What they decided is in each
   item's notes, its progress note and its pull request.
 

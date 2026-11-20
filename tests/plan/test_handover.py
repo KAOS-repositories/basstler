@@ -1,64 +1,31 @@
 """
-Tests for basstler.plan.handover and its command: handing plans over from one
-personal-notes branch and taking them on in another.
+Tests for basstler.plan.handover and its command: handing plans over from one personal-
+notes branch and taking them on in another.
 """
 
 from __future__ import annotations
 
-from enum import StrEnum
 from pathlib import Path
 
 import pytest
 
-from basstler.locations import PlanHandoverLocation, PluginLocation, ProjectLocation
+from basstler.locations import PlanHandoverLocation, ProjectLocation
 from basstler.plan import handover_command
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.exceptions import (
     HandoverPlanCycleError,
     PlanAlreadyTrackedError,
     PlanOutsideHandoverError,
+    PlanStillNamedError,
 )
 from basstler.plan.handover import HandoverGuide, HandoverPlan, PlanHandover
-from basstler.plan.merged_items import __main__ as merged_items_command
 from basstler.plan.model import ManifestKey, PlanDocument, PlanManifest
 from basstler.plan.repository_rules import RepositoryRules
-from basstler.plan_site import build_start
 
-from ..constants.paths import DatasetLocation
 from ..scratch_repository import ScratchRepository
+from .conftest import RECEIVERS_FORK, UNRELATED_BRANCH, HandedOverPlan
 
 # %% the dataset handover
-
-
-class HandedOverPlan(StrEnum):
-    """
-    The ids of the plans :attr:`DatasetLocation.HANDOVER` holds.
-    """
-
-    UPSTREAM = "upstream-work"
-    """
-    The plan whose item the other plan depends on.
-    """
-
-    DOWNSTREAM = "downstream-work"
-    """
-    The plan depending on an item of :attr:`UPSTREAM`.
-    """
-
-
-UNRELATED_BRANCH = "unrelated-branch"
-"""
-The branch of :attr:`DatasetLocation.UNRELATED_PROGRESS_NOTE`, which no handed-over plan
-tracks.
-"""
-
-
-@pytest.fixture
-def dataset_handover() -> PlanHandover:
-    """
-    :return: The handover the dataset holds.
-    """
-    return PlanHandover.from_directory(DatasetLocation.HANDOVER.value)
 
 
 def plan_named(handover: PlanHandover, identifier: str) -> HandoverPlan:
@@ -70,88 +37,6 @@ def plan_named(handover: PlanHandover, identifier: str) -> HandoverPlan:
     return next(plan for plan in handover.plans if plan.identifier == identifier)
 
 
-def notes_branch_files(handover: PlanHandover) -> dict[Path, str]:
-    """
-    :param handover: A handover.
-    :return: Its plans, progress notes and rules at the paths a notes branch holds them.
-    """
-    files = {
-        ProjectLocation.PULL_REQUEST_PROGRESS
-        / handover.progress_note_path(branch): note
-        for branch, note in handover.progress_notes.items()
-    }
-    for plan in handover.plans:
-        for document, text in (
-            (PlanDocument.MANIFEST, plan.manifest.text),
-            (PlanDocument.ROADMAP, plan.roadmap_text),
-        ):
-            files[Path(document.path_within_notes_branch(plan.identifier))] = text
-    files[ProjectLocation.PLAN_RULES] = handover.repository_rules.render()
-    return files
-
-
-def handover_repository(
-    repository: ScratchRepository, notes: dict[Path, str]
-) -> ScratchRepository:
-    """
-    Set *repository* up to save plans of the dataset's repository, with *notes* on its
-    notes branch, and stand-ins for the plan site build and the merged-item lookup.
-
-    :param repository: The initialized scratch repository and notes remote.
-    :param notes: The files its notes branch is to hold.
-    :return: The same repository.
-    """
-    repository.install_hook_scripts(
-        PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
-    )
-    repository.install_package()
-    repository.replace_package_module(build_start, DatasetLocation.BUILD_START_STUB)
-    repository.replace_package_module(
-        merged_items_command, DatasetLocation.MERGED_ITEMS_STUB
-    )
-    repository.write("README.md", "scratch repo\n")
-    repository.commit_everything("initial commit")
-    repository.publish_notes_branch(notes)
-    repository.resolve_notes_remote_to()
-    repository.serve_origin_as(
-        PlanManifest.from_file(
-            DatasetLocation.HANDOVER
-            / PlanHandoverLocation.PLANS
-            / HandedOverPlan.UPSTREAM
-            / PlanDocument.MANIFEST
-        ).default_repository
-    )
-    return repository
-
-
-@pytest.fixture
-def exporting_repository(
-    scratch_repository: ScratchRepository, dataset_handover: PlanHandover
-) -> ScratchRepository:
-    """
-    :return: A repository whose notes branch holds the dataset's plans, the progress
-        notes of their branches and of one branch they do not track, and the rules.
-    """
-    notes = notes_branch_files(dataset_handover)
-    notes[
-        ProjectLocation.PULL_REQUEST_PROGRESS
-        / PlanHandover.progress_note_path(UNRELATED_BRANCH)
-    ] = DatasetLocation.UNRELATED_PROGRESS_NOTE.read_text()
-    return handover_repository(scratch_repository, notes)
-
-
-@pytest.fixture
-def receiving_repository(scratch_repository: ScratchRepository) -> ScratchRepository:
-    """
-    :return: A repository whose notes branch holds no plan.
-    """
-    return handover_repository(
-        scratch_repository,
-        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "notes\n"},
-    )
-
-
 # %% which plans go together
 
 
@@ -159,7 +44,8 @@ def test_a_plan_is_handed_over_only_with_the_plans_it_depends_on(
     dataset_handover: PlanHandover,
 ):
     """
-    A plan depending on an item of a plan left out could never resolve it after an import.
+    A plan depending on an item of a plan left out could never resolve it after an
+    import.
     """
     with pytest.raises(PlanOutsideHandoverError):
         PlanHandover(
@@ -173,7 +59,8 @@ def test_plans_depending_on_each_other_in_a_cycle_are_refused(
     dataset_handover: PlanHandover,
 ):
     """
-    No plan of a cycle can be saved before the plan it names, so the handover is refused.
+    No plan of a cycle can be saved before the plan it names, so the handover is
+    refused.
     """
     upstream = plan_named(dataset_handover, HandedOverPlan.UPSTREAM)
     downstream = plan_named(dataset_handover, HandedOverPlan.DOWNSTREAM)
@@ -300,7 +187,8 @@ def test_an_export_reads_the_plans_without_sessions_and_only_their_progress_note
     exporting_repository: ScratchRepository, dataset_handover: PlanHandover
 ):
     """
-    An export carries the named plans, the progress notes of their items' branches alone, and the repository's rules.
+    An export carries the named plans, the progress notes of their items' branches
+    alone, and the repository's rules.
     """
     identifiers = [HandedOverPlan.UPSTREAM, HandedOverPlan.DOWNSTREAM]
 
@@ -346,7 +234,8 @@ def test_an_import_saves_every_plan_progress_note_and_rule_onto_the_notes_branch
     tmp_path: Path,
 ):
     """
-    An import leaves the notes branch holding every plan, progress note and rule as handed over.
+    An import leaves the notes branch holding every plan, progress note and rule as
+    handed over.
     """
     dataset_handover.save_to_notes_branch(
         project_root=receiving_repository.project_root
@@ -389,7 +278,8 @@ def test_an_import_refuses_a_plan_the_notes_branch_already_holds_and_saves_nothi
     tmp_path: Path,
 ):
     """
-    An import never overwrites a plan the receiver already tracks, and saves none of the others.
+    An import never overwrites a plan the receiver already tracks, and saves none of the
+    others.
     """
     upstream = plan_named(dataset_handover, HandedOverPlan.UPSTREAM)
     exporting_repository.remove_from_notes_branch(
@@ -408,3 +298,110 @@ def test_an_import_refuses_a_plan_the_notes_branch_already_holds_and_saves_nothi
             f"*/{PlanDocument.MANIFEST.value}"
         )
     ] == [upstream.identifier]
+
+
+# %% removing handed-over plans
+
+
+def test_removing_handed_over_plans_leaves_only_what_they_do_not_carry(
+    exporting_repository: ScratchRepository, tmp_path: Path
+):
+    """
+    Removing the plans deletes them and their items' progress notes from the notes
+    branch, and keeps the progress note of a branch no plan names.
+    """
+    handover = PlanHandover.from_notes_branch(
+        project_root=exporting_repository.project_root,
+        plan_identifiers=list(HandedOverPlan),
+    )
+
+    handover.remove_from_notes_branch(project_root=exporting_repository.project_root)
+
+    checkout = exporting_repository.clone_notes_branch(tmp_path / "notes")
+    assert (
+        list(
+            (checkout / ProjectLocation.PLANS).glob(f"*/{PlanDocument.MANIFEST.value}")
+        )
+        == []
+    )
+    assert [
+        path.relative_to(checkout / ProjectLocation.PULL_REQUEST_PROGRESS)
+        for path in (checkout / ProjectLocation.PULL_REQUEST_PROGRESS).rglob("*")
+        if path.is_file()
+    ] == [PlanHandover.progress_note_path(UNRELATED_BRANCH)]
+
+
+def test_a_plan_another_plan_still_depends_on_is_not_removed(
+    exporting_repository: ScratchRepository,
+    dataset_handover: PlanHandover,
+    tmp_path: Path,
+):
+    """
+    The plan staying on the notes branch would name an item that no longer exists, so
+    the removal is refused, naming its item, and nothing is removed.
+    """
+    downstream = plan_named(dataset_handover, HandedOverPlan.DOWNSTREAM)
+    upstream_only = PlanHandover.from_notes_branch(
+        project_root=exporting_repository.project_root,
+        plan_identifiers=[HandedOverPlan.UPSTREAM],
+    )
+
+    with pytest.raises(PlanStillNamedError) as refusal:
+        upstream_only.remove_from_notes_branch(
+            project_root=exporting_repository.project_root
+        )
+
+    assert refusal.value.named_by == tuple(
+        DependencyReference(item.identifier, plan.identifier).text
+        for plan in [downstream]
+        for item in plan.manifest.items
+        if any(
+            DependencyReference.from_text(entry).plan_id == HandedOverPlan.UPSTREAM
+            for entry in item.dependencies
+        )
+    )
+    checkout = exporting_repository.clone_notes_branch(tmp_path / "notes")
+    assert sorted(
+        path.parent.name
+        for path in (checkout / ProjectLocation.PLANS).glob(
+            f"*/{PlanDocument.MANIFEST.value}"
+        )
+    ) == sorted(HandedOverPlan)
+
+
+# %% moving onto the receiver's repository
+
+
+def test_a_plan_moved_to_another_repository_keeps_its_started_items_where_their_work_is(
+    dataset_handover: PlanHandover,
+):
+    """
+    Started items stay on their repository, the others follow the new default, and the
+    tracking issue, a number on the old default, is dropped; an import first reopens the
+    underway items' pull requests on the receiver's repository.
+    """
+    upstream = plan_named(dataset_handover, HandedOverPlan.UPSTREAM)
+
+    moved = upstream.moved_to_repository(RECEIVERS_FORK).manifest
+
+    assert moved.default_repository == RECEIVERS_FORK
+    assert [moved.repository_of(item) for item in moved.items] == [
+        upstream.manifest.default_repository
+        if item.branch or item.pull_request_number is not None
+        else RECEIVERS_FORK
+        for item in upstream.manifest.items
+    ]
+    assert ManifestKey.TRACKING_ISSUE.key not in moved.content
+
+
+def test_a_plan_already_on_the_receivers_repository_is_not_moved(
+    dataset_handover: PlanHandover,
+):
+    """
+    A receiver pushing to the sender's repository takes the plan over unchanged.
+    """
+    upstream = plan_named(dataset_handover, HandedOverPlan.UPSTREAM)
+
+    assert (
+        upstream.moved_to_repository(upstream.manifest.default_repository) == upstream
+    )

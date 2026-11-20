@@ -388,6 +388,12 @@ class DatasetLocation(PathEnumeration):
     A module standing in for :mod:`basstler.plan_site.build_start`, printing its name.
     """
 
+    GIT_IDENTITY_OF_A_COLLEAGUE_STUB = STUBS / "git_identity_of_a_colleague.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.git_identity`, printing the
+    identity path of a colleague who does not own the notes repository.
+    """
+
     BUILD_START_NEEDS_ACCESS_STUB = STUBS / "build_start_needs_access.py"
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, saying this session
@@ -693,11 +699,6 @@ class PersonalNotesPath(PathEnumeration):
     """
     The clone's private instructions, which the session start writes and save-plan.sh
     reads a plan out of.
-    """
-
-    GIT_IDENTITY = ProjectLocation.PERSONAL_NOTES / "git-identity"
-    """
-    The recorded git identity a clone with none of its own is given.
     """
 
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"

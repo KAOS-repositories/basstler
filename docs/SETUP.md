@@ -32,6 +32,11 @@ It creates your notes branch, records the git identity your commits are authored
 with, installs what the package needs, and asks only about the decisions that
 are genuinely yours. Re-running it on a set-up project changes nothing.
 
+Colleagues can share one notes branch, and the plans on it. The repository's owner keeps
+their identity at `.claude/personal/git-identity`; everyone else records theirs at
+`.claude/personal/git-identities/<their GitHub login>`, so each session authors commits
+as the person it works for.
+
 Without a session, the same setup is one command, once the package's environment exists:
 
 ```bash

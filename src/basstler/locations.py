@@ -526,6 +526,23 @@ class ProjectLocation(PathEnumeration):
     :attr:`PackageLocation.STACK_CONFIGURATION`.
     """
 
+    GIT_IDENTITY = PERSONAL_NOTES / "git-identity"
+    """
+    The git identity of the notes repository's owner, which a clone with none of its
+    own is given.
+
+    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
+    CONTRIBUTOR_GIT_IDENTITIES = PERSONAL_NOTES / "git-identities"
+    """
+    The git identities of everyone else who shares the notes branch, one file per GitHub
+    login.
+
+    Mirrors ``CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY`` in
+    ``resolve-personal-notes-config.sh``.
+    """
+
     PERSONAL_NOTES_DOCUMENT = PERSONAL_NOTES / "notes.md"
     """
     The notes file itself, unless a clone's settings put it elsewhere.

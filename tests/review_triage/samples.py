@@ -39,6 +39,9 @@ class FileSample(StrEnum):
     IMPORT_SOURCE_CHANGED = "import-source-changed"
     IMPORTS_REORDERED = "imports-reordered"
     KEYWORD_ARGUMENTS_ADDED = "keyword-arguments-added"
+    KEYWORD_ARGUMENTS_ADDED_THROUGH_IMPORT_ALIAS = (
+        "keyword-arguments-added-through-import-alias"
+    )
     KEYWORD_ARGUMENTS_REORDERED = "keyword-arguments-reordered"
     KEYWORD_ARGUMENTS_SWAPPED = "keyword-arguments-swapped"
     KEYWORD_ARGUMENTS_UNKNOWN_CALLEE = "keyword-arguments-unknown-callee"

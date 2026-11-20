@@ -118,6 +118,17 @@ class CallScope:
     The base version of the file holding the call, ``None`` when unknown.
     """
 
+    def defined_class_name(self, name: str) -> str:
+        """
+        :param name: A class name as the file spells it.
+        :return: The name the class is defined under, which differs from *name* when
+            the file imports it under another name.
+        """
+        bindings = self.imports.bindings.get(name, ())
+        if len(bindings) == 1 and isinstance(bindings[0], ImportedDefinition):
+            return bindings[0].defined_name
+        return name
+
 
 # %% targets
 
@@ -890,7 +901,8 @@ class ParameterMethod(CalleeResolution):
             and function.value.id in scope.parameter_types
         ):
             return None
-        return MethodTarget(function.attr, scope.parameter_types[function.value.id])
+        annotated = scope.parameter_types[function.value.id]
+        return MethodTarget(function.attr, scope.defined_class_name(annotated))
 
 
 @dataclass(frozen=True)

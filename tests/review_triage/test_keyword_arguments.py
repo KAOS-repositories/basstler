@@ -51,6 +51,10 @@ def triaged(sample: FileSample, renames: RenameMap) -> FileVerdict:
     ("sample", "kinds"),
     [
         (FileSample.KEYWORD_ARGUMENTS_ADDED, {KeywordChange.KEYWORD_ARGUMENTS}),
+        (
+            FileSample.KEYWORD_ARGUMENTS_ADDED_THROUGH_IMPORT_ALIAS,
+            {KeywordChange.KEYWORD_ARGUMENTS},
+        ),
         (FileSample.KEYWORD_ONLY_PARAMETERS, {KeywordChange.KEYWORD_ONLY}),
         (FileSample.IDENTITY_DECORATOR_ADDED, {KeywordChange.IDENTITY_DECORATORS}),
         (FileSample.CODE_REFORMATTED, {MechanicalChange.FORMATTING}),

@@ -15,12 +15,22 @@ permissions:
   contents: read
 
 jobs:
+  # The suite is split into shards run at once, since one Windows runner takes over half
+  # an hour for it; each shard runs its share from the job's index and the job total.
   test:
-    name: pytest on Windows
+    name: pytest on Windows (shard ${{ matrix.shard }})
     if: "!github.event.pull_request.draft"
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
+      # Defender scans every file git and the tests write and every process they start.
+      - name: Stop scanning files as they are written
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
       # The tags give the installed package its release version, which the tests read.
       - uses: actions/checkout@v4
         with:
@@ -40,5 +50,12 @@ jobs:
       - name: Install the browser the page tests run in
         run: python -m playwright install chromium
 
+      # The runner's temporary directory is on its faster drive.
       - name: Run the tests
-        run: pytest tests -n auto
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: >-
+          pytest tests -n auto --durations=20
+          --shard-index ${{ strategy.job-index }}
+          --shard-count ${{ strategy.job-total }}

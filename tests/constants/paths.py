@@ -945,6 +945,27 @@ class TreeRemovalSnippet(PathEnumeration):
     """
 
 
+class SourceModuleSnippet(PathEnumeration):
+    """
+    Source files the tests of resolving names in a parsed file read.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "source-module"
+    """
+    The directory holding them.
+    """
+
+    REMOVES_NOTHING = DIRECTORY / "removes-nothing.py"
+    """
+    One call of :func:`shutil.copytree`, in a file that never spells ``rmtree``.
+    """
+
+    BUILTIN_OPEN = DIRECTORY / "builtin-open.py"
+    """
+    One call of the builtin :func:`open`.
+    """
+
+
 class PackageBoundarySnippet(PathEnumeration):
     """
     A package of two distributions the package boundary check reads.

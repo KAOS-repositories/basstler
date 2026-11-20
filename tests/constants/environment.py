@@ -177,6 +177,17 @@ class InterpreterName(StrEnum):
     """
 
 
+class InterpreterVariable(StrEnum):
+    """
+    Variables the Python interpreter reads when it starts.
+    """
+
+    HASH_SEED = "PYTHONHASHSEED"
+    """
+    The seed the interpreter hashes strings with.
+    """
+
+
 class BashStubVariable(StrEnum):
     """
     The variables ``dataset/stubs/bash.sh`` reads.

@@ -36,7 +36,48 @@ from .constants.environment import (
 from .executable_stubs import ExecutableStubDirectory
 from .maintenance.fork import ForkCheckout
 from .scratch_repository import ScratchRepository
+from .suite_shard import SuiteShard, SuiteShardOption
 from .upstream_reviews.replay import RecordedResponse, ReplayingClient
+
+# %% the shard of the suite this run takes
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """
+    Declare the options choosing the :class:`SuiteShard` a run takes.
+
+    :param parser: The run's option parser.
+    """
+    parser.addoption(
+        SuiteShardOption.INDEX,
+        type=int,
+        default=0,
+        help="Run only the shard of the suite with this index, counting from zero.",
+    )
+    parser.addoption(
+        SuiteShardOption.COUNT,
+        type=int,
+        default=1,
+        help="Split the suite into this many shards.",
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """
+    Leave out every test the run's shard does not hold.
+
+    :param config: The run's configuration.
+    :param items: The collected tests, narrowed in place.
+    """
+    shard = SuiteShard.from_options(config)
+    held = [item for item in items if shard.holds(item.nodeid)]
+    left_out = [item for item in items if not shard.holds(item.nodeid)]
+    if left_out:
+        config.hook.pytest_deselected(items=left_out)
+        items[:] = held
+
 
 # %% the package's environment, as CI has it
 
@@ -68,8 +109,8 @@ def package_environment_of_the_suite(
 
     :param tmp_path: pytest's per-test temporary directory.
     :param monkeypatch: Sets both variables for this test only.
-    :param python3_directory: Where ``python3`` is, when the interpreter's own
-        directory has none.
+    :param python3_directory: Where ``python3`` is, when the interpreter's own directory
+        has none.
     """
     monkeypatch.setenv(ConfigurationVariable.HOME, str(tmp_path / "basstler-home"))
     search_path = [str(Path(sys.executable).parent)]

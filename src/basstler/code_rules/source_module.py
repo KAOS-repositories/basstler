@@ -1,6 +1,6 @@
 """
-A Python source file parsed with libcst, which checkers query for the calls and
-returns they report.
+A Python source file parsed with libcst, which checkers query for the calls and returns
+they report.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import override
 
 import libcst
-from libcst import matchers
 from libcst.metadata import (
     CodeRange,
     MetadataWrapper,
@@ -56,14 +55,42 @@ class QualifiedNameCollector(libcst.CSTVisitor):
         return True
 
 
+# %% the nodes checkers query
+
+
+@dataclass(eq=False)
+class QueriedNodeCollector(libcst.CSTVisitor):
+    """
+    Records every call and ``return`` statement of a tree, in the order they appear.
+    """
+
+    calls: list[libcst.Call] = field(default_factory=list, init=False)
+    """
+    The calls visited.
+    """
+
+    returns: list[libcst.Return] = field(default_factory=list, init=False)
+    """
+    The ``return`` statements visited.
+    """
+
+    @override
+    def visit_Call(self, node: libcst.Call) -> None:
+        self.calls.append(node)
+
+    @override
+    def visit_Return(self, node: libcst.Return) -> None:
+        self.returns.append(node)
+
+
 # %% the parsed file
 
 
 @dataclass(frozen=True)
 class SourceModule:
     """
-    The syntax tree of one source file, with the position and the fully qualified name of
-    every node.
+    The syntax tree of one source file, with the position and the fully qualified name
+    of every node.
     """
 
     path: Path
@@ -72,11 +99,18 @@ class SourceModule:
     """
 
     @cached_property
+    def source(self) -> bytes:
+        """
+        :return: The file's contents.
+        """
+        return self.path.read_bytes()
+
+    @cached_property
     def wrapper(self) -> MetadataWrapper:
         """
         :return: The parsed file, which resolves metadata for its nodes.
         """
-        return MetadataWrapper(libcst.parse_module(self.path.read_bytes()))
+        return MetadataWrapper(libcst.parse_module(self.source), unsafe_skip_copy=True)
 
     @cached_property
     def positions(self) -> dict[libcst.CSTNode, CodeRange]:
@@ -95,22 +129,35 @@ class SourceModule:
         self.wrapper.visit(collector)
         return collector.names
 
+    @cached_property
+    def queried_nodes(self) -> QueriedNodeCollector:
+        """
+        :return: The calls and ``return`` statements of the file.
+        """
+        collector = QueriedNodeCollector()
+        self.wrapper.module.visit(collector)
+        return collector
+
     def calls(self) -> Iterator[libcst.Call]:
         """
         :return: Every call in the file.
         """
-        return iter(matchers.findall(self.wrapper.module, matchers.Call()))
+        return iter(self.queried_nodes.calls)
 
     def returns(self) -> Iterator[libcst.Return]:
         """
         :return: Every ``return`` statement in the file.
         """
-        return iter(matchers.findall(self.wrapper.module, matchers.Return()))
+        return iter(self.queried_nodes.returns)
 
     def refers_to(self, node: libcst.CSTNode, qualified_name: str) -> bool:
         """
         :return: Whether *node* names *qualified_name* or, for a module, something in it.
+            A file that never spells the name's last part cannot refer to it.
         """
+        last_part = qualified_name.rpartition(".")[2]
+        if last_part.encode("utf-8") not in self.source:
+            return False
         return any(
             name == qualified_name or name.startswith(f"{qualified_name}.")
             for name in self.qualified_names.get(node, frozenset())

@@ -65,3 +65,15 @@ def test_the_suite_skips_a_draft_pull_request():
     (job,) = WINDOWS_TESTS.jobs
 
     assert job.condition == DRAFT_SKIP
+
+
+# %% speed
+
+
+def test_the_suite_runs_in_several_shards_at_once():
+    """
+    One Windows runner takes over half an hour for the suite, so it is split.
+    """
+    (job,) = WINDOWS_TESTS.jobs
+
+    assert (job.instances or 0) > 1

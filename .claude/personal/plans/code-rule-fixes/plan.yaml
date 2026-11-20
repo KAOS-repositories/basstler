@@ -44,12 +44,12 @@ items:
   - rule-fixes
   status: in progress
   recommended_model: sonnet
-  notes: 'Draft #227 at a16fe4ba, restacked onto #222 at 7e5aa084: both fixes find their places
-    through CodePattern matchers and import through ImportInsertion (required_import); its
-    own ImportedName and StatementInsertion were dropped as duplicates. rmtree(x) becomes
-    DirectoryTree(x).remove(), keeping ignore_errors; Bash.locate only where an environment
-    parameter is in scope. #222 has since moved to 6ed0232c; not yet merged here. Full suite
-    not run locally.'
+  notes: >
+    Draft #227 at d49949c2 on #222 (7e5aa084). Bash is located in the environment parameter, else
+    os.environ; a tuple stays a tuple; fixes declare imports per place (CodeFix.required_imports).
+    128 code-rule tests pass; full suite and CI not read. Next: merge #222's tip 6ed0232c. #220's
+    newer commits (b15fa66b, fed0d1b8) rework the bash, locale and tree-removal checkers, so expect
+    conflicts once #220 lands.
 - id: portability-fixes
   title: Fixes for file URLs and paths written into git and shell text
   track: pattern-fixes

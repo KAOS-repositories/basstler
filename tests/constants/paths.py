@@ -1088,6 +1088,11 @@ class TreeRemovalSnippet(PathEnumeration):
     Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
     """
 
+    HANDLED_RMTREE = DIRECTORY / "handled-rmtree.py"
+    """
+    A call to :func:`shutil.rmtree` with an error handler, on line 17.
+    """
+
 
 class PackageBoundarySnippet(PathEnumeration):
     """

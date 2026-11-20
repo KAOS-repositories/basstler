@@ -35,7 +35,8 @@ are genuinely yours. Re-running it on a set-up project changes nothing.
 Colleagues can share one notes branch, and the plans on it. The repository's owner keeps
 their identity at `.claude/personal/git-identity`; everyone else records theirs at
 `.claude/personal/git-identities/<their GitHub login>`, so each session authors commits
-as the person it works for.
+as the person it works for. A colleague who may push to the repository joins its notes
+branch by running the same setup once its owner has created it.
 
 Without a session, the same setup is one command, once the package's environment exists:
 

@@ -250,6 +250,13 @@ a.chip:hover { border-color: currentColor; }
 .model-picker-list li:hover, .model-picker-option-selected { background: var(--accent-tint); }
 .action-button-copied { border-color: var(--good); color: var(--good); }
 .action-button-failed { border-color: var(--bad); color: var(--bad); }
+.handover-group { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); align-items: center; margin: var(--space-3) 0 0; font-size: 0.85rem; color: var(--text-muted); }
+.handover-receiver {
+  font: inherit; font-size: 0.8rem; width: 14rem; max-width: 100%;
+  border: 1px solid var(--border); background: var(--surface); color: inherit;
+  border-radius: var(--radius-small); padding: 0.1rem 0.4rem; margin-left: var(--space-1);
+}
+.handover-receiver-invalid { border-color: var(--bad); }
 
 /* %% phone width */
 

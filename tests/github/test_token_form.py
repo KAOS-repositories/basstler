@@ -8,10 +8,10 @@ from __future__ import annotations
 from dataclasses import replace
 from urllib.parse import parse_qs, urlsplit
 
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.actions_secret import ActionsSecret
 from basstler.github.token_form import (
     FineGrainedTokenForm,
-    PermissionLevel,
     RepositoryPermission,
     SharedToken,
     StoredSecret,

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from types import ModuleType
 
 import libcst
 from libcst.codemod import CodemodContext
@@ -129,20 +130,23 @@ class ModuleReplacement(ModuleTransformation):
 @dataclass(frozen=True)
 class ImportInsertion(ModuleTransformation):
     """
-    Imports a class in a module, merged into an import of its module where there is one
-    and left out where the module imports the class already.
+    Imports a class or a module in a module, left out where the module imports it
+    already; a class is merged into an import of its module where there is one.
     """
 
-    imported: type
+    imported: type | ModuleType
     """
-    The class to import.
+    The class or module to import.
     """
 
     def transform(self, module: libcst.Module) -> libcst.Module:
         context = CodemodContext()
-        AddImportsVisitor.add_needed_import(
-            context, self.imported.__module__, self.imported.__name__
-        )
+        if isinstance(self.imported, ModuleType):
+            AddImportsVisitor.add_needed_import(context, self.imported.__name__)
+        else:
+            AddImportsVisitor.add_needed_import(
+                context, self.imported.__module__, self.imported.__name__
+            )
         return AddImportsVisitor(context).transform_module(module)
 
 

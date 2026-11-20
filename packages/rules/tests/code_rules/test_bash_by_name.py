@@ -68,7 +68,9 @@ def test_the_fix_leaves_a_command_with_no_environment_in_scope_as_it_is():
     Fixing changes nothing where there is no environment to locate bash in.
     """
     source_file = PythonSourceFile(BashByNameSnippet.SUBPROCESS_CALL)
-    fixed = SourceFixer((BashByNameChecker(),)).fix_module(source_file)
+    fixed = SourceFixer((BashByNameChecker(),)).fix_module(
+        source_file.parse(), source_file.path
+    )
     assert fixed.module.code == source_file.read()
 
 

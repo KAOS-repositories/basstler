@@ -59,7 +59,9 @@ def test_the_fix_leaves_a_call_with_an_error_handler_as_it_is():
     Fixing changes nothing in a module whose only removal has a handler.
     """
     source_file = PythonSourceFile(TreeRemovalSnippet.HANDLED_RMTREE)
-    fixed = SourceFixer((TreeRemovalChecker(),)).fix_module(source_file)
+    fixed = SourceFixer((TreeRemovalChecker(),)).fix_module(
+        source_file.parse(), source_file.path
+    )
     assert fixed.module.code == source_file.read()
 
 

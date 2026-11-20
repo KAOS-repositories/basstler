@@ -19,6 +19,7 @@ from basstler_testing.constants.environment import (
 )
 from basstler_testing.constants.paths import DatasetLocation, RepositoryLocation
 from basstler_testing.script_runner import BashScriptRunner
+from basstler.text_file import TextFile
 
 # %% an installed triage
 
@@ -66,7 +67,7 @@ class InstalledTriage:
         interpreter.parent.mkdir(parents=True)
         shutil.copy(DatasetLocation.RECORDING_PYTHON_STUB, interpreter)
         interpreter.chmod(FileMode.EXECUTABLE)
-        (environment / ".basstler-commit").write_text(f"{PINNED_COMMIT}\n")
+        TextFile(environment / ".basstler-commit").write(f"{PINNED_COMMIT}\n")
         return cls(environment.parent, parent / "python-calls.log")
 
     def run(self, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -90,7 +91,7 @@ class InstalledTriage:
         """
         :return: The arguments the interpreter was given, across every run so far.
         """
-        return self.call_log.read_text().splitlines()
+        return TextFile(self.call_log).read().splitlines()
 
     def clone(self, repository: str) -> Path:
         """
@@ -107,7 +108,7 @@ class InstalledTriage:
         return subprocess.run(
             ["git", "-C", str(self.clone(repository)), "remote", "get-url", "origin"],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             check=True,
         ).stdout.strip()
 

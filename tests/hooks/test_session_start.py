@@ -267,7 +267,7 @@ def publish_and_run(
     repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
-            PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
             **(notes_branch_files or {}),
         }
     )
@@ -327,7 +327,7 @@ def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
     The session rules do not depend on the user having written any notes.
     """
     session_start_repository.publish_notes_branch(
-        {PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
+        {ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
     )
     result = run_session_start(session_start_repository)
     assert result.returncode == 0, result.stderr

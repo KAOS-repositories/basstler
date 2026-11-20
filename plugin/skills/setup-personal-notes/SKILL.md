@@ -166,7 +166,9 @@ line on standard error that says why and what to run, and prints no
 line, do once what it says, then run step 5 again.
 
 It refuses a remote GitHub says someone else owns (exit 3) before writing
-anything. It records the remote in git config, creates the notes branch if
+anything, unless that remote already holds a notes branch the user may push to:
+then the user joins the notes and plans colleagues share there, and their
+identity is recorded beside the owner's. It records the remote in git config, creates the notes branch if
 it's missing, seeds a notes file only if it didn't exist yet, records the
 identity, and runs `session-start.sh`, which installs the package's
 dependencies and writes `CLAUDE.local.md`. Then it reports which labels this

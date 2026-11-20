@@ -50,6 +50,17 @@ class ParentRepository(ValidatedJSONModel):
         return Repository.parse(self.full_name)
 
 
+class RepositoryPermissions(ValidatedJSONModel):
+    """
+    What the account a request authenticated as may do in a repository.
+    """
+
+    push: bool
+    """
+    Whether it may push branches to the repository.
+    """
+
+
 class RepositoryDetails(ValidatedJSONModel):
     """
     One repository, as its REST resource describes it.
@@ -68,6 +79,11 @@ class RepositoryDetails(ValidatedJSONModel):
     is_private: Annotated[bool, Field(alias="private")]
     """
     Whether only the people and tokens granted access can read it.
+    """
+
+    permissions: RepositoryPermissions | None = None
+    """
+    What the requesting account may do there, ``None`` when the request was anonymous.
     """
 
     parent: ParentRepository | None = None

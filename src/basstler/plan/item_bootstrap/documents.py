@@ -65,7 +65,7 @@ class ProjectCheckout:
             ["git", *arguments],
             cwd=self.project_root,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             check=True,
         )
         return result.stdout.rstrip("\n")
@@ -130,7 +130,8 @@ class ProjectCheckout:
                 self.run_git(
                     "show", FetchedBranchReference.PERSONAL_NOTES.file_at(path)
                 )
-                + "\n"
+                + "\n",
+                encoding="utf-8",
             )
         return PlanDirectory(destination)
 
@@ -372,7 +373,7 @@ class PlanSaveScript:
                 ),
                 cwd=project_root,
                 capture_output=True,
-                text=True,
+                encoding="utf-8",
             )
         if saved.returncode != 0:
             raise PlanSaveRefusedError(detail=saved.stderr.strip())

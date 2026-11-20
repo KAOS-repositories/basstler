@@ -126,7 +126,7 @@ class GitHubCommandLineClient(GraphQLClient, JobLogReader):
             [self.executable, *arguments],
             input=standard_input,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
         )
         if completed.returncode != 0:
             raise GitHubCommandFailed(

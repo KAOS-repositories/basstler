@@ -56,7 +56,7 @@ def write_manifest(plans_directory: Path, manifest: dict) -> None:
         plans_directory / manifest[ManifestKey.IDENTIFIER.key] / PlanDocument.MANIFEST
     )
     path.parent.mkdir(parents=True)
-    path.write_text(yaml.safe_dump(manifest))
+    path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
 
 
 def write_dependent_plan(plans_directory: Path, depends_on: list[str]) -> None:

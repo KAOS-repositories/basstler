@@ -509,7 +509,9 @@ def test_basstler_s_own_caller_marks_every_pull_request():
     Basstler's own repository marks files viewed on every pull request with the workflow
     the setup writes.
     """
-    installed = (RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read_text()
+    installed = (RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read_text(
+        encoding="utf-8"
+    )
     assert (
         installed
         == MarkViewedSetup(

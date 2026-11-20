@@ -382,7 +382,9 @@ class PlanHandover:
         """
         return cls.from_files(
             {
-                PurePosixPath(path.relative_to(directory).as_posix()): path.read_text()
+                PurePosixPath(path.relative_to(directory).as_posix()): path.read_text(
+                    encoding="utf-8"
+                )
                 for path in directory.rglob("*")
                 if path.is_file()
             }
@@ -397,7 +399,7 @@ class PlanHandover:
         for path, text in self.files.items():
             target = directory / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(text)
+            target.write_text(text, encoding="utf-8")
 
     def save_to_notes_branch(self, *, project_root: Path) -> None:
         """

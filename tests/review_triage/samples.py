@@ -48,8 +48,8 @@ class FileSample(StrEnum):
         head = next(self.directory.glob("head.*"))
         return FileVersions(
             PurePosixPath(f"sample{base.suffix}"),
-            base_text=base.read_text(),
-            head_text=head.read_text(),
+            base_text=base.read_text(encoding="utf-8"),
+            head_text=head.read_text(encoding="utf-8"),
         )
 
 
@@ -69,7 +69,7 @@ class DescriptionSample(StrEnum):
         """
         :return: The description.
         """
-        return (DatasetLocation.REVIEW_TRIAGE / self).read_text()
+        return (DatasetLocation.REVIEW_TRIAGE / self).read_text(encoding="utf-8")
 
 
 # %% the pull request
@@ -98,7 +98,7 @@ class PullRequestSample(StrEnum):
         :return: The content of each file of this tree, by its path in the tree.
         """
         return {
-            file.relative_to(self.path): file.read_text()
+            file.relative_to(self.path): file.read_text(encoding="utf-8")
             for file in self.path.rglob("*")
             if file.is_file()
         }
@@ -107,4 +107,4 @@ class PullRequestSample(StrEnum):
         """
         :return: The REST payload, parsed.
         """
-        return json.loads(self.path.read_text())
+        return json.loads(self.path.read_text(encoding="utf-8"))

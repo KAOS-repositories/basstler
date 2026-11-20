@@ -643,7 +643,7 @@ class PlanManifest:
         :param path: A ``plan.yaml`` file.
         :return: The manifest it holds.
         """
-        return cls.from_yaml(path.read_text())
+        return cls.from_yaml(path.read_text(encoding="utf-8"))
 
     @classmethod
     def from_yaml(cls, text: str) -> PlanManifest:
@@ -668,7 +668,7 @@ class PlanManifest:
 
         :param path: Where to write it.
         """
-        path.write_text(self.text)
+        path.write_text(self.text, encoding="utf-8")
 
     @property
     def identifier(self) -> str:

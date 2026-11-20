@@ -217,7 +217,7 @@ class ViewedMarking(TriageOutput):
                 "Not marked viewed, as GitHub does not list them in pull request "
                 f"{outcome.pull_request.number}: {', '.join(map(str, unlisted))}"
             )
-        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
+        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text(encoding="utf-8")
         for path in mechanical:
             if path not in listing.result:
                 continue
@@ -233,7 +233,7 @@ class ViewedMarking(TriageOutput):
         :return: The paths of every file GitHub lists in it, as a frozen set.
         :raises PullRequestHeadMoved: If its head commit is no longer the triaged one.
         """
-        document = ReviewTriageLocation.PULL_REQUEST_FILES.read_text()
+        document = ReviewTriageLocation.PULL_REQUEST_FILES.read_text(encoding="utf-8")
         request = FilesPageRequest(outcome.pull_request.node_identifier)
         paths: set[PurePosixPath] = set()
         while True:

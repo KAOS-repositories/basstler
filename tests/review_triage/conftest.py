@@ -121,7 +121,7 @@ class FileListingWriter(GitHubWriter):
         """
         The path of every file a mutation marked viewed, in the order they were sent.
         """
-        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
+        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text(encoding="utf-8")
         return [
             ViewedFile.from_json(request.variables).path
             for request in self.sent
@@ -131,7 +131,9 @@ class FileListingWriter(GitHubWriter):
     def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
         assert isinstance(write, GraphQLRequest)
         self.sent.append(write)
-        if write.query != ReviewTriageLocation.PULL_REQUEST_FILES.read_text():
+        if write.query != ReviewTriageLocation.PULL_REQUEST_FILES.read_text(
+            encoding="utf-8"
+        ):
             return GitHubResponse(GraphQLResponse(data={}).to_json())
         cursor = FilesPageRequest.from_json(write.variables).cursor
         index = int(cursor) if cursor else 0
@@ -190,7 +192,7 @@ class RefusingWriter(GitHubWriter):
 
 
 WORKFLOW_REPOSITORY_DETAILS: dict[str, Any] = json.loads(
-    DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text()
+    DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text(encoding="utf-8")
 )
 """
 The resource the stand-in workflow repository answers with.

@@ -129,11 +129,17 @@ def test_github_source_reads_the_checks_of_an_open_pull_request():
                 ],
                 commit_report_path(CommitReport.CHECK_RUNS): [
                     json.loads(
-                        RecordedCommitChecks.ONE_CHECK_RUN_FAILING.value.read_text()
+                        RecordedCommitChecks.ONE_CHECK_RUN_FAILING.value.read_text(
+                            encoding="utf-8"
+                        )
                     )
                 ],
                 commit_report_path(CommitReport.STATUS): [
-                    json.loads(RecordedCommitChecks.NO_STATUSES.value.read_text())
+                    json.loads(
+                        RecordedCommitChecks.NO_STATUSES.value.read_text(
+                            encoding="utf-8"
+                        )
+                    )
                 ],
             },
         )
@@ -337,7 +343,7 @@ def landing_source(
     :return: A source over the first plan's repository as a fork, whose one pull request
         is at :attr:`SiteSampleText.HEAD_COMMIT` and based on ``main``.
     """
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     return GitHubPullRequestSource(
         RecordedGitHubClient(
             responses={f"/{PLAN_REPOSITORY.api_path}": fork, **answers},
@@ -366,7 +372,9 @@ def upstream_base() -> str:
     """
     :return: The fork's upstream default branch, as a comparison names it.
     """
-    parent = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())["parent"]
+    parent = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))[
+        "parent"
+    ]
     owner = Repository.parse(parent["full_name"]).owner
     return f"{owner}:{parent['default_branch']}"
 
@@ -458,7 +466,7 @@ def test_a_pull_request_of_a_repository_that_is_not_a_fork_is_not_compared():
 
 
 def test_github_source_reads_the_upstream_of_a_fork():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     source = GitHubPullRequestSource(
         RecordedGitHubClient(responses={f"/{PLAN_REPOSITORY.api_path}": fork})
     )
@@ -477,7 +485,7 @@ def test_github_source_finds_no_upstream_for_a_repository_that_is_not_a_fork():
 
 
 def test_github_source_records_the_upstream_of_each_fork_it_read_pull_requests_of():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     source = GitHubPullRequestSource(
         RecordedGitHubClient(
             responses={f"/{PLAN_REPOSITORY.api_path}": fork},
@@ -526,7 +534,7 @@ def an_upstream_pull_request(
 
 
 def test_github_source_records_the_upstream_pull_request_of_each_fork_branch():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     upstream = Repository.parse(fork["parent"]["full_name"])
     elsewhere = Repository("another-owner", "another-fork")
     source = GitHubPullRequestSource(
@@ -556,7 +564,7 @@ def test_github_source_records_the_upstream_pull_request_of_each_fork_branch():
 
 
 def test_github_source_reading_no_upstream_pull_requests_leaves_the_upstream_unread():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text())
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     upstream = Repository.parse(fork["parent"]["full_name"])
     client = RecordedGitHubClient(
         responses={f"/{PLAN_REPOSITORY.api_path}": fork},

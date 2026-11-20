@@ -25,6 +25,12 @@ class ScratchBranch(StrEnum):
     The throwaway branch a scratch repository is left checked out on.
     """
 
+    INITIAL = "master"
+    """
+    The branch a scratch repository starts on, git's own default, named so a machine
+    whose git defaults to another, as Git for Windows does, starts on it too.
+    """
+
 
 class ClaudeLocalSection(StrEnum):
     """

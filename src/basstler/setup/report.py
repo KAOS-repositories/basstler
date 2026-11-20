@@ -342,5 +342,5 @@ class SetupCheckScript:
             cwd=self.project_root,
             env=dict(self.environment),
             capture_output=True,
-            text=True,
+            encoding="utf-8",
         )

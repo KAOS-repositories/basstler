@@ -26,7 +26,7 @@ The repository every file here is committed to.
 COMMIT = FileCommit(
     RepositoryBranch("trunk", REPOSITORY),
     ".github/workflows/a-workflow.yml",
-    DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text(),
+    DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text(encoding="utf-8"),
     "Add a workflow",
 )
 """

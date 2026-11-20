@@ -138,7 +138,7 @@ def exporting_repository(
     notes[
         ProjectLocation.PULL_REQUEST_PROGRESS
         / PlanHandover.progress_note_path(UNRELATED_BRANCH)
-    ] = DatasetLocation.UNRELATED_PROGRESS_NOTE.read_text()
+    ] = DatasetLocation.UNRELATED_PROGRESS_NOTE.read_text(encoding="utf-8")
     return handover_repository(scratch_repository, notes, plans_repository())
 
 

@@ -146,7 +146,9 @@ def test_the_report_lists_renames_and_both_groups_of_files(
     ones.
     """
     triage = PullRequestTriager().triage(sample_changes)
-    expected = PullRequestSample.REPORT.path.read_text().removesuffix("\n")
+    expected = PullRequestSample.REPORT.path.read_text(encoding="utf-8").removesuffix(
+        "\n"
+    )
     assert MarkdownReport().render(triage) == expected
 
 
@@ -157,7 +159,7 @@ def test_each_mechanical_file_is_marked_viewed(sample_changes: PullRequestChange
     triage = PullRequestTriager().triage(sample_changes)
     writer = listing_of(triage)
     ViewedMarking(writer).publish(triage)
-    document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
+    document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text(encoding="utf-8")
     assert [request for request in writer.sent if request.query == document] == [
         GraphQLRequest(
             document,

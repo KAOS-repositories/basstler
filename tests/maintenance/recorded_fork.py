@@ -6,13 +6,16 @@ the maintenance suites run against a scratch fork.
 from __future__ import annotations
 
 import subprocess
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclasses_field
 from enum import StrEnum
+from pathlib import Path
 
 from basstler.environment import GitHubCredentialVariable
 from basstler.git.commands import GitCommandRunner
+from basstler.github.constants import GitHubExecutable
 from basstler.github.pull_request_record import (
     PullRequestField,
 )
@@ -29,6 +32,8 @@ from basstler.stack.model import (
     Stack,
 )
 
+from ..constants.environment import SearchPathVariable
+from ..executable_stubs import path_hiding_executables
 from ..script_runner import PythonModuleRunner
 from .fork import (
     MAINTENANCE_MODULE,
@@ -354,8 +359,10 @@ def maintenance_runner(checkout: ForkCheckout) -> PythonModuleRunner:
     """
     :param checkout: The fork checkout to run in.
     :return: A runner for the executor, as on a machine with no credential outside a
-        cloud session: no token variable, a ``gh`` with no login, and no cloud session
-        marker.
+        cloud session: no token variable, no ``gh`` on the search path, and no cloud
+        session marker. ``gh`` is hidden rather than logged out because on Windows it
+        reads its login from the credential store, which no configuration directory
+        replaces.
     """
     return PythonModuleRunner(
         project_root=checkout.project_root,
@@ -367,7 +374,11 @@ def maintenance_runner(checkout: ForkCheckout) -> PythonModuleRunner:
             LoggedOutCommandLine.CONFIGURATION_DIRECTORY_VARIABLE: str(
                 checkout.project_root.parent
                 / LoggedOutCommandLine.CONFIGURATION_DIRECTORY
-            )
+            ),
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: path_hiding_executables(
+                Path(tempfile.mkdtemp(dir=checkout.project_root.parent)),
+                GitHubExecutable.COMMAND_LINE,
+            ),
         },
         module_name=MAINTENANCE_MODULE,
     )

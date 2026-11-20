@@ -54,7 +54,7 @@ from ..constants.environment import (
 )
 from ..constants.notes import ScratchBranch
 from ..constants.paths import DatasetLocation, RepositoryLocation
-from ..executable_stubs import ExecutableStubDirectory
+from ..executable_stubs import ExecutableStubDirectory, NEEDS_SCRIPT_AS_EXECUTABLE
 from ..scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
 
 SCRIPTS_UNDER_TEST = (
@@ -305,6 +305,7 @@ def test_completes_a_full_setup(setup_repository: ScratchRepository):
     assert check_setup_report(setup_repository).exit_code == exit_code
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     setup_repository: ScratchRepository, tmp_path: Path
 ):
@@ -328,7 +329,7 @@ def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     ]
     # session start's base-branch sync reads the stack configuration through
     # ``bash -c``, which runs in the configured bash too
-    assert call_log.read_text().splitlines() == [
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
         *(str(setup.plugin_root.path_of(script)) for script in scripts_before_the_sync),
         "-c",
         str(setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT)),
@@ -352,7 +353,9 @@ def test_leaves_a_new_notes_file_empty_without_starter_notes(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text() == ""
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == ""
 
 
 def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
@@ -365,11 +368,11 @@ def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
     ).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (
-        checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT
-    ).read_text() == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
         PluginSkillLocation.STARTER_NOTES
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
 
 def test_never_seeds_over_notes_that_already_exist(
@@ -386,9 +389,9 @@ def test_never_seeds_over_notes_that_already_exist(
     ).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (
-        checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT
-    ).read_text() == "my own notes\n"
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == "my own notes\n"
 
 
 def test_a_second_run_changes_nothing(setup_repository: ScratchRepository):

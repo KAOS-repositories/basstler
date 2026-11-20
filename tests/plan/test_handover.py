@@ -220,9 +220,9 @@ def test_the_export_command_writes_the_handover_with_its_guide(
 
     handover_command.export_plans(list(HandedOverPlan), output=output)
 
-    assert (output / PlanHandoverLocation.GUIDE).read_text() == HandoverGuide(
-        handover=PlanHandover.from_directory(output)
-    ).render()
+    assert (output / PlanHandoverLocation.GUIDE).read_text(
+        encoding="utf-8"
+    ) == HandoverGuide(handover=PlanHandover.from_directory(output)).render()
 
 
 # %% importing
@@ -251,7 +251,7 @@ def test_an_import_saves_every_plan_progress_note_and_rule_onto_the_notes_branch
             (
                 checkout
                 / PlanDocument.ROADMAP.path_within_notes_branch(plan.identifier)
-            ).read_text(),
+            ).read_text(encoding="utf-8"),
         )
         for plan in dataset_handover.plans
     } == {
@@ -263,7 +263,7 @@ def test_an_import_saves_every_plan_progress_note_and_rule_onto_the_notes_branch
             checkout
             / ProjectLocation.PULL_REQUEST_PROGRESS
             / PlanHandover.progress_note_path(branch)
-        ).read_text()
+        ).read_text(encoding="utf-8")
         for branch in dataset_handover.progress_notes
     } == dataset_handover.progress_notes
     assert (
@@ -325,10 +325,10 @@ def test_removing_handed_over_plans_leaves_only_what_they_do_not_carry(
         == []
     )
     assert [
-        path.relative_to(checkout / ProjectLocation.PULL_REQUEST_PROGRESS)
+        path.relative_to(checkout / ProjectLocation.PULL_REQUEST_PROGRESS).as_posix()
         for path in (checkout / ProjectLocation.PULL_REQUEST_PROGRESS).rglob("*")
         if path.is_file()
-    ] == [PlanHandover.progress_note_path(UNRELATED_BRANCH)]
+    ] == [PlanHandover.progress_note_path(UNRELATED_BRANCH).as_posix()]
 
 
 def test_a_plan_another_plan_still_depends_on_is_not_removed(

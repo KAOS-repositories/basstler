@@ -10,8 +10,8 @@ import subprocess
 from basstler.bash import Bash
 
 
-def run(script: str, overrides: dict[str, str]) -> None:
+def run(script: str) -> None:
     """
-    Run *script* with *overrides* set.
+    Run *script* in a copy of the process environment.
     """
-    subprocess.run(Bash.locate(os.environ).command("-c", script), check=True, env={**os.environ, **overrides})
+    subprocess.run(Bash.locate(os.environ).command(script), env=dict(os.environ))

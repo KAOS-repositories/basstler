@@ -122,6 +122,7 @@ class ScopeSample(StrEnum):
     """
 
     GLOBAL_IN_NESTED_FUNCTION = "global-in-nested-function.py"
+    INVALID_ESCAPE_SEQUENCE = "invalid-escape-sequence.py"
 
     def read(self) -> str:
         """

@@ -4,6 +4,8 @@ Tests for the names each scope of a file binds.
 
 from __future__ import annotations
 
+import warnings
+
 from basstler.review_triage.name_scopes import NameScope, UnknownValue
 from basstler.review_triage.python_source import PythonSource
 
@@ -40,3 +42,18 @@ def test_a_text_in_a_package_is_one_source():
     assert PythonSource.from_text(text, ("package",)) is not PythonSource.from_text(
         text
     )
+
+
+# %% parsing a file that Python warns about
+
+
+def test_parsing_a_file_with_an_invalid_escape_sequence_raises_no_warning():
+    """
+    A file under review that Python warns about while compiling is parsed silently, as
+    the warning is about the reviewed code and not about the review.
+    """
+    module = PythonSource.from_text(ScopeSample.INVALID_ESCAPE_SEQUENCE.read())
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert module.parses

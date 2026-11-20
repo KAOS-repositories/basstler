@@ -9,6 +9,7 @@ import ast
 import io
 import keyword
 import tokenize
+import warnings
 from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -554,7 +555,17 @@ class PythonSource:
 
         :raises SyntaxError: If the file is not valid Python.
         """
-        return ast.parse(self.text)
+        return self.parse()
+
+    def parse(self) -> ast.Module:
+        """
+        :return: A new syntax tree of the file, without the warnings Python gives about
+            the code it parses.
+        :raises SyntaxError: If the file is not valid Python.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            return ast.parse(self.text)
 
     @cached_property
     def parses(self) -> bool:
@@ -573,7 +584,7 @@ class PythonSource:
             rename replaced.
         :raises SyntaxError: If the file is not valid Python.
         """
-        tree = ast.parse(self.text)
+        tree = self.parse()
         if renames.renames:
             IdentifierRenamer(renames).visit(tree)
         return tree

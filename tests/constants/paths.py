@@ -361,6 +361,18 @@ class DatasetLocation(PathEnumeration):
     :class:`ProgressBranch` that has one.
     """
 
+    HANDOVER = DIRECTORY / "handover"
+    """
+    A plan handover: two plans, one depending on the other's item, the progress notes
+    of their items' branches and the repository's rules, laid out as
+    :class:`basstler.locations.PlanHandoverLocation` names them.
+    """
+
+    UNRELATED_PROGRESS_NOTE = DIRECTORY / "handover-notes" / "unrelated-branch.md"
+    """
+    The progress note of a branch no plan of :attr:`HANDOVER` tracks.
+    """
+
     PLANS = DIRECTORY / "plans"
     """
     A plans directory the cross-plan reference tests resolve against: one subdirectory
@@ -395,6 +407,12 @@ class DatasetLocation(PathEnumeration):
     BUILD_START_STUB = STUBS / "build_start_prints_its_name.py"
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, printing its name.
+    """
+
+    GIT_IDENTITY_OF_A_COLLEAGUE_STUB = STUBS / "git_identity_of_a_colleague.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.git_identity`, printing the
+    identity path of a colleague who does not own the notes repository.
     """
 
     BUILD_START_NEEDS_ACCESS_STUB = STUBS / "build_start_needs_access.py"
@@ -710,11 +728,6 @@ class PersonalNotesPath(PathEnumeration):
     """
     The clone's private instructions, which the session start writes and save-plan.sh
     reads a plan out of.
-    """
-
-    GIT_IDENTITY = ProjectLocation.PERSONAL_NOTES / "git-identity"
-    """
-    The recorded git identity a clone with none of its own is given.
     """
 
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"

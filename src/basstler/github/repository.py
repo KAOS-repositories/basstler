@@ -143,6 +143,18 @@ class Repository:
             return cls.parse(name)
         return cls.from_remote_url(git.run("remote", "get-url", remote))
 
+    @classmethod
+    def from_configured_remote(
+        cls, git: GitCommandRunner, remote: str = "origin"
+    ) -> Repository:
+        """
+        :param git: A checkout.
+        :param remote: One of its remotes.
+        :return: The repository the URL the checkout configures for *remote* names, not
+            git's rewrite of that URL.
+        """
+        return cls.from_remote_url(git.run("config", "--get", f"remote.{remote}.url"))
+
     @staticmethod
     def is_full_name(text: str) -> bool:
         """
@@ -507,3 +519,11 @@ class PullRequestReference(HasRepository):
         The pull request's address in GitHub's REST pulls API.
         """
         return f"{GitHubAddress.API}/{self.repository.pull_request_path(self.number)}"
+
+    @property
+    def head_reference(self) -> str:
+        """
+        The ref the repository keeps the pull request's head commit under, whichever
+        repository its branch is on.
+        """
+        return f"refs/pull/{self.number}/head"

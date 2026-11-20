@@ -21,7 +21,6 @@ from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
 
 from ..constants.notes import ScratchBranch
-from ..constants.paths import PersonalNotesPath
 from ..scratch_repository import (
     SCRATCH_IDENTITY,
     ScratchRepository,
@@ -171,7 +170,7 @@ class ForkedScratchRepository:
         repository.publish_notes_branch(
             {
                 ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
-                PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+                ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
             }
         )
         repository.resolve_notes_remote_to()

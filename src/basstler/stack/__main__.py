@@ -44,7 +44,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
-from cyclopts import App, Parameter, Token
+from cyclopts import App, Parameter
 
 from basstler.exit_codes import CommandFailure, ExitCode, StackExitCode
 from basstler.git.commands import GitCommandRunner
@@ -53,7 +53,7 @@ from basstler.stack.commit_move import (
     CommitMoveChecks,
     ProposedCommitMove,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository_option import RepositoryOption
 from basstler.locations import RepositoryStateLocation
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.merge_probe import MergeProbe
@@ -174,25 +174,6 @@ def derived_stack() -> Stack:
         )
     )
 
-
-def parse_repository(_: type, tokens: tuple[Token, ...]) -> Repository:
-    """
-    Convert a command-line ``owner/name`` value.
-
-    :param tokens: The one token given for the option.
-    :return: The repository it names.
-    :raises MalformedRepositoryError: If the value is not ``owner/name``.
-    """
-    return Repository.parse(tokens[0].value)
-
-
-RepositoryOption = Annotated[
-    Repository | None,
-    Parameter(converter=parse_repository, n_tokens=1, accepts_keys=False),
-]
-"""
-An optional ``owner/name`` repository given on the command line.
-"""
 
 # %% commands
 

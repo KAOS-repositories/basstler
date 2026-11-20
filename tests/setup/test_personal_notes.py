@@ -53,7 +53,7 @@ from ..constants.environment import (
     ShellExitStatus,
 )
 from ..constants.notes import ScratchBranch
-from ..constants.paths import DatasetLocation, PersonalNotesPath, RepositoryLocation
+from ..constants.paths import DatasetLocation, RepositoryLocation
 from ..executable_stubs import ExecutableStubDirectory, NEEDS_SCRIPT_AS_EXECUTABLE
 from ..scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
 
@@ -402,9 +402,7 @@ def test_records_the_git_identity_it_is_given(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    recorded = GitIdentity.from_git_config_file(
-        checkout / PersonalNotesPath.GIT_IDENTITY
-    )
+    recorded = GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
     assert recorded == SCRATCH_IDENTITY
 
 

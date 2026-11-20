@@ -17,10 +17,11 @@ import subprocess
 import pytest
 
 from basstler.locations import PluginLocation, ProjectLocation
+from basstler.personal_notes import git_identity
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from ..constants.notes import ScratchBranch
-from ..constants.paths import PersonalNotesPath
+from ..constants.paths import DatasetLocation
 from ..scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
 from .session_start_summary import (
     SummaryLine,
@@ -78,7 +79,7 @@ def publish_notes_branch(
     """
     files = {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n"}
     if identity_file is not None:
-        files[PersonalNotesPath.GIT_IDENTITY] = identity_file
+        files[ProjectLocation.GIT_IDENTITY] = identity_file
     repository.publish_notes_branch(files)
 
 
@@ -122,7 +123,7 @@ def test_reports_the_identity_it_set(git_identity_repository: ScratchRepository)
     assert summary_value(result.stdout, SummaryLine.GIT_IDENTITY) == summary_message(
         SummaryMessage.GIT_IDENTITY_WRITTEN,
         ScratchBranch.PERSONAL_NOTES,
-        PersonalNotesPath.GIT_IDENTITY,
+        ProjectLocation.GIT_IDENTITY,
         f"{RECORDED_IDENTITY.name} <{RECORDED_IDENTITY.email}>",
     )
 
@@ -183,7 +184,7 @@ def test_reports_that_no_identity_is_recorded(
     assert summary_value(result.stdout, SummaryLine.GIT_IDENTITY) == summary_message(
         SummaryMessage.NO_GIT_IDENTITY_RECORDED,
         ScratchBranch.PERSONAL_NOTES,
-        PersonalNotesPath.GIT_IDENTITY,
+        ProjectLocation.GIT_IDENTITY,
     )
 
 
@@ -211,7 +212,7 @@ def test_names_what_an_incomplete_recording_is_missing(
 
     assert summary_value(result.stdout, SummaryLine.GIT_IDENTITY) == summary_message(
         SummaryMessage.GIT_IDENTITY_INCOMPLETE,
-        PersonalNotesPath.GIT_IDENTITY,
+        ProjectLocation.GIT_IDENTITY,
         ScratchBranch.PERSONAL_NOTES,
     )
 
@@ -235,7 +236,7 @@ def test_records_the_given_identity_on_the_notes_branch(
     assert result.returncode == 0, result.stderr
     checkout = git_identity_repository.clone_notes_branch(tmp_path / "notes-checkout")
     assert (
-        GitIdentity.from_git_config_file(checkout / PersonalNotesPath.GIT_IDENTITY)
+        GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
         == RECORDED_IDENTITY
     )
 
@@ -313,3 +314,107 @@ def test_reads_the_recorded_identity_after_another_fetch_moved_fetch_head(
     )
 
     assert recorded == f"{RECORDED_IDENTITY.name}\t{RECORDED_IDENTITY.email}\n"
+
+
+# %% colleagues sharing one notes branch
+
+COLLEAGUE_IDENTITY = GitIdentity("Grace Hopper", "grace@example.com")
+"""
+The identity of a colleague who shares the notes branch without owning its repository.
+"""
+
+COLLEAGUE_IDENTITY_PATH = ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES / "a-colleague"
+"""
+Where :data:`COLLEAGUE_IDENTITY` is recorded, as the colleague stub module prints it.
+"""
+
+
+@pytest.fixture
+def colleague_repository(
+    git_identity_repository: ScratchRepository,
+) -> ScratchRepository:
+    """
+    The scratch repository as a colleague's session sees it: the package resolves the
+    identity file to the colleague's own.
+
+    :param git_identity_repository: The scratch repository carrying both halves.
+    :return: The same repository, its identity lookup standing in for a colleague's.
+    """
+    git_identity_repository.install_package()
+    git_identity_repository.replace_package_module(
+        git_identity, DatasetLocation.GIT_IDENTITY_OF_A_COLLEAGUE_STUB
+    )
+    return git_identity_repository
+
+
+def test_a_colleague_s_session_takes_their_own_identity_not_the_owner_s(
+    colleague_repository: ScratchRepository,
+):
+    colleague_repository.publish_notes_branch(
+        {
+            ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
+            ProjectLocation.GIT_IDENTITY: RECORDED_IDENTITY.as_git_config_file(),
+            COLLEAGUE_IDENTITY_PATH: COLLEAGUE_IDENTITY.as_git_config_file(),
+        }
+    )
+    colleague_repository.clear_local_git_identity()
+
+    result = run_session_start(colleague_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert colleague_repository.local_git_identity() == COLLEAGUE_IDENTITY
+
+
+def test_a_colleague_without_a_recorded_identity_is_given_none(
+    colleague_repository: ScratchRepository,
+):
+    publish_notes_branch(colleague_repository, RECORDED_IDENTITY.as_git_config_file())
+    colleague_repository.clear_local_git_identity()
+
+    result = run_session_start(colleague_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert colleague_repository.local_git_identity() is None
+
+
+def test_a_colleague_records_their_identity_beside_the_owner_s(
+    colleague_repository: ScratchRepository, tmp_path
+):
+    publish_notes_branch(colleague_repository, RECORDED_IDENTITY.as_git_config_file())
+
+    result = colleague_repository.run_hook_script(
+        PluginLocation.GIT_IDENTITY_SAVING_SCRIPT.name,
+        "--name",
+        COLLEAGUE_IDENTITY.name,
+        "--email",
+        COLLEAGUE_IDENTITY.email,
+    )
+
+    assert result.returncode == 0, result.stderr
+    checkout = colleague_repository.clone_notes_branch(tmp_path / "notes-checkout")
+    assert (
+        GitIdentity.from_git_config_file(checkout / COLLEAGUE_IDENTITY_PATH)
+        == COLLEAGUE_IDENTITY
+    )
+    assert (
+        GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
+        == RECORDED_IDENTITY
+    )
+
+
+def test_the_identity_paths_match_the_shell_configuration_that_owns_them(
+    git_identity_repository: ScratchRepository,
+):
+    """
+    :attr:`ProjectLocation.GIT_IDENTITY` and
+    :attr:`ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES` mirror two shell variables; this
+    is what stops the mirrors drifting.
+    """
+    resolved = git_identity_repository.configuration_output(
+        'printf "%s\\n%s\\n" "${PERSONAL_GIT_IDENTITY_PATH}"'
+        ' "${CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY}"'
+    )
+
+    owner_path, contributors_directory = resolved.strip().split("\n")
+    assert owner_path == str(ProjectLocation.GIT_IDENTITY)
+    assert contributors_directory == str(ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES)

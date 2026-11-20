@@ -334,13 +334,15 @@ else
   rm -f "${OUTPUT_FILE}"
 fi
 
-# Git identity from the notes branch, only where the clone has no local one.
-if ! recorded_git_identity_exists; then
+# Git identity from the notes branch, only where the clone has no local one: the
+# identity of the account this session works as (git_identity_path).
+GIT_IDENTITY_PATH="$(git_identity_path)"
+if ! recorded_git_identity_exists "${GIT_IDENTITY_PATH}"; then
   SUMMARY_GIT_IDENTITY="$(git_identity_line_not_recorded \
-    "${NOTES_BRANCH}" "${PERSONAL_GIT_IDENTITY_PATH}")"
-elif ! RECORDED_GIT_IDENTITY="$(recorded_git_identity)"; then
+    "${NOTES_BRANCH}" "${GIT_IDENTITY_PATH}")"
+elif ! RECORDED_GIT_IDENTITY="$(recorded_git_identity "${GIT_IDENTITY_PATH}")"; then
   SUMMARY_GIT_IDENTITY="$(git_identity_line_incomplete \
-    "${PERSONAL_GIT_IDENTITY_PATH}" "${NOTES_BRANCH}")"
+    "${GIT_IDENTITY_PATH}" "${NOTES_BRANCH}")"
 elif LOCAL_GIT_IDENTITY="$(repository_local_git_identity)"; then
   IFS=$'\t' read -r LOCAL_NAME LOCAL_EMAIL <<< "${LOCAL_GIT_IDENTITY}"
   SUMMARY_GIT_IDENTITY="$(git_identity_line_already_set \
@@ -350,7 +352,7 @@ else
   git config --local user.name "${RECORDED_NAME}"
   git config --local user.email "${RECORDED_EMAIL}"
   SUMMARY_GIT_IDENTITY="$(git_identity_line_written "${NOTES_BRANCH}" \
-    "${PERSONAL_GIT_IDENTITY_PATH}" \
+    "${GIT_IDENTITY_PATH}" \
     "$(format_git_identity "${RECORDED_NAME}" "${RECORDED_EMAIL}")")"
 fi
 

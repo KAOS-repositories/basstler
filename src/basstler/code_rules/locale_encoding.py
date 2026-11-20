@@ -5,7 +5,6 @@ cannot encode most of Unicode.
 
 from __future__ import annotations
 
-import ast
 import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -13,7 +12,10 @@ from enum import StrEnum
 from pathlib import Path
 from typing import override
 
+import libcst
+
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.code_rules.source_module import SourceModule
 
 # %% what reads and writes text
 
@@ -80,73 +82,79 @@ class LocaleEncodingChecker(CodeRuleChecker):
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(module):
-            if not isinstance(node, ast.Call) or not self.uses_locale_encoding(node):
+        module = SourceModule(path)
+        for call in module.calls():
+            if not self.uses_locale_encoding(module, call):
                 continue
             yield CodeRuleViolation(
                 path,
-                node.lineno,
-                node.end_lineno,
+                module.first_line(call),
+                module.last_line(call),
                 "reads or writes text in the locale encoding, which on Windows cannot "
                 f'encode most of Unicode; pass {TextKeyword.ENCODING}="utf-8"',
             )
 
-    def uses_locale_encoding(self, call: ast.Call) -> bool:
+    def uses_locale_encoding(self, module: SourceModule, call: libcst.Call) -> bool:
         """
         :return: Whether *call* reads or writes text without naming its encoding.
         """
-        keywords = {keyword.arg: keyword.value for keyword in call.keywords}
+        keywords = {
+            argument.keyword.value: argument.value
+            for argument in call.args
+            if argument.keyword is not None
+        }
         if TextKeyword.ENCODING in keywords:
             return False
-        if self.is_subprocess_call(call):
+        if module.refers_to(call.func, subprocess.__name__):
             switch = keywords.get(TextKeyword.TEXT)
-            return isinstance(switch, ast.Constant) and switch.value is True
+            return isinstance(switch, libcst.Name) and switch.value == "True"
         function = call.func
-        name = function.attr if isinstance(function, ast.Attribute) else None
-        if isinstance(function, ast.Name):
-            name = function.id
+        if isinstance(function, libcst.Attribute):
+            name = function.attr.value
+        elif isinstance(function, libcst.Name):
+            name = function.value
+        else:
+            return False
         if name == TextFunction.OPEN:
             return self.opens_a_file(call) and not self.opens_bytes(call, keywords)
         return name in (TextFunction.READ_TEXT, TextFunction.WRITE_TEXT)
 
     @staticmethod
-    def is_subprocess_call(call: ast.Call) -> bool:
+    def positional_arguments(call: libcst.Call) -> list[libcst.BaseExpression]:
         """
-        :return: Whether *call* calls a function of :mod:`subprocess`.
+        :return: The arguments of *call* given by position.
         """
-        function = call.func
-        return (
-            isinstance(function, ast.Attribute)
-            and isinstance(function.value, ast.Name)
-            and function.value.id == subprocess.__name__
-        )
+        return [argument.value for argument in call.args if argument.keyword is None]
 
-    @staticmethod
-    def opens_a_file(call: ast.Call) -> bool:
+    def opens_a_file(self, call: libcst.Call) -> bool:
         """
         :return: Whether *call*, an :data:`TextFunction.OPEN`, opens a file: a call of
             :func:`open`, or a method call given nothing but a mode, as
             :meth:`pathlib.Path.open` is, unlike an opener handed a request.
         """
-        if isinstance(call.func, ast.Name):
+        if isinstance(call.func, libcst.Name):
             return True
-        return all(isinstance(argument, ast.Constant) for argument in call.args)
+        return all(
+            isinstance(argument, libcst.SimpleString | libcst.BaseNumber)
+            for argument in self.positional_arguments(call)
+        )
 
-    @staticmethod
-    def opens_bytes(call: ast.Call, keywords: dict[str | None, ast.expr]) -> bool:
+    def opens_bytes(
+        self, call: libcst.Call, keywords: dict[str, libcst.BaseExpression]
+    ) -> bool:
         """
         :param keywords: The keyword arguments of *call*, by name.
         :return: Whether *call*, an :data:`TextFunction.OPEN`, names a binary mode: by
             keyword, as the second argument of :func:`open` or the first of
             :meth:`pathlib.Path.open`.
         """
-        mode_position = 0 if isinstance(call.func, ast.Attribute) else 1
+        mode_position = 0 if isinstance(call.func, libcst.Attribute) else 1
         mode = keywords.get(TextKeyword.MODE)
-        if mode is None and len(call.args) > mode_position:
-            mode = call.args[mode_position]
+        positional = self.positional_arguments(call)
+        if mode is None and len(positional) > mode_position:
+            mode = positional[mode_position]
         return (
-            isinstance(mode, ast.Constant)
-            and isinstance(mode.value, str)
-            and BINARY_MODE in mode.value
+            isinstance(mode, libcst.SimpleString)
+            and isinstance(mode.evaluated_value, str)
+            and BINARY_MODE in mode.evaluated_value
         )

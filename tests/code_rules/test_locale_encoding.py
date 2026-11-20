@@ -22,6 +22,16 @@ def test_every_kind_of_text_in_the_locale_encoding_is_reported():
     assert [violation.first_line for violation in violations] == list(range(12, 17))
 
 
+def test_a_subprocess_imported_under_another_name_is_resolved():
+    """
+    A call is a :mod:`subprocess` call by what it imports, not by how it is spelled.
+    """
+    violations = LocaleEncodingChecker().violations(
+        LocaleEncodingSnippet.IMPORTED_SUBPROCESS
+    )
+    assert [violation.first_line for violation in violations] == [11, 12]
+
+
 def test_text_as_utf_8_and_bytes_are_not_reported():
     """
     Calls naming their encoding, and calls handling bytes, are left alone.

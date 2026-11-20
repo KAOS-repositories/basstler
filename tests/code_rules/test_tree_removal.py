@@ -24,6 +24,22 @@ def test_every_shutil_rmtree_is_reported():
     assert [violation.first_line for violation in violations] == [10, 11]
 
 
+def test_a_rmtree_imported_under_another_name_is_reported():
+    """
+    The module is resolved through its imports, not matched by its spelling.
+    """
+    violations = TreeRemovalChecker().violations(TreeRemovalSnippet.IMPORTED_RMTREE)
+    assert [violation.first_line for violation in violations] == [12, 13, 14]
+
+
+def test_a_function_named_rmtree_that_is_not_the_shutil_one_is_not_reported():
+    """
+    A function or method sharing the name is not :func:`shutil.rmtree`.
+    """
+    violations = TreeRemovalChecker().violations(TreeRemovalSnippet.OTHER_RMTREE)
+    assert list(violations) == []
+
+
 def test_the_module_removing_trees_is_not_reported():
     """
     The one module allowed to call :func:`shutil.rmtree` is left out.

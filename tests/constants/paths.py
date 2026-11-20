@@ -882,6 +882,12 @@ class BashByNameSnippet(PathEnumeration):
     command.
     """
 
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls running bash by its name through :mod:`subprocess` imported under other
+    names, on lines 10 and 11.
+    """
+
 
 class LocaleEncodingSnippet(PathEnumeration):
     """
@@ -905,6 +911,12 @@ class LocaleEncodingSnippet(PathEnumeration):
     request opened, which is no file.
     """
 
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls decoding output in the locale encoding through :mod:`subprocess` imported
+    under other names, on lines 11 and 12.
+    """
+
 
 class TreeRemovalSnippet(PathEnumeration):
     """
@@ -919,6 +931,17 @@ class TreeRemovalSnippet(PathEnumeration):
     SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
     """
     Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
+    """
+
+    IMPORTED_RMTREE = DIRECTORY / "imported-rmtree.py"
+    """
+    Three calls to :func:`shutil.rmtree` through an aliased module and through names
+    imported from it, on lines 12 to 14.
+    """
+
+    OTHER_RMTREE = DIRECTORY / "other-rmtree.py"
+    """
+    A function and a method named ``rmtree`` that are not :func:`shutil.rmtree`.
     """
 
 

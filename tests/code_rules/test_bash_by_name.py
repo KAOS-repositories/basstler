@@ -32,6 +32,13 @@ def test_a_subprocess_call_running_bash_by_its_name_is_reported():
     assert violation_lines(BashByNameSnippet.SUBPROCESS_CALL) == [9]
 
 
+def test_a_subprocess_imported_under_another_name_is_resolved():
+    """
+    A call is a :mod:`subprocess` call by what it imports, not by how it is spelled.
+    """
+    assert violation_lines(BashByNameSnippet.IMPORTED_SUBPROCESS) == [10, 11]
+
+
 def test_a_returned_command_running_bash_by_its_name_is_reported():
     """
     A command line returned for a caller to run is reported.

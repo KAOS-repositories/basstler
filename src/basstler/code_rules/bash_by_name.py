@@ -4,15 +4,17 @@ Finds commands that start bash by its name instead of through :class:`basstler.b
 
 from __future__ import annotations
 
-import ast
 import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+import libcst
+
 from basstler.bash import Bash, LocatedProgram
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.code_rules.source_module import SourceModule
 
 # %% the check
 
@@ -26,48 +28,42 @@ class BashByNameChecker(CodeRuleChecker):
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(module):
-            command = self.command_line(node)
-            if command is None or not self.starts_bash_by_name(command):
+        module = SourceModule(path)
+        for command in self.command_lines(module):
+            if not self.starts_bash_by_name(command):
                 continue
             yield CodeRuleViolation(
                 path,
-                command.lineno,
-                command.end_lineno,
+                module.first_line(command),
+                module.last_line(command),
                 f"starts {LocatedProgram.BASH} by its name, which Windows resolves to "
                 f"WSL's launcher; build the command with {Bash.__name__}.locate(...)"
                 f".{Bash.command.__name__}(...)",
             )
 
     @staticmethod
-    def command_line(node: ast.AST) -> ast.expr | None:
+    def command_lines(module: SourceModule) -> Iterator[libcst.BaseExpression]:
         """
-        :return: The command line *node* runs or hands on: the first argument of a call
-            to a :mod:`subprocess` function, or a returned value; ``None`` otherwise.
+        :return: The command line each :mod:`subprocess` call in *module* runs, taken as
+            its first argument, and every value it returns.
         """
-        if isinstance(node, ast.Return):
-            return node.value
-        if not isinstance(node, ast.Call) or not node.args:
-            return None
-        function = node.func
-        if (
-            isinstance(function, ast.Attribute)
-            and isinstance(function.value, ast.Name)
-            and function.value.id == subprocess.__name__
-        ):
-            return node.args[0]
-        return None
+        for statement in module.returns():
+            if statement.value is not None:
+                yield statement.value
+        for call in module.calls():
+            if call.args and module.refers_to(call.func, subprocess.__name__):
+                yield call.args[0].value
 
     @staticmethod
-    def starts_bash_by_name(command: ast.expr) -> bool:
+    def starts_bash_by_name(command: libcst.BaseExpression) -> bool:
         """
         :return: Whether *command* is a list or tuple whose first element is the bare
             name of bash.
         """
+        if not isinstance(command, libcst.List | libcst.Tuple) or not command.elements:
+            return False
+        first = command.elements[0].value
         return (
-            isinstance(command, ast.List | ast.Tuple)
-            and bool(command.elts)
-            and isinstance(command.elts[0], ast.Constant)
-            and command.elts[0].value == LocatedProgram.BASH
+            isinstance(first, libcst.SimpleString)
+            and first.evaluated_value == LocatedProgram.BASH
         )

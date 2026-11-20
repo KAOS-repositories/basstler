@@ -868,12 +868,13 @@ class BashByNameSnippet(PathEnumeration):
 
     SUBPROCESS_CALL = DIRECTORY / "subprocess-call.py"
     """
-    A :mod:`subprocess` call running bash by its name, on line 9.
+    A :mod:`subprocess` call running bash by its name, marked as a violation.
     """
 
     RETURNED_COMMAND = DIRECTORY / "returned-command.py"
     """
-    A function returning a command line that runs bash by its name, on line 12.
+    A function returning a command line that runs bash by its name, marked as a
+    violation.
     """
 
     LOCATED_BASH = DIRECTORY / "located-bash.py"
@@ -885,7 +886,7 @@ class BashByNameSnippet(PathEnumeration):
     IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
     """
     Two calls running bash by its name through :mod:`subprocess` imported under other
-    names, on lines 10 and 11.
+    names, marked as violations.
     """
 
 
@@ -901,8 +902,7 @@ class LocaleEncodingSnippet(PathEnumeration):
 
     LOCALE_TEXT = DIRECTORY / "locale-text.py"
     """
-    Every kind of text read or written in the locale encoding, one per line from line
-    12 to line 16.
+    Every kind of text read or written in the locale encoding, one per marked line.
     """
 
     UTF_8_TEXT = DIRECTORY / "utf-8-text.py"
@@ -914,7 +914,7 @@ class LocaleEncodingSnippet(PathEnumeration):
     IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
     """
     Two calls decoding output in the locale encoding through :mod:`subprocess` imported
-    under other names, on lines 11 and 12.
+    under other names, marked as violations.
     """
 
 
@@ -930,13 +930,13 @@ class TreeRemovalSnippet(PathEnumeration):
 
     SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
     """
-    Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
+    Two calls to :func:`shutil.rmtree`, marked as violations.
     """
 
     IMPORTED_RMTREE = DIRECTORY / "imported-rmtree.py"
     """
     Three calls to :func:`shutil.rmtree` through an aliased module and through names
-    imported from it, on lines 12 to 14.
+    imported from it, marked as violations.
     """
 
     OTHER_RMTREE = DIRECTORY / "other-rmtree.py"

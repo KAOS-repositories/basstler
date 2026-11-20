@@ -6,7 +6,7 @@ returns they report.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from typing import override
@@ -20,25 +20,38 @@ from libcst.metadata import (
     QualifiedNameProvider,
 )
 
+from basstler.class_property import classproperty
+
 # %% resolving names
 
 
+@dataclass(eq=False)
 class QualifiedNameCollector(libcst.CSTVisitor):
     """
     Records the fully qualified names every name and attribute of a tree refers to.
     """
 
-    METADATA_DEPENDENCIES = (QualifiedNameProvider,)
+    names: dict[libcst.CSTNode, frozenset[str]] = field(
+        default_factory=dict, init=False
+    )
     """
-    The metadata :meth:`get_metadata` reads while visiting.
+    The names each visited node refers to.
     """
 
-    def __init__(self) -> None:
+    def __post_init__(self) -> None:
+        """
+        Sets up the metadata the visitor reads, which :class:`libcst.CSTVisitor` does in
+        its own initialiser.
+        """
         super().__init__()
-        self.names: dict[libcst.CSTNode, frozenset[str]] = {}
+
+    @classproperty
+    @override
+    def METADATA_DEPENDENCIES(cls) -> tuple[type[QualifiedNameProvider]]:
         """
-        The names each visited node refers to.
+        The metadata :meth:`get_metadata` reads while visiting.
         """
+        return (QualifiedNameProvider,)
 
     @override
     def on_visit(self, node: libcst.CSTNode) -> bool:

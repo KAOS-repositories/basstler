@@ -7,5 +7,5 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-shutil.rmtree(Path("clone"))
-shutil.rmtree(Path("clone"), ignore_errors=True)
+shutil.rmtree(Path("clone"))  # violation
+shutil.rmtree(Path("clone"), ignore_errors=True)  # violation

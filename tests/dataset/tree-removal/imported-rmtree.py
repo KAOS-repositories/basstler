@@ -9,6 +9,6 @@ from pathlib import Path
 from shutil import rmtree
 from shutil import rmtree as remove_tree
 
-filesystem.rmtree(Path("clone"))
-rmtree(Path("clone"))
-remove_tree(Path("clone"))
+filesystem.rmtree(Path("clone"))  # violation
+rmtree(Path("clone"))  # violation
+remove_tree(Path("clone"))  # violation

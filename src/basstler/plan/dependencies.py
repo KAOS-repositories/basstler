@@ -6,6 +6,7 @@ or, through a plans directory, in another - and that item's readiness.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -62,6 +63,22 @@ class DependencyReference:
         if not separator:
             return cls(item_identifier=plan_id)
         return cls(item_identifier=item_identifier, plan_id=plan_id)
+
+    @classmethod
+    def read_other_plans(
+        cls, *, plan_identifier: str, entries: Iterable[str]
+    ) -> set[str]:
+        """
+        :param plan_identifier: The plan the entries are written in.
+        :param entries: Raw ``depends_on`` entries.
+        :return: The ids of the plans other than *plan_identifier* the entries name.
+        """
+        references = (cls.from_text(entry) for entry in entries)
+        return {
+            reference.plan_id
+            for reference in references
+            if reference.plan_id is not None and reference.plan_id != plan_identifier
+        }
 
     @property
     def text(self) -> str:
@@ -430,6 +447,36 @@ class DependencyResolver:
             resolved = self.plan_directory.resolve(reference)
         self.dependencies_by_reference[dependency_identifier] = resolved
         return resolved
+
+    def collect_plans_depended_on(self) -> list[str]:
+        """
+        :return: The ids of every plan :attr:`plan` depends on, directly or through
+            another plan, sorted; a plan :attr:`plan_directory` lacks is named but not
+            followed.
+        """
+        found: set[str] = set()
+        pending = [self.plan]
+        while pending:
+            depending = pending.pop()
+            named = (
+                DependencyReference.read_other_plans(
+                    plan_identifier=depending.id,
+                    entries=(
+                        entry for item in depending.items for entry in item.depends_on
+                    ),
+                )
+                - found
+                - {self.plan.id}
+            )
+            found |= named
+            if self.plan_directory is None:
+                continue
+            pending.extend(
+                depended_on
+                for depended_on in map(self.plan_directory.plan, sorted(named))
+                if depended_on is not None
+            )
+        return sorted(found)
 
     @property
     def resolved_dependencies(self) -> list[ResolvedDependency]:

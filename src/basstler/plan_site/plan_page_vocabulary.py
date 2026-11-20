@@ -14,6 +14,7 @@ from basstler.plan_site.cards import (
     PromotionAttribute,
     RefreshSource,
 )
+from basstler.plan.handover_options import PlanHandoverOption
 from basstler.plan_site.chip_tone import ChipTone
 from basstler.plan_site.site_vocabulary import LiveStateVocabulary
 from basstler.stack.promotability import PromotionBlocker
@@ -71,6 +72,13 @@ class PlanPageVocabulary(LiveStateVocabulary):
         default=PromotionBlocker, init=False
     )
     """
-    The reasons a pull request may not be promoted, which the script words its
-    button with.
+    The reasons a pull request may not be promoted, which the script words its button
+    with.
+    """
+
+    handover_option: type[PlanHandoverOption] = field(
+        default=PlanHandoverOption, init=False
+    )
+    """
+    The options the handover button fills with the receiver typed beside it.
     """

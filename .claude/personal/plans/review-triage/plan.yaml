@@ -64,32 +64,12 @@ items:
   recommended_model: sonnet
   branch: fix-windows-test-failures
   pull_request_number: 220
-  notes: 'Draft #220, main merged at b2bb4d75; last Windows run 39 failed, 2712 passed. Runs
-    on a Windows machine (.venv/Scripts/python.exe). Next, in order: install-lock liveness
-    (kill -0 sees MSYS PIDs); session start on Scripts/python.exe environments and their removal;
-    GH_CONFIG_DIR at a temporary folder for no-credential tests; the no-upstream remote test;
-    skip the ~20 gh/bash stub tests on win32, naming the limit. Push only through basstler.sh
-    maintenance push; a push restacks #222 and clears Viewed. Update these notes per push;
-    after this order''s last push, run goal pushes-done on this item.'
-- id: mark-220-viewed
-  title: 'Mark #220''s mechanical files viewed'
-  track: windows
-  depends_on:
-  - windows-suite
-  - code-rule-fixes/rule-fix-triage
-  depends_on_merged:
-  - code-rule-fixes/rule-fix-triage
-  depends_on_pushes_done:
-  - windows-suite
-  status: not started
-  performed_by: owner
-  commands:
-  - basstler review-triage report 220
-  - basstler review-triage mark-viewed 220
-  notes: 'Run on your own computer, from a checkout that has rule-fix-triage merged, and before
-    you review #220: it shrinks that review''s diff. It waits for windows-suite''s last push
-    to be recorded (goal pushes-done), and waits again if #220 is pushed after it, since every
-    push clears Viewed. The report lists what will be marked; read it before marking.'
+  notes: 'Draft #220 at e6871da0, its pushes done (pushes_done_at). The whole order is in:
+    install-lock liveness, session start on Scripts/python.exe, gh hidden from PATH, the no-upstream
+    test and the win32 skips of the gh/bash stub tests (d8d1a0ce, 42fc3148). CI at e6871da0:
+    pytest 3.12, 3.13, ruff and personal-notes setup on Windows pass; the Windows suite job
+    is skipped while draft. Any push clears Viewed for mark-220-viewed.'
+  pushes_done_at: e6871da0981a6e134f115a9833b2afd8f8c6c5bf
 - id: move-split
   title: Split every proven mechanical change out of a pull request, and leave one sample
     per rename unviewed
@@ -172,4 +152,4 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
-landed_item_count: 3
+landed_item_count: 4

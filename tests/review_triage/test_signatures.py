@@ -18,6 +18,7 @@ from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import Signature, SignatureReader
 
 from .samples import SIGNATURE_DEFINITIONS
+from basstler.text_file import TextFile
 
 # %% signatures
 
@@ -28,7 +29,7 @@ def reader() -> SignatureReader:
     :return: Reads the signatures of the sample definitions.
     """
     return SignatureReader(
-        DefinitionIndex(SourceDefinitions((SIGNATURE_DEFINITIONS.read_text(),)))
+        DefinitionIndex(SourceDefinitions((TextFile(SIGNATURE_DEFINITIONS).read(),)))
     )
 
 

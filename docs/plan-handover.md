@@ -42,6 +42,11 @@ the open pull requests of the plans' underway items on your repository are close
 with a comment linking the handover pull request; the receiver's import continues them
 all the same. Nothing is closed when the receiver pushes to your repository.
 
+Every plan page on the plan site carries this command ready to copy: type the receiver's
+GitHub login, or their repository as `owner/repository`, beside **Copy handover
+command**. It names the plan and every plan it depends on, and a login stands for the
+receiver's fork, named like the plan's repository.
+
 **As a directory**, for a receiver without a repository you can open a pull request on:
 
 ```bash

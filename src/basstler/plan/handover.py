@@ -86,16 +86,14 @@ class HandoverPlan:
         """
         The ids of the other plans whose items this plan's items depend on.
         """
-        references = (
-            DependencyReference.from_text(dependency)
-            for item in self.manifest.items
-            for dependency in item.dependencies
+        return DependencyReference.read_other_plans(
+            plan_identifier=self.identifier,
+            entries=(
+                dependency
+                for item in self.manifest.items
+                for dependency in item.dependencies
+            ),
         )
-        return {
-            reference.plan_id
-            for reference in references
-            if reference.names_another_plan and reference.plan_id != self.identifier
-        }
 
     def without_sessions(self) -> HandoverPlan:
         """

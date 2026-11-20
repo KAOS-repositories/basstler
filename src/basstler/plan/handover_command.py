@@ -21,7 +21,7 @@ from basstler.github.repository_option import RepositoryArgument
 from basstler.locations import PlanHandoverLocation
 from basstler.plan.handover import PlanHandover
 from basstler.plan.handover_continuation import HandoverImport
-from basstler.plan.handover_options import PlanHandoverOption
+from basstler.plan.handover_options import PlanHandoverCommand, PlanHandoverOption
 from basstler.plan.handover_originals import SenderOriginalPullRequests
 from basstler.plan.handover_pull_request import HandoverOffer, HandoverPullRequests
 from basstler.standard_streams import StandardStreamHandler
@@ -44,7 +44,7 @@ class PlanHandoverExitCode(ExitCode):
 
 
 plan_handover_app = App(
-    name="plan-handover",
+    name=PlanHandoverCommand.GROUP,
     help="Hand plans over to another person, and take handed-over plans on.",
 )
 """
@@ -52,7 +52,7 @@ The ``plan-handover`` command group.
 """
 
 
-@plan_handover_app.command(name="export")
+@plan_handover_app.command(name=PlanHandoverCommand.EXPORT)
 def export_plans(plans: list[str], *, output: Path) -> PlanHandoverExitCode:
     """
     Write plans of this repository's notes branch, their items' progress notes and the
@@ -75,13 +75,17 @@ def export_plans(plans: list[str], *, output: Path) -> PlanHandoverExitCode:
     return PlanHandoverExitCode.SUCCESS
 
 
-@plan_handover_app.command(name="offer")
+@plan_handover_app.command(name=PlanHandoverCommand.OFFER)
 def offer_plans(
     plans: list[str],
     *,
-    receiver_repository: RepositoryArgument,
+    receiver_repository: Annotated[
+        RepositoryArgument, Parameter(name=PlanHandoverOption.RECEIVER_REPOSITORY)
+    ],
     base: str | None = None,
-    receiver_login: str | None = None,
+    receiver_login: Annotated[
+        str | None, Parameter(name=PlanHandoverOption.RECEIVER_LOGIN)
+    ] = None,
     close_pull_requests: bool = False,
 ) -> PlanHandoverExitCode:
     """
@@ -127,9 +131,13 @@ def offer_plans(
     return PlanHandoverExitCode.SUCCESS
 
 
-@plan_handover_app.command(name="delete-branches")
+@plan_handover_app.command(name=PlanHandoverCommand.DELETE_BRANCHES)
 def delete_branches(
-    plans: list[str], *, receiver_repository: RepositoryArgument
+    plans: list[str],
+    *,
+    receiver_repository: Annotated[
+        RepositoryArgument, Parameter(name=PlanHandoverOption.RECEIVER_REPOSITORY)
+    ],
 ) -> PlanHandoverExitCode:
     """
     Delete this repository's branches of handed-over plans' unmerged pull requests once
@@ -161,7 +169,7 @@ def delete_branches(
     return PlanHandoverExitCode.SUCCESS
 
 
-@plan_handover_app.command(name="remove")
+@plan_handover_app.command(name=PlanHandoverCommand.REMOVE)
 def remove_plans(plans: list[str]) -> PlanHandoverExitCode:
     """
     Remove handed-over plans, and their items' progress notes, from this repository's
@@ -191,7 +199,7 @@ most one of them.
 """
 
 
-@plan_handover_app.command(name="import")
+@plan_handover_app.command(name=PlanHandoverCommand.IMPORT)
 def import_plans(
     directory: Annotated[
         ExistingDirectory | None, Parameter(group=import_source)

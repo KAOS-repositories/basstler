@@ -1,11 +1,10 @@
 ## Plan
-- Make the Windows CI job finish (it timed out at ~82% at 958944a1) and fix the Windows failures it names.
+- Make the Windows CI job finish and pass.
 
 ## Done
-- b3b95932: Windows job split into 4 shards (`--shard-index`/`--shard-count` from strategy.job-index/job-total), Defender real-time scanning off, TEMP on runner.temp, timeout 20 min, `--durations=20`.
-- b3b95932: portability checks 162 s -> ~50 s (no tree copy, one walk for calls/returns, names resolved only in files that spell them).
-- 2c02c51a: main merged (probe clean vs 34892a38); full suite green on Linux locally.
+- b3b95932: 4 shards, Defender off, TEMP on runner.temp, 20 min timeout; portability checks 162 s -> ~50 s. Windows run 44833340854 (2c02c51a) finished in ~10 min with 16 failures named.
+- 864bace2: those 16 fixed - posix paths in tests, Windows drive root in entry-point approval, scripts dir for the console script, Windows skips for stubs Git Bash or Windows cannot reach and versioned interpreter names. Changed files pass on Linux.
 
 ## Next
-- Read the sharded Windows run for 2c02c51a (not read yet): fix each failure it names, test-first.
-- PR stays ready for review (the user marked it ready), so each push runs the Windows job.
+- Read the Windows run for 864bace2 when the user says it finished; the curl-fallback skip rests on a likely, unverified cause (Git Bash puts its own curl first).
+- #222 restack conflicts with this branch's checker speed-ups: the user decides.

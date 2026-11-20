@@ -97,12 +97,8 @@ class DirectoryTreeFix(CodeFix[Specification]):
             "permission error that making the entry writable does not cure.",
         )
 
-    @classproperty
-    def required_import(cls) -> type:
-        """
-        :class:`~basstler.directory_tree.DirectoryTree`.
-        """
-        return DirectoryTree
+    def required_imports(self, specification: Specification) -> tuple[type, ...]:
+        return (DirectoryTree,)
 
     def replacement(self, specification: Specification) -> libcst.Call:
         call = libcst.ensure_type(specification.node, libcst.Call)

@@ -2,8 +2,8 @@ schema_version: 1
 id: code-rule-fixes
 title: 'Code rule fixes: applied automatically and proven mechanical'
 description: Code rules declare reversible fixes that code-rules fix applies, and the review
-  triage marks a file mechanical when recomputing a rule's fix, or replaying a recorded
-  modification plan, on the base reproduces the head.
+  triage marks a file mechanical when recomputing a rule's fix, or replaying a recorded modification
+  plan, on the base reproduces the head.
 default_repository: KAOS-repositories/basstler
 waves:
 - id: fixes
@@ -22,17 +22,16 @@ items:
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 222
   blockers:
-    - >-
-      Base #220 conflicts with main in plan/item_bootstrap/documents.py and plan/model.py and
-      carries needs-resolution, so the maintenance pass withholds it and this pull request. This one
-      merges cleanly into the base at 6ed0232c.
-    - >-
-      CI at 6ed0232c is not read yet (pushed just now). Locally: ruff and the suite pass, except
-      tests/plan_site and tests/plan/item_bootstrap, which were not run.
-  notes: 'Ready for review #222, stacked on #220, which stays a draft until these rule fixes are run on it; nothing here waits for #220. basstler.code_modification (specifications, NodeReplacement
-    with exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
-    SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107 of #220''s 129 .py files;
-    examples under tests/dataset/rule-fixes tested automatically.
+  - 'Base #220 conflicts with main in plan/item_bootstrap/documents.py and plan/model.py and
+    carries needs-resolution, so the maintenance pass withholds it and this pull request.
+    This one merges cleanly into the base at 6ed0232c.'
+  - 'CI at 6ed0232c is not read yet (pushed just now). Locally: ruff and the suite pass, except
+    tests/plan_site and tests/plan/item_bootstrap, which were not run.'
+  notes: 'Ready for review #222, stacked on #220, which stays a draft until these rule fixes
+    are run on it; nothing here waits for #220. basstler.code_modification (specifications,
+    NodeReplacement with exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with
+    BehaviourDeclaration; SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107
+    of #220''s 129 .py files; examples under tests/dataset/rule-fixes tested automatically.
 
     '
 - id: directory-and-bash-fixes
@@ -45,9 +44,12 @@ items:
   - rule-fixes
   status: in progress
   recommended_model: sonnet
-  notes: rmtree(x) becomes DirectoryTree(x).remove(); with ignore_errors=True the fix keeps
-    ignoring errors through a declared DirectoryTree option, unless the rule wants it to raise,
-    and declares that. Bash.locate fix only where an environment is in scope.
+  notes: 'Draft #227 at a16fe4ba, restacked onto #222 at 7e5aa084: both fixes find their places
+    through CodePattern matchers and import through ImportInsertion (required_import); its
+    own ImportedName and StatementInsertion were dropped as duplicates. rmtree(x) becomes
+    DirectoryTree(x).remove(), keeping ignore_errors; Bash.locate only where an environment
+    parameter is in scope. #222 has since moved to 6ed0232c; not yet merged here. Full suite
+    not run locally.'
 - id: portability-fixes
   title: Fixes for file URLs and paths written into git and shell text
   track: pattern-fixes
@@ -64,7 +66,8 @@ items:
     so. Done when code-rules fix reproduces #220''s hand edits and rule-fix-triage marks those
     files mechanical.'
 - id: rule-fix-triage
-  title: Prove a file mechanical when recomputing a rule's fix on the base reproduces the head
+  title: Prove a file mechanical when recomputing a rule's fix on the base reproduces the
+    head
   track: pattern-fixes
   branch: claude/awesome-cray-jrpb8w
   pull_request_number: 270
@@ -74,11 +77,12 @@ items:
   - rule-fixes
   status: in progress
   recommended_model: opus
-  notes: 'Done when #220''s rule-fix files (107 of 129 from the UTF-8 fix) are marked mechanical,
-    run from this item''s branch. basstler-review-triage depends on basstler-rules; a new
-    change kind names the rule. Mark #220 only once windows-suite stops pushing. Stack on the
-    highest pushed pattern-fixes branch (#227 or #228, else #222). Check: basstler review-triage
-    report 220, run from this branch, lists those files as mechanical.'
+  notes: 'Draft #270 at ff661565, with #227 (a16fe4ba) and #266 (speed, progress bars, batched
+    marking) merged. Proves a file with the UTF-8 and directory removal fixes (test_rule_fixes).
+    #220 at e6871da0: 109 of 173 mechanical, in 29 s (957 s before #266); no file is proven
+    through the directory removal fix, since #220 dropped ignore_errors and the shutil import
+    by hand. Locally: code-rules, code-modification and review-triage tests pass (393), ruff
+    and code-rules check pass; the full suite was not run. #222 has moved to 6ed0232c since.'
 - id: reduced-review-diff
   title: Show a reviewer only what is left once rule fixes are reversed
   track: pattern-fixes
@@ -100,29 +104,13 @@ items:
   - basstler-packages/uv-workspace
   status: in progress
   recommended_model: opus
-  notes: 'Draft #271 on #270 with #223 merged. A Code-Modification-Plan trailer names the
-    plan and the basstler release; --plan commit=plan for older commits. The triage rebuilds
-    and replays it on the base (ReplayedPlanChange); on #223 685 files are proven and 118 need
-    review, each moved one edited by #223 itself. Replay 30 s, triage 1m26s.'
-- id: mark-223-viewed
-  title: 'Mark #223''s mechanical files viewed'
-  track: pattern-fixes
-  depends_on:
-  - action-plan-triage
-  - basstler-packages/uv-workspace
-  depends_on_pushes_done:
-  - basstler-packages/uv-workspace
-  status: not started
-  recommended_model: haiku
-  performed_by: owner
-  commands:
-  - basstler review-triage report 223
-  - basstler review-triage mark-viewed 223
-  notes: 'Run on your own computer from action-plan-triage''s branch, which carries the proof that #223''s
-    moved files are mechanical, and before you review #223. It waits for uv-workspace''s last push to
-    be recorded (goal pushes-done), and again after any later push to #223. The report lists what will
-    be marked; read it before marking.'
-
+  notes: 'Draft #271 at 094e5abf, restacked onto #270 ff661565 with #223 merged: #266''s modules
+    placed in the workspace (progress in basstler-core with tqdm, templates in basstler-review-triage);
+    CommitTree keeps both reads; plan replay judges in worker processes. #223 at 25bbd5ca:
+    646 of 806 mechanical, 160 need review, in 104 s; the pre-restack head b720068f gives
+    645 of 806 in 489 s (the earlier 685 of 803 was read on an older #223). Locally: review-triage
+    306 pass; rules, git and core fail only 3 Windows-only tests (executable bit, CRLF) present
+    before.'
 - id: recorded-release-replay
   title: Replay a recorded plan with the basstler release its trailer names
   track: pattern-fixes
@@ -130,10 +118,9 @@ items:
   - action-plan-triage
   status: not started
   recommended_model: opus
-  notes: 'When a Code-Modification-Plan trailer names a release other than the running one,
-    install that tagged release into a cached environment and replay the plan with its
-    builder, so a later builder change cannot unmake an older proof.'
-
+  notes: When a Code-Modification-Plan trailer names a release other than the running one,
+    install that tagged release into a cached environment and replay the plan with its builder,
+    so a later builder change cannot unmake an older proof.
 - id: verified-action-commits
   title: Trust a plan's commit without replay when the tool's own verified identity made it
   track: pattern-fixes
@@ -141,6 +128,7 @@ items:
   - action-plan-triage
   status: not started
   recommended_model: opus
-  notes: 'Commits made and signed by an identity only the tool holds (a key or a CI app),
-    verified by the triage before it trusts them, so nobody can fake one; replay stays the
-    proof for every other commit. Decide the identity and how it is verified.'
+  notes: Commits made and signed by an identity only the tool holds (a key or a CI app), verified
+    by the triage before it trusts them, so nobody can fake one; replay stays the proof for
+    every other commit. Decide the identity and how it is verified.
+landed_item_count: 1

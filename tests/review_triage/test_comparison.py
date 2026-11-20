@@ -61,6 +61,24 @@ def test_a_mechanical_change_is_reported_with_its_kinds(
     ) == MechanicalFile(change, frozenset(kinds))
 
 
+def test_a_future_import_added_is_mechanical():
+    """
+    A ``__future__`` import the head version has and the base version lacks is a change
+    of imports.
+    """
+    with_import = FileSample.IMPORT_ADDED_UNUSED.change().base_text
+    without_import = with_import.split("\n", 2)[2]
+    change = replace(
+        FileSample.IMPORT_ADDED_UNUSED.change(),
+        base_text=without_import,
+        head_text=with_import,
+    )
+
+    assert FileTriager(JudgmentContext()).triage(change) == MechanicalFile(
+        change, frozenset({MechanicalChange.IMPORTS})
+    )
+
+
 @pytest.mark.parametrize(
     "sample",
     [

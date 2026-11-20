@@ -68,11 +68,11 @@ def package_environment_of_the_suite(
 
     :param tmp_path: pytest's per-test temporary directory.
     :param monkeypatch: Sets both variables for this test only.
-    :param python3_directory: Where ``python3`` is, when the interpreter's own
-        directory has none.
+    :param python3_directory: Where ``python3`` is, when the interpreter's own directory
+        has none.
     """
     monkeypatch.setenv(ConfigurationVariable.HOME, str(tmp_path / "basstler-home"))
-    search_path = [str(Path(sys.executable).parent)]
+    search_path = [Path(sys.executable).parent.as_posix()]
     if python3_directory is not None:
         search_path.append(str(python3_directory))
     monkeypatch.setenv(

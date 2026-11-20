@@ -620,7 +620,7 @@ def run_release_step(
         **{
             SearchPathVariable.EXECUTABLE_SEARCH_PATH: os.pathsep.join(
                 [
-                    str(Path(sys.executable).parent),
+                    Path(sys.executable).parent.as_posix(),
                     os.environ[SearchPathVariable.EXECUTABLE_SEARCH_PATH],
                 ]
             ),
@@ -743,7 +743,7 @@ def test_the_release_step_moves_the_plugin_release_branch_to_the_released_plugin
     changed = published_checkout.runner.run(
         "diff",
         "--name-only",
-        f"{merge_commit}:{BasstlerRepositoryLocation.PLUGIN}",
+        f"{merge_commit}:{BasstlerRepositoryLocation.PLUGIN.as_posix()}",
         plugin_commit,
     )
     assert (

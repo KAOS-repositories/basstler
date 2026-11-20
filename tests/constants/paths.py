@@ -1049,6 +1049,23 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
 
 
+class PosixPathTextSnippet(PathEnumeration):
+    """
+    Source files the check for paths turned into text other than as POSIX reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "posix-path-text"
+    """
+    The directory holding them.
+    """
+
+    OTHER_TEXT = DIRECTORY / "other-text.py"
+    """
+    Text that is no path, or a path of a type the module does not show, and paths
+    already written as POSIX text.
+    """
+
+
 class FileUriSnippet(PathEnumeration):
     """
     Source files the check for file URLs built by putting a path after ``file://``

@@ -340,7 +340,9 @@ class GitCommandRunner:
         """
         with tempfile.TemporaryDirectory() as scratch:
             index = {
-                GitVariable.INDEX_FILE: str(Path(scratch) / CommitScratchFile.INDEX)
+                GitVariable.INDEX_FILE: (
+                    Path(scratch) / CommitScratchFile.INDEX
+                ).as_posix()
             }
             self.run("read-tree", parent or "--empty", environment=index)
             blob_file = Path(scratch) / CommitScratchFile.BLOB

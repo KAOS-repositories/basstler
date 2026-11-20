@@ -112,6 +112,7 @@ def test_the_checkers_are_those_of_the_checked_rules():
         PortabilityRules.READ_AND_WRITE_TEXT_THROUGH_TEXT_FILE.checker,
         PortabilityRules.READ_AND_WRITE_TEXT_AS_UTF_8.checker,
         PortabilityRules.BUILD_FILE_URLS_WITH_AS_URI.checker,
+        PortabilityRules.WRITE_PATHS_AS_POSIX_TEXT.checker,
         PortabilityRules.REMOVE_TREES_THROUGH_DIRECTORY_TREE.checker,
     )
 

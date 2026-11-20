@@ -10,6 +10,7 @@ from typing import Annotated
 from pydantic import Field
 
 from basstler.git.branch import Branch
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.pull_request_state import ForkLineage
 from basstler.github.repository import Repository
 from basstler.github.repository_resources import RepositoryRead
@@ -50,15 +51,18 @@ class ParentRepository(ValidatedJSONModel):
         return Repository.parse(self.full_name)
 
 
-class RepositoryPermissions(ValidatedJSONModel):
+class ContentsAccess(RawValueReader):
     """
-    What the account a request authenticated as may do in a repository.
+    Reads the requesting account's role in a repository, as its resource gives it, as
+    the :class:`PermissionLevel` it has on the repository's contents.
     """
 
-    push: bool
-    """
-    Whether it may push branches to the repository.
-    """
+    def read(self, value: dict[str, bool]) -> PermissionLevel | None:
+        if value.get("push"):
+            return PermissionLevel.WRITE
+        if value.get("pull"):
+            return PermissionLevel.READ
+        return None
 
 
 class RepositoryDetails(ValidatedJSONModel):
@@ -81,9 +85,12 @@ class RepositoryDetails(ValidatedJSONModel):
     Whether only the people and tokens granted access can read it.
     """
 
-    permissions: RepositoryPermissions | None = None
+    contents_access: Annotated[
+        PermissionLevel | None, Field(alias="permissions"), ContentsAccess()
+    ] = None
     """
-    What the requesting account may do there, ``None`` when the request was anonymous.
+    What the requesting account may do with the repository's files and branches,
+    ``None`` when it may do neither or the request was anonymous.
     """
 
     parent: ParentRepository | None = None

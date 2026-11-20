@@ -32,6 +32,7 @@ from basstler.exceptions import MalformedEmailAddressError
 from basstler.exit_codes import CommandFailure, PersonalNotesSetupExitCode
 from basstler.git.commands import TransientGitSetting
 from basstler.github.client import GitHubRestClient
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository_access import GitHubRepository
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.tooling_labels import GitHubLabel
@@ -310,13 +311,9 @@ class PersonalNotesSetup:
             logger.info(f"'{repository.full_name}' is owned by '{login}'.")
             return
         details = RepositoryDetailsRead(repository)
-        permissions = details.parse(self.github.client.get(details.path)).permissions
+        access = details.parse(self.github.client.get(details.path)).contents_access
         notes_branch = initial_report.results[SetupCheck.NOTES_BRANCH].status
-        if (
-            notes_branch is not CheckStatus.OK
-            or permissions is None
-            or not permissions.push
-        ):
+        if notes_branch is not CheckStatus.OK or access is not PermissionLevel.WRITE:
             raise ForeignNotesRemoteError(repository, login)
         logger.info(
             f"'{repository.full_name}' is owned by '{repository.owner}'; '{login}' "

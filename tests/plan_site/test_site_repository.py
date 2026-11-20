@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository import NewTokenPage, Repository
 from basstler.plan_site.site_repository import (
-    PermissionLevel,
     SiteRepository,
     TokenFormField,
 )

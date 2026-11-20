@@ -45,7 +45,7 @@ from basstler.review_triage.outputs import (
     ListedFilesAnswer,
     ListedFilesPage,
     ListedPullRequest,
-    ViewedFile,
+    ViewedFilesVariable,
 )
 from basstler.review_triage.renames import Rename, RenameMap
 from basstler.review_triage.triage import TriageOutcome
@@ -169,15 +169,23 @@ class FileListingWriter(GitHubWriter):
     """
 
     @property
+    def markings(self) -> list[GraphQLRequest]:
+        """
+        Every request sent other than the queries for the listing, oldest first.
+        """
+        listing = TextFile(ReviewTriageLocation.PULL_REQUEST_FILES).read()
+        return [request for request in self.sent if request.query != listing]
+
+    @property
     def marked_paths(self) -> list[PurePosixPath]:
         """
-        The path of every file a mutation marked viewed, in the order they were sent.
+        The path of every file a request marked viewed, in the order they were sent.
         """
-        document = TextFile(ReviewTriageLocation.MARK_FILE_AS_VIEWED).read()
         return [
-            ViewedFile.from_json(request.variables).path
-            for request in self.sent
-            if request.query == document
+            PurePosixPath(value)
+            for request in self.markings
+            for name, value in request.variables.items()
+            if name != ViewedFilesVariable.PULL_REQUEST
         ]
 
     def attempt_send(self, write: GitHubWrite) -> GitHubResponse:

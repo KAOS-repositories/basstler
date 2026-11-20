@@ -55,6 +55,11 @@ class RepositoryLocation(PathEnumeration):
     The shell entry points under test.
     """
 
+    REVIEW_TRIAGE_SCRIPT = ROOT / "scripts" / "review-triage.sh"
+    """
+    The script that triages a repository's pull requests without a checkout of basstler.
+    """
+
     WORKFLOWS = ROOT / ".github" / "workflows"
     """
     The repository's Actions workflows.
@@ -383,6 +388,11 @@ class DatasetLocation(PathEnumeration):
     hook script.
     """
 
+    RECORDING_PYTHON_STUB = STUBS / "recording_python.sh"
+    """
+    An interpreter that runs nothing and records the arguments it is given.
+    """
+
     DISPATCH_CHECK_NEEDS_SETUP_STUB = STUBS / "dispatch_check_needs_setup.py"
     """
     A module standing in for :mod:`basstler.plan_site.dispatch_check`, reporting a
@@ -464,6 +474,20 @@ class DatasetLocation(PathEnumeration):
     REVIEW_TRIAGE = DIRECTORY / "review-triage"
     """
     The file versions, descriptions and pull request the review triage is tested on.
+    """
+
+    CLASS_HEADERS = DIRECTORY / "review-triage" / "class-headers"
+    """
+    A base class, two subclasses naming it on and after the line defining them, and a
+    class only mentioning it.
+    """
+
+    CONFLICTED_MODULE = (
+        DIRECTORY / "review-triage" / "conflicted-module" / "triangle.py.txt"
+    )
+    """
+    A subclass of the class header dataset's base class, left with a merge's conflict
+    markers.
     """
 
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
@@ -1104,6 +1128,11 @@ class TreeRemovalSnippet(PathEnumeration):
     SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
     """
     Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
+    """
+
+    HANDLED_RMTREE = DIRECTORY / "handled-rmtree.py"
+    """
+    A call to :func:`shutil.rmtree` with an error handler, on line 17.
     """
 
 

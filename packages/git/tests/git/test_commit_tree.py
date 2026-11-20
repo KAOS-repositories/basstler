@@ -1,5 +1,6 @@
 """
-Tests for :mod:`basstler.git.commit_tree`: reading every file of a commit.
+Tests for :mod:`basstler.git.commit_tree`: reading and searching the files of one
+commit.
 """
 
 from __future__ import annotations
@@ -11,6 +12,8 @@ import pytest
 
 from basstler.git.commands import GitCommandRunner
 from basstler.git.commit_tree import CommitTree, CommittedFile
+
+from .test_commands import committed_repository
 
 COMMITTED = {
     PurePosixPath("notes.txt"): CommittedFile(b"plain text\n", is_executable=False),
@@ -57,3 +60,19 @@ def test_a_git_command_s_output_is_read_as_bytes(committed_tree: CommitTree):
         committed_tree.git.run_binary("show", f"{committed_tree.commit}:data/blob.bin")
         == blob.content
     )
+
+
+# %% the files a commit holds
+
+
+@pytest.mark.parametrize(
+    ("path", "held"),
+    [("package/__init__.py", True), ("package", False), ("absent.py", False)],
+)
+def test_a_commit_holds_only_its_files(tmp_path: Path, path: str, held: bool):
+    """
+    A commit holds a file at the path of each of its files, not at a directory's.
+    """
+    git, commit = committed_repository(tmp_path, {"package/__init__.py": ""})
+
+    assert CommitTree(git, commit).holds(PurePosixPath(path)) is held

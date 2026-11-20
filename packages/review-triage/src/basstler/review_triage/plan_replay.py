@@ -12,7 +12,12 @@ from pathlib import Path
 from basstler.code_modification.source_tree import SourceTree
 from basstler.git.commands import GIT_TEXT_ENCODING
 from basstler.git.commit_range import CommitRange, FileVersions
-from basstler.review_triage.comparison import ChangeKind, ChangeKinds, FileTriager
+from basstler.review_triage.comparison import (
+    ChangeKind,
+    ChangeKinds,
+    FileTriager,
+    JudgmentContext,
+)
 from basstler.review_triage.recorded_plans import PlanRecord, RecordedPlan
 
 # %% what replaying a plan changes
@@ -136,17 +141,19 @@ class ReplayingFileTriager(FileTriager):
     The plans the triaged commits record, replayed on their base.
     """
 
-    def judged_changes(self, change: FileVersions) -> ChangeKinds | None:
+    def judged_changes(
+        self, change: FileVersions, context: JudgmentContext
+    ) -> ChangeKinds | None:
         """
         :meth:`FileTriager.judged_changes`, judging a text file a replayed plan changed
         against the replayed tree and naming the plan among its kinds.
         """
         plans = self.replay.plans_changing(change)
         if not plans or change.is_binary:
-            return super().judged_changes(change)
+            return super().judged_changes(change, context)
         kinds = frozenset(ReplayedPlanChange[plan.name] for plan in plans)
         replayed = self.replay.replayed_version(change)
         if replayed.base_text is None and replayed.head_text is None:
             return kinds
-        judged = super().judged_changes(replayed)
+        judged = super().judged_changes(replayed, context)
         return None if judged is None else judged | kinds

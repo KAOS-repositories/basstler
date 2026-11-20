@@ -24,6 +24,7 @@ from basstler.review_triage.comparison import (
     MechanicalChange,
     PythonComparison,
 )
+from basstler.review_triage.keyword_arguments import KeywordArgumentComparison
 from basstler.review_triage.moved_definitions import MovedDefinition, MovedDefinitions
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.python_source import LineSpan, PythonSource
@@ -119,10 +120,10 @@ class DefinitionMoveDetection(RenameSource):
         """
         if change.head_text is None:
             return frozenset()
-        head_names = PythonSource(change.head_text).defined_names
+        head_names = PythonSource.from_text(change.head_text).defined_names
         if change.base_text is None:
             return head_names
-        return head_names - PythonSource(change.base_text).defined_names
+        return head_names - PythonSource.from_text(change.base_text).defined_names
 
     @staticmethod
     def removed_names(
@@ -138,8 +139,8 @@ class DefinitionMoveDetection(RenameSource):
             return
         module = base.module_path(change.previous_path or change.path)
         removed = (
-            PythonSource(change.base_text).defined_names
-            - PythonSource(change.head_text).defined_names
+            PythonSource.from_text(change.base_text).defined_names
+            - PythonSource.from_text(change.head_text).defined_names
         )
         for name in sorted(removed):
             yield module, name
@@ -155,7 +156,7 @@ class DefinitionMoveComparison(FileJudgment):
     taken out, and any other Python file as :attr:`comparison` does.
     """
 
-    comparison: PythonComparison = field(default_factory=PythonComparison)
+    comparison: PythonComparison = field(default_factory=KeywordArgumentComparison)
     """
     How what is left of a module, and every other Python file, is compared.
     """
@@ -178,8 +179,8 @@ class DefinitionMoveComparison(FileJudgment):
             if change.base_text is None:
                 return None
             return self.comparison.changes(change, context)
-        head = PythonSource(change.head_text, change.path.parent.parts)
-        base = PythonSource(change.base_text or "", base_path.parent.parts)
+        head = PythonSource.from_text(change.head_text, change.path.parent.parts)
+        base = PythonSource.from_text(change.base_text or "", base_path.parent.parts)
         head_rest = head.without(self.spans(head, arriving, base))
         base_rest = base.without(self.spans(base, leaving, head))
         arrival_kinds = self.arrival_changes(head, arriving, context)

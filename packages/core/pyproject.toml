@@ -27,6 +27,7 @@ dependencies = [
     "nh3>=0.2",
     "pydantic>=2.11",
     "rustworkx>=0.15",
+    "tqdm>=4.66",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -30,8 +30,8 @@ class PathEnumeration(Path, ReprEnum):
 
     def __hash__(self) -> int:
         """
-        Hash as the path does, so a member and its path are one key; the enumeration's own
-        hash would tell them apart.
+        Hash as the path does, so a member and its path are one key; the enumeration's
+        own hash would tell them apart.
         """
         return hash(self.value)
 
@@ -40,7 +40,8 @@ class PathEnumeration(Path, ReprEnum):
         The value of the Enum should be equal to an equivalent Path instance.
 
         :param value: A Path instance to compare.
-        :return: True if the value is equal to an equivalent Path instance, False otherwise.
+        :return: True if the value is equal to an equivalent Path instance, False
+            otherwise.
         """
         return self.value == value
 
@@ -80,10 +81,6 @@ class ShippedPath(PathEnumeration):
     The program a helper session runs without ``basstler``, so it imports nothing of it.
     """
 
-    MARK_FILE_AS_VIEWED = Path("review_triage") / "mark_file_as_viewed.graphql"
-    """
-    The GraphQL mutation marking one file of a pull request viewed.
-    """
 
     PULL_REQUEST_FILES = Path("review_triage") / "pull_request_files.graphql"
     """
@@ -93,8 +90,8 @@ class ShippedPath(PathEnumeration):
 
     GITHUB_REPOSITORY_MODULE = Path("github") / "repository.py"
     """
-    The module whose :class:`basstler.github.repository.Repository` builds every
-    address within a repository.
+    The module whose :class:`basstler.github.repository.Repository` builds every address
+    within a repository.
     """
 
     PLAN_ITEM_MODE_DEFAULTS = Path("plan") / "plan-item-modes.toml"
@@ -343,15 +340,17 @@ class RepositoryStateLocation(PathEnumeration):
 
     PLAN_STATE_SYNC_STAMP = DIRECTORY / "plan-state-sync-sha"
     """
-    The personal-notes commit this clone last read plan state at. The shell
-    configuration's ``PLAN_STATE_SYNC_STAMP`` spells the same name.
+    The personal-notes commit this clone last read plan state at.
+
+    The shell configuration's ``PLAN_STATE_SYNC_STAMP`` spells the same name.
     """
 
     PERSONAL_SETTINGS_SYNC_STAMP = DIRECTORY / "personal-settings-sync-hash"
     """
     The hash of the personal settings last synced into, or saved out of, this clone's
-    local settings. The shell configuration's ``PERSONAL_SETTINGS_SYNC_STAMP`` spells
-    the same name.
+    local settings.
+
+    The shell configuration's ``PERSONAL_SETTINGS_SYNC_STAMP`` spells the same name.
     """
 
 
@@ -427,8 +426,8 @@ class SiteTemplate(PathEnumeration):
         ShippedPath.TEMPLATES / "site_live_progress.js"
     )
     """
-    The hub's and repository indexes' script that recounts every progress card from
-    each repository's pull request listing.
+    The hub's and repository indexes' script that recounts every progress card from each
+    repository's pull request listing.
     """
 
     PLAN_PULL_REQUEST_RECHECK_SCRIPT = INSTALLED_PACKAGE.shipped(
@@ -449,12 +448,10 @@ class BasstlerVariable(EnvironmentVariable):
     """
     The root of the Claude Code plugin whose hooks and skills run this package.
     """
-
     PYTHON = "BASSTLER_PYTHON"
     """
     The interpreter whose environment holds this package, for running its modules.
     """
-
     ENVIRONMENT_DIRECTORY = "BASSTLER_ENVIRONMENT_DIRECTORY"
     """
     The package's environment of the session's project, which every command of the
@@ -478,9 +475,11 @@ class ReviewTriageLocation(PathEnumeration):
     The files the review triage reads beside its modules.
     """
 
-    MARK_FILE_AS_VIEWED = INSTALLED_PACKAGE.shipped(ShippedPath.MARK_FILE_AS_VIEWED)
+    MARK_FILES_AS_VIEWED_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "review_triage_mark_files_viewed.graphql.jinja"
+    )
     """
-    The GraphQL mutation marking one file of a pull request viewed.
+    The GraphQL mutation marking several files of a pull request viewed in one request.
     """
 
     PULL_REQUEST_FILES = INSTALLED_PACKAGE.shipped(ShippedPath.PULL_REQUEST_FILES)
@@ -494,6 +493,13 @@ class ReviewTriageLocation(PathEnumeration):
     )
     """
     The Markdown report of which files of a pull request need review.
+    """
+
+    SUMMARY_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "review_triage_summary.md.jinja"
+    )
+    """
+    The sentence of the report counting the files that need review.
     """
 
     MARK_VIEWED_SETUP_TEMPLATE = INSTALLED_PACKAGE.shipped(
@@ -553,8 +559,8 @@ class PluginLocation(PathEnumeration):
 
     ENTRY_POINT_SCRIPT = HOOKS / "basstler.sh"
     """
-    Runs one module of the package once the package is ready to run, saying in one
-    line why when it cannot be.
+    Runs one module of the package once the package is ready to run, saying in one line
+    why when it cannot be.
     """
 
     SESSION_START_SCRIPT = HOOKS / "session-start.sh"
@@ -576,8 +582,8 @@ class PluginLocation(PathEnumeration):
 
     PERSONAL_NOTES_SAVING_SCRIPT = HOOKS / "save-personal-notes.sh"
     """
-    Saves the personal notes in the project's local instructions back to the
-    personal-notes branch.
+    Saves the personal notes in the project's local instructions back to the personal-
+    notes branch.
     """
 
     SETUP_CHECK_SCRIPT = HOOKS / "check-setup.sh"
@@ -764,7 +770,7 @@ class WorkflowLocation(PathEnumeration):
 
     PLAN_SITE_BUILD = DIRECTORY / "plan-site-build.yml"
     """
-    basstler's reusable workflow that builds and deploys the plan site.
+    Basstler's reusable workflow that builds and deploys the plan site.
     """
 
     PLAN_SITE = DIRECTORY / "plan-site.yml"
@@ -785,7 +791,7 @@ class WorkflowLocation(PathEnumeration):
 
     REVIEW_TRIAGE_MARK_VIEWED = DIRECTORY / "review-triage-mark-viewed.yml"
     """
-    basstler's reusable workflow that marks a pull request's mechanical files viewed.
+    Basstler's reusable workflow that marks a pull request's mechanical files viewed.
     """
 
     MARK_VIEWED = DIRECTORY / "mark-viewed.yml"
@@ -804,29 +810,24 @@ class ClaudeCodeVariable(EnvironmentVariable):
     """
     The root of the project the session runs in.
     """
-
     PLUGIN_ROOT = "CLAUDE_PLUGIN_ROOT"
     """
     The plugin's installation directory, which Claude Code also substitutes into a
     plugin skill's own instructions when it loads them.
     """
-
     REMOTE = "CLAUDE_CODE_REMOTE"
     """
-    :attr:`~basstler.environment.EnvironmentFlag.TRUE` in a Claude Code cloud session, whose proxy answers GitHub's REST API but
-    not its GraphQL API.
+    :attr:`~basstler.environment.EnvironmentFlag.TRUE` in a Claude Code cloud session,
+    whose proxy answers GitHub's REST API but not its GraphQL API.
     """
-
     SESSION_IDENTIFIER = "CLAUDE_CODE_SESSION_ID"
     """
     The session's own identifier, which names its transcript file.
     """
-
     CONFIGURATION_DIRECTORY = "CLAUDE_CONFIG_DIR"
     """
     Where Claude Code keeps its state, transcripts included, when not ``~/.claude``.
     """
-
     GIT_BASH_PATH = "CLAUDE_CODE_GIT_BASH_PATH"
     """
     The bash Claude Code runs its commands in on Windows, when set.

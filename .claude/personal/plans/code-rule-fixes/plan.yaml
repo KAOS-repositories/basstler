@@ -60,11 +60,12 @@ items:
   - rule-fixes
   status: in progress
   recommended_model: opus
-  notes: 'Two patterns #220 applied by hand: a file:// URL built from a path becomes Path.as_uri();
-    str(path) in git or shell command text becomes as_posix(), only if a checker can tell
-    reliably that it sits in command text, otherwise that half is dropped and the item says
-    so. Done when code-rules fix reproduces #220''s hand edits and rule-fix-triage marks those
-    files mechanical.'
+  notes: >
+    Draft #228 at dff36388, stacked on #227. Adds FileUriChecker (as_uri) and
+    WRITE_PATHS_AS_POSIX_TEXT: str(path), f-string path fields and bare os.path.relpath become
+    as_posix(), for paths the module shows statically (path enum members from absolute imports,
+    pathlib calls and what is built from them). Repository violations fixed; on Windows 7 old
+    failures pass and nothing new fails. CI not read. Next: review, after #227.
 - id: rule-fix-triage
   title: Prove a file mechanical when recomputing a rule's fix on the base reproduces the
     head

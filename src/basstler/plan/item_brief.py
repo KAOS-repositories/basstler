@@ -7,7 +7,8 @@ Usage:
     python -m basstler.plan.item_brief --plan <plan-id> (--item <item-id> | --branch <branch>)
 
 Run from the project, whose personal-notes branch it fetches. The dependencies' live
-state is read from GitHub with the token the environment carries. Prints YAML.
+state is read from GitHub with the token the environment carries; a fork's upstream is
+never read, so it need not be reachable. Prints YAML.
 """
 
 from __future__ import annotations
@@ -280,10 +281,12 @@ class ItemBriefCommandLine:
 def main() -> int:
     """
     Print the brief the command line asks for, reading live state from GitHub.
+
+    :return: The process exit code.
     """
     ItemBriefCommandLine.run(
         ItemBriefCommandLine.parser().parse_args(),
-        GitHubPullRequestSource.from_environment(),
+        GitHubPullRequestSource.from_environment(reads_upstream_pull_requests=False),
         Path.cwd(),
     )
     return 0

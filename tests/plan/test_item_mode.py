@@ -148,8 +148,9 @@ def test_the_report_names_where_a_personal_setting_would_go(
     where to put one without deriving the path itself.
     """
     report = resolve(mode_repository, PlanItemSkill.KICKOFF)
-    assert report[ReportKey.PERSONAL_SETTING_PATH] == str(
-        ProjectLocation.PERSONAL_PLAN_ITEM_MODES
+    assert (
+        report[ReportKey.PERSONAL_SETTING_PATH]
+        == ProjectLocation.PERSONAL_PLAN_ITEM_MODES.as_posix()
     )
 
 

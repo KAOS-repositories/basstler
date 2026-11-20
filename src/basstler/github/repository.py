@@ -519,3 +519,11 @@ class PullRequestReference(HasRepository):
         The pull request's address in GitHub's REST pulls API.
         """
         return f"{GitHubAddress.API}/{self.repository.pull_request_path(self.number)}"
+
+    @property
+    def head_reference(self) -> str:
+        """
+        The ref the repository keeps the pull request's head commit under, whichever
+        repository its branch is on.
+        """
+        return f"refs/pull/{self.number}/head"

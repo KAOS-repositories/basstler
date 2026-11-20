@@ -1,6 +1,6 @@
 {{ marker }}
-{% if receiver %}
-@{{ receiver }}, this
+{% if receiver_login %}
+@{{ receiver_login }}, this
 {% else %}
 This
 {% endif %}
@@ -20,7 +20,8 @@ basstler plan-handover import
 
 That finds this pull request, saves every plan, progress note and repository rule onto
 your personal-notes branch, then closes it. With several handovers open, name this one
-with `--pull-request`. Start an item with `/plan-item-kickoff <plan-id> <item-id>`
+with `--pull-request`,
+or take them all over with `--all`. Start an item with `/plan-item-kickoff <plan-id> <item-id>`
 and continue one that is underway with `/plan-item-resolve <plan-id> <item-id>`.
 
 **Without basstler**, open [`{{ location.PULL_REQUEST_DIRECTORY }}/{{ location.GUIDE }}`]({{ guide_url }}): it

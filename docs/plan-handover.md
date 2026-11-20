@@ -30,13 +30,13 @@ items depend on a plan left out is refused.
 theirs, or yours for a collaborator:
 
 ```bash
-basstler plan-handover offer <plan-id> [<plan-id>...] --to <owner>/<repository> [--receiver <login>] [--base <branch>]
+basstler plan-handover offer <plan-id> [<plan-id>...] --receiver-repository <owner>/<repository> [--receiver-login <login>] [--base <branch>]
 ```
 
 It commits the handover under `plan-handover/` on top of the base branch (the
 repository's default branch unless `--base` names another), pushes it to a
 `basstler/plan-handover/...` branch of your `origin`, and opens the pull request,
-mentioning `--receiver`. Its files are what the receiver reviews; it is never merged.
+mentioning `--receiver-login`. Its files are what the receiver reviews; it is never merged.
 Offering the same plans again updates the pull request. With `--close-pull-requests`,
 the open pull requests of the plans' underway items on your repository are closed, each
 with a comment linking the handover pull request; the receiver's import continues them
@@ -68,10 +68,11 @@ repository the pull request is on:
 basstler plan-handover import
 ```
 
-It finds the handover pull request open there (name one with `--pull-request <number>`
-when several are), saves each plan onto their notes branch after the plans it depends
+It finds the handover pull request open there, saves each plan onto their notes branch after the plans it depends
 on, so every save is validated as any other is, then their progress notes and rules, and
-closes the pull request. Running it again after a failure reuses the branches and pull
+closes the pull request. When several are open it lists them and takes none over: name
+one with `--pull-request <number>`, or take them all over, oldest first, with `--all`.
+Running it again after a failure reuses the branches and pull
 requests it already continued. Given a directory instead, `basstler plan-handover import
 <directory>` reads it from there. It refuses a plan their notes branch already holds,
 before saving anything. Items then start with `/plan-item-kickoff` and continue with
@@ -87,7 +88,7 @@ Handing over leaves your notes branch as it was. Once the receiver has imported 
 plans into their fork, delete your copies of the underway items' branches:
 
 ```bash
-basstler plan-handover delete-branches <plan-id> [<plan-id>...] --to <owner>/<repository>
+basstler plan-handover delete-branches <plan-id> [<plan-id>...] --receiver-repository <owner>/<repository>
 ```
 
 It deletes the branch of every unmerged pull request of those items on your repository
@@ -97,5 +98,12 @@ cannot delete a pull request: closed, it stays listed with its review threads. R
 before removing the plans, since it reads them from your notes branch.
 
 Then remove the plans from your notes branch, or keep them to follow along: both of you
-then see the same pull requests' live state. A plan another of your plans depends on cannot be removed
-until that dependency is dropped or the item it names is done.
+then see the same pull requests' live state. To remove them:
+
+```bash
+basstler plan-handover remove <plan-id> [<plan-id>...]
+```
+
+It removes the plans and their items' progress notes. A plan that another of your plans
+depends on is refused, naming the items that depend on it, until those dependencies are
+dropped or that plan is removed with it.

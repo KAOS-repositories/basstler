@@ -24,6 +24,7 @@ from basstler.plan.exceptions import (
     HandoverPlanCycleError,
     PlanAlreadyTrackedError,
     PlanOutsideHandoverError,
+    PlanStillNamedError,
 )
 from basstler.plan.item_bootstrap.documents import (
     PlanDocuments,
@@ -116,7 +117,7 @@ class HandoverPlan:
             roadmap_text=self.roadmap_text,
         )
 
-    def rehomed(self, repository: Repository) -> HandoverPlan:
+    def moved_to_repository(self, repository: Repository) -> HandoverPlan:
         """
         :param repository: The repository the receiver's checkout is a clone of.
         :return: This plan with *repository* as its default, every item that already
@@ -402,9 +403,9 @@ class PlanHandover:
 
     def save_to_notes_branch(self, *, project_root: Path) -> None:
         """
-        Save every plan onto the notes branch after the plans it depends on, each
-        :meth:`HandoverPlan.rehomed` onto the checkout's repository, then the progress
-        notes and the repository's rules, merged into those already there.
+        Save every plan onto the notes branch after the plans it depends on, each moved
+        onto the checkout's repository, then the progress notes and the repository's
+        rules, merged into those already there.
 
         :param project_root: The repository whose notes branch receives the handover.
         :raises PlanAlreadyTrackedError: If the notes branch already holds one of the
@@ -429,7 +430,7 @@ class PlanHandover:
         )
         for plan in self.plans_in_saving_order:
             PlanSaveScript(plan_identifier=plan.identifier, read_at=read_at).run(
-                version=plan.rehomed(checkout_repository).version,
+                version=plan.moved_to_repository(checkout_repository).version,
                 project_root=project_root,
             )
         store = RepositoryRulesStore.from_project_root(project_root)
@@ -446,6 +447,61 @@ class PlanHandover:
             NotesFileChanges(changes),
             "Import the progress notes and rules of handed-over plans "
             f"{', '.join(plan.identifier for plan in self.plans)}",
+        )
+
+    def remove_from_notes_branch(self, *, project_root: Path) -> None:
+        """
+        Remove every plan and its items' progress notes from the notes branch.
+
+        :param project_root: The repository whose notes branch holds the plans.
+        :raises PlanStillNamedError: If a plan staying on the notes branch depends on an
+            item of one of them; nothing is removed.
+        """
+        checkout = ProjectCheckout(project_root)
+        checkout.fetch_notes_branch()
+        removed = {plan.identifier for plan in self.plans}
+        staying = [
+            PlanManifest.from_yaml(
+                checkout.run_git(
+                    "show", FetchedBranchReference.PERSONAL_NOTES.file_at(path)
+                )
+            )
+            for path in checkout.notes_branch_paths(ProjectLocation.PLANS)
+            if path.name == PlanDocument.MANIFEST.value
+            and path.parent.name not in removed
+        ]
+        for plan in self.plans:
+            named_by = tuple(
+                DependencyReference(item.identifier, manifest.identifier).text
+                for manifest in staying
+                for item in manifest.items
+                if any(
+                    DependencyReference.from_text(entry).plan_id == plan.identifier
+                    for entry in item.dependencies
+                )
+            )
+            if named_by:
+                raise PlanStillNamedError(
+                    plan_identifier=plan.identifier, named_by=named_by
+                )
+        changes: dict[PurePosixPath, str | None] = {
+            PurePosixPath(
+                PlanDocument.MANIFEST.path_within_notes_branch(plan.identifier)
+            ).parent: None
+            for plan in self.plans
+        }
+        changes.update(
+            {
+                PurePosixPath(ProjectLocation.PULL_REQUEST_PROGRESS)
+                / self.progress_note_path(branch): None
+                for branch in self.progress_notes
+            }
+        )
+        NotesBranchWriter(
+            RepositoryRulesStore.from_project_root(project_root).branch
+        ).write(
+            NotesFileChanges(changes),
+            f"Remove handed-over plans {', '.join(sorted(removed))}",
         )
 
 

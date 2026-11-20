@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, Any
 from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, ManifestToolsExitCode
-from basstler.github.repository import Repository
+from basstler.github.repository import PullRequestReference, Repository
+from basstler.plan.handover_options import PlanHandoverOption
 
 if TYPE_CHECKING:
     from basstler.plan.merge import PlanPart
@@ -730,8 +731,9 @@ class PlanAlreadyTrackedError(DataclassException, FileExistsError):
 @dataclass
 class HandoverPullRequestNotChosenError(DataclassException, LookupError):
     """
-    Raised when the open handover pull requests of a repository do not name exactly one
-    to take over.
+    Raised when the open handover pull requests of a repository do not settle which to
+    take over: none is open, the one asked for is not, or several are and neither one
+    nor all of them was asked for.
     """
 
     repository: Repository
@@ -739,9 +741,9 @@ class HandoverPullRequestNotChosenError(DataclassException, LookupError):
     The repository the handover pull requests were looked for on.
     """
 
-    offered_numbers: tuple[int, ...]
+    offered: tuple[PullRequestReference, ...]
     """
-    The numbers of every handover pull request open there.
+    Every handover pull request open there.
     """
 
     requested_number: int | None
@@ -750,21 +752,60 @@ class HandoverPullRequestNotChosenError(DataclassException, LookupError):
     """
 
     def error_message(self) -> str:
-        offered = ", ".join(f"#{number}" for number in self.offered_numbers) or "none"
+        offered = "".join(
+            f"\n  #{pull_request.number}: {pull_request.url}"
+            for pull_request in self.offered
+        )
+        if not self.offered:
+            return f"{self.repository.full_name} has no open handover pull request"
         if self.requested_number is not None:
             return (
                 f"#{self.requested_number} is no open handover pull request on "
-                f"{self.repository.full_name}; open there: {offered}"
+                f"{self.repository.full_name}; open there:{offered}"
             )
         return (
-            f"{self.repository.full_name} has {len(self.offered_numbers)} open handover "
-            f"pull requests, not one: {offered}"
+            f"{self.repository.full_name} has {len(self.offered)} open handover pull "
+            f"requests:{offered}"
         )
 
     def suggest_correction(self) -> str:
-        if not self.offered_numbers:
+        if not self.offered:
             return (
                 "Ask the sender to offer the plans to this repository with "
                 "'basstler plan-handover offer', or import the directory they sent."
             )
-        return "Name the one to take over with --pull-request."
+        return (
+            f"Take them all over with {PlanHandoverOption.ALL}, or name the one to "
+            f"take over with {PlanHandoverOption.PULL_REQUEST}."
+        )
+
+
+@dataclass
+class PlanStillNamedError(DataclassException, ValueError):
+    """
+    Raised when a plan to be removed from the notes branch holds an item that a plan
+    staying there still depends on.
+    """
+
+    plan_identifier: str
+    """
+    The plan to be removed.
+    """
+
+    named_by: tuple[str, ...]
+    """
+    Every item staying on the notes branch that depends on one of its items, as ``<plan-
+    id>/<item-id>``.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"plan {self.plan_identifier!r} is still depended on by "
+            f"{', '.join(self.named_by)}"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Drop those dependencies, or remove the plans holding them together with "
+            "it."
+        )

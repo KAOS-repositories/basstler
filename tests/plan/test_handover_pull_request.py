@@ -22,7 +22,7 @@ from basstler.plan.exceptions import HandoverPullRequestNotChosenError
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.handover import HandoverPlan, PlanHandover
 from basstler.plan.handover_continuation import ContinuedHandover, HandoverImport
-from basstler.plan.handover_originals import OriginalPullRequests
+from basstler.plan.handover_originals import SenderOriginalPullRequests
 from basstler.plan.handover_pull_request import (
     HandoverOffer,
     HandoverPullRequestDescription,
@@ -171,41 +171,48 @@ def offer_to_receiver(
     client: PullRequestHostingClient,
     *,
     closes_pull_requests: bool = False,
+    plan_identifiers: tuple[HandedOverPlan, ...] = tuple(HandedOverPlan),
 ) -> HandoverOffer:
     """
-    Offer the dataset's plans from the sender's notes branch to the receiver's fork.
+    Offer plans of the dataset from the sender's notes branch to the receiver's fork.
 
     :param sender: The sender's clone.
     :param client: Hosts the receiver's pull requests.
     :param closes_pull_requests: Whether the sender's underway pull requests are closed.
+    :param plan_identifiers: The plans offered.
     :return: The offer made.
     """
     offer = HandoverOffer(
         handover=PlanHandover.from_notes_branch(
             project_root=sender.project_root,
-            plan_identifiers=list(HandedOverPlan),
+            plan_identifiers=list(plan_identifiers),
         ),
         base=RepositoryBranch(repository=RECEIVERS_FORK, name="main"),
-        receiver=RECEIVERS_FORK.owner,
+        receiver_login=RECEIVERS_FORK.owner,
         git=sender.git,
     )
-    offered = offer.offer(client=client)
+    offered = offer.push_and_open_pull_request(client=client)
     if closes_pull_requests:
-        originals(sender, client, offer.handover).close(handover_pull_request=offered)
+        originals(sender, client, offer.handover).close_open_originals(
+            handover_pull_request=offered
+        )
     return offer
 
 
 def originals(
     sender: ScratchRepository, client: PullRequestHostingClient, handover: PlanHandover
-) -> OriginalPullRequests:
+) -> SenderOriginalPullRequests:
     """
     :param sender: The sender's clone.
     :param client: Serves the sender's pull requests.
     :param handover: The handover offered.
     :return: The sender's pull requests of its underway items.
     """
-    return OriginalPullRequests(
-        handover=handover, receiver=RECEIVERS_FORK, git=sender.git, client=client
+    return SenderOriginalPullRequests(
+        handover=handover,
+        receiver_repository=RECEIVERS_FORK,
+        git=sender.git,
+        client=client,
     )
 
 
@@ -371,7 +378,7 @@ def take_over(
     :param requested_number: The handover pull request asked for.
     :return: The handover as taken over.
     """
-    return HandoverPullRequests(git=receiver.git).take_over(
+    (continued,) = HandoverPullRequests(git=receiver.git).import_and_close(
         importing=HandoverImport(
             project_root=receiver.project_root,
             client=client,
@@ -379,6 +386,7 @@ def take_over(
         ),
         requested_number=requested_number,
     )
+    return continued
 
 
 def saved_manifests(
@@ -399,7 +407,7 @@ def saved_manifests(
     }
 
 
-def test_a_handover_left_underway_is_rehomed_onto_the_receivers_fork(
+def test_a_handover_left_underway_is_moved_onto_the_receivers_fork(
     sender_reaching_the_receiver: ScratchRepository,
     receivers_fork: ScratchRepository,
     hosting_client: PullRequestHostingClient,
@@ -415,7 +423,7 @@ def test_a_handover_left_underway_is_rehomed_onto_the_receivers_fork(
     take_over(receivers_fork, hosting_client, continues_underway_work=False)
 
     assert saved_manifests(receivers_fork, offered.handover.plans, tmp_path) == {
-        plan.identifier: plan.rehomed(RECEIVERS_FORK).manifest.content
+        plan.identifier: plan.moved_to_repository(RECEIVERS_FORK).manifest.content
         for plan in offered.handover.plans
     }
     assert [type(write) for write in hosting_client.sent[1:]] == [
@@ -443,12 +451,12 @@ def test_underway_items_continue_in_pull_requests_on_the_receivers_fork(
 
     receivers_remote = hosting_client.bare_remote_of(RECEIVERS_FORK)
     assert {
-        continuation.original.head.name: receivers_remote.commit_at(
-            f"refs/heads/{continuation.original.head.name}"
+        continuation.original.summary.head.name: receivers_remote.commit_at(
+            f"refs/heads/{continuation.original.summary.head.name}"
         )
         for continuation in continued.continuations
     } == {
-        continuation.original.head.name: continuation.original.head.object_hash
+        continuation.original.summary.head.name: continuation.original.summary.head.object_hash
         for continuation in continued.continuations
     }
     reopened = {
@@ -462,21 +470,18 @@ def test_underway_items_continue_in_pull_requests_on_the_receivers_fork(
         )
         for continuation in continued.continuations
     ] == [
-        (continuation.original.head.name, continuation.original.base.name)
+        (
+            continuation.original.summary.head.name,
+            continuation.original.summary.base.name,
+        )
         for continuation in continued.continuations
     ]
     assert saved_manifests(receivers_fork, offered.handover.plans, tmp_path) == {
         plan.identifier: plan.manifest.content for plan in continued.handover.plans
     }
     assert {
-        (continuation.plan_identifier, continuation.item_identifier)
-        for continuation in continued.continuations
-    } == {
-        (plan.identifier, item.identifier)
-        for plan in offered.handover.plans
-        for item in plan.manifest.items
-        if item.branch and item.pull_request_number is not None
-    }
+        continuation.original.item for continuation in continued.continuations
+    } == underway_items(offered.handover)
 
 
 def test_a_continued_item_names_its_new_pull_request_on_the_receivers_fork(
@@ -495,13 +500,13 @@ def test_a_continued_item_names_its_new_pull_request_on_the_receivers_fork(
     plans = {plan.identifier: plan for plan in continued.handover.plans}
     assert [
         (
-            plans[continuation.plan_identifier].manifest.repository_of(item),
+            plans[continuation.original.item.plan_id].manifest.repository_of(item),
             item.pull_request_number,
         )
         for continuation in continued.continuations
         for item in [
-            plans[continuation.plan_identifier].manifest.item_named(
-                continuation.item_identifier
+            plans[continuation.original.item.plan_id].manifest.item_named(
+                continuation.original.item.item_identifier
             )
         ]
     ] == [
@@ -520,7 +525,7 @@ def test_an_import_with_no_handover_pull_request_open_names_none(
     with pytest.raises(HandoverPullRequestNotChosenError) as refusal:
         take_over(receivers_fork, hosting_client)
 
-    assert refusal.value.offered_numbers == ()
+    assert refusal.value.offered == ()
 
 
 def test_an_import_of_a_pull_request_not_offered_is_refused(
@@ -540,7 +545,65 @@ def test_an_import_of_a_pull_request_not_offered_is_refused(
             receivers_fork, hosting_client, requested_number=offered["number"] + 1
         )
 
-    assert refusal.value.offered_numbers == (offered["number"],)
+    assert [pull_request.number for pull_request in refusal.value.offered] == [
+        offered["number"]
+    ]
+
+
+def offer_twice(
+    sender: ScratchRepository, client: PullRequestHostingClient
+) -> list[int]:
+    """
+    Offer the upstream plan alone, then every plan, which opens two handover pull
+    requests.
+
+    :param sender: The sender's clone.
+    :param client: Hosts the receiver's pull requests.
+    :return: The numbers of the two pull requests, oldest first.
+    """
+    offer_to_receiver(sender, client, plan_identifiers=(HandedOverPlan.UPSTREAM,))
+    offer_to_receiver(sender, client)
+    return [pull_request["number"] for pull_request in client.pull_requests]
+
+
+def test_several_open_handover_pull_requests_are_named_when_none_is_asked_for(
+    sender_reaching_the_receiver: ScratchRepository,
+    receivers_fork: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    With two handovers open and neither one nor all asked for, the import takes none
+    over and names both.
+    """
+    numbers = offer_twice(sender_reaching_the_receiver, hosting_client)
+
+    with pytest.raises(HandoverPullRequestNotChosenError) as refusal:
+        take_over(receivers_fork, hosting_client)
+
+    assert [pull_request.number for pull_request in refusal.value.offered] == numbers
+    assert [pull_request["state"] for pull_request in hosting_client.pull_requests] == [
+        "open",
+        "open",
+    ]
+
+
+def test_every_open_handover_pull_request_is_chosen_when_all_are_asked_for(
+    sender_reaching_the_receiver: ScratchRepository,
+    receivers_fork: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    Asked for all of them, the import takes every open handover over, oldest first.
+    """
+    numbers = offer_twice(sender_reaching_the_receiver, hosting_client)
+
+    chosen = HandoverPullRequests(
+        git=receivers_fork.git
+    ).choose_pull_requests_to_take_over(
+        client=hosting_client, requested_number=None, takes_every_one=True
+    )
+
+    assert [pull_request.number for pull_request in chosen] == numbers
 
 
 def test_the_receivers_repository_is_the_one_its_origin_configures(
@@ -560,13 +623,13 @@ def test_the_receivers_repository_is_the_one_its_origin_configures(
 # %% the sender's originals
 
 
-def underway_items(handover: PlanHandover) -> set[tuple[str, str]]:
+def underway_items(handover: PlanHandover) -> set[DependencyReference]:
     """
     :param handover: A handover of the dataset's plans.
-    :return: Every item naming a branch and a pull request, by plan and item id.
+    :return: Every item naming a branch and a pull request.
     """
     return {
-        (plan.identifier, item.identifier)
+        DependencyReference(item_identifier=item.identifier, plan_id=plan.identifier)
         for plan in handover.plans
         for item in plan.manifest.items
         if item.branch and item.pull_request_number is not None
@@ -630,8 +693,7 @@ def test_items_whose_originals_were_closed_on_offering_still_continue(
     continued = take_over(receivers_fork, hosting_client)
 
     assert {
-        (continuation.plan_identifier, continuation.item_identifier)
-        for continuation in continued.continuations
+        continuation.original.item for continuation in continued.continuations
     } == underway_items(offered.handover)
 
 
@@ -649,12 +711,12 @@ def test_no_original_is_closed_when_the_receiver_works_in_the_senders_repository
     )
 
     assert (
-        OriginalPullRequests(
+        SenderOriginalPullRequests(
             handover=handover,
-            receiver=sender_repository(),
+            receiver_repository=sender_repository(),
             git=sender_reaching_the_receiver.git,
             client=hosting_client,
-        ).unmerged()
+        ).read_unmerged()
         == []
     )
 
@@ -673,12 +735,11 @@ def test_branches_are_deleted_once_the_receivers_fork_holds_them(
 
     deletions = originals(
         sender_reaching_the_receiver, hosting_client, offered.handover
-    ).delete_branches()
+    ).delete_continued_branches()
 
-    assert {
-        (original.plan_identifier, original.item_identifier)
-        for original in deletions.deleted
-    } == underway_items(offered.handover)
+    assert {original.item for original in deletions.deleted} == underway_items(
+        offered.handover
+    )
     assert deletions.kept == ()
     assert sender_branches(hosting_client) == set()
     assert {
@@ -700,13 +761,12 @@ def test_branches_the_receivers_fork_lacks_are_kept(
 
     deletions = originals(
         sender_reaching_the_receiver, hosting_client, offered.handover
-    ).delete_branches()
+    ).delete_continued_branches()
 
     assert deletions.deleted == ()
-    assert {
-        (original.plan_identifier, original.item_identifier)
-        for original in deletions.kept
-    } == underway_items(offered.handover)
+    assert {original.item for original in deletions.kept} == underway_items(
+        offered.handover
+    )
     assert sender_branches(hosting_client) == branches
     assert {
         pull_request["state"]

@@ -16,13 +16,14 @@ from basstler.plan.exceptions import (
     HandoverPlanCycleError,
     PlanAlreadyTrackedError,
     PlanOutsideHandoverError,
+    PlanStillNamedError,
 )
 from basstler.plan.handover import HandoverGuide, HandoverPlan, PlanHandover
 from basstler.plan.model import ManifestKey, PlanDocument, PlanManifest
 from basstler.plan.repository_rules import RepositoryRules
 
 from ..scratch_repository import ScratchRepository
-from .conftest import RECEIVERS_FORK, HandedOverPlan
+from .conftest import RECEIVERS_FORK, UNRELATED_BRANCH, HandedOverPlan
 
 # %% the dataset handover
 
@@ -299,32 +300,101 @@ def test_an_import_refuses_a_plan_the_notes_branch_already_holds_and_saves_nothi
     ] == [upstream.identifier]
 
 
+# %% removing handed-over plans
+
+
+def test_removing_handed_over_plans_leaves_only_what_they_do_not_carry(
+    exporting_repository: ScratchRepository, tmp_path: Path
+):
+    """
+    Removing the plans deletes them and their items' progress notes from the notes
+    branch, and keeps the progress note of a branch no plan names.
+    """
+    handover = PlanHandover.from_notes_branch(
+        project_root=exporting_repository.project_root,
+        plan_identifiers=list(HandedOverPlan),
+    )
+
+    handover.remove_from_notes_branch(project_root=exporting_repository.project_root)
+
+    checkout = exporting_repository.clone_notes_branch(tmp_path / "notes")
+    assert (
+        list(
+            (checkout / ProjectLocation.PLANS).glob(f"*/{PlanDocument.MANIFEST.value}")
+        )
+        == []
+    )
+    assert [
+        path.relative_to(checkout / ProjectLocation.PULL_REQUEST_PROGRESS)
+        for path in (checkout / ProjectLocation.PULL_REQUEST_PROGRESS).rglob("*")
+        if path.is_file()
+    ] == [PlanHandover.progress_note_path(UNRELATED_BRANCH)]
+
+
+def test_a_plan_another_plan_still_depends_on_is_not_removed(
+    exporting_repository: ScratchRepository,
+    dataset_handover: PlanHandover,
+    tmp_path: Path,
+):
+    """
+    The plan staying on the notes branch would name an item that no longer exists, so
+    the removal is refused, naming its item, and nothing is removed.
+    """
+    downstream = plan_named(dataset_handover, HandedOverPlan.DOWNSTREAM)
+    upstream_only = PlanHandover.from_notes_branch(
+        project_root=exporting_repository.project_root,
+        plan_identifiers=[HandedOverPlan.UPSTREAM],
+    )
+
+    with pytest.raises(PlanStillNamedError) as refusal:
+        upstream_only.remove_from_notes_branch(
+            project_root=exporting_repository.project_root
+        )
+
+    assert refusal.value.named_by == tuple(
+        DependencyReference(item.identifier, plan.identifier).text
+        for plan in [downstream]
+        for item in plan.manifest.items
+        if any(
+            DependencyReference.from_text(entry).plan_id == HandedOverPlan.UPSTREAM
+            for entry in item.dependencies
+        )
+    )
+    checkout = exporting_repository.clone_notes_branch(tmp_path / "notes")
+    assert sorted(
+        path.parent.name
+        for path in (checkout / ProjectLocation.PLANS).glob(
+            f"*/{PlanDocument.MANIFEST.value}"
+        )
+    ) == sorted(HandedOverPlan)
+
+
 # %% moving onto the receiver's repository
 
 
-def test_a_plan_rehomed_keeps_its_started_items_where_their_work_is(
+def test_a_plan_moved_to_another_repository_keeps_its_started_items_where_their_work_is(
     dataset_handover: PlanHandover,
 ):
     """
-    Items with a branch or pull request stay on the repository they are on, items not
-    started follow the new default, and the tracking issue, a number on the old default,
-    is dropped.
+    Started items stay on their repository, the others follow the new default, and the
+    tracking issue, a number on the old default, is dropped; an import first reopens the
+    underway items' pull requests on the receiver's repository.
     """
     upstream = plan_named(dataset_handover, HandedOverPlan.UPSTREAM)
 
-    rehomed = upstream.rehomed(RECEIVERS_FORK).manifest
+    moved = upstream.moved_to_repository(RECEIVERS_FORK).manifest
 
-    assert rehomed.default_repository == RECEIVERS_FORK
-    assert [rehomed.repository_of(item) for item in rehomed.items] == [
+    assert moved.default_repository == RECEIVERS_FORK
+    assert [moved.repository_of(item) for item in moved.items] == [
         upstream.manifest.default_repository
         if item.branch or item.pull_request_number is not None
         else RECEIVERS_FORK
         for item in upstream.manifest.items
     ]
-    assert ManifestKey.TRACKING_ISSUE.key not in rehomed.content
+    assert ManifestKey.TRACKING_ISSUE.key not in moved.content
 
 
-def test_a_plan_already_on_the_receivers_repository_is_not_rehomed(
+def test_a_plan_already_on_the_receivers_repository_is_not_moved(
     dataset_handover: PlanHandover,
 ):
     """
@@ -332,4 +402,6 @@ def test_a_plan_already_on_the_receivers_repository_is_not_rehomed(
     """
     upstream = plan_named(dataset_handover, HandedOverPlan.UPSTREAM)
 
-    assert upstream.rehomed(upstream.manifest.default_repository) == upstream
+    assert (
+        upstream.moved_to_repository(upstream.manifest.default_repository) == upstream
+    )

@@ -1,41 +1,30 @@
 """
 Continuing a handover's underway items on the receiver's own repository: each item whose
-pull request has not merged has its branch, and the branch it stacks on, pushed there, and
-its pull request opened again from them.
+pull request has not merged has its branch, and the branch it stacks on, pushed there,
+and its pull request opened again from them.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
 from basstler.git.commands import GitCommandRunner
+from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import GitHubClient
 from basstler.github.issue import Issue
 from basstler.github.pull_request import NewPullRequest
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import (
+    PullRequestReference,
+    Repository,
+    RepositoryBranch,
+)
 from basstler.github.repository_access import PullRequestListState
-from basstler.github.rest_models import RestPullRequestSummary
-from basstler.plan.handover import HandoverPlan, PlanHandover
-from basstler.plan.model import PlanItem
+from basstler.plan.handover import PlanHandover
+from basstler.plan.handover_originals import OriginalPullRequest
 from basstler.render_common import TemplatePage
 from basstler.class_property import classproperty
 from basstler.locations import PlanHandoverLocation
-
-# %% where it is kept
-
-
-class UnderwayBranchReference(StrEnum):
-    """
-    Where continuing an item keeps a branch it fetched from the sender's repository.
-    """
-
-    FETCHED = "refs/basstler/plan-handover-underway"
-    """
-    The branch last fetched to be pushed to the receiver's repository.
-    """
-
 
 # %% what was continued
 
@@ -46,22 +35,12 @@ class ItemContinuation:
     An underway item's pull request, opened again on the receiver's repository.
     """
 
-    plan_identifier: str
+    original: OriginalPullRequest
     """
-    The plan holding the item.
-    """
-
-    item_identifier: str
-    """
-    The item's id.
+    The pull request it was started in, which keeps its review threads.
     """
 
-    original: RestPullRequestSummary
-    """
-    The pull request on the sender's repository, which keeps its review threads.
-    """
-
-    continued: Issue
+    continued: PullRequestReference
     """
     The pull request on the receiver's repository the item now names.
     """
@@ -92,9 +71,9 @@ class UnderwayWork:
     """
     Continues the underway items of handed-over plans on the receiver's repository.
 
-    An item is continued when its plan is on another repository and it names a branch
-    and a pull request not merged there. Running it again reuses the branches and pull
-    requests already continued.
+    An item is continued when it names a branch and a pull request not merged on another
+    repository. Running it again reuses the branches and pull requests already
+    continued.
     """
 
     git: GitCommandRunner
@@ -104,7 +83,7 @@ class UnderwayWork:
 
     client: GitHubClient
     """
-    Reads the sender's pull requests and opens the receiver's.
+    Reads the original pull requests and opens the receiver's.
     """
 
     remote: str = "origin"
@@ -119,31 +98,29 @@ class UnderwayWork:
         """
         return Repository.from_configured_remote(self.git, self.remote)
 
-    def continued(self, handover: PlanHandover) -> ContinuedHandover:
+    def continue_underway_items(self, handover: PlanHandover) -> ContinuedHandover:
         """
         :param handover: The handover taken over.
-        :return: It with every plan rehomed onto the receiver's repository and every
+        :return: It with every plan moved onto the receiver's repository and every
             continued item naming its new pull request.
         """
         repository = self.repository
-        continuations = []
-        for plan in handover.plans:
-            if plan.manifest.default_repository == repository:
-                continue
-            for item in plan.manifest.items:
-                if not item.branch or item.pull_request_number is None:
-                    continue
-                continuation = self.continue_item(plan=plan, item=item)
-                if continuation is not None:
-                    continuations.append(continuation)
+        continuations = tuple(
+            self.reopen_on_receiver(original)
+            for original in OriginalPullRequest.read_every_unmerged(
+                handover=handover, receiver_repository=repository, client=self.client
+            )
+        )
         return ContinuedHandover(
             handover=PlanHandover(
                 plans=tuple(
-                    plan.rehomed(repository).with_pull_requests(
+                    plan.moved_to_repository(repository).with_pull_requests(
                         {
-                            continuation.item_identifier: continuation.continued.number
+                            continuation.original.item.item_identifier: (
+                                continuation.continued.number
+                            )
                             for continuation in continuations
-                            if continuation.plan_identifier == plan.identifier
+                            if continuation.original.item.plan_id == plan.identifier
                         }
                     )
                     for plan in handover.plans
@@ -151,82 +128,80 @@ class UnderwayWork:
                 progress_notes=handover.progress_notes,
                 repository_rules=handover.repository_rules,
             ),
-            continuations=tuple(continuations),
+            continuations=continuations,
         )
 
-    def continue_item(
-        self, *, plan: HandoverPlan, item: PlanItem
-    ) -> ItemContinuation | None:
+    def reopen_on_receiver(self, original: OriginalPullRequest) -> ItemContinuation:
         """
-        Push the item's branch and the branch its pull request merges into to the
-        receiver's repository, the latter only where it has none, and open the pull
-        request there as a draft unless one is open already.
+        Copy the original's branch, and the branch it merges into where the receiver's
+        repository has none, to the receiver's repository, and open the pull request
+        there as a draft unless one is open already.
 
-        :param plan: The plan holding the item.
-        :param item: An item naming a branch and a pull request.
-        :raises GitCommandFailedError: If the receiver's repository has the item's branch
-            at another commit.
-        :return: The continuation, ``None`` when the pull request has merged.
+        :param original: An unmerged pull request on another repository.
+        :raises GitCommandFailed: If the receiver's repository has the original's branch
+            at a commit the copy does not descend from.
+        :return: The continuation.
         """
-        source = plan.manifest.repository_of(item)
-        original = RestPullRequestSummary.from_json(
-            self.client.get(source.pull_request_path(item.pull_request_number))
-        )
-        if original.merged:
-            return None
-        self.push_branch(source=source, branch=original.head.name, replace=True)
-        self.push_branch(source=source, branch=original.base.name, replace=False)
         repository = self.repository
+        head = RepositoryBranch(repository=repository, name=original.summary.head.name)
+        base = RepositoryBranch(repository=repository, name=original.summary.base.name)
+        self.copy_branch_to_receiver(
+            RepositoryBranch(repository=original.repository, name=head.name),
+            replace=True,
+        )
+        self.copy_branch_to_receiver(
+            RepositoryBranch(repository=original.repository, name=base.name),
+            replace=False,
+        )
         opening = NewPullRequest(
-            base=RepositoryBranch(repository=repository, name=original.base.name),
-            head=RepositoryBranch(repository=repository, name=original.head.name),
-            title=original.title,
+            base=base,
+            head=head,
+            title=original.summary.title,
             body=(
-                f"Continues {original.page_url}, handed over with basstler; its "
-                "review threads and checks stay there."
+                f"Continues {original.url}, handed over with basstler; its review "
+                "threads and checks stay there."
             ),
         )
         already_open = self.client.get_pages(
             PullRequestListState.OPEN.path_between(opening)
         )
-        continued = (
-            Issue.from_json(already_open[0])
-            if already_open
-            else Issue.from_json(self.client.send(opening))
+        opened = Issue.from_json(
+            already_open[0] if already_open else self.client.send(opening)
         )
         return ItemContinuation(
-            plan_identifier=plan.identifier,
-            item_identifier=item.identifier,
             original=original,
-            continued=continued,
+            continued=PullRequestReference(repository=repository, number=opened.number),
         )
 
-    def push_branch(self, *, source: Repository, branch: str, replace: bool) -> None:
+    def copy_branch_to_receiver(
+        self, branch: RepositoryBranch, *, replace: bool
+    ) -> None:
         """
-        Push *source*'s *branch* to the receiver's repository.
+        Push *branch* to the receiver's repository under the same name.
 
-        :param source: The repository the branch is on.
-        :param branch: The branch.
+        :param branch: A branch of another repository.
         :param replace: Whether to push it where the receiver's repository has it
             already; it is pushed without force either way, so a branch that moved
             elsewhere there is never overwritten.
-        :raises GitCommandFailedError: If the receiver's branch is at a commit the
-            pushed one does not descend from.
+        :raises GitCommandFailed: If the receiver's branch is at a commit the pushed one
+            does not descend from.
         """
-        if not replace and self.git.run("ls-remote", "--heads", self.remote, branch):
+        if (
+            not replace
+            and RemoteBranch(
+                git=self.git, name=branch.name, remote=self.remote
+            ).exists()
+        ):
             return
-        self.git.run(
-            "fetch",
-            "--quiet",
-            "--no-write-fetch-head",
-            source.clone_url,
-            f"+refs/heads/{branch}:{UnderwayBranchReference.FETCHED}",
+        fetched = RemoteBranch(
+            git=self.git, name=branch.name, remote=branch.repository.clone_url
         )
+        fetched.fetch()
         self.git.run(
             "push",
             "--quiet",
             self.remote,
-            f"{UnderwayBranchReference.FETCHED}:refs/heads/{branch}",
+            f"{fetched.local_reference}:{branch.reference}",
         )
 
 
@@ -266,7 +241,7 @@ class HandoverImport:
         continued = (
             UnderwayWork(
                 git=GitCommandRunner(self.project_root), client=self.client
-            ).continued(handover)
+            ).continue_underway_items(handover)
             if self.continues_underway_work
             else ContinuedHandover(handover=handover, continuations=())
         )

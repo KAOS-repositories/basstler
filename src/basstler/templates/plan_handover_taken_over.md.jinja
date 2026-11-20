@@ -7,6 +7,6 @@ originals keep their review threads and can be closed:
 | Item | Original | Continued in |
 | --- | --- | --- |
 {% for continuation in continued.continuations %}
-| `{{ continuation.plan_identifier }}/{{ continuation.item_identifier }}` | {{ continuation.original.page_url }} | {{ continuation.continued.url }} |
+| `{{ continuation.original.item.text }}` | {{ continuation.original.url }} | {{ continuation.continued.url }} |
 {% endfor %}
 {% endif %}

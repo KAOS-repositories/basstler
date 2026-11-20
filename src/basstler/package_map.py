@@ -294,6 +294,7 @@ PACKAGE_MAP = PackageMap(
             Layer.CORE,
             (
                 "bash",
+                "class_name",
                 "class_property",
                 "command_line",
                 "credential_origin",
@@ -386,6 +387,7 @@ PACKAGE_MAP = PackageMap(
                 Distribution.GIT,
                 Distribution.GITHUB,
                 Distribution.REVIEWS,
+                Distribution.REVIEW_TRIAGE,
                 Distribution.STACK,
                 Distribution.PLAN,
                 Distribution.NOTES,

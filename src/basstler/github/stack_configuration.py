@@ -21,6 +21,7 @@ from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, StackExitCode
 from basstler.github.repository import Repository
 from basstler.locations import PackageLocation, ProjectLocation
+from basstler.text_file import TextFile
 
 
 class StackSetting(StrEnum):
@@ -138,9 +139,9 @@ class CommittedStackConfiguration:
         """
         :return: The shipped values, with every key the project sets replaced by its own.
         """
-        values = tomllib.loads(self.shipped.read_text(encoding="utf-8"))
+        values = tomllib.loads(TextFile(self.shipped).read())
         if self.project_file.is_file():
-            values.update(tomllib.loads(self.project_file.read_text(encoding="utf-8")))
+            values.update(tomllib.loads(TextFile(self.project_file).read()))
         return values
 
     def upstream_repository(self) -> Repository:

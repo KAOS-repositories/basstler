@@ -5,53 +5,62 @@ Finds directories removed with :func:`shutil.rmtree` instead of through
 
 from __future__ import annotations
 
-import ast
 import shutil
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+from libcst import matchers
+
 from basstler import directory_tree
-from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.class_property import classproperty
+from basstler.code_modification.patterns import CodePattern
+from basstler.code_modification.positions import PositionedModule
+from basstler.code_rules.checker import CodeRuleViolation
+from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
 from basstler.directory_tree import DirectoryTree
+
+# %% the pattern
+
+
+class TreeRemovalCall(CodePattern):
+    """
+    A call to :func:`shutil.rmtree`.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        return matchers.Call(
+            func=matchers.Attribute(
+                value=matchers.Name(shutil.__name__),
+                attr=matchers.Name(shutil.rmtree.__name__),
+            )
+        )
+
 
 # %% the check
 
 
 @dataclass(frozen=True)
-class TreeRemovalChecker(CodeRuleChecker):
+class TreeRemovalChecker(SyntaxTreeChecker):
     """
     Finds calls to :func:`shutil.rmtree` outside :mod:`basstler.directory_tree`; they stop
     at the read-only object files git leaves on Windows.
     """
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+    def violations_of_module(
+        self, path: Path, module: PositionedModule
+    ) -> Iterator[CodeRuleViolation]:
         if path.resolve() == Path(directory_tree.__file__).resolve():
             return
-        module = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(module):
-            if not self.calls_rmtree(node):
-                continue
+        for occurrence in TreeRemovalCall.found_in(module):
             yield CodeRuleViolation(
                 path,
-                node.lineno,
-                node.end_lineno,
+                occurrence.location.start.line,
+                occurrence.location.end.line,
                 f"removes a directory with {shutil.__name__}."
                 f"{shutil.rmtree.__name__}, which stops at a read-only entry; call "
                 f"{DirectoryTree.__name__}(...).{DirectoryTree.remove.__name__}()",
             )
-
-    @staticmethod
-    def calls_rmtree(node: ast.AST) -> bool:
-        """
-        :return: Whether *node* is a call to :func:`shutil.rmtree`.
-        """
-        return (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == shutil.rmtree.__name__
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == shutil.__name__
-        )

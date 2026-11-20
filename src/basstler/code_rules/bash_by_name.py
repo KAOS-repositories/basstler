@@ -4,70 +4,99 @@ Finds commands that start bash by its name instead of through :class:`basstler.b
 
 from __future__ import annotations
 
-import ast
-import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+import libcst
+from libcst import matchers
+
 from basstler.bash import Bash, LocatedProgram
-from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.class_property import classproperty
+from basstler.code_modification.patterns import CodePattern
+from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.syntax import ExpressionSyntax
+from basstler.code_rules.checker import CodeRuleViolation
+from basstler.code_rules.subprocess_function import SubprocessFunction
+from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
+
+# %% the patterns
+
+
+class BashCommandLine(CodePattern):
+    """
+    A list or tuple whose first element is the bare name of bash.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        bash_first = [
+            matchers.Element(
+                value=matchers.MatchIfTrue(
+                    lambda value: (
+                        ExpressionSyntax(value).literal_text == LocatedProgram.BASH
+                    )
+                )
+            ),
+            matchers.ZeroOrMore(),
+        ]
+        return matchers.OneOf(
+            matchers.List(elements=bash_first), matchers.Tuple(elements=bash_first)
+        )
+
+
+class BashStarted(CodePattern):
+    """
+    A call to a :mod:`subprocess` function, or a return, that hands on a command line
+    starting bash by its name; the command line is saved as :attr:`saved_command_name`.
+    """
+
+    @classproperty
+    def saved_command_name(cls) -> str:
+        """
+        The name the command line is saved under when the pattern matches.
+        """
+        return "command"
+
+    @classproperty
+    def matcher(cls) -> matchers.OneOf:
+        command = matchers.SaveMatchedNode(
+            BashCommandLine.matcher, cls.saved_command_name
+        )
+        return matchers.OneOf(
+            matchers.Return(value=command),
+            matchers.Call(
+                func=SubprocessFunction.matcher,
+                args=[matchers.Arg(value=command), matchers.ZeroOrMore()],
+            ),
+        )
+
 
 # %% the check
 
 
 @dataclass(frozen=True)
-class BashByNameChecker(CodeRuleChecker):
+class BashByNameChecker(SyntaxTreeChecker):
     """
     Finds command lines whose program is bash given by its name, which Windows resolves
     to WSL's launcher: those passed to a :mod:`subprocess` function, and those returned.
     """
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        module = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(module):
-            command = self.command_line(node)
-            if command is None or not self.starts_bash_by_name(command):
-                continue
+    def violations_of_module(
+        self, path: Path, module: PositionedModule
+    ) -> Iterator[CodeRuleViolation]:
+        for occurrence in BashStarted.found_in(module):
+            command = BashStarted.captures(occurrence.node)[
+                BashStarted.saved_command_name
+            ]
+            location = module.positions[libcst.ensure_type(command, libcst.CSTNode)]
             yield CodeRuleViolation(
                 path,
-                command.lineno,
-                command.end_lineno,
+                location.start.line,
+                location.end.line,
                 f"starts {LocatedProgram.BASH} by its name, which Windows resolves to "
                 f"WSL's launcher; build the command with {Bash.__name__}.locate(...)"
                 f".{Bash.command.__name__}(...)",
             )
-
-    @staticmethod
-    def command_line(node: ast.AST) -> ast.expr | None:
-        """
-        :return: The command line *node* runs or hands on: the first argument of a call
-            to a :mod:`subprocess` function, or a returned value; ``None`` otherwise.
-        """
-        if isinstance(node, ast.Return):
-            return node.value
-        if not isinstance(node, ast.Call) or not node.args:
-            return None
-        function = node.func
-        if (
-            isinstance(function, ast.Attribute)
-            and isinstance(function.value, ast.Name)
-            and function.value.id == subprocess.__name__
-        ):
-            return node.args[0]
-        return None
-
-    @staticmethod
-    def starts_bash_by_name(command: ast.expr) -> bool:
-        """
-        :return: Whether *command* is a list or tuple whose first element is the bare
-            name of bash.
-        """
-        return (
-            isinstance(command, ast.List | ast.Tuple)
-            and bool(command.elts)
-            and isinstance(command.elts[0], ast.Constant)
-            and command.elts[0].value == LocatedProgram.BASH
-        )

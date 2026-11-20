@@ -18,6 +18,7 @@ from basstler.code_modification.actions import (
     Action,
     ActionPlan,
     AppliedAction,
+    ImportInsertion,
     NodeReplacement,
 )
 from basstler.code_modification.positions import PositionedModule
@@ -78,6 +79,13 @@ class CodeFix[SpecificationType: Specification](ABC):
         """
         How the fixed code behaves compared with the code it replaces.
         """
+
+    @classproperty
+    def required_import(cls) -> type | None:
+        """
+        The class the replacement needs imported in the module, if any.
+        """
+        return None
 
     @abstractmethod
     def replacement(self, specification: SpecificationType) -> libcst.CSTNode:
@@ -161,7 +169,16 @@ class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
         :return: Every place in it that breaks the rule.
         """
 
+    def checks(self, path: Path) -> bool:
+        """
+        :param path: A Python source file.
+        :return: Whether the checker reports places in it.
+        """
+        return True
+
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+        if not self.checks(path):
+            return
         module = PositionedModule(PythonSourceFile(path).parse())
         for specification in self.specifications_of_module(module):
             yield CodeRuleViolation(
@@ -225,13 +242,19 @@ class SourceFixer:
             places breaking a rule as there were before it.
         """
         inverses: list[Action] = []
+        imports: list[type] = []
         module = source_file.parse()
-        places = self.places(module)
+        places = self.places(module, source_file.path)
         while places:
+            imports.extend(
+                place.fix.required_import
+                for place in places
+                if place.fix.required_import is not None
+            )
             applied = self.round_of_fixes(places).apply(module)
             module = applied.module
             inverses.append(applied.inverse)
-            remaining = self.places(module)
+            remaining = self.places(module, source_file.path)
             if len(remaining) >= len(places):
                 raise FixDoesNotConvergeError(
                     tuple(
@@ -239,16 +262,23 @@ class SourceFixer:
                     )
                 )
             places = remaining
+        for imported in dict.fromkeys(imports):
+            applied = ImportInsertion(imported).apply(module)
+            module = applied.module
+            inverses.append(applied.inverse)
         return AppliedAction(module, ActionPlan(tuple(reversed(inverses))))
 
-    def places(self, module: libcst.Module) -> list[FixablePlace]:
+    def places(self, module: libcst.Module, path: Path) -> list[FixablePlace]:
         """
-        :return: Every place in *module* that one of :attr:`checkers` reports.
+        :param path: The file *module* was parsed from.
+        :return: Every place in *module* that one of :attr:`checkers` that checks *path*
+            reports.
         """
         positioned = PositionedModule(module)
         return [
             FixablePlace(checker.fix, specification)
             for checker in self.checkers
+            if checker.checks(path)
             for specification in checker.specifications_of_module(positioned)
         ]
 

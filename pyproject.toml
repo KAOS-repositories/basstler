@@ -47,6 +47,12 @@ dynamic = ["version"]
 [project.scripts]
 basstler = "basstler.__main__:app"
 
+# What a maintenance pass runs once it has closed pull requests whose work landed upstream:
+# `basstler.maintenance.landed_closing_follow_up` loads this group, so the pass never imports
+# the plan site.
+[project.entry-points."basstler.landed_closing_follow_ups"]
+plan-site-rebuild = "basstler.plan_site.build_start:PlanSiteRebuild"
+
 [project.urls]
 "Source" = "https://github.com/KAOS-repositories/basstler"
 "Bug Tracker" = "https://github.com/KAOS-repositories/basstler/issues"

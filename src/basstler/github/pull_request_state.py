@@ -17,6 +17,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_description import PullRequestDescription
 from basstler.github.pull_request_record import (
@@ -202,6 +203,19 @@ class PullRequestRecord:
     were not read.
     """
 
+    landed_upstream: bool | None = None
+    """
+    Whether GitHub's comparison shows every commit of the head in the upstream's default
+    branch and some commit beyond the pull request's own base; ``None`` while it was not
+    read.
+    """
+
+    mergeable_state: MergeableState | None = None
+    """
+    GitHub's verdict on whether the pull request conflicts with its base, ``None`` while
+    it was not read.
+    """
+
     @property
     def identified_labels(self) -> frozenset[GitHubLabel]:
         """The subset of :attr:`labels` that match a known
@@ -266,8 +280,12 @@ class PullRequestRecord:
                 )
             }
         )
+        mergeable_state = PullRequestField.MERGEABLE_STATE.read(api_record, number)
         return dataclasses.replace(
             record,
+            mergeable_state=(
+                None if mergeable_state is None else MergeableState(mergeable_state)
+            ),
             head_commit=PullRequestHead.commit_in(api_record),
             assignees=PullRequestField.ASSIGNEES.read(api_record, number) or [],
             base=PullRequestField.BASE.read(api_record, number),
@@ -286,13 +304,28 @@ class PullRequestRecord:
         )
 
     @property
+    def has_unread_mergeable_state(self) -> bool:
+        """
+        Whether the pull request is open and out of draft with its mergeable state not
+        read.
+        """
+        return (
+            self.state is PullRequestState.OPEN
+            and not self.draft
+            and self.mergeable_state is None
+        )
+
+    @property
     def was_merged(self) -> bool:
         """Whether this pull request's changes actually landed - GitHub's own
-        :attr:`merged_at`, or (for an out-of-band merge GitHub never
+        :attr:`merged_at`, its commits found in the upstream by
+        :attr:`landed_upstream`, or (for an out-of-band merge GitHub never
         recorded) the manually-applied :attr:`GitHubLabel.MERGED`
         label."""
         return (
-            self.merged_at is not None or GitHubLabel.MERGED in self.identified_labels
+            self.merged_at is not None
+            or self.landed_upstream is True
+            or GitHubLabel.MERGED in self.identified_labels
         )
 
     @classmethod
@@ -395,4 +428,10 @@ class LivePullRequests:
     fork_lineages: dict[str, ForkLineage] = field(default_factory=dict)
     """
     The upstream of each readable repository that is a fork, by ``"owner/repo"``.
+    """
+
+    upstream_pull_requests: dict[str, dict[str, int]] = field(default_factory=dict)
+    """
+    The number of the open upstream pull request opened from each branch, by the
+    ``"owner/repo"`` of the fork the branch is in.
     """

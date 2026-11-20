@@ -1,0 +1,9 @@
+"""
+Imports a name of the module that holds the text file.
+"""
+
+from __future__ import annotations
+
+from basstler.text_file import TextFile, UTF_8
+
+print(UTF_8)

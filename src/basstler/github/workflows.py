@@ -12,12 +12,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import yaml
+from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.locations import PackageLocation, ProjectLocation
+from basstler.text_file import TextFile
 
 # %% vocabulary
 
@@ -205,6 +207,21 @@ class WorkflowKey(StrEnum):
     EXCLUDE = "exclude"
     """
     The combinations a matrix removes.
+    """
+
+
+# %% a workflow of a repository
+
+
+@dataclass(frozen=True)
+class RepositoryWorkflow:
+    """
+    Names one workflow of a repository by its file.
+    """
+
+    workflow_path: Annotated[Path, Field(exclude=True)]
+    """
+    The workflow's file in the repository.
     """
 
 
@@ -437,7 +454,7 @@ class Workflow:
         :param path: The workflow file.
         :return: The workflow.
         """
-        declared = yaml.safe_load(path.read_text(encoding="utf-8"))
+        declared = yaml.safe_load(TextFile(path).read())
         # YAML 1.1 reads a bare ``on`` key as the boolean true.
         triggers = declared.get(True, declared.get(WorkflowKey.TRIGGERS))
         if isinstance(triggers, str):

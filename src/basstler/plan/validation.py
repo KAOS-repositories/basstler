@@ -12,6 +12,12 @@ from typing import Any
 
 import rustworkx
 
+from basstler.github.repository import Repository
+from basstler.plan.dependencies import (
+    DependencyReference,
+    PlanDirectory,
+    ResolvedDependency,
+)
 from basstler.plan.exceptions import (
     DependencyCycle,
     DuplicateItemId,
@@ -25,6 +31,7 @@ from basstler.plan.exceptions import (
     MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
+    RemovedItemStillNamed,
     SelfPlanReference,
     SharedBranch,
     UnknownDependency,
@@ -34,12 +41,6 @@ from basstler.plan.exceptions import (
     UnknownTrack,
     UnknownWave,
     ValidationProblem,
-)
-from basstler.github.repository import Repository
-from basstler.plan.dependencies import (
-    DependencyReference,
-    PlanDirectory,
-    ResolvedDependency,
 )
 from basstler.plan.model import ItemStatus, ManifestKey
 from basstler.plan.model_alias import ModelAlias
@@ -251,6 +252,7 @@ class PlanValidator:
     saved_item_identifiers: frozenset[str] | None = None
     """
     The items the plan's saved copy holds when a save is being checked, else ``None``.
+
     An item outside it is new and must carry a ``recommended_model``.
     """
 
@@ -277,6 +279,7 @@ class PlanValidator:
             *self.landed_item_count_problems(),
             *self.duplicate_identifier_problems(),
             *self.shared_branch_problems(),
+            *self.removed_item_problems(),
             *(problem for item in self.items for problem in self.item_problems(item)),
             *self.cycle_problems(),
             *self.wave_problems(),
@@ -391,6 +394,23 @@ class PlanValidator:
                 problems.append(
                     SharedBranch(branch, [*identifiers, *other_plans_items])
                 )
+        return problems
+
+    def removed_item_problems(self) -> list[ValidationProblem]:
+        """
+        :return: A problem for each item the save removes that another plan's item
+            still names; none when no save is being checked.
+        """
+        if self.saved_item_identifiers is None or self.plan_directory is None:
+            return []
+        problems: list[ValidationProblem] = []
+        for identifier in sorted(
+            self.saved_item_identifiers - set(self.item_identifiers)
+        ):
+            reference = DependencyReference(identifier, self.plan_id).text
+            named_by = self.plan_directory.items_naming(reference)
+            if named_by:
+                problems.append(RemovedItemStillNamed(reference, named_by))
         return problems
 
     def is_new_item(self, item_identifier: str) -> bool:

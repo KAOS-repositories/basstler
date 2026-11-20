@@ -18,8 +18,10 @@ from basstler.code_rules.fixes import CodeFix, FixableChecker
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 from basstler.code_rules.package_boundaries import PackageBoundaryChecker
 from basstler.code_rules.rule import CodeReference, Section
+from basstler.code_rules.text_file_usage import TextFileChecker
 from basstler.code_rules.tree_removal import TreeRemovalChecker
 from basstler.directory_tree import DirectoryTree
+from basstler.text_file import TextFile
 
 
 class ProjectRules(Section):
@@ -82,6 +84,14 @@ class PortabilityRules(Section):
         "resolves a bare `bash` to WSL's launcher instead of Git Bash",
         (),
         BashByNameChecker(),
+    )
+
+    READ_AND_WRITE_TEXT_THROUGH_TEXT_FILE = (
+        f"Read and write text through {CodeReference(TextFile).path}, never with a "
+        "path's `read_text` and `write_text`: it is always UTF-8, so no caller "
+        "spells the encoding",
+        (),
+        TextFileChecker(),
     )
 
     READ_AND_WRITE_TEXT_AS_UTF_8 = (

@@ -12,11 +12,10 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from basstler.class_property import classproperty
-from basstler.plan.model_alias import ModelAlias
 from basstler.github.repository import Repository
-from basstler.stack.promotability import PromotionBlocker
-
 from basstler.plan.dependencies import UnresolvedDependency
+from basstler.plan.model_alias import ModelAlias
+from basstler.stack.promotability import PromotionBlocker
 
 if TYPE_CHECKING:
     from basstler.github.repository import PullRequestReference
@@ -51,6 +50,38 @@ class DraftRecheckAttribute(StrEnum):
     FINISHED = "data-draft-recheck-finished"
     """
     On the page: every re-check has had its answer.
+    """
+
+
+class PromotionAttribute(StrEnum):
+    """
+    The data attributes a plan page's script re-evaluates a Contribute button by.
+    """
+
+    FORM_URL = "data-promotion-form-url"
+    """
+    On the button: the upstream's prefilled pull request form it opens once nothing
+    blocks it.
+    """
+
+    ENABLED_TITLE = "data-promotion-enabled-title"
+    """
+    On the button: its hover title once nothing blocks it.
+    """
+
+    OTHER_BLOCKERS = "data-promotion-other-blockers"
+    """
+    On the button: the reasons besides a draft that block it, as a JSON list.
+    """
+
+    DRAFT = "data-promotion-draft"
+    """
+    On the button: present while its pull request is a draft.
+    """
+
+    CHECKS_OVERRIDE = "data-promotion-checks-override"
+    """
+    On the checkbox that, while ticked, stops failed checks from blocking the button.
     """
 
 
@@ -293,9 +324,9 @@ class PromotionButton:
     The repository the pull request would be opened in.
     """
 
-    url: str | None
+    form_url: str
     """
-    The compare-and-create page, ``None`` while something blocks the promotion.
+    The compare-and-create page, whether or not something blocks the promotion.
     """
 
     blockers: list[PromotionBlocker]
@@ -304,11 +335,58 @@ class PromotionButton:
     """
 
     @property
+    def url(self) -> str | None:
+        """
+        :return: :attr:`form_url`, ``None`` while something blocks the promotion.
+        """
+        return None if self.blockers else self.form_url
+
+    @property
+    def is_draft(self) -> bool:
+        """
+        :return: Whether the pull request was a draft when the page was built.
+        """
+        return PromotionBlocker.DRAFT in self.blockers
+
+    @property
+    def checks_failed(self) -> bool:
+        """
+        :return: Whether failed checks block the promotion, so the card offers to
+            override them.
+        """
+        return PromotionBlocker.CHECKS_FAILED in self.blockers
+
+    @property
+    def other_blockers(self) -> list[str]:
+        """
+        :return: The reasons besides a draft, which the page's script does not re-check.
+        """
+        return [
+            blocker.value
+            for blocker in self.blockers
+            if blocker is not PromotionBlocker.DRAFT
+        ]
+
+    @property
     def label(self) -> str:
         """
         :return: The button's text.
         """
         return "Contribute"
+
+    @property
+    def checks_override_label(self) -> str:
+        """
+        :return: The text of the checkbox overriding failed checks.
+        """
+        return "Ignore failed checks (bypass rules)"
+
+    @property
+    def enabled_title(self) -> str:
+        """
+        :return: The hover title of the button once nothing blocks it.
+        """
+        return f"Open a pull request on {self.upstream_repository}"
 
     @property
     def reason(self) -> str:

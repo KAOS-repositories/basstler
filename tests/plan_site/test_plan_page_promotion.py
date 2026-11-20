@@ -10,10 +10,12 @@ from html import escape
 
 import pytest
 
+from basstler.github.constants import MergeableState
 from basstler.github.states import CombinedCheckState
 from basstler.maintenance.promotion import PromotionSummary
 from basstler.plan.model import ItemStatus
 from basstler.plan.structure import Item, Plan, Track, Wave
+from basstler.plan_site.cards import PromotionAttribute
 from basstler.plan_site.plan_page import PlanPage
 from basstler.github.pull_request_state import (
     ForkLineage,
@@ -21,7 +23,7 @@ from basstler.github.pull_request_state import (
     PullRequestRecord,
     PullRequestState,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.stack.promotability import PromotionBlocker
 from basstler.stack.promotion_link import PromotionLink, PromotionTarget
 
@@ -118,9 +120,10 @@ def test_a_promotable_item_links_to_the_prefilled_upstream_form():
         promotion.url
         == PromotionLink.for_target(
             PromotionTarget(
-                upstream_repository=LINEAGE.upstream_repository,
-                upstream_base=LINEAGE.upstream_default_branch,
-                fork_owner=FORK.owner,
+                upstream_base=RepositoryBranch(
+                    LINEAGE.upstream_default_branch, LINEAGE.upstream_repository
+                ),
+                fork=FORK,
             ),
             "a",
             "A title",
@@ -193,6 +196,78 @@ def test_a_pull_request_that_may_not_be_promoted_gets_a_disabled_button(
     assert promotion.url is None
     assert promotion.blockers == [blocker]
     assert f'title="{escape(blocker.value)}"' in page.render().html
+
+
+def test_a_branch_with_an_open_upstream_pull_request_is_in_review_without_a_link():
+    page = a_page(a_ready_record())
+    page.live_pull_requests.upstream_pull_requests[str(FORK)] = {"a": 7}
+    assert promotion_of_first_item(page).blockers == [PromotionBlocker.IN_REVIEW]
+
+
+def test_a_branch_in_review_shows_no_other_blocker():
+    page = a_page(
+        a_ready_record(
+            check_state=CombinedCheckState.FAILURE,
+            labels=[StackLabel.NEEDS_RESOLUTION.value],
+            base=PARENT_BRANCH,
+        )
+    )
+    page.live_pull_requests.upstream_pull_requests[str(FORK)] = {"a": 7}
+    assert promotion_of_first_item(page).blockers == [PromotionBlocker.IN_REVIEW]
+
+
+def test_the_reason_a_button_is_disabled_is_visible_without_hovering():
+    page = a_page(a_ready_record(draft=True))
+    reason = escape(PromotionBlocker.DRAFT.value)
+    assert f'<span class="promote-reason">{reason}</span>' in page.render().html
+
+
+# %% conflicts read from the pull request
+
+
+@pytest.mark.parametrize(
+    "mergeable_state",
+    [state for state in MergeableState if state is not MergeableState.DIRTY],
+)
+def test_a_labelled_pull_request_that_no_longer_conflicts_is_promotable(
+    mergeable_state: MergeableState,
+):
+    labelled = a_ready_record(
+        labels=[StackLabel.NEEDS_RESOLUTION.value], mergeable_state=mergeable_state
+    )
+    expected = (
+        [PromotionBlocker.WITHHELD] if mergeable_state is MergeableState.UNKNOWN else []
+    )
+    assert promotion_of_first_item(a_page(labelled)).blockers == expected
+
+
+@pytest.mark.parametrize("labels", [[], [StackLabel.NEEDS_RESOLUTION.value]])
+def test_a_pull_request_that_conflicts_is_withheld_with_or_without_the_label(
+    labels: list[str],
+):
+    conflicting = a_ready_record(labels=labels, mergeable_state=MergeableState.DIRTY)
+    assert promotion_of_first_item(a_page(conflicting)).blockers == [
+        PromotionBlocker.WITHHELD
+    ]
+
+
+# %% overriding failed checks
+
+
+OVERRIDE_CHECKBOX = f'<input type="checkbox" {PromotionAttribute.CHECKS_OVERRIDE}'
+"""
+The start of the checkbox overriding failed checks, as the card renders it.
+"""
+
+
+def test_a_button_held_back_by_failed_checks_offers_the_override():
+    page = a_page(a_ready_record(check_state=CombinedCheckState.FAILURE))
+    assert OVERRIDE_CHECKBOX in page.render().html
+
+
+def test_a_button_with_passing_checks_offers_no_override():
+    page = a_page(a_ready_record(draft=True))
+    assert OVERRIDE_CHECKBOX not in page.render().html
 
 
 # %% no button

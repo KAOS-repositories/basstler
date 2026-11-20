@@ -45,6 +45,7 @@ from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandFailed, GitCommandRunner
 from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.repository import Repository
+from basstler.github.stack_configuration import StackSetting
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
 from basstler.plugin_root import PluginRoot
@@ -52,8 +53,8 @@ from basstler.shell_configuration import (
     FetchedBranchReference,
     ShellConfigurationFunction,
 )
-from basstler.github.stack_configuration import StackSetting
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 from basstler.upstream_reviews.action.branch import ActionBranch, ActionInstallation
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -673,9 +674,7 @@ class PersonalUpstream:
         """
         with tempfile.TemporaryDirectory() as scratch_directory:
             scratch_file = Path(scratch_directory) / "stack.toml"
-            scratch_file.write_text(
-                self.written_over(self.existing(project_root)), encoding="utf-8"
-            )
+            TextFile(scratch_file).write(self.written_over(self.existing(project_root)))
             written = subprocess.run(
                 Bash.locate(os.environ).command(
                     PluginRoot.locate(os.environ).path_of(

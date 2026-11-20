@@ -9,8 +9,8 @@ import os
 from basstler.bash import Bash
 
 
-def variable_names(script: str) -> str:
+def exit_status(script: str) -> int:
     """
-    :return: The names of the variables *script* defines.
+    :return: The status *script* exits with.
     """
-    return subprocess.run(Bash.locate(os.environ).command("-c", script), capture_output=True).stdout
+    return subprocess.run(Bash.locate(os.environ).command(script)).returncode

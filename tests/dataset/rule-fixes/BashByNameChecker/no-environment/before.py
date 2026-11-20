@@ -7,8 +7,8 @@ from __future__ import annotations
 import subprocess
 
 
-def variable_names(script: str) -> str:
+def exit_status(script: str) -> int:
     """
-    :return: The names of the variables *script* defines.
+    :return: The status *script* exits with.
     """
-    return subprocess.run(["bash", "-c", script], capture_output=True).stdout
+    return subprocess.run(["bash", script]).returncode

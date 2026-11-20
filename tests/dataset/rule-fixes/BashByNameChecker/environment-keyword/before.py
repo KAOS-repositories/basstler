@@ -11,6 +11,6 @@ import subprocess
 
 def run(script: str, overrides: dict[str, str]) -> None:
     """
-    Run *script* with *overrides* set.
+    Run *script* with *overrides* as its environment.
     """
-    subprocess.run(["bash", "-c", script], check=True, env={**os.environ, **overrides})
+    subprocess.run(["bash", script], env=overrides)

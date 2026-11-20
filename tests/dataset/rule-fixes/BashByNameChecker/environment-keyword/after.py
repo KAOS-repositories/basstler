@@ -12,6 +12,6 @@ from basstler.bash import Bash
 
 def run(script: str, overrides: dict[str, str]) -> None:
     """
-    Run *script* with *overrides* set.
+    Run *script* with *overrides* as its environment.
     """
-    subprocess.run(Bash.locate(os.environ).command("-c", script), check=True, env={**os.environ, **overrides})
+    subprocess.run(Bash.locate(os.environ).command(script), env=overrides)

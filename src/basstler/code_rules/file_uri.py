@@ -102,7 +102,9 @@ class FileUriChecker(FixableChecker[PathAfterFileScheme]):
         )
 
     @override
-    def specifications(self, module: PositionedModule) -> Iterator[PathAfterFileScheme]:
+    def specifications_of_module(
+        self, module: PositionedModule
+    ) -> Iterator[PathAfterFileScheme]:
         concatenated = {
             part
             for node in module.positions

@@ -219,4 +219,12 @@ items:
     own module; the rule becomes "once, in its own package''s locations". Pure moves.
 
     '
+
+- id: isolated-test-helpers
+  title: "Move each shared test helper into the distribution that owns its subject"
+  branch: null
+  track: package-split
+  depends_on: []
+  status: not started
+  recommended_model: opus
 landed_item_count: 3

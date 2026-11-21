@@ -38,3 +38,11 @@ def test_a_refused_attach_is_put_to_the_user_with_attaching_recommended():
 
 def test_the_command_to_run_once_attached_is_named():
     assert ATTACHMENT.retry_command in ATTACHMENT.instruction()
+
+
+def test_the_session_is_told_to_skip_the_clone_and_registration_the_attach_asks_for():
+    """
+    Only the attachment's credential is needed; a clone takes minutes and registering it
+    is refused by the session's permission check.
+    """
+    assert SessionTool.REGISTER_REPOSITORY_ROOT in ATTACHMENT.instruction()

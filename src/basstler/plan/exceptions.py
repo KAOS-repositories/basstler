@@ -636,8 +636,13 @@ class DependencyCycle(ValidationProblem):
 
 
 @dataclass
-class PlanValidationError(DataclassException):
+class PlanValidationError(CommandFailure, DataclassException):
     """Raised when a plan.yaml fails schema validation - see plan-schema.md."""
+
+    @classproperty
+    def exit_code(cls) -> ManifestToolsExitCode:
+        """:return: The status this kind of error ends a command with."""
+        return ManifestToolsExitCode.INVALID_MANIFEST
 
     problems: list[ValidationProblem]
     """

@@ -1,39 +1,26 @@
 #!/usr/bin/env python3
 """
-Small plan.yaml manifest utilities used by save-plan.sh.
-
-Kept as a real, testable script rather than inline ``python3 -c`` snippets
-in the shell script, so this logic can be read, changed, and (if it grows
-non-trivial branches later) tested like any other code.
-
-Usage:
-    python3 plan/manifest_tools.py read-id <manifest-file>
-    python3 plan/manifest_tools.py validate <manifest-file> [--plans-dir <dir>]
-    python3 plan/manifest_tools.py regenerate-branch-index \\
-        --scratch-dir <dir> --plans-dir <relative-dir> \\
-        --manifest-filename <name> --output <relative-path>
-    python3 plan/manifest_tools.py item <manifest-file> (--id <item-id> | --branch <branch>)
-    python3 plan/manifest_tools.py merge --read <plan-dir> --session <plan-dir> \\
-        --latest <plan-dir> --output <plan-dir>
+The plan.yaml manifest utilities save-plan.sh calls; ``--help`` lists the commands.
 """
 
 from __future__ import annotations
 
-import argparse
 import sys
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import yaml
+from cyclopts import App, Parameter
 
-from basstler.plan.exceptions import OriginNamesNoRepository, PlanValidationError
-from basstler.exit_codes import CommandFailure, ManifestToolsExitCode
+from basstler.command_line import plan_item_selection
+from basstler.exit_codes import CommandFailure, ExitCode, ManifestToolsExitCode
 from basstler.github.repository import Repository
 from basstler.plan import model
 from basstler.plan.dependencies import PlanDirectory
+from basstler.plan.exceptions import OriginNamesNoRepository, PlanValidationError
 from basstler.plan.merge import PlanMerge, PlanVersion
 from basstler.plan.validation import PlanValidator
 from basstler.standard_streams import StandardStreamHandler
@@ -232,6 +219,31 @@ class PlanManifest:
             self.content, plan_directory, checkout_repository, saved_item_identifiers
         ).validate()
 
+    @staticmethod
+    def checkout_repository(origin_url: str | None) -> Repository | None:
+        """
+        :param origin_url: The URL of the saving checkout's ``origin``, or ``None`` when
+            no save is being checked.
+        :return: The repository that URL names, or ``None`` for no URL.
+        :raises PlanValidationError: If the URL names no repository.
+        """
+        if origin_url is None:
+            return None
+        if not Repository.names_a_repository(origin_url):
+            raise PlanValidationError([OriginNamesNoRepository(origin_url)])
+        return Repository.from_remote_url(origin_url)
+
+    def saved_item_identifiers(self, plans_directory: Path) -> frozenset[str]:
+        """
+        :param plans_directory: The directory holding every plan as
+            ``<plan-id>/plan.yaml``.
+        :return: The items this plan's copy there holds, none for a plan not saved yet.
+        """
+        saved = plans_directory / self.identifier / model.PlanDocument.MANIFEST
+        if not saved.is_file():
+            return frozenset()
+        return PlanManifest(saved).item_identifiers
+
     def string_field(self, value: object, field_name: str) -> str:
         """
         Guard against PyYAML's YAML 1.1 boolean coercion silently corrupting a
@@ -316,192 +328,172 @@ class BranchIndex:
         return "\n".join(lines) + ("\n" if lines else "")
 
 
-class ManifestToolsCommandLine:
+# %% command line
+
+
+manifest_tools_app = App(
+    name="basstler.plan.manifest_tools",
+    help="The plan.yaml manifest utilities save-plan.sh calls.",
+)
+"""
+This module's command line: one command per :class:`ManifestToolsCommand`.
+"""
+
+
+@manifest_tools_app.command(name=ManifestToolsCommand.READ_ID)
+def read_id(manifest_path: Path, /) -> ManifestToolsExitCode:
     """
-    The command line save-plan.sh calls: its arguments, and the subcommand they name.
+    Print a manifest's ``id`` field.
+
+    :param manifest_path: The manifest to read.
     """
-
-    @classmethod
-    def parser(cls) -> argparse.ArgumentParser:
-        """
-        :return: The parser for every subcommand and its arguments.
-        """
-        parser = argparse.ArgumentParser(
-            description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-        )
-        subcommands = parser.add_subparsers(dest="subcommand", required=True)
-
-        read_id_parser = subcommands.add_parser(
-            ManifestToolsCommand.READ_ID, help="Print a manifest's id field"
-        )
-        read_id_parser.add_argument("manifest_path", type=Path)
-
-        validate_parser = subcommands.add_parser(
-            ManifestToolsCommand.VALIDATE,
-            help="Check a manifest against the rules a plan page is built under",
-        )
-        validate_parser.add_argument("manifest_path", type=Path)
-        validate_parser.add_argument(
-            ManifestToolsOption.PLANS_DIRECTORY,
-            dest="plans_dir",
-            type=Path,
-            default=None,
-            help="The plans a <plan-id>/<item-id> depends_on entry resolves against",
-        )
-        validate_parser.add_argument(
-            ManifestToolsOption.ORIGIN_URL,
-            dest="origin_url",
-            default=None,
-            help="The origin of the checkout saving the manifest; a plan for another repository, or an origin naming none, is refused",
-        )
-        validate_parser.add_argument(
-            ManifestToolsOption.SAVING,
-            action="store_true",
-            help="Refuse an item the saved copy of the plan lacks unless it has a recommended_model",
-        )
-
-        regenerate_parser = subcommands.add_parser(
-            ManifestToolsCommand.REGENERATE_BRANCH_INDEX,
-            help="Rebuild the branch->plan-id index",
-        )
-        regenerate_parser.add_argument(
-            ManifestToolsOption.SCRATCH_DIRECTORY, required=True, type=Path
-        )
-        regenerate_parser.add_argument(
-            ManifestToolsOption.PLANS_DIRECTORY, required=True, type=Path
-        )
-        regenerate_parser.add_argument(
-            ManifestToolsOption.MANIFEST_FILENAME, required=True
-        )
-        regenerate_parser.add_argument(
-            ManifestToolsOption.OUTPUT,
-            required=True,
-            type=Path,
-            help="Path to write the index to",
-        )
-
-        unmodelled_parser = subcommands.add_parser(
-            ManifestToolsCommand.UNMODELLED_ITEMS,
-            help="Print the items that carry no recommended model, comma separated",
-        )
-        unmodelled_parser.add_argument("manifest_path", type=Path)
-
-        item_parser = subcommands.add_parser(
-            ManifestToolsCommand.ITEM,
-            help="Print the plan's header and one item's entry",
-        )
-        item_parser.add_argument("manifest_path", type=Path)
-        item_selector = item_parser.add_mutually_exclusive_group(required=True)
-        item_selector.add_argument(
-            ManifestToolsOption.ITEM_IDENTIFIER, dest="item_identifier"
-        )
-        item_selector.add_argument(ManifestToolsOption.BRANCH)
-
-        merge_parser = subcommands.add_parser(
-            ManifestToolsCommand.MERGE,
-            help="Merge a session's edit of a plan onto the plan as it stands now",
-        )
-        for option in (
-            ManifestToolsOption.READ,
-            ManifestToolsOption.SESSION,
-            ManifestToolsOption.LATEST,
-            ManifestToolsOption.OUTPUT,
-        ):
-            merge_parser.add_argument(option, required=True, type=Path)
-        return parser
-
-    @staticmethod
-    def checkout_repository(origin_url: str | None) -> Repository | None:
-        """
-        :param origin_url: The URL of the saving checkout's ``origin``, or ``None`` when
-            no save is being checked.
-        :return: The repository that URL names, or ``None`` for no URL.
-        :raises PlanValidationError: If the URL names no repository.
-        """
-        if origin_url is None:
-            return None
-        if not Repository.names_a_repository(origin_url):
-            raise PlanValidationError([OriginNamesNoRepository(origin_url)])
-        return Repository.from_remote_url(origin_url)
-
-    @staticmethod
-    def saved_item_identifiers(
-        manifest: PlanManifest, arguments: argparse.Namespace
-    ) -> frozenset[str] | None:
-        """
-        :param manifest: The manifest being validated.
-        :param arguments: The parsed ``validate`` command line.
-        :return: The items the plan's copy in ``--plans-dir`` holds, none for a plan not
-            saved yet, or ``None`` when no save is being checked.
-        """
-        if not arguments.saving:
-            return None
-        saved = arguments.plans_dir / manifest.identifier / model.PlanDocument.MANIFEST
-        if not saved.is_file():
-            return frozenset()
-        return PlanManifest(saved).item_identifiers
-
-    @classmethod
-    def run(cls, arguments: argparse.Namespace) -> ManifestToolsExitCode:
-        """
-        Carry out the subcommand *arguments* name.
-
-        :param arguments: The parsed command line.
-        :return: How the subcommand ended.
-        """
-        if arguments.subcommand == ManifestToolsCommand.READ_ID:
-            logger.info(PlanManifest(arguments.manifest_path).identifier)
-        elif arguments.subcommand == ManifestToolsCommand.VALIDATE:
-            try:
-                manifest = PlanManifest(arguments.manifest_path)
-                manifest.validate(
-                    PlanDirectory(arguments.plans_dir) if arguments.plans_dir else None,
-                    cls.checkout_repository(arguments.origin_url),
-                    cls.saved_item_identifiers(manifest, arguments),
-                )
-            except PlanValidationError as error:
-                logger.error(f"{arguments.manifest_path} failed validation: {error}")
-                return ManifestToolsExitCode.INVALID_MANIFEST
-        elif arguments.subcommand == ManifestToolsCommand.REGENERATE_BRANCH_INDEX:
-            index = BranchIndex(
-                arguments.scratch_dir, arguments.plans_dir, arguments.manifest_filename
-            )
-            arguments.output.write_text(index.render(), encoding="utf-8")
-        elif arguments.subcommand == ManifestToolsCommand.UNMODELLED_ITEMS:
-            manifest = model.PlanManifest.from_file(arguments.manifest_path)
-            logger.info(
-                ", ".join(
-                    item.identifier for item in manifest.items_without_recommended_model
-                )
-            )
-        elif arguments.subcommand == ManifestToolsCommand.ITEM:
-            manifest = model.PlanManifest.from_file(arguments.manifest_path)
-            item = (
-                manifest.item_on_branch(arguments.branch)
-                if arguments.branch is not None
-                else manifest.item_named(arguments.item_identifier)
-            )
-            logger.info(manifest.item_summary(item).rstrip("\n"))
-        elif arguments.subcommand == ManifestToolsCommand.MERGE:
-            merge = PlanMerge(
-                read=PlanVersion.from_directory(arguments.read),
-                session=PlanVersion.from_directory(arguments.session),
-                latest=PlanVersion.from_directory(arguments.latest),
-            )
-            try:
-                merge.merged().write(arguments.output)
-            except CommandFailure as error:
-                logger.error(str(error))
-                return error.exit_code
-        return ManifestToolsExitCode.SUCCESS
+    logger.info(PlanManifest(manifest_path).identifier)
+    return ManifestToolsExitCode.SUCCESS
 
 
-def main() -> ManifestToolsExitCode:
+@manifest_tools_app.command(name=ManifestToolsCommand.VALIDATE)
+def validate(
+    manifest_path: Path,
+    /,
+    *,
+    plans_directory: Annotated[
+        Path | None, Parameter(name=ManifestToolsOption.PLANS_DIRECTORY)
+    ] = None,
+    origin_url: Annotated[
+        str | None, Parameter(name=ManifestToolsOption.ORIGIN_URL)
+    ] = None,
+    saving: Annotated[bool, Parameter(name=ManifestToolsOption.SAVING)] = False,
+) -> ManifestToolsExitCode:
     """
-    Parse arguments and dispatch to the requested subcommand.
+    Check a manifest against the rules a plan page is built under.
+
+    :param manifest_path: The manifest to check.
+    :param plans_directory: The plans a ``<plan-id>/<item-id>`` entry resolves against.
+    :param origin_url: The origin of the checkout saving the manifest; a plan for
+        another repository, or an origin naming none, is refused.
+    :param saving: Refuse an item the saved copy of the plan lacks unless it has a
+        recommended_model.
     """
-    return ManifestToolsCommandLine.run(ManifestToolsCommandLine.parser().parse_args())
+    manifest = PlanManifest(manifest_path)
+    manifest.validate(
+        PlanDirectory(plans_directory) if plans_directory else None,
+        PlanManifest.checkout_repository(origin_url),
+        manifest.saved_item_identifiers(plans_directory) if saving else None,
+    )
+    return ManifestToolsExitCode.SUCCESS
+
+
+@manifest_tools_app.command(name=ManifestToolsCommand.REGENERATE_BRANCH_INDEX)
+def regenerate_branch_index(
+    *,
+    scratch_directory: Annotated[
+        Path, Parameter(name=ManifestToolsOption.SCRATCH_DIRECTORY)
+    ],
+    plans_directory: Annotated[
+        Path, Parameter(name=ManifestToolsOption.PLANS_DIRECTORY)
+    ],
+    manifest_filename: Annotated[
+        str, Parameter(name=ManifestToolsOption.MANIFEST_FILENAME)
+    ],
+    output: Annotated[Path, Parameter(name=ManifestToolsOption.OUTPUT)],
+) -> ManifestToolsExitCode:
+    """
+    Rebuild the branch to plan-id index.
+
+    :param scratch_directory: The checkout of the personal-notes branch to scan.
+    :param plans_directory: The plans directory, relative to *scratch_directory*.
+    :param manifest_filename: The filename every plan's manifest has.
+    :param output: Where to write the index.
+    """
+    index = BranchIndex(scratch_directory, plans_directory, manifest_filename)
+    output.write_text(index.render(), encoding="utf-8")
+    return ManifestToolsExitCode.SUCCESS
+
+
+@manifest_tools_app.command(name=ManifestToolsCommand.UNMODELLED_ITEMS)
+def unmodelled_items(manifest_path: Path, /) -> ManifestToolsExitCode:
+    """
+    Print the items that carry no recommended model, comma separated.
+
+    :param manifest_path: The manifest to read.
+    """
+    manifest = model.PlanManifest.from_file(manifest_path)
+    logger.info(
+        ", ".join(item.identifier for item in manifest.items_without_recommended_model)
+    )
+    return ManifestToolsExitCode.SUCCESS
+
+
+@manifest_tools_app.command(name=ManifestToolsCommand.ITEM)
+def item(
+    manifest_path: Path,
+    /,
+    *,
+    item_identifier: Annotated[
+        str | None,
+        Parameter(name=ManifestToolsOption.ITEM_IDENTIFIER, group=plan_item_selection),
+    ] = None,
+    branch: Annotated[
+        str | None,
+        Parameter(name=ManifestToolsOption.BRANCH, group=plan_item_selection),
+    ] = None,
+) -> ManifestToolsExitCode:
+    """
+    Print the plan's header and one item's entry.
+
+    :param manifest_path: The manifest holding the item.
+    :param item_identifier: The id of the item to print.
+    :param branch: The branch whose item to print.
+    """
+    manifest = model.PlanManifest.from_file(manifest_path)
+    selected_item = (
+        manifest.item_on_branch(branch)
+        if branch is not None
+        else manifest.item_named(item_identifier)
+    )
+    logger.info(manifest.item_summary(selected_item).rstrip("\n"))
+    return ManifestToolsExitCode.SUCCESS
+
+
+@manifest_tools_app.command(name=ManifestToolsCommand.MERGE)
+def merge(
+    *,
+    read: Annotated[Path, Parameter(name=ManifestToolsOption.READ)],
+    session: Annotated[Path, Parameter(name=ManifestToolsOption.SESSION)],
+    latest: Annotated[Path, Parameter(name=ManifestToolsOption.LATEST)],
+    output: Annotated[Path, Parameter(name=ManifestToolsOption.OUTPUT)],
+) -> ManifestToolsExitCode:
+    """
+    Merge a session's edit of a plan onto the plan as it stands now.
+
+    :param read: The plan directory as the session read it.
+    :param session: The plan directory as the session wrote it.
+    :param latest: The plan directory as it stands on the notes branch now.
+    :param output: Where to write the merged plan directory.
+    """
+    PlanMerge(
+        read=PlanVersion.from_directory(read),
+        session=PlanVersion.from_directory(session),
+        latest=PlanVersion.from_directory(latest),
+    ).merged().write(output)
+    return ManifestToolsExitCode.SUCCESS
+
+
+# %% entry point
+
+
+def main() -> ExitCode:
+    """
+    Run the invoked command, ending with the status a refusal carries.
+
+    :return: The process exit code.
+    """
+    try:
+        return manifest_tools_app(sys.argv[1:], result_action="return_value")
+    except CommandFailure as error:
+        logger.error(f"{error}")
+        return error.exit_code
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

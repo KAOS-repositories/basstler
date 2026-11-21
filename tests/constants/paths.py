@@ -907,6 +907,12 @@ class CodeModificationSnippet(PathEnumeration):
     :mod:`os`.
     """
 
+    IMPORTS_WITH_FUTURE = DIRECTORY / "imports-with-future.py.txt"
+    """
+    :attr:`IMPORTS` with :class:`concurrent.futures.Future` imported from the public
+    module that exports it.
+    """
+
     IMPORTS_OF_TEXT_FILE_MODULE = DIRECTORY / "imports-of-text-file-module.py.txt"
     """
     A module that imports :data:`~basstler.text_file.UTF_8` and nothing else from

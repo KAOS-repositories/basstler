@@ -21,6 +21,7 @@ from basstler.plan.exceptions import (
 )
 from basstler.plan.item_bootstrap.manifest_text import ManifestText
 from basstler.plan.model import ManifestKey, PlanDocument
+from basstler.text_file import TextFile
 
 # %% one plan's documents at one point in time
 
@@ -69,7 +70,7 @@ class PlanVersion:
         """
         texts = {
             document: (
-                (directory / document).read_text(encoding="utf-8")
+                TextFile(directory / document).read()
                 if (directory / document).is_file()
                 else None
             )
@@ -94,7 +95,7 @@ class PlanVersion:
         }
         for document, text in texts.items():
             if text is not None:
-                (directory / document).write_text(text, encoding="utf-8")
+                TextFile(directory / document).write(text)
 
     @cached_property
     def manifest_content(self) -> dict[str, Any]:

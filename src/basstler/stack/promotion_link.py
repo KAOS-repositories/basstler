@@ -12,11 +12,11 @@ from basstler.github.pull_request_form import (
     PullRequestForm,
 )
 from basstler.github.repository import Repository, RepositoryBranch
-from basstler.locations import ProjectLocation
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     MissingUpstreamRepositoryError,
 )
+from basstler.locations import ProjectLocation
 from basstler.stack.exceptions import PromotionLinkTooLongError
 from basstler.stack.settings import Configuration
 from basstler.standard_streams import StandardStreamHandler

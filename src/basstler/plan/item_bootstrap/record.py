@@ -11,12 +11,12 @@ from basstler.plan.item_bootstrap.documents import PlanDocuments
 from basstler.plan.item_bootstrap.exceptions import IncompleteNewItemError
 from basstler.plan.item_bootstrap.manifest_text import ManifestText
 from basstler.plan.item_bootstrap.report import BootstrapReport
-from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemIndentation,
     ItemStatus,
     ManifestKey,
 )
+from basstler.plan.model_alias import ModelAlias
 
 # %% recording an item
 

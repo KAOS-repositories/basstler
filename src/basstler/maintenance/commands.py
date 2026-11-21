@@ -19,27 +19,16 @@ from basstler.class_property import classproperty
 from basstler.command_line import Command
 from basstler.exit_codes import StackExitCode
 from basstler.git.commands import GitCommandRunner, ProposedPush
-from basstler.stack.commit_move import (
-    BranchAncestry,
-    CommitMoveAction,
-    CommitMoveChecks,
-    ProposedCommitMove,
-)
-from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import GitHubRestClient
 from basstler.github.constants import MaintenanceNotice
+from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
 from basstler.locations import RepositoryStateLocation
 from basstler.maintenance.board import BoardExport
-from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
-from basstler.upstream_reviews.action.open_pull_requests import (
-    OpenPullRequestsAnswer,
-    OpenPullRequestsRequest,
-    UpstreamPullRequests,
-)
 from basstler.maintenance.check_overview import CheckOverview
 from basstler.maintenance.fast_forward import fast_forward
 from basstler.maintenance.landed_closing import LandedPullRequestClosing
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.maintenance.finish_summary import FinishSummary
 from basstler.maintenance.promotion import (
     PromotionSummaries,
@@ -49,14 +38,26 @@ from basstler.maintenance.promotion import (
 from basstler.maintenance.promotion_context import PromotionContextReader
 from basstler.maintenance.report import MaintenanceReport
 from basstler.maintenance.restack_procedure import restack
-from basstler.maintenance.upstream_read_route import UpstreamReadRoute
 from basstler.maintenance.upstream_pull_request_synchronization import (
     UpstreamPullRequestSynchronization,
+)
+from basstler.maintenance.upstream_read_route import UpstreamReadRoute
+from basstler.stack.commit_move import (
+    BranchAncestry,
+    CommitMoveAction,
+    CommitMoveChecks,
+    ProposedCommitMove,
 )
 from basstler.stack.model import Stack
 from basstler.stack.settings import Configuration
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 from basstler.upstream_reviews.action.branch import ActionBranch
+from basstler.upstream_reviews.action.open_pull_requests import (
+    OpenPullRequestsAnswer,
+    OpenPullRequestsRequest,
+    UpstreamPullRequests,
+)
 from basstler.upstream_reviews.action.read import ActionRead
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -579,7 +580,7 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
             closing_follow_ups,
         )
         maintenance.board.unlink(missing_ok=True)
-        maintenance.full_report.write_text(report.as_json() + "\n", encoding="utf-8")
+        TextFile(maintenance.full_report).write(report.as_json() + "\n")
         if as_json:
             logger.info(report.as_json())
             return report

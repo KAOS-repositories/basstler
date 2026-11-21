@@ -13,11 +13,14 @@ from basstler.code_rules import rules
 from basstler.code_rules.bash_by_name import BashByNameChecker
 from basstler.code_rules.checker import CodeRuleChecker
 from basstler.code_rules.commands import CodeRulesCommand
+from basstler.code_rules.fixes import CodeFix, FixableChecker
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 from basstler.code_rules.package_boundaries import PackageBoundaryChecker
 from basstler.code_rules.rule import CodeReference, Section
+from basstler.code_rules.text_file_usage import TextFileChecker
 from basstler.code_rules.tree_removal import TreeRemovalChecker
 from basstler.directory_tree import DirectoryTree
+from basstler.text_file import TextFile
 
 
 class ProjectRules(Section):
@@ -82,6 +85,14 @@ class PortabilityRules(Section):
         BashByNameChecker(),
     )
 
+    READ_AND_WRITE_TEXT_THROUGH_TEXT_FILE = (
+        f"Read and write text through {CodeReference(TextFile).path}, never with a "
+        "path's `read_text` and `write_text`: it is always UTF-8, so no caller "
+        "spells the encoding",
+        (),
+        TextFileChecker(),
+    )
+
     READ_AND_WRITE_TEXT_AS_UTF_8 = (
         'Read and write text as UTF-8: pass `encoding="utf-8"` to every '
         "`read_text`, `write_text`, text-mode `open` and `subprocess` call that "
@@ -120,6 +131,15 @@ class AgentInstructionsRules(Section):
         "A script that finds code breaking a rule is a "
         f"{CodeReference(CodeRuleChecker).path}, set as that rule's "
         "`checker`, so the rule and its check are declared together"
+    )
+
+    DECLARE_EACH_FIX_ON_ITS_CHECKER = (
+        "Where every violation of a rule has one correct fix, its checker is a "
+        f"{CodeReference(FixableChecker).path}: its {CodeReference(CodeFix).path} builds "
+        "the replacement and declares whether behaviour changes. Give the fix examples "
+        "as `before.py` and `after.py` in `tests/dataset/rule-fixes/<checker class>/"
+        "<example>/`, which the suite tests, and apply it with "
+        f"`{CodeRulesCommand.FIX.invocation}`, never by hand"
     )
 
 

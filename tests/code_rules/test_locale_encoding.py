@@ -39,6 +39,19 @@ def test_text_as_utf_8_and_bytes_are_not_reported():
     assert snippet.reported_lines(LocaleEncodingChecker()) == snippet.marked_lines
 
 
+# %% calls that are not of open
+
+
+def test_a_call_that_is_not_of_open_opens_no_file():
+    """
+    Only a call of :data:`TextFunction.OPEN` opens a file, whatever it is given.
+    """
+    assert (
+        list(LocaleEncodingChecker().violations(LocaleEncodingSnippet.OTHER_CALLS))
+        == []
+    )
+
+
 # %% this repository
 
 

@@ -1,6 +1,6 @@
 """
-The ``basstler code-rules`` commands: checking code against the rules, and generating
-``AGENTS.md`` from them.
+The ``basstler code-rules`` commands: checking code against the rules, fixing it, and
+generating ``AGENTS.md`` from them.
 """
 
 from __future__ import annotations
@@ -9,9 +9,11 @@ from pathlib import Path
 
 from cyclopts import App
 
+from basstler.code_modification.source_file import PythonSourceFile
 from basstler.code_rules import rules
 from basstler.code_rules.checker import CodeRulesCheck, StagedLines
 from basstler.code_rules.commands import CodeRulesCommand
+from basstler.code_rules.fixes import SourceFixer
 from basstler.code_rules.instructions import AgentsInstructions
 from basstler.code_rules.package_boundaries import (
     PackageAtCommit,
@@ -48,7 +50,10 @@ class CodeRulesExitCode(ExitCode):
 
 code_rules_app = App(
     name=CodeRulesCommand.GROUP,
-    help="Check code against the repository's rules, and generate AGENTS.md from them.",
+    help=(
+        "Check code against the repository's rules, fix it, and generate AGENTS.md "
+        "from them."
+    ),
 )
 """
 The ``code-rules`` command group.
@@ -73,6 +78,32 @@ def check(
     for violation in violations:
         logger.error(violation.render())
     if violations:
+        return CodeRulesExitCode.CHANGES_NEEDED
+    return CodeRulesExitCode.SUCCESS
+
+
+@code_rules_app.command(name=CodeRulesCommand.FIX)
+def fix(paths: list[Path] | None = None) -> CodeRulesExitCode:
+    """
+    Rewrite each file in *paths* that breaks a rule with a fix, applying the fix to
+    every place that breaks it; a file is written only once every file is fixed.
+
+    :param paths: The Python files to fix.
+    """
+    fixer = SourceFixer(RuleModule(rules).fixable_checkers)
+    fixed_sources = {
+        source_file: fixer.fix_module(source_file).module.code
+        for source_file in map(PythonSourceFile, paths or [])
+    }
+    changed = {
+        source_file: source
+        for source_file, source in fixed_sources.items()
+        if source != source_file.read()
+    }
+    for source_file, source in changed.items():
+        source_file.write(source)
+        logger.info("Fixed %s", source_file.path)
+    if changed:
         return CodeRulesExitCode.CHANGES_NEEDED
     return CodeRulesExitCode.SUCCESS
 

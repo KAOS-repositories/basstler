@@ -18,6 +18,7 @@ from basstler.github.pull_request_state import LivePullRequests, LiveState
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.plan.model import PlanDocument, PlanManifest
 from basstler.plan.structure import Item, Plan
+from basstler.text_file import TextFile
 
 # %% references
 
@@ -329,9 +330,7 @@ class PlanDirectory:
         manifest_path = self.directory / plan_id / PlanDocument.MANIFEST
         if not manifest_path.is_file():
             return None
-        plan = Plan.from_mapping(
-            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        )
+        plan = Plan.from_mapping(yaml.safe_load(TextFile(manifest_path).read()))
         self.plans_by_id[plan_id] = plan
         return plan
 

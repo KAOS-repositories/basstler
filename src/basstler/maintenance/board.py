@@ -17,8 +17,8 @@ from basstler.github.pull_request_record import (
     PullRequestRecord,
 )
 from basstler.stack.model import BoardKey, PullRequest
+from basstler.text_file import TextFile
 from basstler.upstream_reviews.action.open_pull_requests import UpstreamPullRequests
-
 
 # %% the export itself
 
@@ -109,5 +109,5 @@ class BoardExport:
         :return: The path written to.
         """
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.as_json() + "\n", encoding="utf-8")
+        TextFile(path).write(self.as_json() + "\n")
         return path

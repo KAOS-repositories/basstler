@@ -9,9 +9,9 @@ import json
 import time
 from dataclasses import dataclass
 
-from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.client import GitHubReader
 from basstler.github.exceptions import GitHubRequestFailed
+from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.run_listing import RunListing
 from basstler.upstream_reviews.action.branch import ActionBranch, ActionFile
 from basstler.upstream_reviews.action.exchange import (

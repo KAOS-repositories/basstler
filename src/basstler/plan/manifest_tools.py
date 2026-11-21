@@ -24,6 +24,7 @@ from basstler.plan.exceptions import OriginNamesNoRepository, PlanValidationErro
 from basstler.plan.merge import PlanMerge, PlanVersion
 from basstler.plan.validation import PlanValidator
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -406,7 +407,7 @@ def regenerate_branch_index(
     :param output: Where to write the index.
     """
     index = BranchIndex(scratch_directory, plans_directory, manifest_filename)
-    output.write_text(index.render(), encoding="utf-8")
+    TextFile(output).write(index.render())
     return ManifestToolsExitCode.SUCCESS
 
 

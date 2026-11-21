@@ -40,6 +40,7 @@ from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.locations import PackageLocation
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -295,7 +296,7 @@ class DependencyDeclaration(RequirementSource):
         if not self.path.is_file():
             raise UnreadableDependencyDeclarationError(self.path)
         try:
-            declaration = tomllib.loads(self.path.read_text(encoding="utf-8"))
+            declaration = tomllib.loads(TextFile(self.path).read())
         except tomllib.TOMLDecodeError as error:
             raise MalformedDependencyDeclarationError(self.path) from error
         return declaration[PyprojectKey.PROJECT]

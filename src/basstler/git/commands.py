@@ -21,6 +21,7 @@ from basstler.environment import GitVariable
 from basstler.exceptions import ExternalCallFailed, UnresolvableReferenceError
 from basstler.exit_codes import CommandFailure, StackExitCode
 from basstler.locations import CommitScratchFile, RepositoryStateLocation
+from basstler.text_file import TextFile
 
 # %% running git
 
@@ -344,7 +345,7 @@ class GitCommandRunner:
             self.run("read-tree", parent or "--empty", environment=index)
             blob_file = Path(scratch) / CommitScratchFile.BLOB
             for path, text in files.items():
-                blob_file.write_text(text + "\n", encoding="utf-8")
+                TextFile(blob_file).write(text + "\n")
                 blob = self.run("hash-object", "-w", str(blob_file))
                 self.run(
                     "update-index",

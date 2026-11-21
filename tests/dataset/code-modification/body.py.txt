@@ -1,0 +1,13 @@
+"""
+Holds statements of every kind a body can have.
+"""
+
+from __future__ import annotations
+
+SIZE = 1
+"The size."
+
+"unrelated"; print(SIZE)
+
+if SIZE:
+    print(SIZE)

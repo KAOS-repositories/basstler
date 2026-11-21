@@ -81,15 +81,17 @@ class PullRequestHostingClient(GitHubClient):
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
         heads = query.get(ListingParameter.HEAD.value)
         return [
-            pull_request
-            for pull_request in self.pull_requests
-            if pull_request["state"] == "open"
-            and (
-                heads is None
-                or f"{pull_request['head']['user']['login']}:"
-                f"{pull_request['head']['ref']}"
-                in heads
-            )
+            [
+                pull_request
+                for pull_request in self.pull_requests
+                if pull_request["state"] == "open"
+                and (
+                    heads is None
+                    or f"{pull_request['head']['user']['login']}:"
+                    f"{pull_request['head']['ref']}"
+                    in heads
+                )
+            ]
         ]
 
     def attempt_send(self, write: GitHubWrite) -> GitHubResponse:

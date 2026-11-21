@@ -406,11 +406,7 @@ class GitHubRepository(
         :param filters: The query parameters narrowing the listing.
         :return: Every entry, first page first.
         """
-        return [
-            entry
-            for page in self.client.get_pages(self._listing(str(path), filters))
-            for entry in page
-        ]
+        return self.client.get_entries(self._listing(str(path), filters))
 
     def _listing(self, path: str, filters: Mapping[ListingParameter, str]) -> str:
         """

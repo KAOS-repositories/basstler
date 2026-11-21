@@ -74,6 +74,13 @@ class GitHubReader(ABC):
         :return: Each page's parsed response, first page first.
         """
 
+    def get_entries(self, path: str) -> list[Any]:
+        """
+        :param path: The path of a listing whose pages are lists.
+        :return: Every entry of every page, first page first.
+        """
+        return [entry for page in self.get_pages(path) for entry in page]
+
 
 class GitHubAttemptReader(ABC):
     """

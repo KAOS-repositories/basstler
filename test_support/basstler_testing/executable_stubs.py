@@ -30,7 +30,28 @@ NEEDS_SCRIPT_AS_EXECUTABLE = pytest.mark.skipif(
     ),
 )
 """
-Skips a test that runs a script as ``gh`` or ``bash``, where the platform cannot launch one.
+Skips a test that runs a script as ``gh`` or ``bash``, where the platform cannot launch
+one.
+"""
+
+NEEDS_STUB_AHEAD_OF_GIT_TOOLS = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason=(
+        "Git for Windows' bash puts its own tools, curl among them, ahead of PATH, "
+        "so a stub on PATH cannot stand in for one"
+    ),
+)
+"""
+Skips a test that stubs an executable Git for Windows ships, where its own one wins.
+"""
+
+NEEDS_VERSIONED_INTERPRETER_NAME = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows installs Python as python.exe, never as python3.13 or the like",
+)
+"""
+Skips a test that needs a real interpreter found by a versioned name such as
+``python3.13``.
 """
 
 # %% stub directories
@@ -71,7 +92,8 @@ class ExecutableStubDirectory:
         Copy a stub into this directory under the name of the executable it replaces.
 
         :param executable_name: The executable to stand in for.
-        :param stub_name: The stub to copy; the one named like *executable_name* if omitted.
+        :param stub_name: The stub to copy; the one named like *executable_name* if
+            omitted.
         """
         destination = self.path / executable_name
         shutil.copy(self.stub_for(stub_name or executable_name), destination)

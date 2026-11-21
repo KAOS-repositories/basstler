@@ -83,8 +83,8 @@ class RepositoryLocation(PathEnumeration):
 
     WINDOWS_TESTS_WORKFLOW = WORKFLOWS / "windows-tests.yml"
     """
-    The workflow that runs the whole suite on Windows for every pull request ready for
-    review.
+    The workflow that runs the whole suite on Windows for every push to main, and for a
+    pull request changing what Windows is known to treat differently.
     """
 
     MAIN_FAILURE_WORKFLOW = WORKFLOWS / "main-failure.yml"
@@ -306,9 +306,20 @@ class DatasetLocation(PathEnumeration):
     The jobs of a failed run of the tests: one failed, one timed out, two passed.
     """
 
+    SESSION_PULL_REQUEST = DIRECTORY / "session-pull-request.json"
+    """
+    The REST response for an open pull request opened from the branch a session works on.
+    """
+
     MERGE_WORKFLOW_PULL_REQUEST = DIRECTORY / "merge-workflow-pull-request.json"
     """
     The REST response for the pull request proposing the plan site's merge workflow.
+    """
+
+    STALE_MERGE_WORKFLOW = DIRECTORY / "plan-site-merge-workflow-closed-only.yml"
+    """
+    The plan site's merge workflow as an earlier release wrote it, starting the build
+    only when a pull request closes.
     """
 
     PULL_REQUEST_REFUSED = DIRECTORY / "pull-request-refused.json"
@@ -355,6 +366,18 @@ class DatasetLocation(PathEnumeration):
     :class:`ProgressBranch` that has one.
     """
 
+    HANDOVER = DIRECTORY / "handover"
+    """
+    A plan handover: two plans, one depending on the other's item, the progress notes
+    of their items' branches and the repository's rules, laid out as
+    :class:`basstler.locations.PlanHandoverLocation` names them.
+    """
+
+    UNRELATED_PROGRESS_NOTE = DIRECTORY / "handover-notes" / "unrelated-branch.md"
+    """
+    The progress note of a branch no plan of :attr:`HANDOVER` tracks.
+    """
+
     PLANS = DIRECTORY / "plans"
     """
     A plans directory the cross-plan reference tests resolve against: one subdirectory
@@ -391,6 +414,12 @@ class DatasetLocation(PathEnumeration):
     A module standing in for :mod:`basstler.plan_site.build_start`, printing its name.
     """
 
+    GIT_IDENTITY_OF_A_COLLEAGUE_STUB = STUBS / "git_identity_of_a_colleague.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.git_identity`, printing the
+    identity path of a colleague who does not own the notes repository.
+    """
+
     BUILD_START_NEEDS_ACCESS_STUB = STUBS / "build_start_needs_access.py"
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, saying this session
@@ -414,6 +443,17 @@ class DatasetLocation(PathEnumeration):
     FAILING_CHECK_SETUP_STUB = STUBS / "check_setup_fails.sh"
     """
     A script standing in for check-setup.sh, failing before it prints a report.
+    """
+
+    MERGE_WORKFLOW_REFRESH_STUB = STUBS / "merge_workflow_refresh_from_environment.py"
+    """
+    A module standing in for :mod:`basstler.plan_site.merge_workflow_refresh`'s command,
+    printing what the environment says.
+    """
+
+    MERGE_WORKFLOW_REFRESH_OUTPUT = DIRECTORY / "merge-workflow-refresh-output.txt"
+    """
+    What the real command prints once it proposed the current merge workflow.
     """
 
     MERGED_ITEMS_STUB = STUBS / "merged_items_from_recording.py"
@@ -695,11 +735,6 @@ class PersonalNotesPath(PathEnumeration):
     reads a plan out of.
     """
 
-    GIT_IDENTITY = ProjectLocation.PERSONAL_NOTES / "git-identity"
-    """
-    The recorded git identity a clone with none of its own is given.
-    """
-
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"
     """
     The directory holding each pull request branch's progress notes, by branch name.
@@ -719,6 +754,27 @@ class PersonalNotesPath(PathEnumeration):
     BRANCH_INDEX = ProjectLocation.PLAN_BRANCH_INDEX
     """
     The generated reverse index mapping an item's branch to the plan tracking it.
+    """
+
+
+class AddressSnippet(PathEnumeration):
+    """
+    Python sources the address check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "address-building"
+    """
+    The directory holding them.
+    """
+
+    HAND_BUILT = DIRECTORY / "hand-built-addresses.py"
+    """
+    A REST path and a page each appended to a repository's address by hand.
+    """
+
+    FROM_THEIR_CLASS = DIRECTORY / "addresses-from-their-class.py"
+    """
+    An address the repository builds, and a repository's name in a sentence.
     """
 
 
@@ -817,18 +873,25 @@ class BashByNameSnippet(PathEnumeration):
 
     SUBPROCESS_CALL = DIRECTORY / "subprocess-call.py"
     """
-    A :mod:`subprocess` call running bash by its name, on line 9.
+    A :mod:`subprocess` call running bash by its name, marked as a violation.
     """
 
     RETURNED_COMMAND = DIRECTORY / "returned-command.py"
     """
-    A function returning a command line that runs bash by its name, on line 12.
+    A function returning a command line that runs bash by its name, marked as a
+    violation.
     """
 
     LOCATED_BASH = DIRECTORY / "located-bash.py"
     """
     A run of the located bash, and a tuple of names starting with bash that is no
     command.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls running bash by its name through :mod:`subprocess` imported under other
+    names, marked as violations.
     """
 
 
@@ -1025,8 +1088,7 @@ class LocaleEncodingSnippet(PathEnumeration):
 
     LOCALE_TEXT = DIRECTORY / "locale-text.py"
     """
-    Every kind of text read or written in the locale encoding, one per line from line
-    12 to line 16.
+    Every kind of text read or written in the locale encoding, one per marked line.
     """
 
     UTF_8_TEXT = DIRECTORY / "utf-8-text.py"
@@ -1039,6 +1101,12 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
     A function and a method that are not :func:`open`, given a file name and a binary
     mode.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls decoding output in the locale encoding through :mod:`subprocess` imported
+    under other names, marked as violations.
     """
 
 
@@ -1054,7 +1122,18 @@ class TreeRemovalSnippet(PathEnumeration):
 
     SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
     """
-    Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
+    Two calls to :func:`shutil.rmtree`, marked as violations.
+    """
+
+    IMPORTED_RMTREE = DIRECTORY / "imported-rmtree.py"
+    """
+    Three calls to :func:`shutil.rmtree` through an aliased module and through names
+    imported from it, marked as violations.
+    """
+
+    OTHER_RMTREE = DIRECTORY / "other-rmtree.py"
+    """
+    A function and a method named ``rmtree`` that are not :func:`shutil.rmtree`.
     """
 
 

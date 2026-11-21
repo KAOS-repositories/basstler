@@ -85,6 +85,10 @@
       <a href="{{ plan.repository_url }}">{{ plan.default_repository }}</a>
       {% if header.tracking_url %}<a href="{{ header.tracking_url }}">Propose a structural change →</a>{% endif %}
     </p>
+    <p class="handover-group">
+      <label>Hand over to <input type="text" class="handover-receiver" placeholder="login or owner/repository" spellcheck="false" autocomplete="off" aria-label="The receiver's GitHub login, or their repository as owner/repository"></label>
+      <button type="button" class="action-button" data-handover-command="{{ handover_button.command }}" data-repository-name="{{ handover_button.plan_repository.name }}" data-receiver-repository-option="{{ vocabulary.handover_option.RECEIVER_REPOSITORY }}" data-receiver-login-option="{{ vocabulary.handover_option.RECEIVER_LOGIN }}" title="Copies the command offering {{ handover_button.plan_identifiers | join(', ') }}; run it in a checkout of {{ plan.default_repository }}" onclick="planPageCopyHandoverCommand(this)">▸ Copy handover command</button>
+    </p>
     {% if header.history or header.built_at %}
     <p class="meta-line plan-times">
       {% if header.history %}

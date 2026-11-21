@@ -834,6 +834,7 @@ def test_the_query_and_variables_are_sent_as_the_request_body(
     )
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_failing_gh_invocation_is_raised(stubbed_gh, monkeypatch):
     monkeypatch.setenv(StubEnvironmentVariable.EXIT_CODE, "1")
 
@@ -884,6 +885,7 @@ def test_a_job_log_comes_back_as_the_runner_recorded_it(stubbed_gh, monkeypatch)
     assert read == recorded
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_failing_job_log_read_is_raised(stubbed_gh, monkeypatch):
     monkeypatch.setenv(StubEnvironmentVariable.EXIT_CODE, "1")
 

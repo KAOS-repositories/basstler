@@ -32,6 +32,12 @@ It creates your notes branch, records the git identity your commits are authored
 with, installs what the package needs, and asks only about the decisions that
 are genuinely yours. Re-running it on a set-up project changes nothing.
 
+Colleagues can share one notes branch, and the plans on it. The repository's owner keeps
+their identity at `.claude/personal/git-identity`; everyone else records theirs at
+`.claude/personal/git-identities/<their GitHub login>`, so each session authors commits
+as the person it works for. A colleague who may push to the repository joins its notes
+branch by running the same setup once its owner has created it.
+
 Without a session, the same setup is one command, once the package's environment exists:
 
 ```bash
@@ -108,7 +114,16 @@ A project that prefers a dispatch-only workflow on its default branch may still 
 the package, both from `main`; to pin a release instead, change both references to its
 tag.
 
-## 4. Check it worked
+## 4. For the review triage: choose how files are marked viewed
+
+Only if you use `basstler review-triage mark-viewed`. "Viewed" is kept for each GitHub
+account, and only GitHub's GraphQL API sets it, which a Claude Code cloud session cannot
+reach. There are two routes: marking from your own computer, where `gh` is logged in, or
+from a repository's Actions, which `basstler review-triage set-up-mark-viewed` sets up.
+[The review triage's README](review-triage/README.md) describes both and the steps for
+each; in Claude Code, `/setup-review-triage` walks you through them.
+
+## 5. Check it worked
 
 ```bash
 "${BASSTLER_PLUGIN_ROOT}/hooks/check-setup.sh"

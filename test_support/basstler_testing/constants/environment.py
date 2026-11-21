@@ -137,6 +137,11 @@ class ConfigurationVariable(StrEnum):
     The ref the personal-notes branch is fetched into.
     """
 
+    PULL_REQUEST_PROGRESS_DIRECTORY = "PR_PROGRESS_DIRECTORY"
+    """
+    The notes branch's directory of progress notes.
+    """
+
 
 class SearchPathVariable(EnvironmentVariable):
     """
@@ -179,6 +184,17 @@ class InterpreterName(StrEnum):
     """
     The name the shell configuration falls back to before the package environment
     exists, which a Windows virtual environment does not provide.
+    """
+
+
+class InterpreterVariable(StrEnum):
+    """
+    Variables the Python interpreter reads when it starts.
+    """
+
+    HASH_SEED = "PYTHONHASHSEED"
+    """
+    The seed the interpreter hashes strings with.
     """
 
 
@@ -229,4 +245,21 @@ class PullRequestStubVariable(StrEnum):
     """
     The ``pr_data.json``-shaped file the pull requests are read from; unset, none exists,
     and naming a missing file, every read gets no answer.
+    """
+
+
+class MergeWorkflowRefreshStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/merge_workflow_refresh_from_environment.py`` reads.
+    """
+
+    OUTPUT = "STUB_MERGE_WORKFLOW_REFRESH_OUTPUT"
+    """
+    The file whose text the stub prints; unset, it prints nothing.
+    """
+
+    FAILURE = "STUB_MERGE_WORKFLOW_REFRESH_FAILURE"
+    """
+    What the stub prints to the error stream before exiting with status 1; unset, it
+    does not fail.
     """

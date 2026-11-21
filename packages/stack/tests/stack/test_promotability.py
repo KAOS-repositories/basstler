@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 
+from basstler.github.repository import RepositoryBranch
 from basstler.stack.model import BranchStatus, PullRequest
 from basstler.stack.promotability import PromotionBlocker, PromotionReadiness
 from basstler.stack.promotion_link import PromotionLink, PromotionTarget
@@ -147,12 +148,13 @@ def test_the_stack_promotes_exactly_the_branches_its_rule_finds_promotable():
 # %% the link target
 
 
-def test_the_target_of_a_configuration_names_its_upstream_and_fork_owner():
+def test_the_target_of_a_configuration_names_its_upstream_base_and_fork():
     configuration = make_configuration()
     assert PromotionTarget.from_configuration(configuration) == PromotionTarget(
-        upstream_repository=configuration.upstream_repository,
-        upstream_base=configuration.upstream_base,
-        fork_owner=configuration.fork_repository.owner,
+        upstream_base=RepositoryBranch(
+            configuration.upstream_base, configuration.upstream_repository
+        ),
+        fork=configuration.fork_repository,
     )
 
 

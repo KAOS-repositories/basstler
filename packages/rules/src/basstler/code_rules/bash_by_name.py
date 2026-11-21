@@ -1,5 +1,6 @@
 """
-Finds commands that start bash by its name instead of through :class:`basstler.bash.Bash`.
+Finds commands that start bash by its name instead of through
+:class:`basstler.bash.Bash`.
 """
 
 from __future__ import annotations
@@ -88,7 +89,7 @@ class BashByNameChecker(SyntaxTreeChecker):
         self, path: Path, module: PositionedModule
     ) -> Iterator[CodeRuleViolation]:
         for occurrence in BashStarted.found_in(module):
-            command = BashStarted.captures(occurrence.node)[
+            command = BashStarted.captures(occurrence.node, module.metadata)[
                 BashStarted.saved_command_name
             ]
             location = module.positions[libcst.ensure_type(command, libcst.CSTNode)]

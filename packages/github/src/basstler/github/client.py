@@ -22,9 +22,8 @@ from enum import StrEnum
 from functools import cached_property
 from http import HTTPStatus
 from http.client import HTTPResponse
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
@@ -36,7 +35,7 @@ from basstler.github.exceptions import (
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, HasRepository
 from basstler.json_model import ValidatedJSONModel
 
 # %% the interface
@@ -75,6 +74,13 @@ class GitHubReader(ABC):
         :return: Each page's parsed response, first page first.
         """
 
+    def get_entries(self, path: str) -> list[dict[str, Any]]:
+        """
+        :param path: The path of a listing whose pages are lists.
+        :return: Every entry of every page, first page first.
+        """
+        return [entry for page in self.get_pages(path) for entry in page]
+
 
 class GitHubAttemptReader(ABC):
     """
@@ -111,14 +117,9 @@ class GitHubWrite(ValidatedJSONModel, ABC):
         """
 
 
-class RepositoryWrite(GitHubWrite, ABC):
+class RepositoryWrite(GitHubWrite, HasRepository, ABC):
     """
     A change to a resource of one repository.
-    """
-
-    repository: Annotated[Repository, Field(exclude=True)]
-    """
-    The repository the resource belongs to.
     """
 
 

@@ -54,7 +54,7 @@ def test_the_build_is_dispatched_on_the_site_s_default_branch():
         WorkflowDispatch(
             SITE.repository,
             WorkflowLocation.PLAN_SITE,
-            RepositoryDetails.from_json(SITE_DETAILS).default_branch,
+            RepositoryDetails.from_json(SITE_DETAILS).default_branch.name,
         )
     ]
 

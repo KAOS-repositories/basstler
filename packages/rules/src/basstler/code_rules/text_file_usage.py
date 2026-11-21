@@ -40,8 +40,10 @@ class TextFileFix(CodeFix[Specification]):
     def behaviour(cls) -> BehaviourDeclaration:
         return BehaviourDeclaration(
             BehaviourEffect.CHANGED,
-            "Text is read and written as UTF-8 instead of in the locale encoding; "
-            "nothing changes where the locale encoding is UTF-8.",
+            "Text is read and written as UTF-8 instead of in the locale encoding, and "
+            "text is written with its line endings as given instead of translated to "
+            "the platform's; nothing changes where the locale encoding is UTF-8 and "
+            "the platform ends lines in a line feed.",
         )
 
     @classproperty

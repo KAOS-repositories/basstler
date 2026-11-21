@@ -21,6 +21,8 @@ from basstler.github.review_models import (
     ThreadComment,
 )
 from basstler.github.states import ConclusionOutcome, PullRequestState, ReviewState
+from basstler.git.branch import Branch
+from basstler.github.git_objects import GitObject
 from basstler.github.web_page import AbsentAsEmpty, WebPage
 from basstler.json_model import ValidatedJSONModel
 
@@ -42,14 +44,22 @@ class RestPullRequestState(StrEnum):
     CLOSED = "closed"
 
 
-class RestPullRequestHead(ValidatedJSONModel):
+class PullRequestEnd(GitObject, Branch):
     """
-    The branch a pull request was opened from.
+    One end of a pull request - the branch it is opened from or merges into - standing
+    for the commit the branch points at.
     """
 
-    sha: str
+    name: Annotated[str, Field(alias="ref")]
     """
-    The commit the branch points at, which the checks are reported against.
+    The branch's name.
+    """
+
+
+class RestPullRequestHead(PullRequestEnd):
+    """
+    The branch a pull request was opened from, whose commit the checks are reported
+    against.
     """
 
     owner: Annotated[Author, Field(alias="user")]
@@ -58,14 +68,47 @@ class RestPullRequestHead(ValidatedJSONModel):
     """
 
 
-class RestPullRequestSummary(RestResponse, WebPage):
+class PullRequestNumber(ValidatedJSONModel):
     """
-    One pull request as REST describes it, whether listed or read on its own.
+    A pull request as every REST resource of one names it: by its number.
     """
 
     number: int
     """
-    Its number on the upstream repository.
+    Its number on the repository it is opened on.
+    """
+
+
+class PullRequestPage(PullRequestNumber, WebPage):
+    """
+    A pull request named by its number and its page.
+    """
+
+
+class PullRequestAtHead(PullRequestNumber):
+    """
+    A pull request and the commit its branch points at.
+    """
+
+    head: PullRequestEnd
+    """
+    The branch it was opened from.
+    """
+
+    def is_at(self, other: PullRequestAtHead) -> bool:
+        """
+        :param other: A pull request.
+        :return: Whether it is the same pull request at the same head commit.
+        """
+        return (
+            self.number == other.number
+            and self.head.object_hash == other.head.object_hash
+        )
+
+
+class RestPullRequestSummary(RestResponse, PullRequestAtHead, PullRequestPage):
+    """
+    One pull request as REST describes it, whether listed or read on its own.
     """
 
     title: str
@@ -85,7 +128,12 @@ class RestPullRequestSummary(RestResponse, WebPage):
 
     head: RestPullRequestHead
     """
-    The branch it was opened from.
+    The branch it was opened from, with whoever owns it.
+    """
+
+    base: PullRequestEnd
+    """
+    The branch it merges into.
     """
 
     @property

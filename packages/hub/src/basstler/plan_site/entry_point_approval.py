@@ -62,9 +62,9 @@ class ShellCall(ValidatedJSONModel):
 @dataclass(frozen=True)
 class EntryPointInvocation:
     """
-    A command line that runs this plugin's entry point script alone, whether it names the
-    plugin root through a variable or by its path, with arguments the shell leaves as
-    they are.
+    A command line that runs this plugin's entry point script alone, whether it names
+    the plugin root through a variable or by its path, with arguments the shell leaves
+    as they are.
     """
 
     plugin_root: PluginRoot
@@ -99,10 +99,11 @@ class EntryPointInvocation:
     @classproperty
     def plugin_root_path(cls) -> str:
         """
-        The plugin root once expanded, a plain path with nothing the shell would
-        interpret, as a pattern whose group is that path.
+        The plugin root once expanded, a plain absolute path with nothing the shell
+        would interpret, below ``/`` or a Windows drive, as a pattern whose group is
+        that path.
         """
-        return r"(?P<expanded_root>/[^\s\"'`$;&|<>()\\]+)"
+        return r"(?P<expanded_root>(?:[A-Za-z]:)?/[^\s\"'`$;&|<>()\\]+)"
 
     @classproperty
     def arguments(cls) -> str:
@@ -159,8 +160,8 @@ The command, which reads the hook input from standard input.
 @app.default
 def answer_hook() -> StackExitCode:
     """
-    Print the answer allowing the command on standard output, and nothing when it is
-    not the entry point.
+    Print the answer allowing the command on standard output, and nothing when it is not
+    the entry point.
 
     :return: :attr:`StackExitCode.SUCCESS`, also when nothing is printed.
     """

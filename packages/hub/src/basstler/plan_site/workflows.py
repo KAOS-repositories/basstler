@@ -16,6 +16,7 @@ import yaml
 
 from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
+from basstler.github.actions_secret import ActionsSecret
 from basstler.github.repository import Repository
 from basstler.github.workflows import ActivityType
 from basstler.json_model import JSONModel
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 # %% names
 
 
-class PlanSiteSecret(StrEnum):
+class PlanSiteSecret(ActionsSecret):
     """
     The Actions secrets the plan site's workflows read.
     """
@@ -57,13 +58,6 @@ class PlanSiteSecret(StrEnum):
             "the site repository and re-run plan_site.publication "
             "(/setup-personal-notes), so the site workflow passes it to the build"
         )
-
-    def path_on(self, repository: Repository) -> str:
-        """
-        :param repository: The repository that stores it.
-        :return: The REST path of its metadata there.
-        """
-        return f"{repository.api_path}/actions/secrets/{self}"
 
     def read_value(self) -> str:
         """

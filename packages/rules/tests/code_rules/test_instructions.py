@@ -14,6 +14,7 @@ from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.instructions import AgentsInstructions
 from basstler.code_rules.rule import CodeReference, Section
 from basstler.code_rules.rule_module import RuleModule
+from basstler.code_rules.rules import code_quality
 from basstler.code_rules.rules.code_quality import DocumentationRules
 from basstler.code_rules.rules.project import PackageAndPluginRules, PortabilityRules
 from basstler.exceptions import DataclassException
@@ -103,6 +104,7 @@ def test_the_checkers_are_those_of_the_checked_rules():
     The checkers the repository's rules declare, in the order the rules are listed.
     """
     assert RuleModule(rules).checkers == (
+        code_quality.DesignPrinciplesRules.ADDRESSES_ON_THEIR_SUBJECT.checker,
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_DOCSTRINGS.checker,
         PackageAndPluginRules.IMPORT_ONLY_LISTED_PACKAGES.checker,

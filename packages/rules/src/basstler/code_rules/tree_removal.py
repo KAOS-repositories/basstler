@@ -17,6 +17,7 @@ from basstler import directory_tree
 from basstler.class_property import classproperty
 from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.references import ReferenceTo
 from basstler.code_rules.checker import CodeRuleViolation
 from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
 from basstler.directory_tree import DirectoryTree
@@ -26,16 +27,13 @@ from basstler.directory_tree import DirectoryTree
 
 class TreeRemovalCall(CodePattern):
     """
-    A call to :func:`shutil.rmtree`.
+    A call to :func:`shutil.rmtree`, whichever way the file imports it.
     """
 
     @classproperty
     def matcher(cls) -> matchers.Call:
         return matchers.Call(
-            func=matchers.Attribute(
-                value=matchers.Name(shutil.__name__),
-                attr=matchers.Name(shutil.rmtree.__name__),
-            )
+            func=ReferenceTo(f"{shutil.__name__}.{shutil.rmtree.__name__}").matcher
         )
 
 
@@ -45,8 +43,8 @@ class TreeRemovalCall(CodePattern):
 @dataclass(frozen=True)
 class TreeRemovalChecker(SyntaxTreeChecker):
     """
-    Finds calls to :func:`shutil.rmtree` outside :mod:`basstler.directory_tree`; they stop
-    at the read-only object files git leaves on Windows.
+    Finds calls to :func:`shutil.rmtree` outside :mod:`basstler.directory_tree`; they
+    stop at the read-only object files git leaves on Windows.
     """
 
     @override

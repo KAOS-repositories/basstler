@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, Any
 from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, ManifestToolsExitCode
-from basstler.github.repository import Repository
+from basstler.github.repository import PullRequestReference, Repository
+from basstler.plan.handover_options import PlanHandoverOption
 
 if TYPE_CHECKING:
     from basstler.plan.merge import PlanPart
@@ -635,8 +636,13 @@ class DependencyCycle(ValidationProblem):
 
 
 @dataclass
-class PlanValidationError(DataclassException):
+class PlanValidationError(CommandFailure, DataclassException):
     """Raised when a plan.yaml fails schema validation - see plan-schema.md."""
+
+    @classproperty
+    def exit_code(cls) -> ManifestToolsExitCode:
+        """:return: The status this kind of error ends a command with."""
+        return ManifestToolsExitCode.INVALID_MANIFEST
 
     problems: list[ValidationProblem]
     """
@@ -649,3 +655,162 @@ class PlanValidationError(DataclassException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+# %% handing plans over
+
+
+@dataclass
+class PlanOutsideHandoverError(DataclassException, ValueError):
+    """
+    Raised when a handed-over plan depends on an item of a plan the handover leaves out,
+    which the receiver could then never resolve.
+    """
+
+    plan_identifier: str
+    """
+    The handed-over plan holding the dependency.
+    """
+
+    missing_plan_identifiers: tuple[str, ...]
+    """
+    Every plan its items depend on that the handover leaves out.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"plan {self.plan_identifier!r} depends on items of plans the handover "
+            f"leaves out: {', '.join(self.missing_plan_identifiers)}"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Hand those plans over together with it."
+
+
+@dataclass
+class HandoverPlanCycleError(DataclassException, ValueError):
+    """
+    Raised when handed-over plans depend on each other in a cycle, so no plan can be
+    saved before the others it names.
+    """
+
+    plan_identifiers: tuple[str, ...]
+    """
+    The handed-over plans.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "the handed-over plans depend on each other in a cycle: "
+            f"{', '.join(self.plan_identifiers)}"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Move the items that close the cycle into one plan, then hand the plans "
+            "over again."
+        )
+
+
+@dataclass
+class PlanAlreadyTrackedError(DataclassException, FileExistsError):
+    """
+    Raised when the receiving notes branch already holds a plan the handover carries.
+    """
+
+    plan_identifier: str
+    """
+    The plan both hold.
+    """
+
+    def error_message(self) -> str:
+        return f"the notes branch already holds plan {self.plan_identifier!r}"
+
+    def suggest_correction(self) -> str:
+        return (
+            "Import into a notes branch without that plan, or edit the plan that is "
+            "there instead of importing it again."
+        )
+
+
+@dataclass
+class HandoverPullRequestNotChosenError(DataclassException, LookupError):
+    """
+    Raised when the open handover pull requests of a repository do not settle which to
+    take over: none is open, the one asked for is not, or several are and neither one
+    nor all of them was asked for.
+    """
+
+    repository: Repository
+    """
+    The repository the handover pull requests were looked for on.
+    """
+
+    offered: tuple[PullRequestReference, ...]
+    """
+    Every handover pull request open there.
+    """
+
+    requested_number: int | None
+    """
+    The pull request asked for, ``None`` when none was.
+    """
+
+    def error_message(self) -> str:
+        offered = "".join(
+            f"\n  #{pull_request.number}: {pull_request.url}"
+            for pull_request in self.offered
+        )
+        if not self.offered:
+            return f"{self.repository.full_name} has no open handover pull request"
+        if self.requested_number is not None:
+            return (
+                f"#{self.requested_number} is no open handover pull request on "
+                f"{self.repository.full_name}; open there:{offered}"
+            )
+        return (
+            f"{self.repository.full_name} has {len(self.offered)} open handover pull "
+            f"requests:{offered}"
+        )
+
+    def suggest_correction(self) -> str:
+        if not self.offered:
+            return (
+                "Ask the sender to offer the plans to this repository with "
+                "'basstler plan-handover offer', or import the directory they sent."
+            )
+        return (
+            f"Take them all over with {PlanHandoverOption.ALL}, or name the one to "
+            f"take over with {PlanHandoverOption.PULL_REQUEST}."
+        )
+
+
+@dataclass
+class PlanStillNamedError(DataclassException, ValueError):
+    """
+    Raised when a plan to be removed from the notes branch holds an item that a plan
+    staying there still depends on.
+    """
+
+    plan_identifier: str
+    """
+    The plan to be removed.
+    """
+
+    named_by: tuple[str, ...]
+    """
+    Every item staying on the notes branch that depends on one of its items, as ``<plan-
+    id>/<item-id>``.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"plan {self.plan_identifier!r} is still depended on by "
+            f"{', '.join(self.named_by)}"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Drop those dependencies, or remove the plans holding them together with "
+            "it."
+        )

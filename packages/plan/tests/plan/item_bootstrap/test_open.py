@@ -74,11 +74,11 @@ def test_opening_asks_for_a_draft_pull_request_against_the_plans_repository(
     request = opener.requests[0]
     assert request.draft is True
     assert (
-        request.repository
+        request.base.repository
         == PlanManifest(yaml.safe_load(PLAN_MANIFEST)).default_repository
     )
-    assert request.head == NEW_BRANCH
-    assert request.base == ScratchBranch.WORK
+    assert request.head.name == NEW_BRANCH
+    assert request.base.name == ScratchBranch.WORK
 
 
 def test_opening_publishes_the_branch_to_the_repositorys_own_remote(

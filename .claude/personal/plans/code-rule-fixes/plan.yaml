@@ -22,18 +22,18 @@ items:
   session: https://claude.ai/code/session_01JxHGiQ6QwrU1DCxnD3WaYc
   pull_request_number: 222
   blockers:
-  - 'Base #220 conflicts with main in plan/item_bootstrap/documents.py and plan/model.py and
-    carries needs-resolution, so the maintenance pass withholds it and this pull request.
-    This one merges cleanly into the base at 6ed0232c.'
-  - 'CI at 6ed0232c is not read yet (pushed just now). Locally: ruff and the suite pass, except
-    tests/plan_site and tests/plan/item_bootstrap, which were not run.'
-  notes: 'Ready for review #222, stacked on #220, which stays a draft until these rule fixes
-    are run on it; nothing here waits for #220. basstler.code_modification (specifications,
-    NodeReplacement with exact inverse, ActionPlan) on libcst; FixableChecker + CodeFix with
-    BehaviourDeclaration; SourceFixer in rounds; code-rules fix. UTF-8 fix reproduces 107
-    of #220''s 129 .py files; examples under tests/dataset/rule-fixes tested automatically.
-
-    '
+    - >-
+      CI at 54f7ebb5 not read yet (pushed just now), Windows above all. Locally the suite passes
+      except tests/plan_site tests needing Playwright's browser, not run. Merge probe vs main:
+      clean.
+  notes: >
+    Draft #222, based on main (#220, which it was stacked on, has merged).
+    basstler.code_modification (specifications, NodeReplacement with exact inverse, ActionPlan,
+    CodePattern, ReferenceTo) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
+    SourceFixer in rounds; code-rules fix. UTF-8 fix reproduced 107 of #220's 129 .py files
+    (measured before the review changes and before TextFile kept newlines as stored; not measured
+    again); examples under tests/dataset/rule-fixes tested automatically. TextFile keeps line
+    endings as stored and the TextFile fix declares that change.
 - id: directory-and-bash-fixes
   title: Fixes for directory removal and bash started by name
   track: pattern-fixes

@@ -9,6 +9,7 @@ Only the released plugin's manifest names the version.
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import sys
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.git.commands import GitCommandRunner
+from basstler.github.basstler_project import BasstlerProject
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import BasstlerRepositoryLocation
 from basstler.standard_streams import StandardStreamHandler
@@ -251,6 +253,16 @@ class ReleaseVersion:
         except MalformedVersion:
             return None
 
+    @classmethod
+    def installed(cls) -> ReleaseVersion | None:
+        """
+        :return: The release of the installed package, ``None`` for a build that is no
+            release, such as a source checkout past one.
+        """
+        return cls.from_tag(
+            f"{cls.tag_prefix}{importlib.metadata.version(BasstlerProject.name)}"
+        )
+
     def bumped(self, part: VersionPart) -> ReleaseVersion:
         """
         :param part: The part to increment; every part after it resets to zero.
@@ -269,6 +281,41 @@ class ReleaseVersion:
 
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
+
+
+@dataclass(frozen=True)
+class PublishedReleases:
+    """
+    The releases a remote repository has tagged.
+    """
+
+    git: GitCommandRunner
+    """
+    A checkout, whose git lists the remote's tags.
+    """
+
+    remote: str
+    """
+    The remote's name or URL.
+    """
+
+    def latest(self) -> ReleaseVersion | None:
+        """
+        :return: The highest released version, ``None`` before the first release.
+        """
+        listed = self.git.run("ls-remote", "--tags", "--refs", self.remote)
+        tags = "\n".join(
+            line.rpartition("refs/tags/")[2] for line in listed.splitlines()
+        )
+        return max(Release.released(tags), default=None)
+
+    def is_ahead_of(self, installed: ReleaseVersion | None) -> bool:
+        """
+        :param installed: The release a session runs, ``None`` when it runs none.
+        :return: Whether a release newer than it is published.
+        """
+        latest = self.latest()
+        return installed is not None and latest is not None and installed < latest
 
 
 @dataclass(frozen=True)

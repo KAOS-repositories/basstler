@@ -24,6 +24,11 @@ class SessionTool(StrEnum):
     repository's git and API requests.
     """
 
+    REGISTER_REPOSITORY_ROOT = "mcp__claude-code-remote__register_repo_root"
+    """
+    Loads the instructions of an attached repository's local clone into the session.
+    """
+
     ASK_USER = "AskUserQuestion"
     """
     Asks the user to choose between options.
@@ -80,12 +85,15 @@ class RepositoryAttachment:
     def instruction(self) -> str:
         """
         :return: The tool call that attaches :attr:`repository`, the command to run
-            then, and the question to put to the user when the attach is refused.
+            then without a local clone, and the question to put to the user when the
+            attach is refused.
         """
         return (
             f"Attach {self.repository.full_name} to this session: call "
             f"{SessionTool.ATTACH_REPOSITORY} with owner {self.repository.owner}, repo "
-            f"{self.repository.name} and access push, then run {self.retry_command}. If "
+            f"{self.repository.name} and access push, then run {self.retry_command}. "
+            f"Only the attachment's credential is needed: skip the clone and the "
+            f"{SessionTool.REGISTER_REPOSITORY_ROOT} call the attach answer asks for. If "
             f"the attach is refused, ask the user with {SessionTool.ASK_USER} to allow "
             f'it, with "{self.recommended_option}" as the first option: '
             f"{self.benefit}."

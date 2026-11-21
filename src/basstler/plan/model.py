@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 import sys
 import textwrap
+import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 from pathlib import Path
@@ -18,6 +20,7 @@ from typing import Any
 
 import yaml
 
+from basstler.class_property import classproperty
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
 from basstler.text_file import TextFile
@@ -535,6 +538,122 @@ class ManifestKey(KeySpecification, Enum):
 
 
 @dataclass(frozen=True)
+class ExternalDependency:
+    """
+    An item of a plan not kept alongside the plan whose item stacked on it, as it stood
+    when that plan was handed over.
+    """
+
+    reference: str
+    """
+    The item as ``<plan-id>/<item-id>``.
+    """
+
+    title: str
+    """
+    The item's title.
+    """
+
+    status: ItemStatus
+    """
+    The item's status when the plan was handed over.
+    """
+
+    plan_description: str
+    """
+    What the item's plan is for.
+    """
+
+    branch: str | None = None
+    """
+    The branch the item's work happens on, ``None`` when it had none.
+    """
+
+    pull_request_url: str | None = None
+    """
+    The item's pull request, ``None`` when it had none.
+    """
+
+    notes: str | None = None
+    """
+    The item's notes, ``None`` when it had none.
+    """
+
+    @classproperty
+    def guidance(cls) -> str:
+        """
+        What whoever continues an item stacked on external work is told to do with it.
+        """
+        return (
+            "This item stacked on work that was not handed over, described in "
+            "external_dependencies. Whoever continues the item decides whether to "
+            "repeat, replace, ignore or depend on that work."
+        )
+
+    @classmethod
+    def from_item(cls, *, plan: PlanManifest, item: PlanItem) -> ExternalDependency:
+        """
+        :param plan: The plan holding the item.
+        :param item: The item to describe.
+        :return: The item as it stands now.
+        """
+        return cls(
+            reference=f"{plan.identifier}/{item.identifier}",
+            title=str(item.content[ManifestKey.TITLE.key]),
+            status=item.status,
+            plan_description=plan.description,
+            branch=item.branch,
+            pull_request_url=(
+                plan.repository_of(item).pull_request_url(item.pull_request_number)
+                if item.pull_request_number is not None
+                else None
+            ),
+            notes=item.notes or None,
+        )
+
+    @classmethod
+    def is_readable(cls, content: Any) -> bool:
+        """
+        :param content: One entry of an item's ``external_dependencies``, as parsed.
+        :return: Whether :meth:`from_content` can read it.
+        """
+        fields = dataclasses.fields(cls)
+        required = {
+            field.name for field in fields if field.default is dataclasses.MISSING
+        }
+        return (
+            isinstance(content, dict)
+            and required <= set(content) <= {field.name for field in fields}
+            and content[ManifestKey.STATUS.key] in set(ItemStatus)
+        )
+
+    @classmethod
+    def from_content(cls, content: dict[str, Any]) -> ExternalDependency:
+        """
+        :param content: One entry of an item's ``external_dependencies``.
+        :return: The entry as parsed.
+        """
+        return cls(
+            **{
+                **content,
+                ManifestKey.STATUS.key: ItemStatus(content[ManifestKey.STATUS.key]),
+            }
+        )
+
+    @property
+    def content(self) -> dict[str, Any]:
+        """
+        The entry as a manifest writes it, without the fields that are empty.
+        """
+        fields = {
+            name: value
+            for name, value in dataclasses.asdict(self).items()
+            if value is not None
+        }
+        return {**fields, ManifestKey.STATUS.key: self.status.value}
+
+
+@dataclass(frozen=True)
 class PlanItem:
     """
     One entry of a manifest's ``items`` list.
@@ -608,34 +727,37 @@ class PlanItem:
         ]
 
     @property
-    def external_dependencies(self) -> list[str]:
+    def external_dependencies(self) -> list[ExternalDependency]:
         """
-        :return: The items of plans not kept alongside this one that it stacked on, as
-            ``<plan-id>/<item-id>``.
+        :return: The items of plans not kept alongside this one that it stacked on.
         """
         return [
-            str(dependency)
-            for dependency in self.content.get(ManifestKey.EXTERNAL_DEPENDENCIES.key)
-            or []
+            ExternalDependency.from_content(entry)
+            for entry in self.content.get(ManifestKey.EXTERNAL_DEPENDENCIES.key) or []
         ]
 
-    def with_dependencies_made_external(self, identifiers: set[str]) -> PlanItem:
+    def with_dependencies_made_external(
+        self, external: Mapping[str, ExternalDependency]
+    ) -> PlanItem:
         """
-        :param identifiers: ``depends_on`` entries to stop depending on.
-        :return: This item with every dependency on *identifiers* moved from its
+        :param external: The items of plans no longer kept alongside this one, by their
+            ``<plan-id>/<item-id>``.
+        :return: This item with every dependency on one of them moved from its
             dependencies to its external dependencies.
         """
         moved = [
-            dependency for dependency in self.dependencies if dependency in identifiers
+            external[dependency]
+            for dependency in self.dependencies
+            if dependency in external
         ]
         if not moved:
             return self
         return PlanItem(
             {
-                **self.without_dependencies(identifiers).content,
+                **self.without_dependencies(set(external)).content,
                 ManifestKey.EXTERNAL_DEPENDENCIES.key: [
-                    *self.external_dependencies,
-                    *moved,
+                    *(entry.content for entry in self.external_dependencies),
+                    *(entry.content for entry in moved),
                 ],
             }
         )

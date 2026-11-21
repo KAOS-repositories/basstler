@@ -79,9 +79,11 @@ items:                         # the actual trackable units of work - flat,
     depends_on: [<item-id>, ...]  # structural/stacking dependency - a bare id for
                                    # an item of this plan, <plan-id>/<item-id> for
                                    # one in another plan (see below)
-    external_dependencies: [<plan-id>/<item-id>, ...]  # optional: items of plans not kept
-                                   # alongside this one that it stacked on; written by
-                                   # `plan-handover --without-dependencies`, never resolved
+    external_dependencies:       # optional, written by `plan-handover --without-dependencies`:
+      - reference: <plan-id>/<item-id>   # one record per item of a plan not kept alongside
+        title: ...                       # this one that the item stacked on, as it stood
+        status: ...                      # when handed over; never resolved. Also: plan_description,
+                                         # branch, pull_request_url, notes
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
     recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
                                                # difficulty; see "Choosing the recommended model"

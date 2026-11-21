@@ -85,8 +85,11 @@ None.
 - **Depends on:** nothing
 {% endif %}
 {% if item.external_dependencies %}
-- **Stacked on, not handed over:** {% for dependency in item.external_dependencies %}`{{ dependency }}`{{ ", " if not loop.last }}{% endfor %}
+- **Stacked on work not handed over:** {{ external_guidance }}
+{% for dependency in item.external_dependencies %}
+  - `{{ dependency.reference }}`: {{ dependency.title }} ({{ dependency.status.value }}{% if dependency.branch %}, branch `{{ dependency.branch }}`{% endif %}{% if dependency.pull_request_url %}, [pull request]({{ dependency.pull_request_url }}){% endif %}). Its plan: {{ dependency.plan_description }}{% if dependency.notes %} Its notes: {{ dependency.notes }}{% endif %}
 
+{% endfor %}
 {% endif %}
 {% if item.notes %}
 

@@ -432,8 +432,8 @@ class InvalidBlockers(ValidationProblem):
 @dataclass
 class InvalidExternalDependencies(ValidationProblem):
     """
-    An item's ``external_dependencies`` isn't a list, so a string would be misread as
-    one dependency per character.
+    An item's ``external_dependencies`` isn't a list of records of items left out of the
+    plan's handover.
     """
 
     item_identifier: str
@@ -441,15 +441,15 @@ class InvalidExternalDependencies(ValidationProblem):
     The offending item's effective id.
     """
 
-    actual_type: type
+    actual: Any
     """
-    The type ``external_dependencies`` actually held, instead of ``list``.
+    The list, or the entry of it, that is not what ``external_dependencies`` holds.
     """
 
     def error_message(self) -> str:
         return (
-            f"item {self.item_identifier!r} external_dependencies must be a list, "
-            f"got {self.actual_type.__name__}"
+            f"item {self.item_identifier!r} external_dependencies must be a list of "
+            f"records of the items stacked on, got {self.actual!r}"
         )
 
 

@@ -43,7 +43,7 @@ from basstler.plan.exceptions import (
     UnknownWave,
     ValidationProblem,
 )
-from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model import ExternalDependency, ItemStatus, ManifestKey
 from basstler.plan.model_alias import ModelAlias
 
 # %% dependency cycles
@@ -462,9 +462,13 @@ class PlanValidator:
             external_dependencies, list
         ):
             problems.append(
-                InvalidExternalDependencies(
-                    item_identifier, type(external_dependencies)
-                )
+                InvalidExternalDependencies(item_identifier, external_dependencies)
+            )
+        else:
+            problems.extend(
+                InvalidExternalDependencies(item_identifier, entry)
+                for entry in external_dependencies or []
+                if not ExternalDependency.is_readable(entry)
             )
         blockers = item.get(ManifestKey.BLOCKERS.key)
         if blockers is not None and not isinstance(blockers, list):

@@ -29,9 +29,12 @@ from basstler.plan.item_brief import (
     main,
 )
 from basstler.plan.model import (
+    ExternalDependency,
     ItemNotTrackedError,
+    ItemStatus,
     ManifestKey,
     PlanDocument,
+    PlanItem,
     PlanManifest,
 )
 from basstler.plan.repository_rules import RepositoryRules
@@ -325,3 +328,48 @@ def test_the_command_leaves_the_upstream_of_a_forked_plan_repository_unread(
     assert [
         path for path in client.reads if path.startswith(f"/{upstream.api_path}/")
     ] == []
+
+
+# %% work stacked on that was not handed over
+
+
+def test_the_brief_of_an_item_with_external_dependencies_says_what_to_do_with_them():
+    """
+    The session continuing the item is told to decide what to do with the external
+    work, and the records it decides from are the item's own.
+    """
+    record = ExternalDependency(
+        reference="other-plan/some-item",
+        title="Some item",
+        status=ItemStatus.IN_PROGRESS,
+        plan_description="What the other plan is for.",
+    )
+    item = PlanItem(
+        {
+            **BRIEFED_ITEM.content,
+            ManifestKey.EXTERNAL_DEPENDENCIES.key: [record.content],
+        }
+    )
+
+    brief = yaml.safe_load(
+        ItemBrief(
+            manifest=BRIEFED_MANIFEST,
+            item=item,
+            dependencies=[],
+            standing_rules=[],
+            repository_rules=RepositoryRules(),
+        ).render()
+    )
+
+    assert brief[ItemBriefKey.EXTERNAL_DEPENDENCIES_GUIDANCE] == (
+        ExternalDependency.guidance
+    )
+
+
+def test_the_brief_of_an_item_without_external_dependencies_has_no_such_guidance(
+    briefed_repository: ScratchRepository,
+    pull_request_source: RecordedPullRequestSource,
+):
+    brief = read_brief(briefed_repository, pull_request_source)
+
+    assert ItemBriefKey.EXTERNAL_DEPENDENCIES_GUIDANCE not in brief

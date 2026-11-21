@@ -110,6 +110,9 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
+  notes: 'Draft #262 on #226. mark-viewed-in-reviews starts from LastReviewStart, which
+    viewed-state-start removes; when restacked onto that item, it moves onto the viewed-state
+    start.'
 - id: repository-field-once
   title: Declare the repository field once in every GitHub model
   branch: null
@@ -151,4 +154,19 @@ items:
   notes: 'Draft #240 at 1b6fb9f6, stacked on #238 (experiments/receiver-inference-experiment) on
     #214. Pins pyrefly==1.4.1; reveals receivers once per pull request; --no-type-checker. Conflicts
     with its base (needs-resolution), CI not read. Next: restack onto #238.'
+
+- id: viewed-state-start
+  title: Start each file's triage from where its reviewer last viewed it
+  branch: null
+  track: triage
+  depends_on:
+  - binding-renames
+  status: not started
+  recommended_model: opus
+  notes: 'Stacked on #266 (untracked). Replaces LastReviewStart, which a Claude thread reply
+    under the user reset to head on #223. One paged GraphQL snapshot reads headRefOid and each
+    file''s viewerViewedState: VIEWED skipped, UNVIEWED from the merge base, DISMISSED from the
+    latest checkpoint head where it was VIEWED, else the merge base. Each run stores a checkpoint
+    (head, VIEWED files) on personal notes when reachable, else the local cache. Marking stops
+    if headRefOid moved. --since and --from-merge-base stay. #223 moves these paths.'
 landed_item_count: 5

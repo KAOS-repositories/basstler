@@ -398,7 +398,7 @@ class GitHubRepository(
 
     def _every_entry(
         self, path: GitHubRepositoryPath, filters: Mapping[ListingParameter, str]
-    ) -> list[Any]:
+    ) -> list[dict[str, Any]]:
         """
         Read a listing below the repository whose pages are lists, to its end.
 

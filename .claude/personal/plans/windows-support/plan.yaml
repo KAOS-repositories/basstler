@@ -24,22 +24,10 @@ items:
   depends_on:
   - basstler-packages/uv-workspace
   pull_request_number: null
-  notes: >
-    Folded into basstler-packages/uv-workspace (owner, 2026-11-13): that item creates the
-    environment with uv sync --frozen and also covers creating it on Windows without uv on PATH (py
-    -3.x and a python on PATH as interpreter candidates). Nothing is left to do here.
+  notes: 'Folded into basstler-packages/uv-workspace (owner, 2026-11-13): that item creates
+    the environment with uv sync --frozen and also covers creating it on Windows without uv
+    on PATH (py -3.x and a python on PATH as interpreter candidates). Nothing is left to do
+    here.
 
-- id: windows-tests-after-merge
-  title: Run the Windows suite on main within the tests, and on pull requests only for platform files
-  track: fixes
-  branch: claude/sharp-faraday-9x7d17
-  pull_request_number: 278
-  session: https://claude.ai/code/session_01JxHGiL9d4V2wAQbz3qegpx
-  depends_on: []
-  status: in progress
-  recommended_model: sonnet
-  notes: >
-    Draft #278 at ff41a68e. Tests calls windows-tests.yml on every push to main, so the release
-    waits for Windows; pull requests run it only for platform files, or by hand. Budget override
-    raises tests.yml to 8 jobs. Locally ruff, code rules and the touched tests pass; CI not read.
-    Next: review.
+    '
+landed_item_count: 1

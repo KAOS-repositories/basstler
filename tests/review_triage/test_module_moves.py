@@ -17,7 +17,11 @@ from basstler.review_triage.triage import PullRequestTriager
 
 from ..scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
-from .samples import ModuleMoveSample, PackageRootMoveSample
+from .samples import (
+    AmbiguousPackageInitializersSample,
+    ModuleMoveSample,
+    PackageRootMoveSample,
+)
 
 # %% the sample
 
@@ -84,3 +88,21 @@ def test_a_package_moved_under_a_plain_directory_keeps_its_relative_imports_mech
     )
     triage = PullRequestTriager().triage(changes)
     assert triage.files_needing_review == ()
+
+
+# %% empty package initializers git cannot tell apart
+
+
+def test_empty_package_initializers_paired_by_git_do_not_rename_their_packages(
+    scratch_repository: ScratchRepository,
+):
+    """
+    Git pairs identical, empty ``__init__.py`` files in no meaningful order, so a package
+    is not renamed to the package of the file git paired its initializer with.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        AmbiguousPackageInitializersSample.BASE_TREE,
+        AmbiguousPackageInitializersSample.HEAD_TREE,
+    )
+    assert ModuleMoveDetection().decisions(changes) == RenameDecisions(())

@@ -225,6 +225,23 @@ class PackageRootMoveSample(SampleTrees):
         return "package-root-move"
 
 
+# %% empty package initializers moved apart
+
+
+class AmbiguousPackageInitializersSample(SampleTrees):
+    """
+    A pull request splitting one ``tests`` package into two, whose many identical, empty
+    ``__init__.py`` files git pairs with each other in no meaningful order.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "ambiguous-package-initializers"
+
+
 # %% the definition move
 
 

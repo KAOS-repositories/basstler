@@ -213,7 +213,9 @@ class HandoverOffer:
             title=description.title,
             body=description.render(),
         )
-        already_open = client.get_pages(PullRequestListState.OPEN.path_between(opening))
+        already_open = client.get_entries(
+            PullRequestListState.OPEN.path_between(opening)
+        )
         if not already_open:
             return PullRequestReference(
                 repository=self.base.repository,
@@ -332,7 +334,7 @@ class HandoverPullRequests:
             HandoverPullRequest(repository=repository, number=pull_request.number)
             for pull_request in map(
                 RestPullRequest.from_json,
-                client.get_pages(PullRequestListState.OPEN.path_on(repository)),
+                client.get_entries(PullRequestListState.OPEN.path_on(repository)),
             )
             if HandoverPullRequestDescription.marker in pull_request.description
         ]

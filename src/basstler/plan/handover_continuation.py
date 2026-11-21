@@ -162,7 +162,7 @@ class UnderwayWork:
                 "threads and checks stay there."
             ),
         )
-        already_open = self.client.get_pages(
+        already_open = self.client.get_entries(
             PullRequestListState.OPEN.path_between(opening)
         )
         opened = Issue.from_json(

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import sysconfig
 from importlib.metadata import version
 from pathlib import Path
 
@@ -13,9 +14,10 @@ import pytest
 
 from basstler.locations import PackageLocation
 
-INSTALLED_COMMAND = Path(sys.executable).with_name(PackageLocation.DIRECTORY.name)
+INSTALLED_COMMAND = Path(sysconfig.get_path("scripts")) / PackageLocation.DIRECTORY.name
 """
-The console script the package installs beside the interpreter running the tests.
+The console script the package installs into the scripts directory of the interpreter
+running the tests.
 """
 
 # %% the version

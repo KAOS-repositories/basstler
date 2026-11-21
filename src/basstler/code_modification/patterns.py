@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import libcst
 from libcst import matchers
-from libcst.metadata import CodeRange
+from libcst.metadata import CodeRange, MetadataWrapper
 
 from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
@@ -52,21 +52,27 @@ class CodePattern(ABC):
         """
 
     @classmethod
-    def matches(cls, node: libcst.CSTNode) -> bool:
+    def matches(
+        cls, node: libcst.CSTNode, metadata: MetadataWrapper | None = None
+    ) -> bool:
         """
+        :param metadata: Resolves the metadata of *node*, which only a pattern matching
+            on metadata needs.
         :return: Whether *node* has the shape of the pattern.
         """
-        return matchers.matches(node, cls.matcher)
+        return matchers.matches(node, cls.matcher, metadata_resolver=metadata)
 
     @classmethod
     def captures(
-        cls, node: libcst.CSTNode
+        cls, node: libcst.CSTNode, metadata: MetadataWrapper | None = None
     ) -> Mapping[str, libcst.CSTNode | Sequence[libcst.CSTNode]] | None:
         """
+        :param metadata: Resolves the metadata of *node*, which only a pattern matching
+            on metadata needs.
         :return: The nodes *node* holds that the matcher saved by name; ``None`` where
             *node* lacks the shape of the pattern.
         """
-        return matchers.extract(node, cls.matcher)
+        return matchers.extract(node, cls.matcher, metadata_resolver=metadata)
 
     @classmethod
     def found_in(cls, module: PositionedModule) -> Iterator[Occurrence]:
@@ -74,5 +80,7 @@ class CodePattern(ABC):
         :return: Every node of *module* with the shape of the pattern, in the order of
             the source.
         """
-        for node in matchers.findall(module.module, cls.matcher):
+        for node in matchers.findall(
+            module.module, cls.matcher, metadata_resolver=module.metadata
+        ):
             yield Occurrence(node, module.positions[node])

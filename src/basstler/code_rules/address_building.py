@@ -14,6 +14,7 @@ from typing import override
 
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.locations import PackageLocation
+from basstler.text_file import TextFile
 
 # %% what is an address
 
@@ -62,7 +63,7 @@ class HandBuiltAddressChecker(CodeRuleChecker):
             return
         if not source.is_relative_to(self.package_directory.resolve()):
             return
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(TextFile(path).read())):
             if isinstance(node, ast.JoinedStr) and self.appends_to_an_address(node):
                 yield CodeRuleViolation(
                     path,

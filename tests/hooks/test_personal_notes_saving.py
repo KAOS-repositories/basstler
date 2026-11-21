@@ -40,7 +40,7 @@ def notes_saving_repository(scratch_repository: ScratchRepository) -> ScratchRep
     scratch_repository.write("README.md", "scratch repo\n")
     scratch_repository.commit_everything("initial commit")
     scratch_repository.publish_notes_branch(
-        {PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
+        {ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
     )
     scratch_repository.resolve_notes_remote_to()
     return scratch_repository

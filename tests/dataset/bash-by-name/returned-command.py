@@ -9,4 +9,4 @@ def command(script: str) -> tuple[str, ...]:
     """
     :return: bash, running *script*.
     """
-    return ("bash", script)
+    return ("bash", script)  # violation

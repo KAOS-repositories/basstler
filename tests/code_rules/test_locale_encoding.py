@@ -9,6 +9,7 @@ from basstler.code_rules.checker import CodeRulesCheck
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 
 from ..constants.paths import LocaleEncodingSnippet
+from .marked_snippet import MarkedSnippet
 
 # %% text
 
@@ -18,17 +19,24 @@ def test_every_kind_of_text_in_the_locale_encoding_is_reported():
     File reads, writes and text-mode opens, and :mod:`subprocess` calls decoding their
     output, are each reported.
     """
-    violations = LocaleEncodingChecker().violations(LocaleEncodingSnippet.LOCALE_TEXT)
-    assert [violation.first_line for violation in violations] == list(range(12, 17))
+    snippet = MarkedSnippet(LocaleEncodingSnippet.LOCALE_TEXT)
+    assert snippet.reported_lines(LocaleEncodingChecker()) == snippet.marked_lines
+
+
+def test_a_subprocess_imported_under_another_name_is_resolved():
+    """
+    A call is a :mod:`subprocess` call by what it imports, not by how it is spelled.
+    """
+    snippet = MarkedSnippet(LocaleEncodingSnippet.IMPORTED_SUBPROCESS)
+    assert snippet.reported_lines(LocaleEncodingChecker()) == snippet.marked_lines
 
 
 def test_text_as_utf_8_and_bytes_are_not_reported():
     """
     Calls naming their encoding, and calls handling bytes, are left alone.
     """
-    assert (
-        list(LocaleEncodingChecker().violations(LocaleEncodingSnippet.UTF_8_TEXT)) == []
-    )
+    snippet = MarkedSnippet(LocaleEncodingSnippet.UTF_8_TEXT)
+    assert snippet.reported_lines(LocaleEncodingChecker()) == snippet.marked_lines
 
 
 # %% calls that are not of open

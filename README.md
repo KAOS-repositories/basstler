@@ -9,6 +9,7 @@ first letters with the surname of the person who wrote it, Bassiouny.
 
 basstler is maintained in the [KAOS-repositories](https://github.com/KAOS-repositories)
 organization on GitHub. Setting it up: [`docs/SETUP.md`](docs/SETUP.md).
+Handing a line of work to someone else: [`docs/plan-handover.md`](docs/plan-handover.md).
 
 ## What is in this repository
 

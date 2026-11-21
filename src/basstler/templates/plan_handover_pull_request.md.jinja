@@ -1,0 +1,42 @@
+{{ marker }}
+{% if receiver_login %}
+@{{ receiver_login }}, this
+{% else %}
+This
+{% endif %}
+pull request hands over {{ handover.plans | length }} plan{{ "s" if handover.plans | length != 1 }} and every item in them, so you can carry the
+work on. It is a proposal to take them over, not a change to merge: importing it closes it.
+
+{% include "plan_handover_summary.md.jinja" %}
+
+## Taking it over
+
+**With basstler**, from a checkout of this repository whose personal-notes branch is set
+up:
+
+```bash
+basstler plan-handover import
+```
+
+That finds this pull request, saves every plan, progress note and repository rule onto
+your personal-notes branch, then closes it. With several handovers open, name this one
+with `--pull-request`,
+or take them all over with `--all`. Start an item with `/plan-item-kickoff <plan-id> <item-id>`
+and continue one that is underway with `/plan-item-resolve <plan-id> <item-id>`.
+
+**Without basstler**, open [`{{ location.PULL_REQUEST_DIRECTORY }}/{{ location.GUIDE }}`]({{ guide_url }}): it
+describes every item and how to work it. Close this pull request once you have read it.
+
+## What is in it
+
+| Path | What it is |
+| --- | --- |
+| `{{ location.PULL_REQUEST_DIRECTORY }}/{{ location.GUIDE }}` | The guide to every item: state, branch, pull request, dependencies, notes and blockers. |
+| `{{ location.PULL_REQUEST_DIRECTORY }}/{{ location.PLANS }}/` | Each plan's `plan.yaml` and standing rules. |
+| `{{ location.PULL_REQUEST_DIRECTORY }}/{{ location.PULL_REQUEST_PROGRESS }}/` | The progress note of every item's branch that has one. |
+{% if handover.repository_rules.rules %}
+| `{{ location.PULL_REQUEST_DIRECTORY }}/{{ location.REPOSITORY_RULES }}` | The rules every plan of the repository follows. |
+{% endif %}
+
+The sessions that started these items are left out: only the person who ran a session can
+open it.

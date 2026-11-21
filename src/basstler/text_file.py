@@ -1,5 +1,6 @@
 """
-Text files read and written as UTF-8, whatever the locale encoding is.
+Text files read and written as UTF-8 with their line endings untouched, whatever the
+platform's locale encoding and newline are.
 """
 
 from __future__ import annotations
@@ -28,12 +29,12 @@ class TextFile:
 
     def read(self) -> str:
         """
-        :return: The file's text.
+        :return: The file's text, with the line endings as stored.
         """
-        return self.path.read_text(encoding=UTF_8)
+        return self.path.read_bytes().decode(UTF_8)
 
     def write(self, text: str) -> None:
         """
-        Replace the file's content by *text*.
+        Replace the file's content by *text*, with its line endings as given.
         """
-        self.path.write_text(text, encoding=UTF_8)
+        self.path.write_bytes(text.encode(UTF_8))

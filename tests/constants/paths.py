@@ -361,6 +361,18 @@ class DatasetLocation(PathEnumeration):
     :class:`ProgressBranch` that has one.
     """
 
+    HANDOVER = DIRECTORY / "handover"
+    """
+    A plan handover: two plans, one depending on the other's item, the progress notes
+    of their items' branches and the repository's rules, laid out as
+    :class:`basstler.locations.PlanHandoverLocation` names them.
+    """
+
+    UNRELATED_PROGRESS_NOTE = DIRECTORY / "handover-notes" / "unrelated-branch.md"
+    """
+    The progress note of a branch no plan of :attr:`HANDOVER` tracks.
+    """
+
     PLANS = DIRECTORY / "plans"
     """
     A plans directory the cross-plan reference tests resolve against: one subdirectory
@@ -395,6 +407,12 @@ class DatasetLocation(PathEnumeration):
     BUILD_START_STUB = STUBS / "build_start_prints_its_name.py"
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, printing its name.
+    """
+
+    GIT_IDENTITY_OF_A_COLLEAGUE_STUB = STUBS / "git_identity_of_a_colleague.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.git_identity`, printing the
+    identity path of a colleague who does not own the notes repository.
     """
 
     BUILD_START_NEEDS_ACCESS_STUB = STUBS / "build_start_needs_access.py"
@@ -712,11 +730,6 @@ class PersonalNotesPath(PathEnumeration):
     reads a plan out of.
     """
 
-    GIT_IDENTITY = ProjectLocation.PERSONAL_NOTES / "git-identity"
-    """
-    The recorded git identity a clone with none of its own is given.
-    """
-
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"
     """
     The directory holding each pull request branch's progress notes, by branch name.
@@ -855,18 +868,25 @@ class BashByNameSnippet(PathEnumeration):
 
     SUBPROCESS_CALL = DIRECTORY / "subprocess-call.py"
     """
-    A :mod:`subprocess` call running bash by its name, on line 9.
+    A :mod:`subprocess` call running bash by its name, marked as a violation.
     """
 
     RETURNED_COMMAND = DIRECTORY / "returned-command.py"
     """
-    A function returning a command line that runs bash by its name, on line 12.
+    A function returning a command line that runs bash by its name, marked as a
+    violation.
     """
 
     LOCATED_BASH = DIRECTORY / "located-bash.py"
     """
     A run of the located bash, and a tuple of names starting with bash that is no
     command.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls running bash by its name through :mod:`subprocess` imported under other
+    names, marked as violations.
     """
 
 
@@ -1032,8 +1052,7 @@ class LocaleEncodingSnippet(PathEnumeration):
 
     LOCALE_TEXT = DIRECTORY / "locale-text.py"
     """
-    Every kind of text read or written in the locale encoding, one per line from line
-    12 to line 16.
+    Every kind of text read or written in the locale encoding, one per marked line.
     """
 
     UTF_8_TEXT = DIRECTORY / "utf-8-text.py"
@@ -1046,6 +1065,12 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
     A function and a method that are not :func:`open`, given a file name and a binary
     mode.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls decoding output in the locale encoding through :mod:`subprocess` imported
+    under other names, marked as violations.
     """
 
 
@@ -1061,7 +1086,18 @@ class TreeRemovalSnippet(PathEnumeration):
 
     SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
     """
-    Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
+    Two calls to :func:`shutil.rmtree`, marked as violations.
+    """
+
+    IMPORTED_RMTREE = DIRECTORY / "imported-rmtree.py"
+    """
+    Three calls to :func:`shutil.rmtree` through an aliased module and through names
+    imported from it, marked as violations.
+    """
+
+    OTHER_RMTREE = DIRECTORY / "other-rmtree.py"
+    """
+    A function and a method named ``rmtree`` that are not :func:`shutil.rmtree`.
     """
 
 

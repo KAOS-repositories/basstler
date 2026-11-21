@@ -31,6 +31,7 @@ from ..constants.environment import ScrubbedEnvironmentPrefix, SearchPathVariabl
 from ..constants.notes import ScratchBranch
 from ..constants.paths import DatasetLocation
 from ..executable_stubs import (
+    NEEDS_STUB_AHEAD_OF_GIT_TOOLS,
     ExecutableStubDirectory,
     path_hiding_executables,
 )
@@ -386,6 +387,7 @@ def test_prints_tracking_issue_comments_via_the_gh_backend(
     assert "since=" in logged_call
 
 
+@NEEDS_STUB_AHEAD_OF_GIT_TOOLS
 def test_prints_tracking_issue_comments_via_the_curl_fallback(
     scratch_repo: ScratchRepository, stub_bin: ExecutableStubDirectory, tmp_path: Path
 ):

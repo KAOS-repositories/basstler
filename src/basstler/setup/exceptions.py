@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 @dataclass
 class ForeignNotesRemoteError(CommandFailure, DataclassException, PermissionError):
     """
-    Raised when GitHub says the notes remote belongs to somebody other than the caller.
+    Raised when GitHub says the notes remote belongs to somebody other than the caller,
+    who may not push to it or finds no notes branch there to share.
     """
 
     @classproperty
@@ -46,7 +47,10 @@ class ForeignNotesRemoteError(CommandFailure, DataclassException, PermissionErro
         )
 
     def suggest_correction(self) -> str:
-        return "pass --remote naming your own fork"
+        return (
+            "pass --remote naming your own fork, or a repository you may push to whose "
+            "owner has set up its notes branch"
+        )
 
 
 @dataclass

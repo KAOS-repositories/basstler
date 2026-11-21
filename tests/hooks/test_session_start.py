@@ -64,7 +64,11 @@ from ..constants.paths import (
     RepositoryLocation,
 )
 from ..constants.site import SiteRepository
-from ..executable_stubs import ExecutableStubDirectory, path_hiding_executables
+from ..executable_stubs import (
+    NEEDS_VERSIONED_INTERPRETER_NAME,
+    ExecutableStubDirectory,
+    path_hiding_executables,
+)
 from ..plan_dataset import LandedItemsPlan
 from ..plugin_manifest import PluginManifest
 from ..project_declaration import ProjectDeclaration
@@ -270,7 +274,7 @@ def publish_and_run(
     repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
-            PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
             **(notes_branch_files or {}),
         }
     )
@@ -329,7 +333,7 @@ def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
     The session rules do not depend on the user having written any notes.
     """
     session_start_repository.publish_notes_branch(
-        {PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
+        {ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
     )
     result = run_session_start(session_start_repository)
     assert result.returncode == 0, result.stderr
@@ -1859,6 +1863,7 @@ def test_creates_the_environment_with_uv_and_installs_the_package_into_it(
     assert not install_log.exists()
 
 
+@NEEDS_VERSIONED_INTERPRETER_NAME
 def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
     session_start_repository: ScratchRepository,
     stub_bin: ExecutableStubDirectory,
@@ -1899,6 +1904,7 @@ def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
     assert version.stdout.strip() == str(True)
 
 
+@NEEDS_VERSIONED_INTERPRETER_NAME
 def test_skips_an_interpreter_on_the_path_that_cannot_run_when_creating_the_environment(
     session_start_repository: ScratchRepository,
     stub_bin: ExecutableStubDirectory,

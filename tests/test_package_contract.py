@@ -359,6 +359,16 @@ def test_the_shell_fetches_the_notes_branch_where_the_package_reads_it():
     )
 
 
+def test_the_shell_keeps_progress_notes_where_the_package_reads_them():
+    """
+    :attr:`ProjectLocation.PULL_REQUEST_PROGRESS` mirrors ``PR_PROGRESS_DIRECTORY``.
+    """
+    assert (
+        configuration_value(ConfigurationVariable.PULL_REQUEST_PROGRESS_DIRECTORY)
+        == ProjectLocation.PULL_REQUEST_PROGRESS.as_posix()
+    )
+
+
 @pytest.mark.parametrize(
     "argument",
     [

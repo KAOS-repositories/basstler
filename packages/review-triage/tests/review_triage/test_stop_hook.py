@@ -18,8 +18,8 @@ from basstler.github.client import GitHubReader
 from basstler.locations import BasstlerVariable, PluginLocation, RepositoryStateLocation
 from basstler.review_triage.stop_hook import SessionPullRequest
 
-from ..constants.paths import DatasetLocation
-from ..scratch_repository import ScratchRepository
+from basstler_testing.constants.paths import DatasetLocation
+from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import SAMPLE_REPOSITORY
 
 # %% stand-ins and fixtures

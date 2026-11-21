@@ -14,7 +14,7 @@ from basstler.github.file_proposal import (
 from basstler.github.git_objects import EncodedContent
 from basstler.github.repository import Repository, RepositoryBranch
 
-from ..constants.paths import DatasetLocation
+from basstler_testing.constants.paths import DatasetLocation
 
 # %% a committed file
 

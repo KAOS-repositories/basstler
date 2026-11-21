@@ -23,7 +23,7 @@ from basstler.github.user_steps import AllowActions, EnableWorkflow
 from basstler.locations import WorkflowLocation
 from basstler.review_triage.viewed_request import ReviewTriageSecret
 
-from .path_answering_client import PathAnsweringClient
+from basstler_testing.github.path_answering_client import PathAnsweringClient
 
 # %% reading
 

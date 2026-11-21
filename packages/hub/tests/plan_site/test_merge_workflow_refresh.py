@@ -15,7 +15,7 @@ from basstler.plan_site import merge_workflow_refresh
 from basstler.plan_site.merge_workflow_refresh import refresh_merge_workflow
 from basstler.plan_site.site_repository import SiteRepository
 
-from ..maintenance.fork import ForkCheckout
+from basstler_testing.maintenance.fork import ForkCheckout
 
 ANY_RECORDED_SITE = SiteRepository(Repository("an-owner", "a-site"))
 """

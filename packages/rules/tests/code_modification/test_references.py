@@ -16,7 +16,7 @@ from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.references import ReferenceTo
 from basstler.code_modification.source_file import PythonSourceFile
 
-from ..constants.paths import TreeRemovalSnippet
+from basstler_testing.constants.paths import TreeRemovalSnippet
 
 # %% the patterns
 

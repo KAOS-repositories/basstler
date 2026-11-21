@@ -23,7 +23,7 @@ from basstler.github.repository_access import GitHubPath
 from basstler.locations import ProjectLocation
 from basstler.personal_notes.git_identity import GitIdentityRecord
 
-from ..scratch_repository import ScratchRepository
+from basstler_testing.scratch_repository import ScratchRepository
 
 SHARED_NOTES = Repository.parse("an-owner/a-team-project")
 """

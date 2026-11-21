@@ -17,8 +17,8 @@ from basstler.plan.merged_items import __main__ as merged_items_command
 from basstler.plan.model import PlanDocument, PlanManifest
 from basstler.plan_site import build_start
 
-from ..constants.paths import DatasetLocation
-from ..scratch_repository import ScratchRepository
+from basstler_testing.constants.paths import DatasetLocation
+from basstler_testing.scratch_repository import ScratchRepository
 
 # %% the dataset handover
 

@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from typing import Any
 
+from basstler.github.credential import CredentialProvider
+from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.client import (
     GitHubAttemptClient,
     GitHubResponse,
@@ -15,9 +17,27 @@ from basstler.github.client import (
     HttpMethod,
 )
 
-from ..review_triage.conftest import refusal
 
 # %% the stand-in
+
+
+def refusal(status: HTTPStatus, method: HttpMethod, path: str) -> GitHubResponse:
+    """
+    :param status: The status GitHub refuses the call with.
+    :param method: The call's method.
+    :param path: The call's path.
+    :return: GitHub's answer refusing the call.
+    """
+    return GitHubResponse(
+        None,
+        failure=GitHubRequestFailed(
+            status=status,
+            detail="",
+            method=method,
+            path=path,
+            credential_origin=CredentialProvider.CALLER,
+        ),
+    )
 
 
 @dataclass

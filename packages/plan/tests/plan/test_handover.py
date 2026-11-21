@@ -22,7 +22,7 @@ from basstler.plan.handover import HandoverGuide, HandoverPlan, PlanHandover
 from basstler.plan.model import ManifestKey, PlanDocument, PlanManifest
 from basstler.plan.repository_rules import RepositoryRules
 
-from ..scratch_repository import ScratchRepository
+from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import RECEIVERS_FORK, UNRELATED_BRANCH, HandedOverPlan
 
 # %% the dataset handover

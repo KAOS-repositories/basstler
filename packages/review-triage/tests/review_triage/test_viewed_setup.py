@@ -48,8 +48,8 @@ from basstler.review_triage.viewed_setup import (
 )
 from basstler.plan_site.workflows import PlanSiteSecret
 
-from ..constants.paths import RepositoryLocation
-from ..github.path_answering_client import PathAnsweringClient
+from basstler_testing.constants.paths import RepositoryLocation
+from basstler_testing.github.path_answering_client import PathAnsweringClient
 from .conftest import WORKFLOW_REPOSITORY_DETAILS
 
 # %% a stand-in for GitHub

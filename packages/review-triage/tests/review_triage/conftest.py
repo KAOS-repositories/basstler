@@ -21,8 +21,6 @@ from basstler.github.client import (
     GitHubWriter,
     HttpMethod,
 )
-from basstler.github.credential import CredentialProvider
-from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.github.pull_request_changes import (
     PullRequestChanges,
@@ -43,6 +41,7 @@ from basstler.review_triage.outputs import (
 from basstler.review_triage.renames import Rename, RenameMap
 from basstler.review_triage.triage import TriageOutcome
 from basstler_testing.constants.paths import DatasetLocation
+from basstler_testing.github.path_answering_client import refusal
 from basstler_testing.scratch_repository import ScratchRepository
 
 from .samples import DescriptionSample, PullRequestSample
@@ -154,25 +153,6 @@ def listing_of(triage: TriageOutcome) -> FileListingWriter:
     return FileListingWriter(
         triage.pull_request.head.commit,
         (tuple(file.change.path for file in triage.files),),
-    )
-
-
-def refusal(status: HTTPStatus, method: HttpMethod, path: str) -> GitHubResponse:
-    """
-    :param status: The status GitHub refuses the call with.
-    :param method: The call's method.
-    :param path: The call's path.
-    :return: GitHub's answer refusing the call.
-    """
-    return GitHubResponse(
-        None,
-        failure=GitHubRequestFailed(
-            status=status,
-            detail="",
-            method=method,
-            path=path,
-            credential_origin=CredentialProvider.CALLER,
-        ),
     )
 
 

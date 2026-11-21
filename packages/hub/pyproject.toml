@@ -34,6 +34,7 @@ dependencies = [
     "basstler-git",
     "basstler-github",
     "basstler-reviews",
+    "basstler-review-triage",
     "basstler-stack",
     "basstler-plan",
     "basstler-notes",
@@ -54,5 +55,6 @@ dev = [
     "basstler-notes",
     "basstler-plan",
     "basstler-reviews",
+    "basstler-review-triage",
     "basstler-stack",
 ]

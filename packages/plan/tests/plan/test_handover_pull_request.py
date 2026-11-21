@@ -32,7 +32,7 @@ from basstler.plan.handover_pull_request import (
 from basstler.plan.model import ManifestKey, PlanDocument, PlanItem, PlanManifest
 from basstler.plan.repository_rules import RepositoryRules
 
-from ..scratch_repository import ScratchRepository
+from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import (
     RECEIVERS_FORK,
     HandedOverPlan,

@@ -8,7 +8,7 @@ from __future__ import annotations
 from basstler.code_rules.address_building import HandBuiltAddressChecker
 from basstler.locations import PackageLocation
 
-from ..constants.paths import AddressSnippet
+from basstler_testing.constants.paths import AddressSnippet
 
 # %% finding them
 

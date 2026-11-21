@@ -22,6 +22,9 @@ tracks:
 - id: finishing
   name: Finishing
   wave: experiments
+- id: measurements
+  name: Experiments measuring a choice against its alternatives
+  wave: experiments
 items:
 - id: experiment-record
   title: An experiment is a recorded entry with its stage and the moves open from it
@@ -166,3 +169,17 @@ items:
     request appended; iterate refuses to copy without one. Built on experiment/goal-paths, no PR yet.
     The options are fixed in code today; they should come from experiment-record''s declared stage
     moves, as the hub''s links will. goal-paths/verdict does not declare the decision yet.'
+
+- id: receiver-inference-experiment
+  title: Compare the triage's receiver inference with mypy, pyright and Pyrefly
+  track: measurements
+  branch: review-triage-inference-experiments
+  pull_request_number: 238
+  depends_on:
+  - review-triage/keyword-argument-triage
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #238 at e20dbe0e on #214: the basstler.experiments package and its receiver-inference
+    experiment. On #967 basstler+Pyrefly leaves the same 12 files as basstler alone, for +7 % time;
+    no checker disputes basstler. Chose Pyrefly for #240. CI on the head not read. Next: review,
+    after #214.'

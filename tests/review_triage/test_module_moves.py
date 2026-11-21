@@ -17,7 +17,7 @@ from basstler.review_triage.triage import PullRequestTriager
 
 from ..scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
-from .samples import ModuleMoveSample
+from .samples import ModuleMoveSample, PackageRootMoveSample
 
 # %% the sample
 
@@ -65,3 +65,22 @@ def test_imports_following_a_moved_module_are_mechanical(
             {MechanicalChange.MOVE}
         ),
     }
+
+
+# %% a package moved under a directory that is not a package
+
+
+def test_a_package_moved_under_a_plain_directory_keeps_its_relative_imports_mechanical(
+    scratch_repository: ScratchRepository,
+):
+    """
+    Moving a package whole leaves its dotted paths unchanged, so a relative import of a
+    sibling module still reaches the same module.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        PackageRootMoveSample.BASE_TREE,
+        PackageRootMoveSample.HEAD_TREE,
+    )
+    triage = PullRequestTriager().triage(changes)
+    assert triage.files_needing_review == ()

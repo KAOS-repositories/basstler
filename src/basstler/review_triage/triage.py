@@ -236,4 +236,6 @@ class PullRequestTriager:
             substitution_renames,
             self.rules,
             MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
+            base_modules=base_modules,
+            head_modules=CommitModules(changes.commits.head_tree),
         )

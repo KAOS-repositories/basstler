@@ -148,6 +148,18 @@ class CommitModules(DefinitionSearch):
             package = package.parent
         return DOTTED_NAME_SEPARATOR.join(components)
 
+    def package(self, path: PurePosixPath) -> tuple[str, ...]:
+        """
+        :param path: A module's file.
+        :return: The dotted path's components of the package the module's relative
+            imports start from, empty when the file is in no package.
+        """
+        module = self.module_path(path)
+        components = tuple(module.split(DOTTED_NAME_SEPARATOR)) if module else ()
+        if path.name == PACKAGE_INITIALIZER:
+            return components
+        return components[:-1]
+
     @cached_property
     def module_files(self) -> dict[str, tuple[str, ...]]:
         """

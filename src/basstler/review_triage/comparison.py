@@ -9,10 +9,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from functools import cached_property
+from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
 from basstler.git.commit_range import FileVersions
-from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
+from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER, CommitModules
 from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
@@ -248,6 +249,30 @@ class JudgmentContext:
     The reasons for review the judgments of the file being judged found so far.
     """
 
+    base_modules: CommitModules | None = field(default=None, kw_only=True)
+    """
+    The base commit's modules, which say the package each version of a file is in;
+    ``None`` leaves that to the directories holding the file.
+    """
+
+    head_modules: CommitModules | None = field(default=None, kw_only=True)
+    """
+    The head commit's modules, as :attr:`base_modules`.
+    """
+
+    @staticmethod
+    def package_of(
+        modules: CommitModules | None, path: PurePosixPath
+    ) -> tuple[str, ...]:
+        """
+        :param modules: The modules of the commit holding the file, if known.
+        :param path: The file's path.
+        :return: The package its relative imports start from.
+        """
+        if modules is None:
+            return path.parent.parts
+        return modules.package(path)
+
     @cached_property
     def substituted(self) -> JudgmentContext:
         """
@@ -392,8 +417,12 @@ class PythonComparison(ContentComparison):
         unless its code uses it and both versions star-import it from one module.
         """
         base_path = change.previous_path or change.path
-        base = PythonSource.from_text(change.base_text, base_path.parent.parts)
-        head = PythonSource.from_text(change.head_text, change.path.parent.parts)
+        base = PythonSource.from_text(
+            change.base_text, context.package_of(context.base_modules, base_path)
+        )
+        head = PythonSource.from_text(
+            change.head_text, context.package_of(context.head_modules, change.path)
+        )
         kinds = self.source_changes(base, head, context)
         if kinds is None or MechanicalChange.IMPORTS not in kinds:
             return kinds

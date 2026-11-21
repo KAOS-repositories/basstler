@@ -208,6 +208,23 @@ class ModuleMoveSample(SampleTrees):
         return "module-move"
 
 
+# %% the package root move
+
+
+class PackageRootMoveSample(SampleTrees):
+    """
+    A pull request moving a package, ``__init__.py`` files and all, under a directory
+    that is not a package, leaving its modules' dotted paths as they were.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "package-root-move"
+
+
 # %% the definition move
 
 

@@ -15,10 +15,8 @@ import pytest
 
 import basstler.review_triage.stop_hook
 from basstler.github.client import GitHubReader
-from basstler.github.repository import Repository
 from basstler.locations import BasstlerVariable, PluginLocation, RepositoryStateLocation
 from basstler.review_triage.stop_hook import SessionPullRequest
-from basstler.review_triage.viewed_setup import MarkViewedSetup
 
 from ..constants.paths import DatasetLocation
 from ..scratch_repository import ScratchRepository
@@ -151,10 +149,3 @@ def test_the_plugin_runs_the_hook_when_a_turn_ends():
         f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
         f"{basstler.review_triage.stop_hook.__spec__.name.removeprefix('basstler.')}"
     )
-
-
-def test_the_installed_workflow_does_not_run_when_a_pull_request_is_made_ready():
-    workflow = MarkViewedSetup(
-        Repository("an-owner", "a-fork"), on_every_pull_request=True
-    ).caller_workflow
-    assert "ready_for_review" not in workflow

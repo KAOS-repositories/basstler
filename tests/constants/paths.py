@@ -306,6 +306,11 @@ class DatasetLocation(PathEnumeration):
     The jobs of a failed run of the tests: one failed, one timed out, two passed.
     """
 
+    SESSION_PULL_REQUEST = DIRECTORY / "session-pull-request.json"
+    """
+    The REST response for an open pull request opened from the branch a session works on.
+    """
+
     MERGE_WORKFLOW_PULL_REQUEST = DIRECTORY / "merge-workflow-pull-request.json"
     """
     The REST response for the pull request proposing the plan site's merge workflow.

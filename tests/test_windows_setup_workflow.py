@@ -1,11 +1,9 @@
 """
 Tests for the workflow that runs the personal-notes setup on Windows: that it runs only
-for the pull requests it names, and that each name still matches something to change.
+for pull requests.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from basstler.github.workflows import Trigger, TriggerEvent, Workflow
 
@@ -32,26 +30,3 @@ def test_the_workflow_runs_only_for_pull_requests():
     A push runs nothing on a Windows runner, so no change is paid for twice.
     """
     assert only_trigger().event is TriggerEvent.PULL_REQUEST
-
-
-@pytest.mark.parametrize("pattern", sorted(only_trigger().paths))
-def test_every_path_filter_matches_a_file_in_the_repository(pattern: str):
-    """
-    A filter left naming a moved file would stop the workflow running for it, silently.
-    """
-    matched = list(RepositoryLocation.ROOT.value.glob(pattern))
-    # Before Python 3.13, a pattern ending in ``**`` matches only directories.
-    candidates = [path for match in matched for path in [match, *match.rglob("*")]]
-
-    assert any(path.is_file() for path in candidates)
-
-
-def test_the_workflow_runs_when_it_changes():
-    """
-    A change to the workflow itself is checked by running it.
-    """
-    workflow = RepositoryLocation.WINDOWS_SETUP_WORKFLOW.value.relative_to(
-        RepositoryLocation.ROOT.value
-    )
-
-    assert workflow.as_posix() in only_trigger().paths

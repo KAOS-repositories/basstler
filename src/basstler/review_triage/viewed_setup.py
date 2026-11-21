@@ -128,12 +128,6 @@ class MarkViewedSetup(TemplatePage):
     The basstler branch or tag the installed workflow runs.
     """
 
-    on_every_pull_request: bool = False
-    """
-    Whether the workflow also runs for every pull request opened or updated on the
-    workflow repository, besides when started.
-    """
-
     shared_uses: tuple[TokenUse, ...] = ()
     """
     Other jobs of basstler's the person's token may do too; those on the same owner's
@@ -165,7 +159,6 @@ class MarkViewedSetup(TemplatePage):
                 reusable_workflow=self.reusable_workflow,
                 branch_or_tag=self.branch_or_tag,
                 token_secret=ReviewTriageSecret.VIEWER_TOKEN,
-                every_pull_request=self.on_every_pull_request,
             )
             + "\n"
         )
@@ -201,16 +194,6 @@ class MarkViewedSetup(TemplatePage):
                 self.workflow_repository, read.response.failure.error_message()
             )
         details = read.resource
-        if self.on_every_pull_request and details.parent is not None:
-            self.steps.append(
-                SetupStep(
-                    "running on every pull request",
-                    SetupState.LEFT_TO_USER,
-                    f"{self.workflow_repository.full_name} is a fork, which never sees "
-                    f"{details.parent.full_name}'s pull requests; set the workflow up "
-                    f"there with --workflow-repository {details.parent.full_name}",
-                )
-            )
         installed = self.install_workflow(client, details)
         self.enable_actions(client, details)
         if installed:

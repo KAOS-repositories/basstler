@@ -83,8 +83,8 @@ class RepositoryLocation(PathEnumeration):
 
     WINDOWS_TESTS_WORKFLOW = WORKFLOWS / "windows-tests.yml"
     """
-    The workflow that runs the whole suite on Windows for every pull request ready for
-    review.
+    The workflow that runs the whole suite on Windows for every push to main, and for a
+    pull request changing what Windows is known to treat differently.
     """
 
     MAIN_FAILURE_WORKFLOW = WORKFLOWS / "main-failure.yml"
@@ -304,6 +304,11 @@ class DatasetLocation(PathEnumeration):
     MAIN_FAILURE_RUN_JOBS = DIRECTORY / "main-failure" / "failed-run-jobs.json"
     """
     The jobs of a failed run of the tests: one failed, one timed out, two passed.
+    """
+
+    SESSION_PULL_REQUEST = DIRECTORY / "session-pull-request.json"
+    """
+    The REST response for an open pull request opened from the branch a session works on.
     """
 
     MERGE_WORKFLOW_PULL_REQUEST = DIRECTORY / "merge-workflow-pull-request.json"

@@ -23,17 +23,17 @@ items:
   pull_request_number: 222
   blockers:
     - >-
-      CI at 54f7ebb5 not read yet (pushed just now), Windows above all. Locally the suite passes
-      except tests/plan_site tests needing Playwright's browser, not run. Merge probe vs main:
-      clean.
+      Windows CI at f7a288b5 not read yet (pushed just now); 54f7ebb5 failed 19 Windows tests from
+      CRLF checkouts, fixed by TextFile reading \n and LF checkouts. Locally the suite passes except
+      Playwright tests in tests/plan_site, not run.
   notes: >
     Draft #222, based on main (#220, which it was stacked on, has merged).
     basstler.code_modification (specifications, NodeReplacement with exact inverse, ActionPlan,
     CodePattern, ReferenceTo) on libcst; FixableChecker + CodeFix with BehaviourDeclaration;
     SourceFixer in rounds; code-rules fix. UTF-8 fix reproduced 107 of #220's 129 .py files
-    (measured before the review changes and before TextFile kept newlines as stored; not measured
-    again); examples under tests/dataset/rule-fixes tested automatically. TextFile keeps line
-    endings as stored and the TextFile fix declares that change.
+    (measured before the review changes and the TextFile newline change; not measured again);
+    examples under tests/dataset/rule-fixes tested automatically. TextFile reads every line ending
+    as \n and writes text as given; .gitattributes checks text out as LF.
 - id: directory-and-bash-fixes
   title: Fixes for directory removal and bash started by name
   track: pattern-fixes

@@ -29,7 +29,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PLAN_SITE_TOKEN }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error title=PLAN_SITE_TOKEN is not stored::KAOS-repositories/basstler stores no PLAN_SITE_TOKEN secret, so this run started no build in AbdelrhmanBassiouny/stack-board. Run /setup-personal-notes, or create the token at https://github.com/settings/personal-access-tokens/new?name=basstler+plan+site&description=Starts+the+plan+site+build+in+AbdelrhmanBassiouny%2Fstack-board&target_name=AbdelrhmanBassiouny&actions=write and store it at https://github.com/KAOS-repositories/basstler/settings/secrets/actions/new"
+            echo "::error title=PLAN_SITE_TOKEN is not stored::KAOS-repositories/basstler stores no PLAN_SITE_TOKEN secret, so this run started no build in AbdelrhmanBassiouny/stack-board. Run /setup-personal-notes, or create the token at https://github.com/settings/personal-access-tokens/new?name=basstler%20plan%20site&description=Starts%20the%20plan%20site%20build%20in%20AbdelrhmanBassiouny%2Fstack-board&target_name=AbdelrhmanBassiouny&actions=write and store it at https://github.com/KAOS-repositories/basstler/settings/secrets/actions/new"
             exit 1
           fi
           gh workflow run plan-site.yml --repo AbdelrhmanBassiouny/stack-board

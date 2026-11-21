@@ -11,8 +11,8 @@ from typing import Annotated
 import pydantic
 import yaml
 
-from basstler.plan.exceptions import UnknownRepositoryRuleError
 from basstler.json_model import ValidatedJSONModel
+from basstler.plan.exceptions import UnknownRepositoryRuleError
 
 # %% rules
 
@@ -75,7 +75,7 @@ class RepositoryRules(ValidatedJSONModel):
         :raises pydantic.ValidationError: If the file does not hold valid rules.
         :return: The rules it holds; none if there is no such file.
         """
-        return cls.from_yaml(path.read_text() if path.exists() else "")
+        return cls.from_yaml(path.read_text(encoding="utf-8") if path.exists() else "")
 
     @property
     def identifiers(self) -> tuple[str, ...]:

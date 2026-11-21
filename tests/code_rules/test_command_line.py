@@ -10,6 +10,7 @@ from basstler.code_rules.command_line import (
     CodeRulesExitCode,
     check,
     generate_agents_instructions,
+    report_new_crossings,
 )
 from basstler.code_rules.instructions import AgentsInstructions
 
@@ -34,6 +35,16 @@ def test_checking_passes_when_nothing_breaks_a_rule():
     assert check([DocstringSnippet.DOCUMENTED_MODULE], all_lines=True) == (
         CodeRulesExitCode.SUCCESS
     )
+
+
+# %% boundary crossings
+
+
+def test_a_package_compared_with_its_own_commit_has_no_new_crossing():
+    """
+    Against the commit checked out, the base holds every crossing the package has.
+    """
+    assert report_new_crossings("HEAD") == CodeRulesExitCode.SUCCESS
 
 
 # %% generating AGENTS.md
@@ -69,7 +80,7 @@ def test_verifying_a_stale_file_fails_without_writing_it(instructions):
     """
     Verifying reports a stale ``AGENTS.md`` and leaves it stale.
     """
-    instructions.path.write_text("stale")
+    instructions.path.write_text("stale", encoding="utf-8")
 
     assert generate_agents_instructions(verify=True) == (
         CodeRulesExitCode.CHANGES_NEEDED

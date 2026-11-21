@@ -22,9 +22,10 @@ import argparse
 import sys
 from pathlib import Path
 
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.environment import GitHubActionsVariable
-from basstler.repository import Repository
-from basstler.stack.configuration import (
+from basstler.github.repository import Repository
+from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     MissingUpstreamRepositoryError,
 )
@@ -32,9 +33,7 @@ from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.clients import (
     GitHubCommandLineClient,
 )
-from basstler.upstream_reviews.exceptions import (
-    UpstreamReadError,
-)
+from basstler.github.exceptions import UpstreamReadError
 from basstler.upstream_reviews.readers import (
     ReadSource,
 )
@@ -129,13 +128,17 @@ def main(argv: list[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
     try:
         report = _build_report(arguments)
-    except (UpstreamReadError, MissingUpstreamRepositoryError) as failure:
+    except (
+        UpstreamReadError,
+        GraphQLErrorsReturned,
+        MissingUpstreamRepositoryError,
+    ) as failure:
         logger.error(failure)
         return 1
     logger.info(report)
     summary_path = GitHubActionsVariable.STEP_SUMMARY.read()
     if summary_path:
-        Path(summary_path).write_text(report)
+        Path(summary_path).write_text(report, encoding="utf-8")
     return 0
 
 

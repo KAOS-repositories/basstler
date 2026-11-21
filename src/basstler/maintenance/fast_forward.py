@@ -1,8 +1,9 @@
 """
 Moving the fork's copy of the upstream base onto the upstream's tip.
 
-This is the step that closes the pull requests whose work has landed, since GitHub marks
-one merged the moment its head becomes an ancestor of its base.
+This is the step that closes the pull requests based on that branch whose work has landed,
+since GitHub marks one merged the moment its head becomes an ancestor of its base. One based on
+another branch is not closed by it.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from basstler.maintenance.git_commands import GitCommandRunner, ProposedPush
+from basstler.git.commands import GitCommandRunner, ProposedPush
 from basstler.stack.settings import Configuration
 
 
@@ -200,8 +201,9 @@ def fast_forward(
     """
     Fetch the upstream's base, then move the fork's copy of it onto the upstream's tip.
 
-    This is what closes the pull requests whose work has landed: GitHub marks one merged
-    the moment its head becomes an ancestor of its base.
+    This is what closes the pull requests based on that branch whose work has landed:
+    GitHub marks one merged the moment its head becomes an ancestor of its base. One based
+    on another branch is not closed by it.
 
     :param configuration: The resolved configuration.
     :param git: The runner to execute through.

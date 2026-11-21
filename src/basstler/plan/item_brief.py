@@ -4,7 +4,8 @@ item's entry, whether each of its dependencies is ready to build on, and the pla
 standing rules.
 
 Run from the project, whose personal-notes branch it fetches. The dependencies' live
-state is read from GitHub with the token the environment carries. Prints YAML.
+state is read from GitHub with the token the environment carries; a fork's upstream is
+never read, so it need not be reachable. Prints YAML.
 """
 
 from __future__ import annotations
@@ -20,7 +21,11 @@ from typing import Annotated
 
 from cyclopts import App, Parameter
 
-from basstler.plan_site.plan import Plan
+from basstler.command_line import plan_item_selection
+from basstler.github.pull_request_source import (
+    GitHubPullRequestSource,
+    PullRequestSource,
+)
 from basstler.plan.check_dependency_readiness import DependencyReadiness
 from basstler.plan.dependencies import DependencyResolver
 from basstler.plan.item_bootstrap.documents import PlanDocuments, ProjectCheckout
@@ -28,9 +33,8 @@ from basstler.plan.model import PlanItem, PlanManifest
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.repository_rules_store import RepositoryRulesStore
 from basstler.plan.size_limits import Roadmap
+from basstler.plan.structure import Plan
 from basstler.plan.validation import PlanValidator
-from basstler.pull_request_source import GitHubPullRequestSource, PullRequestSource
-from basstler.command_line import plan_item_selection
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -173,8 +177,8 @@ class ItemBrief:
             dependencies = DependencyReadiness.of_item(
                 plan,
                 item.identifier,
-                pull_request_source.pull_requests_of(
-                    DependencyResolver(plan, plan_directory)
+                pull_request_source.live_pull_requests_of(
+                    DependencyResolver(plan, plan_directory).pull_request_references
                 ),
                 plan_directory,
             )
@@ -292,10 +296,13 @@ class ItemBriefCommandLine:
 def main() -> int:
     """
     Print the brief the command line asks for, reading live state from GitHub.
+
+    :return: The process exit code.
     """
-    ItemBriefCommandLine(GitHubPullRequestSource.from_environment(), Path.cwd()).app(
-        sys.argv[1:], result_action="return_value"
-    )
+    ItemBriefCommandLine(
+        GitHubPullRequestSource.from_environment(reads_upstream_pull_requests=False),
+        Path.cwd(),
+    ).app(sys.argv[1:], result_action="return_value")
     return 0
 
 

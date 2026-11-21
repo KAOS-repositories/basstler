@@ -89,7 +89,18 @@ class PackageLocation(PathEnumeration):
     The templates the plan site's pages are rendered from.
     """
 
-    QUERIES = DIRECTORY / "upstream_reviews" / "queries"
+    GITHUB_REPOSITORY_MODULE = DIRECTORY / "github" / "repository.py"
+    """
+    The module whose :class:`basstler.github.repository.Repository` builds every
+    address within a repository.
+    """
+
+    PACKAGE_MAP = DIRECTORY / "package_map.py"
+    """
+    The module declaring which distribution ships each of the package's modules.
+    """
+
+    QUERIES = DIRECTORY / "github" / "queries"
     """
     The GraphQL documents the upstream review reader sends.
     """
@@ -193,12 +204,24 @@ class SiteTemplate(PathEnumeration):
     A plan page's behaviour: copying commands, choosing a model, revealing an item.
     """
 
-    PLAN_DRAFT_RECHECK_SCRIPT = (
-        PackageLocation.TEMPLATES.value / "site_plan_draft_recheck.js"
+    LIVE_STATE_SCRIPT = PackageLocation.TEMPLATES.value / "site_live_state.js"
+    """
+    The script every site page reads a pull request's live state from GitHub's answer
+    with, and re-checks with when the tab is shown again.
+    """
+
+    LIVE_PROGRESS_SCRIPT = PackageLocation.TEMPLATES.value / "site_live_progress.js"
+    """
+    The hub's and repository indexes' script that recounts every progress card from
+    each repository's pull request listing.
+    """
+
+    PLAN_PULL_REQUEST_RECHECK_SCRIPT = (
+        PackageLocation.TEMPLATES.value / "site_plan_pull_request_recheck.js"
     )
     """
-    The plan page's script that asks GitHub whether a blocking draft pull request is
-    now ready for review.
+    The plan page's script that reads every pull request's state from GitHub in the
+    browser, and shows when the page was last refreshed.
     """
 
 
@@ -217,6 +240,12 @@ class BasstlerVariable(EnvironmentVariable):
     The interpreter whose environment holds this package, for running its modules.
     """
 
+    ENVIRONMENT_DIRECTORY = "BASSTLER_ENVIRONMENT_DIRECTORY"
+    """
+    The package's environment of the session's project, which every command of the
+    session runs, whichever repository it runs in.
+    """
+
 
 class InstructionsTemplate(PathEnumeration):
     """
@@ -226,6 +255,112 @@ class InstructionsTemplate(PathEnumeration):
     AGENTS = PackageLocation.TEMPLATES.value / "agents.md.jinja"
     """
     The content of ``AGENTS.md``: rules under the headings of their sections.
+    """
+
+
+class PlanHandoverLocation(PathEnumeration):
+    """
+    The files a plan handover holds, relative to its directory.
+    """
+
+    GUIDE = Path("HANDOVER.md")
+    """
+    The instructions a coding agent continues the handed-over plans from without basstler.
+    """
+
+    PLANS = Path("plans")
+    """
+    One directory per plan, holding its documents as the notes branch does.
+    """
+
+    PULL_REQUEST_PROGRESS = Path("pr-progress")
+    """
+    The progress note of each handed-over item's branch, named after the branch.
+    """
+
+    REPOSITORY_RULES = Path("repository-rules.yaml")
+    """
+    The rules every plan of the repository follows, in the notes branch's format.
+    """
+
+    GUIDE_TEMPLATE = PackageLocation.TEMPLATES.value / "plan_handover_guide.md.jinja"
+    """
+    The template :attr:`GUIDE` is rendered from.
+    """
+
+    TAKEN_OVER_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "plan_handover_taken_over.md.jinja"
+    )
+    """
+    The template of the comment a handover pull request is closed with.
+    """
+
+    PULL_REQUEST_DIRECTORY = Path("plan-handover")
+    """
+    Where a handover pull request's commit holds the handover, relative to its root.
+    """
+
+    PULL_REQUEST_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "plan_handover_pull_request.md.jinja"
+    )
+    """
+    The template a handover pull request's description is rendered from.
+    """
+
+
+class ReviewTriageLocation(PathEnumeration):
+    """
+    The files the review triage reads beside its modules.
+    """
+
+    MARK_FILE_AS_VIEWED = (
+        PackageLocation.DIRECTORY.value
+        / "review_triage"
+        / "mark_file_as_viewed.graphql"
+    )
+    """
+    The GraphQL mutation marking one file of a pull request viewed.
+    """
+
+    PULL_REQUEST_FILES = (
+        PackageLocation.DIRECTORY.value / "review_triage" / "pull_request_files.graphql"
+    )
+    """
+    The GraphQL query reading one page of the files GitHub lists in a pull request,
+    with its head commit.
+    """
+
+    REPORT_TEMPLATE = PackageLocation.TEMPLATES.value / "review_triage_report.md.jinja"
+    """
+    The Markdown report of which files of a pull request need review.
+    """
+
+    MARK_VIEWED_SETUP_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "review_triage_mark_viewed_setup.md.jinja"
+    )
+    """
+    The report of setting a repository's Actions up to mark files viewed.
+    """
+
+    MARK_VIEWED_CALLER_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "review_triage_mark_viewed_caller.yml"
+    )
+    """
+    The workflow installed on a user's repository that calls basstler's reusable
+    workflow marking files viewed.
+    """
+
+
+class GitHubTemplate(PathEnumeration):
+    """
+    The templates the GitHub client's models render.
+    """
+
+    SHARED_TOKEN_STORE_COMMAND = (
+        PackageLocation.TEMPLATES.value / "shared_token_store_command.sh"
+    )
+    """
+    The command storing one token, read once at a hidden prompt, as several secrets.
     """
 
 
@@ -338,6 +473,11 @@ class BasstlerRepositoryLocation(PathEnumeration):
     The plugin's manifest: its name, description and, once released, version.
     """
 
+    REVIEW_TRIAGE_README = Path("docs") / "review-triage" / "README.md"
+    """
+    How to use the review triage and set up marking files viewed.
+    """
+
     @property
     def path_in_plugin(self) -> Path:
         """
@@ -386,6 +526,23 @@ class ProjectLocation(PathEnumeration):
     :attr:`PackageLocation.STACK_CONFIGURATION`.
     """
 
+    GIT_IDENTITY = PERSONAL_NOTES / "git-identity"
+    """
+    The git identity of the notes repository's owner, which a clone with none of its
+    own is given.
+
+    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
+    CONTRIBUTOR_GIT_IDENTITIES = PERSONAL_NOTES / "git-identities"
+    """
+    The git identities of everyone else who shares the notes branch, one file per GitHub
+    login.
+
+    Mirrors ``CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY`` in
+    ``resolve-personal-notes-config.sh``.
+    """
+
     PERSONAL_NOTES_DOCUMENT = PERSONAL_NOTES / "notes.md"
     """
     The notes file itself, unless a clone's settings put it elsewhere.
@@ -406,9 +563,24 @@ class ProjectLocation(PathEnumeration):
     Mirrors ``PLAN_HUB_PATH`` in ``resolve-personal-notes-config.sh``.
     """
 
+    PLAN_BRANCH_INDEX = PLANS / "_generated" / "branch-index.tsv"
+    """
+    The generated index naming the plan each item branch belongs to.
+
+    Mirrors ``PLAN_BRANCH_INDEX_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
     PLAN_RULES = PLANS / "_rules.yaml"
     """
     The rules every plan of the repository follows, one entry per rule.
+    """
+
+    PULL_REQUEST_PROGRESS = PERSONAL_NOTES / "pr-progress"
+    """
+    Where the personal-notes branch keeps each branch's progress note, named after the
+    branch.
+
+    Mirrors ``PR_PROGRESS_DIRECTORY`` in ``resolve-personal-notes-config.sh``.
     """
 
     PERSONAL_STACK_CONFIGURATION = PERSONAL_NOTES / "stack.toml"
@@ -439,7 +611,7 @@ class ProjectLocation(PathEnumeration):
 
 class WorkflowLocation(PathEnumeration):
     """
-    The GitHub Actions workflows the plan site runs on, relative to the root of the
+    The GitHub Actions workflows basstler runs or starts, relative to the root of the
     branch that holds each.
     """
 
@@ -467,6 +639,17 @@ class WorkflowLocation(PathEnumeration):
     """
     The workflow on a notes repository's default branch that starts :attr:`PLAN_SITE`
     whenever a pull request merges.
+    """
+
+    REVIEW_TRIAGE_MARK_VIEWED = DIRECTORY / "review-triage-mark-viewed.yml"
+    """
+    basstler's reusable workflow that marks a pull request's mechanical files viewed.
+    """
+
+    MARK_VIEWED = DIRECTORY / "mark-viewed.yml"
+    """
+    The workflow on the user's repository that calls :attr:`REVIEW_TRIAGE_MARK_VIEWED`
+    with the user's own token.
     """
 
 

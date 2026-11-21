@@ -4,22 +4,24 @@ The fixture plan's items, and the requests and stand-ins the item-bootstrap test
 
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass, field
 from typing import Any
 
 import yaml
 
 import basstler.plan.item_bootstrap
+from basstler.directory_tree import DirectoryTree
+from basstler.github.pull_request import NewPullRequest
+from basstler.github.repository import PullRequestReference
 from basstler.plan.item_bootstrap.exceptions import PullRequestRefusedError
 from basstler.plan.item_bootstrap.manifest_text import ManifestText
-from basstler.github.pull_request import NewPullRequest
 from basstler.plan.item_bootstrap.opening import (
     PullRequestOpener,
     WorkOpenRequest,
 )
 from basstler.plan.item_bootstrap.record import ItemRecordRequest
 from basstler.plan.item_bootstrap.update import ItemUpdateRequest
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemLayout,
     ItemStatus,
@@ -33,7 +35,6 @@ from basstler.plan.size_limits import (
     RoadmapEntryLocation,
     SizeViolation,
 )
-from basstler.repository import PullRequestReference
 
 from ...constants.notes import ScratchBranch
 from ...constants.paths import DatasetLocation
@@ -55,13 +56,17 @@ the package's own directory on ``sys.path`` in place of the project root.
 PLAN_IDENTIFIER = "test-plan"
 
 
-PLAN_MANIFEST = (DatasetLocation.DIRECTORY / "bootstrap-plan.yaml").read_text()
+PLAN_MANIFEST = (DatasetLocation.DIRECTORY / "bootstrap-plan.yaml").read_text(
+    encoding="utf-8"
+)
 """
 The manifest every test starts from.
 """
 
 
-PLAN_ROADMAP = (DatasetLocation.DIRECTORY / "bootstrap-roadmap.md").read_text()
+PLAN_ROADMAP = (DatasetLocation.DIRECTORY / "bootstrap-roadmap.md").read_text(
+    encoding="utf-8"
+)
 """
 The roadmap every test starts from.
 """
@@ -93,7 +98,7 @@ The session recorded on an item whose work was opened.
 
 INDENTLESS_PLAN_MANIFEST = (
     DatasetLocation.DIRECTORY / "bootstrap-plan-indentless-items.yaml"
-).read_text()
+).read_text(encoding="utf-8")
 """
 The fixture plan written the way a YAML dumper writes it: every item flush with
 ``items:``, and the fixture's further items - written-out dependencies, a literal note -
@@ -192,7 +197,7 @@ class RecordingPullRequestOpener(PullRequestOpener):
         Record *pull_request* and hand back a pull request as GitHub would.
         """
         self.requests.append(pull_request)
-        return PullRequestReference(pull_request.repository, self.number)
+        return PullRequestReference(pull_request.base.repository, self.number)
 
 
 @dataclass
@@ -225,12 +230,12 @@ def published_plan(repository: ScratchRepository) -> dict[PlanDocument, str]:
     :return: Each document's content.
     """
     checkout = repository.project_root.parent / "published-plan-checkout"
-    shutil.rmtree(checkout, ignore_errors=True)
+    DirectoryTree(checkout).remove()
     repository.clone_notes_branch(checkout)
     return {
         document: (
             checkout / document.path_within_notes_branch(PLAN_IDENTIFIER)
-        ).read_text()
+        ).read_text(encoding="utf-8")
         for document in PlanDocument
     }
 
@@ -247,6 +252,7 @@ def record_request(repository: ScratchRepository, **overrides: object):
         plan_identifier=PLAN_IDENTIFIER,
         item_identifier=EXISTING_ITEM,
         status=ItemStatus.IN_PROGRESS,
+        recommended_model=ModelAlias.SONNET,
     )
     defaults.update(overrides)
     return ItemRecordRequest(**defaults)
@@ -319,17 +325,6 @@ def publish_the_branch_index(repository: ScratchRepository) -> None:
     :param repository: The scratch repository to save within.
     """
     update_request().update(repository.project_root)
-
-
-def put_both_items_on_one_branch(repository: ScratchRepository) -> None:
-    """
-    Move the fixture's unstarted item onto the branch its underway one already rides on.
-
-    :param repository: The scratch repository to save within.
-    """
-    update_request(values_by_key={ManifestKey.BRANCH: second_item_branch()}).update(
-        repository.project_root
-    )
 
 
 def publish_new_branch(repository: ScratchRepository) -> None:

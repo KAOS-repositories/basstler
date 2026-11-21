@@ -13,7 +13,7 @@ import pytest
 
 from basstler.code_rules.checker import CodeRulesCheck, StagedLines
 from basstler.code_rules.prose_length import ProseLengthChecker
-from basstler.maintenance.git_commands import GitCommandRunner
+from basstler.git.commands import GitCommandRunner
 
 from ..constants.paths import ProseSnippet
 
@@ -43,9 +43,11 @@ def test_only_code_the_staged_change_touches_is_reported(repository):
     docstring the staged change appends is reported.
     """
     path = repository / "module.py"
-    committed_lines = len(path.read_text().splitlines())
-    with path.open("a") as source:
-        source.write(f"\n{ProseSnippet.OVERLONG_ATTRIBUTE_DOCSTRING.read_text()}")
+    committed_lines = len(path.read_text(encoding="utf-8").splitlines())
+    with path.open("a", encoding="utf-8") as source:
+        source.write(
+            f"\n{ProseSnippet.OVERLONG_ATTRIBUTE_DOCSTRING.read_text(encoding='utf-8')}"
+        )
     subprocess.run(["git", "add", "module.py"], cwd=repository, check=True)
     check = CodeRulesCheck(
         (ProseLengthChecker(),), StagedLines(GitCommandRunner(repository))
@@ -56,3 +58,17 @@ def test_only_code_the_staged_change_touches_is_reported(repository):
     assert [violation.first_line > committed_lines for violation in violations] == [
         True
     ]
+
+
+def test_code_a_staged_move_carries_over_unchanged_is_not_reported(repository):
+    """
+    Moving the module keeps its committed overlong docstring out of the check.
+    """
+    subprocess.run(["git", "mv", "module.py", "moved.py"], cwd=repository, check=True)
+    check = CodeRulesCheck(
+        (ProseLengthChecker(),), StagedLines(GitCommandRunner(repository))
+    )
+
+    violations = check.violations([repository / "moved.py"])
+
+    assert violations == []

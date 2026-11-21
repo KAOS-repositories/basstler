@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import argparse
 import functools
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TypeVar
 
 from cyclopts import Group, validators
 
+from basstler.class_name import HyphenatedClassName
 from basstler.class_property import classproperty
 
 # %% parameter groups
@@ -40,7 +40,7 @@ The concrete command type one tool's commands are found as.
 
 
 @dataclass(frozen=True)
-class Command(ABC):
+class Command(HyphenatedClassName, ABC):
     """
     One operation a command-line tool offers.
 
@@ -72,8 +72,7 @@ class Command(ABC):
         The name it is invoked by on the command line: its class name in lower case,
         words joined by hyphens, without a trailing ``Command``.
         """
-        words = cls.__name__.removesuffix(Command.__name__)
-        return re.sub(r"(?<!^)(?=[A-Z])", "-", words).lower()
+        return cls.hyphenated_class_name(Command.__name__)
 
     @classproperty
     @abstractmethod

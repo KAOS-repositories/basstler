@@ -12,14 +12,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from basstler.class_property import classproperty
-from basstler.maintenance.constants import GitHubExecutable
-from basstler.repository import Repository
+from basstler.github.constants import GitHubExecutable
+from basstler.github.graphql import GraphQLRequest, GraphQLResponse
+from basstler.github.repository import Repository
 from basstler.upstream_reviews.exceptions import (
     GitHubCommandFailed,
-)
-from basstler.upstream_reviews.pull_request_models import (
-    GraphQLRequest,
-    GraphQLResponse,
 )
 
 # %% client
@@ -93,7 +90,7 @@ class GitHubCommandLineClient(GraphQLClient, JobLogReader):
         """
         request = json.dumps(GraphQLRequest(query, variables).to_json())
         return GraphQLResponse.from_json(
-            self._run(["api", "graphql", "--input", "-"], request)
+            json.loads(self._run(["api", "graphql", "--input", "-"], request))
         ).result()
 
     def read_job_log(self, repository: Repository, job_identifier: int) -> str:
@@ -129,7 +126,7 @@ class GitHubCommandLineClient(GraphQLClient, JobLogReader):
             [self.executable, *arguments],
             input=standard_input,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
         )
         if completed.returncode != 0:
             raise GitHubCommandFailed(

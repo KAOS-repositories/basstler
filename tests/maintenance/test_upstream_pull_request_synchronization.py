@@ -7,19 +7,18 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from basstler.maintenance.description import (
+from basstler.github.pull_request_description import (
     PullRequestDescription,
     UpstreamPullRequestLink,
 )
 from basstler.maintenance.upstream_pull_request_synchronization import (
+    UpstreamPullRequestSynchronization,
     UpstreamPullRequestSynchronizationAction,
     UpstreamPullRequestSynchronizationChange,
-    UpstreamPullRequestSynchronization,
 )
 from basstler.stack.model import PullRequest
 
 from ..constants.stack import StackBranch, StackLabel
-
 from .fork import (
     ForkCheckout,
     PromotionSampleText,
@@ -95,7 +94,7 @@ def test_a_branch_under_upstream_review_gains_the_label(fork_checkout: ForkCheck
 
     changes = UpstreamPullRequestSynchronization(
         a_stack(fork_checkout, board), fork
-    ).synchronize()
+    ).apply()
 
     assert changes == [
         UpstreamPullRequestSynchronizationChange(
@@ -120,7 +119,7 @@ def test_a_branch_whose_upstream_pull_request_closed_loses_the_label(
 
     changes = UpstreamPullRequestSynchronization(
         a_stack(fork_checkout, board), fork
-    ).synchronize()
+    ).apply()
 
     assert changes == [
         UpstreamPullRequestSynchronizationChange(
@@ -143,7 +142,7 @@ def test_a_branch_already_in_step_is_not_written(fork_checkout: ForkCheckout):
 
     changes = UpstreamPullRequestSynchronization(
         a_stack(fork_checkout, board), fork
-    ).synchronize()
+    ).apply()
 
     assert changes == []
     assert fork.label_writes == []
@@ -164,9 +163,7 @@ def test_the_label_write_keeps_the_labels_the_pull_request_carries_now(
     )
     board = a_board_whose_parent(StackPullRequestNumber.UPSTREAM, labels=[])
 
-    UpstreamPullRequestSynchronization(
-        a_stack(fork_checkout, board), fork
-    ).synchronize()
+    UpstreamPullRequestSynchronization(a_stack(fork_checkout, board), fork).apply()
 
     assert fork.label_writes == [
         RecordedLabelWrite(
@@ -188,7 +185,7 @@ def test_a_pull_request_another_writer_already_put_in_step_is_not_written_again(
 
     changes = UpstreamPullRequestSynchronization(
         a_stack(fork_checkout, board), fork
-    ).synchronize()
+    ).apply()
 
     assert changes == []
     assert fork.label_writes == []
@@ -212,7 +209,7 @@ def test_a_branch_under_upstream_review_gets_its_upstream_pull_request_linked(
 
     changes = UpstreamPullRequestSynchronization(
         a_stack(fork_checkout, board), fork
-    ).synchronize()
+    ).apply()
 
     assert changes == [
         UpstreamPullRequestSynchronizationChange(
@@ -237,7 +234,7 @@ def test_a_branch_whose_upstream_pull_request_closed_loses_its_link(
 
     changes = UpstreamPullRequestSynchronization(
         a_stack(fork_checkout, board), fork
-    ).synchronize()
+    ).apply()
 
     assert changes == [
         UpstreamPullRequestSynchronizationChange(

@@ -4,7 +4,7 @@ Tests for the rules and the ``AGENTS.md`` generated from them.
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -14,7 +14,9 @@ from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.instructions import AgentsInstructions
 from basstler.code_rules.rule import CodeReference, Section
 from basstler.code_rules.rule_module import RuleModule
+from basstler.code_rules.rules import code_quality
 from basstler.code_rules.rules.code_quality import DocumentationRules
+from basstler.code_rules.rules.project import PackageAndPluginRules, PortabilityRules
 from basstler.exceptions import DataclassException
 
 from ..constants.paths import RepositoryLocation, RuleSectionsFile
@@ -45,11 +47,21 @@ def test_the_file_lists_the_rules_of_its_sections_under_their_headings(tmp_path)
         tmp_path, [DesignPrinciplesRules, VerificationRules]
     )
 
-    assert instructions.text == RuleSectionsFile.EXPECTED_TEXT.read_text().format(
+    assert instructions.text == RuleSectionsFile.EXPECTED_TEXT.read_text(
+        encoding="utf-8"
+    ).format(
         source_path=DesignPrinciplesRules.source_path,
         generate_command=CodeRulesCommand.AGENTS_MD.invocation,
         check_command=CodeRulesCommand.CHECK.invocation,
     )
+
+
+def test_a_section_s_source_path_is_written_the_same_on_every_platform():
+    """
+    The path is a pure POSIX path, so ``AGENTS.md`` names it with forward slashes on
+    Windows too and stays what the committed file holds.
+    """
+    assert type(DesignPrinciplesRules.source_path) is PurePosixPath
 
 
 def test_a_section_is_nested_in_the_section_its_parent_returns():
@@ -92,8 +104,13 @@ def test_the_checkers_are_those_of_the_checked_rules():
     The checkers the repository's rules declare, in the order the rules are listed.
     """
     assert RuleModule(rules).checkers == (
+        code_quality.DesignPrinciplesRules.ADDRESSES_ON_THEIR_SUBJECT.checker,
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_DOCSTRINGS.checker,
+        PackageAndPluginRules.IMPORT_ONLY_LISTED_PACKAGES.checker,
+        PortabilityRules.START_BASH_THROUGH_ITS_LOCATOR.checker,
+        PortabilityRules.READ_AND_WRITE_TEXT_AS_UTF_8.checker,
+        PortabilityRules.REMOVE_TREES_THROUGH_DIRECTORY_TREE.checker,
     )
 
 
@@ -140,7 +157,7 @@ def test_writing_replaces_the_file_with_the_rules(tmp_path: Path):
     Writing makes a stale ``AGENTS.md`` current.
     """
     instructions = AgentsInstructions.of_repository(tmp_path)
-    instructions.path.write_text("stale")
+    instructions.path.write_text("stale", encoding="utf-8")
 
     instructions.write()
 

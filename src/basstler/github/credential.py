@@ -7,25 +7,29 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from basstler.credential_origin import CredentialOrigin
+
+# %% the commands that give access
+
+
+class GitHubCommand(StrEnum):
+    """
+    The ``gh`` command lines a user is told to run to give this package or git access to
+    GitHub.
+    """
+
+    LOG_IN = "gh auth login"
+    """
+    Logs ``gh`` in, which gives this package its credential.
+    """
+
+    REFRESH_WORKFLOW_SCOPE = "gh auth refresh -s workflow"
+    """
+    Adds the ``workflow`` scope to ``gh``'s login, which pushing a workflow file needs.
+    """
+
+
 # %% where a token comes from
-
-
-class CredentialOrigin:
-    """
-    Where the token a GitHub request authenticates with comes from.
-    """
-
-    def describe_credential(self) -> str:
-        """
-        :return: The token, named by where it came from.
-        """
-        raise NotImplementedError
-
-    def suggest_renewal(self) -> str:
-        """
-        :return: How to replace the token with a valid one.
-        """
-        raise NotImplementedError
 
 
 class CredentialProvider(CredentialOrigin, StrEnum):

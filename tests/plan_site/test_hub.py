@@ -6,17 +6,26 @@ branch.
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
+from basstler.git.commands import GitCommandRunner
+from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
-from basstler.maintenance.git_commands import GitCommandRunner
 from basstler.plan.model import PlanDocument
 from basstler.plan_site.exceptions import RegistryUnreadableError
-from basstler.plan_site.hub import HubCommand, NotesBranch, PlanHub, SiteAddress, main
-from basstler.plan_site.plan import Item
-from basstler.repository import Repository
+from basstler.plan_site.hub import (
+    HubCommand,
+    NotesBranch,
+    PlanHistory,
+    PlanHub,
+    SiteAddress,
+    main,
+)
+from basstler.plan.structure import Item
+from basstler.plan_site.workflows import PlanSiteSecret
 from basstler.setup.steps import PersonalNotesSetting
 
 from ..constants.site import SitePlan, SiteRepository, SiteSampleText
@@ -52,7 +61,7 @@ def publish_notes(remote_root: Path, repository: Repository, files: dict[Path, s
     for relative_path, content in files.items():
         path = work / ProjectLocation.PLANS / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+        path.write_text(content, encoding="utf-8")
     git = GitCommandRunner(work)
     git.run("add", "--all")
     git.run(
@@ -89,7 +98,7 @@ def test_the_hub_file_round_trips(tmp_path: Path):
         site_url=SiteSampleText.SITE_URL.value,
     )
     path = tmp_path / ProjectLocation.PLAN_HUB.name
-    path.write_text(hub.to_text())
+    path.write_text(hub.to_text(), encoding="utf-8")
 
     assert PlanHub.load(path) == hub
 
@@ -119,12 +128,27 @@ def test_a_registry_whose_notes_cannot_be_fetched_is_refused(tmp_path: Path):
     assert refused.value.registry == SiteRepository.MISSING.value
 
 
+def test_an_unreadable_registry_says_how_the_build_reads_a_private_one(
+    tmp_path: Path,
+):
+    """
+    A private registry fails the same way, so the correction names the read token.
+    """
+    with pytest.raises(RegistryUnreadableError) as refused:
+        PlanHub.from_registry(SiteRepository.MISSING.value, str(tmp_path))
+    assert PlanSiteSecret.private_repository_correction in (
+        refused.value.suggest_correction()
+    )
+
+
 # %% a listed repository's notes
 
 
 def test_a_fetched_notes_branch_reads_and_checks_out_its_plans(tmp_path: Path):
     manifest_path = Path(SitePlan.FIRST) / PlanDocument.MANIFEST
-    publish_notes(tmp_path, REGISTRY, {manifest_path: PLAN_MANIFEST.read_text()})
+    publish_notes(
+        tmp_path, REGISTRY, {manifest_path: PLAN_MANIFEST.read_text(encoding="utf-8")}
+    )
 
     notes = NotesBranch.fetch(
         REGISTRY,
@@ -135,9 +159,11 @@ def test_a_fetched_notes_branch_reads_and_checks_out_its_plans(tmp_path: Path):
     plans_directory = notes.check_out_plans()
 
     assert notes.read(ProjectLocation.PLANS / manifest_path) == (
-        PLAN_MANIFEST.read_text().strip()
+        PLAN_MANIFEST.read_text(encoding="utf-8").strip()
     )
-    assert (plans_directory / manifest_path).read_text() == PLAN_MANIFEST.read_text()
+    assert (plans_directory / manifest_path).read_text(
+        encoding="utf-8"
+    ) == PLAN_MANIFEST.read_text(encoding="utf-8")
 
 
 def test_a_repository_that_cannot_be_fetched_reads_as_none(tmp_path: Path):
@@ -149,6 +175,82 @@ def test_a_repository_that_cannot_be_fetched_reads_as_none(tmp_path: Path):
     )
 
     assert notes is None
+
+
+def commit_plan_change(
+    remote_root: Path, repository: Repository, relative_path: Path, committed_at: str
+) -> None:
+    """
+    Change a file of a notes branch :func:`publish_notes` created, as a commit made at a
+    given time, and push it.
+
+    :param remote_root: The directory standing in for GitHub.
+    :param repository: The repository whose notes branch to change.
+    :param relative_path: The file's path inside the plans directory.
+    :param committed_at: The commit time, in ISO 8601.
+    """
+    work = Path(repository.clone_url_under(str(remote_root))).with_suffix(".work")
+    path = work / ProjectLocation.PLANS / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"{path.read_text(encoding='utf-8') if path.exists() else ''}# {committed_at}\n",
+        encoding="utf-8",
+    )
+    git = GitCommandRunner(work)
+    git.run("add", "--all")
+    dates = {"GIT_AUTHOR_DATE": committed_at, "GIT_COMMITTER_DATE": committed_at}
+    git.run(
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "--quiet",
+        "-m",
+        "n",
+        environment=dates,
+    )
+    git.run(
+        "push",
+        "--quiet",
+        str(Path(repository.clone_url_under(str(remote_root)))),
+        f"HEAD:{PersonalNotesSetting.BRANCH.default}",
+    )
+
+
+def test_a_plan_is_dated_by_its_first_and_latest_commit(tmp_path: Path):
+    manifest_path = Path(SitePlan.FIRST) / PlanDocument.MANIFEST
+    created, modified = "2026-10-01T09:00:00+00:00", "2026-11-03T17:30:00+01:00"
+    publish_notes(tmp_path, REGISTRY, {})
+    commit_plan_change(tmp_path, REGISTRY, manifest_path, created)
+    commit_plan_change(
+        tmp_path, REGISTRY, Path(SitePlan.SECOND) / PlanDocument.MANIFEST, modified
+    )
+    commit_plan_change(tmp_path, REGISTRY, manifest_path, modified)
+
+    notes = NotesBranch.fetch(
+        REGISTRY,
+        PersonalNotesSetting.BRANCH.default,
+        str(tmp_path),
+        tmp_path / "scratch",
+    )
+
+    assert notes.history_of(SitePlan.FIRST) == PlanHistory(
+        datetime.fromisoformat(created), datetime.fromisoformat(modified)
+    )
+
+
+def test_a_plan_the_branch_never_held_has_no_history(tmp_path: Path):
+    publish_notes(tmp_path, REGISTRY, {})
+
+    notes = NotesBranch.fetch(
+        REGISTRY,
+        PersonalNotesSetting.BRANCH.default,
+        str(tmp_path),
+        tmp_path / "scratch",
+    )
+
+    assert notes.history_of(SitePlan.FIRST) is None
 
 
 # %% the address of every page on the site
@@ -189,7 +291,9 @@ def write_hub(directory: Path, site_url: str | None) -> Path:
     :return: The written hub file.
     """
     path = directory / ProjectLocation.PLAN_HUB.name
-    path.write_text(PlanHub(registry=str(REGISTRY), site_url=site_url).to_text())
+    path.write_text(
+        PlanHub(registry=str(REGISTRY), site_url=site_url).to_text(), encoding="utf-8"
+    )
     return path
 
 

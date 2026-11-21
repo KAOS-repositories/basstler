@@ -25,11 +25,12 @@ takes a shortcut a hand-written manifest wouldn't also have to clear.
 
 ## 0. Check the setup is in place, and run it if not
 
-Everything below writes to the personal-notes branch, which the user may not
-have set up yet. Follow
-`skills/setup-personal-notes/prerequisite-check.md` before step 1:
-run the check, and if it reports anything missing, run `/setup-personal-notes`
-without asking first, rather than failing partway through drafting a plan.
+Follow [`prerequisite-check.md`](../setup-personal-notes/prerequisite-check.md) before step 1, with this
+skill's gate:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate --skill plan-create; echo "setup gate exit status: $?"
+```
 
 ## 1. Establish the plan id and refuse to silently overwrite
 
@@ -102,6 +103,9 @@ to read it.
 
 For a single piece of work rather than a whole plan, `/add-plan-item` runs that
 same decision on its own and is the lighter-weight way in.
+
+Give every item its `recommended_model` by invoking the `plan-recommend-models` skill (`Skill` tool, `<plan-id>`) on the
+drafted `plan.yaml` before the first save.
 
 Write only what a future session needs to act, whether drafting fresh or
 migrating a source doc. Structured facts (branch, PR, status, blockers)
@@ -184,11 +188,11 @@ same check the first time the site is built from it:
 - Every `tracks[].wave` resolves to a declared `waves[].id`.
 - Every id in `items[].depends_on` (which may list more than one id)
   resolves to another `items[].id`.
-- `default_repository` is the repository this session's clone saves the plan
-  to. A plan lives in the notes of the repository its work is for, so for
-  another repository run this skill from a checkout of that one;
-  `save-plan.sh` refuses the save otherwise, and also when the notes remote is
-  not a GitHub URL naming a repository.
+- `default_repository` is the repository this session's clone is a checkout
+  of, as its `origin` names it. For another repository run this skill from a
+  checkout of that one; `save-plan.sh` refuses the save otherwise, and also
+  when `origin` is not a GitHub URL naming a repository. The notes remote may
+  be any repository.
 
 Parse with Python's `yaml` module to check this mechanically rather than
 eyeballing it — the same tooling `save-plan.sh` and the plan site's build both

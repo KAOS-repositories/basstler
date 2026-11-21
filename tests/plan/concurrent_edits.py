@@ -26,7 +26,7 @@ PLAN_REPOSITORY = PlanManifest.from_file(
     DatasetLocation.BOOTSTRAP_PLAN
 ).default_repository
 """
-The repository the fixture plan's work is for, whose notes it is saved to.
+The repository the fixture plan's work is for, from whose checkout it is saved.
 """
 
 FIRST_ITEM = "an-existing-item"
@@ -45,8 +45,8 @@ def read_version() -> PlanVersion:
     :return: The fixture plan as the session read it.
     """
     return PlanVersion(
-        manifest_text=DatasetLocation.BOOTSTRAP_PLAN.read_text(),
-        roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(),
+        manifest_text=DatasetLocation.BOOTSTRAP_PLAN.read_text(encoding="utf-8"),
+        roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(encoding="utf-8"),
     )
 
 
@@ -91,7 +91,7 @@ def with_added_item(version: PlanVersion) -> PlanVersion:
     """
     return PlanVersion(
         manifest_text=ManifestText.from_text(version.manifest_text).with_item(
-            DatasetLocation.MERGE_NEW_ITEM.read_text()
+            DatasetLocation.MERGE_NEW_ITEM.read_text(encoding="utf-8")
         ),
         roadmap_text=version.roadmap_text,
     )
@@ -114,5 +114,6 @@ def with_roadmap(version: PlanVersion, roadmap: Path) -> PlanVersion:
     :return: *version* with its roadmap replaced by *roadmap*'s text.
     """
     return PlanVersion(
-        manifest_text=version.manifest_text, roadmap_text=roadmap.read_text()
+        manifest_text=version.manifest_text,
+        roadmap_text=roadmap.read_text(encoding="utf-8"),
     )

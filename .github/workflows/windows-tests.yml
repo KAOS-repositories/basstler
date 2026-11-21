@@ -1,0 +1,61 @@
+name: Windows tests
+
+# Runs the whole suite on a Windows runner for every pull request ready for review, since
+# what breaks only on Windows passes the Linux tests unnoticed. A draft and a push to main
+# run nothing here: a Windows runner costs twice the minutes of a Linux one.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: windows-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The suite is split into shards run at once, since one Windows runner takes over half
+  # an hour for it; each shard runs its share from the job's index and the job total.
+  test:
+    name: pytest on Windows (shard ${{ matrix.shard }})
+    if: "!github.event.pull_request.draft"
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      # Defender scans every file git and the tests write and every process they start.
+      - name: Stop scanning files as they are written
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      # The tags give the installed package its release version, which the tests read.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install basstler and the test runner
+        run: |
+          python -m pip install --upgrade pip
+          pip install --editable . --group dev
+
+      # The plan page's script is tested in a headless Chromium.
+      - name: Install the browser the page tests run in
+        run: python -m playwright install chromium
+
+      # The runner's temporary directory is on its faster drive.
+      - name: Run the tests
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: >-
+          pytest tests -n auto --durations=20
+          --shard-index ${{ strategy.job-index }}
+          --shard-count ${{ strategy.job-total }}

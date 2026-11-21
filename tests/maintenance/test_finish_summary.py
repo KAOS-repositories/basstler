@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from basstler.github_labels import GitHubLabel
+from basstler.github.states import CombinedCheckState
+from basstler.github.tooling_labels import GitHubLabel
 from basstler.maintenance.commands import RunReportCommand
 from basstler.maintenance.exceptions import MarkdownLinkTargetError
 from basstler.maintenance.fast_forward import FastForwardOutcome, FastForwardReport
@@ -27,19 +28,18 @@ from basstler.maintenance.upstream_pull_request_synchronization import (
     UpstreamPullRequestSynchronizationAction,
     UpstreamPullRequestSynchronizationChange,
 )
+from basstler.stack.checkout import ForkRefresh
 from basstler.stack.model import (
-    IntegrationStrategy,
     PullRequest,
     Reparent,
     SkippedPullRequest,
     SkipReason,
     Stack,
 )
-from basstler.github.states import CombinedCheckState
+from basstler.git.commands import IntegrationStrategy
 
 from ..constants.paths import DatasetLocation
 from ..constants.stack import StackBranch
-
 from .fork import (
     A_SESSION_LINK,
     UPSTREAM_BASE,
@@ -193,7 +193,9 @@ def test_a_link_sent_by_an_earlier_pass_is_listed_without_reading_its_descriptio
                 number=StackPullRequestNumber.CHILD,
                 head=StackBranch.CHILD,
                 labels=[GitHubLabel.PROMOTION_LINK_SENT],
-                body=DatasetLocation.DESCRIPTION_WITH_PROMOTION_PROSE.read_text(),
+                body=DatasetLocation.DESCRIPTION_WITH_PROMOTION_PROSE.read_text(
+                    encoding="utf-8"
+                ),
                 title=PromotionSampleText.TITLE,
             )
         ]
@@ -408,6 +410,19 @@ def test_a_skipped_pull_request_names_its_reason_and_where_its_head_lives():
     assert other_fork in entry
 
 
+def test_the_summary_names_the_branches_the_fork_does_not_have():
+    report = MaintenanceReport(
+        fork_refresh=ForkRefresh(missing_branches=(StackBranch.LONG_LIVED_BASE,))
+    )
+
+    (entry,) = section_of(
+        FinishSummary(report, a_titled_stack()).as_markdown(),
+        FinishSummaryHeading.NOT_ON_THE_FORK,
+    )
+
+    assert entry == f"`{StackBranch.LONG_LIVED_BASE}`"
+
+
 def test_a_refused_fast_forward_is_explained():
     explanation = "the fork's base has commits the upstream does not"
     report = MaintenanceReport(
@@ -548,6 +563,6 @@ def test_a_whole_pass_writes_the_whole_report_to_its_file(
         maintenance, as_json=False, summaries=PromotionSummaries()
     )
 
-    assert json.loads(maintenance.full_report.read_text()) == json.loads(
-        report.as_json()
-    )
+    assert json.loads(
+        maintenance.full_report.read_text(encoding="utf-8")
+    ) == json.loads(report.as_json())

@@ -6,19 +6,18 @@ or, through a plans directory, in another - and that item's readiness.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 
 import yaml
 
 from basstler.class_property import classproperty
-from basstler.plan_site.cards import DependencyChip
-from basstler.plan_site.plan import Item, Plan
-from basstler.plan.model import PlanDocument
-from basstler.pull_request_state import LiveState, PullRequestsByRepository
-from basstler.repository import PullRequestReference, Repository
-
+from basstler.github.pull_request_state import LivePullRequests, LiveState
+from basstler.github.repository import PullRequestReference, Repository
+from basstler.plan.model import PlanDocument, PlanManifest
+from basstler.plan.structure import Item, Plan
 
 # %% references
 
@@ -64,6 +63,22 @@ class DependencyReference:
         if not separator:
             return cls(item_identifier=plan_id)
         return cls(item_identifier=item_identifier, plan_id=plan_id)
+
+    @classmethod
+    def read_other_plans(
+        cls, *, plan_identifier: str, entries: Iterable[str]
+    ) -> set[str]:
+        """
+        :param plan_identifier: The plan the entries are written in.
+        :param entries: Raw ``depends_on`` entries.
+        :return: The ids of the plans other than *plan_identifier* the entries name.
+        """
+        references = (cls.from_text(entry) for entry in entries)
+        return {
+            reference.plan_id
+            for reference in references
+            if reference.plan_id is not None and reference.plan_id != plan_identifier
+        }
 
     @property
     def text(self) -> str:
@@ -152,24 +167,15 @@ class Dependency(ABC):
         """
 
     @abstractmethod
-    def chip(self, locate_plan_page: Callable[[str], str] | None) -> DependencyChip:
-        """
-        Render this dependency as a ``needs`` chip on its dependent's card.
-
-        :param locate_plan_page: Where another plan's page is published, given its id,
-            or ``None`` when plan pages have no known address.
-        """
-
-    @abstractmethod
     def classify_live_state(
-        self, pull_requests_by_repository: PullRequestsByRepository
+        self,
+        live_pull_requests: LivePullRequests,
     ) -> None:
         """
         Fill in the live GitHub state of the item this dependency names, against the
         repository that item's own plan uses.
 
-        :param pull_requests_by_repository: Live pull request state, keyed by
-            repository.
+        :param live_pull_requests: What was read of the plans' repositories.
         """
 
 
@@ -236,19 +242,12 @@ class ResolvedDependency(Dependency):
         referenced item's own answer."""
         return self.item.is_ready_for_dependent_review()
 
-    def chip(self, locate_plan_page: Callable[[str], str] | None) -> DependencyChip:
-        return DependencyChip.of_dependency(self, locate_plan_page)
-
     def classify_live_state(
-        self, pull_requests_by_repository: PullRequestsByRepository
+        self,
+        live_pull_requests: LivePullRequests,
     ) -> None:
-        """
-        See :meth:`Dependency.classify_live_state`.
-        """
         self.item.live_state = LiveState.classify(
-            self.item.pull_request_number,
-            self.repository,
-            pull_requests_by_repository,
+            self.item.pull_request_number, self.repository, live_pull_requests
         )
 
 
@@ -284,13 +283,9 @@ class UnresolvedDependency(Dependency):
         ``False``."""
         return False
 
-    def chip(self, locate_plan_page: Callable[[str], str] | None) -> DependencyChip:
-        """See :meth:`Dependency.chip` - the entry's own text, marked unmet and
-        linking nowhere."""
-        return DependencyChip.unresolved(self)
-
     def classify_live_state(
-        self, pull_requests_by_repository: PullRequestsByRepository
+        self,
+        live_pull_requests: LivePullRequests,
     ) -> None:
         """See :meth:`Dependency.classify_live_state` - nothing to classify,
         since this entry named no item."""
@@ -334,9 +329,50 @@ class PlanDirectory:
         manifest_path = self.directory / plan_id / PlanDocument.MANIFEST
         if not manifest_path.is_file():
             return None
-        plan = Plan.from_mapping(yaml.safe_load(manifest_path.read_text()))
+        plan = Plan.from_mapping(
+            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        )
         self.plans_by_id[plan_id] = plan
         return plan
+
+    @cached_property
+    def references_by_branch(self) -> dict[str, list[DependencyReference]]:
+        """
+        Every item of every plan in the directory that names a branch, keyed by that
+        branch; a manifest that is no mapping names none.
+        """
+        references: dict[str, list[DependencyReference]] = {}
+        for manifest_path in sorted(self.directory.glob(f"*/{PlanDocument.MANIFEST}")):
+            manifest = PlanManifest.from_file(manifest_path)
+            if not isinstance(manifest.content, dict):
+                continue
+            for item in manifest.items:
+                if item.branch:
+                    references.setdefault(item.branch, []).append(
+                        DependencyReference(
+                            item_identifier=item.identifier,
+                            plan_id=manifest.identifier,
+                        )
+                    )
+        return references
+
+    def items_naming(self, reference_text: str) -> list[str]:
+        """
+        :param reference_text: An item, as ``<plan-id>/<item-id>``.
+        :return: Every item of a plan in the directory whose ``depends_on`` holds it, as
+            ``<plan-id>/<item-id>``.
+        """
+        naming = []
+        for manifest_path in sorted(self.directory.glob(f"*/{PlanDocument.MANIFEST}")):
+            manifest = PlanManifest.from_file(manifest_path)
+            if not isinstance(manifest.content, dict):
+                continue
+            naming.extend(
+                DependencyReference(item.identifier, manifest.identifier).text
+                for item in manifest.items
+                if reference_text in item.dependencies
+            )
+        return naming
 
     def resolve(self, reference: DependencyReference) -> Dependency:
         """
@@ -414,6 +450,36 @@ class DependencyResolver:
         self.dependencies_by_reference[dependency_identifier] = resolved
         return resolved
 
+    def collect_plans_depended_on(self) -> list[str]:
+        """
+        :return: The ids of every plan :attr:`plan` depends on, directly or through
+            another plan, sorted; a plan :attr:`plan_directory` lacks is named but not
+            followed.
+        """
+        found: set[str] = set()
+        pending = [self.plan]
+        while pending:
+            depending = pending.pop()
+            named = (
+                DependencyReference.read_other_plans(
+                    plan_identifier=depending.id,
+                    entries=(
+                        entry for item in depending.items for entry in item.depends_on
+                    ),
+                )
+                - found
+                - {self.plan.id}
+            )
+            found |= named
+            if self.plan_directory is None:
+                continue
+            pending.extend(
+                depended_on
+                for depended_on in map(self.plan_directory.plan, sorted(named))
+                if depended_on is not None
+            )
+        return sorted(found)
+
     @property
     def resolved_dependencies(self) -> list[ResolvedDependency]:
         """
@@ -424,6 +490,20 @@ class DependencyResolver:
             dependency
             for dependency in self.dependencies_by_reference.values()
             if isinstance(dependency, ResolvedDependency)
+        ]
+
+    @property
+    def pull_request_references(self) -> list[PullRequestReference]:
+        """
+        The pull request of every resolved dependency's item that has one.
+        """
+        return [
+            PullRequestReference(
+                Repository.parse(dependency.repository),
+                dependency.item.pull_request_number,
+            )
+            for dependency in self.resolved_dependencies
+            if dependency.item.pull_request_number is not None
         ]
 
     def dependencies_of(self, item: Item) -> list[Dependency]:
@@ -447,14 +527,14 @@ class DependencyResolver:
         )
 
     def classify_live_states(
-        self, pull_requests_by_repository: PullRequestsByRepository
+        self,
+        live_pull_requests: LivePullRequests,
     ) -> None:
         """
         Fill in the live GitHub state of every item some entry here names, each against
         its own plan's repository.
 
-        :param pull_requests_by_repository: Live pull request state, keyed by
-            repository.
+        :param live_pull_requests: What was read of the plans' repositories.
         """
         for dependency in self.dependencies_by_reference.values():
-            dependency.classify_live_state(pull_requests_by_repository)
+            dependency.classify_live_state(live_pull_requests)

@@ -16,6 +16,7 @@ from typing import Annotated
 from cyclopts import App, Parameter
 
 from basstler.class_property import classproperty
+from basstler.directory_tree import DirectoryTree
 from basstler.exit_codes import CommandFailure, ExitCode, SizeLimitExitCode
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.model import PlanDocument, PlanItem, PlanManifest
@@ -548,7 +549,7 @@ class ProgressNotes(MeasuredDocument):
         :param path: A file holding a pull request's progress notes.
         :return: The notes it holds.
         """
-        return cls(path.read_text())
+        return cls(path.read_text(encoding="utf-8"))
 
     @property
     def limited_document(self) -> LimitedDocument:
@@ -610,7 +611,7 @@ class PlanFiles:
         original = PlanManifest.from_file(self.manifest)
         manifest = original.without_landed_items()
         if not manifest.items:
-            shutil.rmtree(destination.manifest.parent, ignore_errors=True)
+            DirectoryTree(destination.manifest.parent).remove()
             self.release_dependents(original, destination)
             return StagedPlan.REMOVED
         stored = (
@@ -618,7 +619,11 @@ class PlanFiles:
             if destination.manifest.exists()
             else None
         )
-        plan = Plan(manifest, Roadmap.from_text(self.roadmap.read_text()), stored)
+        plan = Plan(
+            manifest,
+            Roadmap.from_text(self.roadmap.read_text(encoding="utf-8")),
+            stored,
+        )
         plan.check()
         for warning in plan.warnings():
             logger.warning(

@@ -3,7 +3,9 @@ set -euo pipefail
 
 # Records your git identity on the personal-notes branch, so every clone
 # session-start.sh runs in authors its commits as you - see the "Git identity"
-# section of ./session-start.sh's header for what reads it back.
+# section of ./session-start.sh's header for what reads it back. It lands where
+# git_identity_path says yours belongs, so colleagues sharing one notes branch
+# each record their own.
 #
 # Usage:
 #   "${BASSTLER_PLUGIN_ROOT}/hooks/save-git-identity.sh" \
@@ -61,5 +63,5 @@ git config --file "${IDENTITY_FILE}" user.email "${IDENTITY_EMAIL}"
 
 bash "${WRITE_PERSONAL_NOTES_FILE_SCRIPT}" \
   --source "${IDENTITY_FILE}" \
-  --destination "${PERSONAL_GIT_IDENTITY_PATH}" \
+  --destination "$(git_identity_path)" \
   --message "Record git identity for $(format_git_identity "${IDENTITY_NAME}" "${IDENTITY_EMAIL}")"

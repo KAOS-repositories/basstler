@@ -7,6 +7,7 @@ from __future__ import annotations
 from enum import IntEnum, StrEnum
 
 from basstler.environment import EnvironmentVariable
+from basstler.locations import ClaudeCodeVariable
 
 
 class ScrubbedEnvironmentPrefix(StrEnum):
@@ -33,6 +34,11 @@ class ScrubbedEnvironmentPrefix(StrEnum):
     The file a SessionStart hook exports variables to the session through.
     """
 
+    CLOUD_SESSION = ClaudeCodeVariable.REMOTE.value
+    """
+    Whether the run is in a Claude Code cloud session, which makes the hooks read GitHub.
+    """
+
     BASSTLER = "BASSTLER_"
     """
     The plugin root, the package's home and anything else the configuration exports.
@@ -52,11 +58,6 @@ class ScrubbedEnvironmentPrefix(StrEnum):
 class ConfigurationVariable(StrEnum):
     """
     The variables of the shell configuration the tests read back, named once.
-    """
-
-    ENVIRONMENT_DIRECTORY = "BASSTLER_ENVIRONMENT_DIRECTORY"
-    """
-    The package's own environment.
     """
 
     ENVIRONMENT_INTERPRETER = "BASSTLER_ENVIRONMENT_INTERPRETER"
@@ -110,11 +111,6 @@ class ConfigurationVariable(StrEnum):
     The repository an installed plugin's package is installed from.
     """
 
-    RELEASE_FILE = "BASSTLER_RELEASE_FILE"
-    """
-    The file recording the latest release a session start read from that repository.
-    """
-
     UV_DIRECTORY = "BASSTLER_UV_DIRECTORY"
     """
     Where a session start installs ``uv`` when it finds neither ``uv`` nor a supported
@@ -129,6 +125,11 @@ class ConfigurationVariable(StrEnum):
     PERSONAL_NOTES_REFERENCE = "PERSONAL_NOTES_REFERENCE"
     """
     The ref the personal-notes branch is fetched into.
+    """
+
+    PULL_REQUEST_PROGRESS_DIRECTORY = "PR_PROGRESS_DIRECTORY"
+    """
+    The notes branch's directory of progress notes.
     """
 
 
@@ -158,6 +159,34 @@ class FileMode(IntEnum):
     Readable and runnable by everyone, writable by its owner.
     """
 
+    READ_ONLY_DIRECTORY = 0o555
+    """
+    A directory everyone can list and enter but no one can add to or delete from.
+    """
+
+
+class InterpreterName(StrEnum):
+    """
+    The names the hooks run a Python interpreter by.
+    """
+
+    PYTHON3 = "python3"
+    """
+    The name the shell configuration falls back to before the package environment
+    exists, which a Windows virtual environment does not provide.
+    """
+
+
+class InterpreterVariable(StrEnum):
+    """
+    Variables the Python interpreter reads when it starts.
+    """
+
+    HASH_SEED = "PYTHONHASHSEED"
+    """
+    The seed the interpreter hashes strings with.
+    """
+
 
 class BashStubVariable(StrEnum):
     """
@@ -167,4 +196,60 @@ class BashStubVariable(StrEnum):
     CALL_LOG = "STUB_BASH_CALL_LOG"
     """
     The file every script the stub is asked to run is recorded in, one per line.
+    """
+
+
+class ShellExitStatus(IntEnum):
+    """
+    Statuses bash itself exits with, rather than a script it runs.
+    """
+
+    COMMAND_NOT_FOUND = 127
+    """
+    A command bash was asked to run does not exist.
+    """
+
+
+class CheckSetupStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/check_setup_fails.sh`` reads.
+    """
+
+    ERROR = "STUB_CHECK_SETUP_ERROR"
+    """
+    What the stub prints to standard error.
+    """
+
+    STATUS = "STUB_CHECK_SETUP_STATUS"
+    """
+    The status the stub exits with.
+    """
+
+
+class PullRequestStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/merged_items_from_recording.py`` reads.
+    """
+
+    RECORDING = "STUB_PULL_REQUESTS"
+    """
+    The ``pr_data.json``-shaped file the pull requests are read from; unset, none exists,
+    and naming a missing file, every read gets no answer.
+    """
+
+
+class MergeWorkflowRefreshStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/merge_workflow_refresh_from_environment.py`` reads.
+    """
+
+    OUTPUT = "STUB_MERGE_WORKFLOW_REFRESH_OUTPUT"
+    """
+    The file whose text the stub prints; unset, it prints nothing.
+    """
+
+    FAILURE = "STUB_MERGE_WORKFLOW_REFRESH_FAILURE"
+    """
+    What the stub prints to the error stream before exiting with status 1; unset, it
+    does not fail.
     """

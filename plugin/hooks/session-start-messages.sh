@@ -13,6 +13,14 @@
 # Deliberately holds no logic. Deciding *which* message applies is
 # session-start.sh's business; this file only says how each one reads.
 
+# %% the personal notes line
+
+# notes_line_not_reached: the notes branch could not be fetched, and its
+# repository is one this session cannot reach; the next lines say how to attach it.
+notes_line_not_reached() {
+  printf 'not loaded - this session cannot reach the notes repository yet'
+}
+
 # %% the plan line
 
 # plan_line_not_applicable: for a branch no plan item could ever track - the
@@ -54,6 +62,46 @@ plan_line_tracked() {
   printf "'%s' (tracking issue: %s)" "${plan_id}" "${tracking_issue}"
 }
 
+# %% the merged items line
+
+# merged_items_line_no_plans: the notes branch holds no plans to record merged items in.
+merged_items_line_no_plans() {
+  printf 'not applicable (the notes branch holds no plans)'
+}
+
+# merged_items_line_not_checked: recording every plan's merged items failed, and
+# nothing was changed.
+merged_items_line_not_checked() {
+  printf 'not checked - recording the plans'"'"' merged items failed; the error is above'
+}
+
+# %% the recommended models line
+
+# recommended_models_line_not_applicable: no plan resolved for this branch, so no items
+# were read.
+recommended_models_line_not_applicable() {
+  printf 'not applicable (this branch tracks no plan)'
+}
+
+# recommended_models_line_not_checked: reading the plan's items failed.
+recommended_models_line_not_checked() {
+  printf 'not checked - reading the plan'"'"'s items failed; the error is above'
+}
+
+# recommended_models_line_all_set: every item of the branch's plan carries one.
+recommended_models_line_all_set() {
+  local plan_id="$1"
+  printf "every item of '%s' has one" "${plan_id}"
+}
+
+# recommended_models_line_unset: items of the branch's plan carry none; a session sets
+# them by judgement, and nothing is written for the user.
+recommended_models_line_unset() {
+  local plan_id="$1"
+  local item_identifiers="$2"
+  printf "'%s' items without one: %s - run /plan-recommend-models %s" "${plan_id}" "${item_identifiers}" "${plan_id}"
+}
+
 # %% the hub line
 
 # hub_line_not_registered: the notes branch has no hub file.
@@ -61,6 +109,14 @@ hub_line_not_registered() {
   local notes_branch="$1"
   printf "none on '%s' - /setup-personal-notes registers this repository on your plan site" \
     "${notes_branch}"
+}
+
+# merge_workflow_refresh_line_failed: the check that the plan site's merge workflow is
+# current could not run, so it may be out of date.
+merge_workflow_refresh_line_failed() {
+  local error="$1"
+  local command="$2"
+  printf "could not check that the merge workflow is current (%s) - run: %s" "${error}" "${command}"
 }
 
 # hub_line_registered: the plan site, and where this session's work sits on it.
@@ -226,6 +282,68 @@ dependencies_line_environment_not_created() {
     "${environment_directory}"
 }
 
+# dependencies_line_release_not_named: outside a checkout, the plugin names no
+# release, so no package was installed for it.
+dependencies_line_release_not_named() {
+  local plugin_root="$1"
+  printf 'not installed - the plugin at %s names no release in its plugin.json, so there is no package of its release to install; reinstall the plugin from the marketplace' \
+    "${plugin_root}"
+}
+
+# %% the release line
+
+# release_line_checkout: the plugin and the package are both the source of the
+# checkout the plugin sits in.
+release_line_checkout() {
+  local checkout="$1"
+  printf 'plugin and package both run from the checkout %s' "${checkout}"
+}
+
+# release_line_matching: the package is the plugin's own release.
+release_line_matching() {
+  local release="$1"
+  printf 'plugin and package both at %s' "${release}"
+}
+
+# release_line_mismatched: the package is another release than the plugin's,
+# so a hook may pass it what it does not accept.
+release_line_mismatched() {
+  local plugin_release="$1"
+  local package_version="$2"
+  local package_source="$3"
+  printf "the plugin is %s but the package is %s - its hooks may pass what this package does not accept; start a new session, or install '%s'" \
+    "${plugin_release}" "${package_version}" "${package_source}"
+}
+
+# release_line_not_named: the plugin names no release, so nothing pins the
+# package to it.
+release_line_not_named() {
+  local package_version="$1"
+  printf 'the plugin names no release, so nothing pins package %s to it - reinstall the plugin from the marketplace' \
+    "${package_version}"
+}
+
+# release_line_package_not_read: the installed package's version could not be
+# read, as when it is not installed.
+release_line_package_not_read() {
+  printf "could not read the installed package's version - see the dependencies line"
+}
+
+# %% the environments line
+
+# environments_line_none_removed: every other package environment still has
+# its project.
+environments_line_none_removed() {
+  printf 'none removed'
+}
+
+# environments_line_removed: the package environments of projects that are gone
+# were removed.
+environments_line_removed() {
+  local removed="$1"
+  printf 'removed %s - their projects are gone' "${removed}"
+}
+
 # %% the Actions usage line
 
 # actions_usage_line_not_checked: the usage could not be measured.
@@ -269,6 +387,12 @@ main_tests_line_failing() {
 upstream_reviews_action_line_not_read() {
   local remote="$1"
   printf "not checked - could not read the fork's branches on '%s'" "${remote}"
+}
+
+# upstream_reviews_action_line_release_not_named: the plugin names no release
+# for the Action to run, so it was not checked.
+upstream_reviews_action_line_release_not_named() {
+  printf 'not checked - the plugin names no release for it to run; see the dependencies line'
 }
 
 # upstream_reviews_action_line_not_installed: the fork has no Action branch.

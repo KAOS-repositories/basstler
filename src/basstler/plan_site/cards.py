@@ -12,15 +12,16 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from basstler.class_property import classproperty
+from basstler.plan.model_alias import ModelAlias
+from basstler.github.repository import Repository
+from basstler.stack.promotability import PromotionBlocker
+
+from basstler.plan.dependencies import UnresolvedDependency
 
 if TYPE_CHECKING:
-    from basstler.plan_site.plan import Item, Track, Wave
-    from basstler.repository import PullRequestReference
-    from basstler.plan.dependencies import (
-        Dependency,
-        ResolvedDependency,
-        UnresolvedDependency,
-    )
+    from basstler.github.repository import PullRequestReference
+    from basstler.plan.dependencies import Dependency, ResolvedDependency
+    from basstler.plan.structure import Item, Track, Wave
 
 
 # %% dependency chips
@@ -53,10 +54,111 @@ class DraftRecheckAttribute(StrEnum):
     """
 
 
+class PromotionAttribute(StrEnum):
+    """
+    The data attributes a plan page's script re-evaluates a Contribute button by.
+    """
+
+    FORM_URL = "data-promotion-form-url"
+    """
+    On the button: the upstream's prefilled pull request form it opens once nothing
+    blocks it.
+    """
+
+    ENABLED_TITLE = "data-promotion-enabled-title"
+    """
+    On the button: its hover title once nothing blocks it.
+    """
+
+    OTHER_BLOCKERS = "data-promotion-other-blockers"
+    """
+    On the button: the reasons besides a draft that block it, as a JSON list.
+    """
+
+    DRAFT = "data-promotion-draft"
+    """
+    On the button: present while its pull request is a draft.
+    """
+
+    CHECKS_OVERRIDE = "data-promotion-checks-override"
+    """
+    On the checkbox that, while ticked, stops failed checks from blocking the button.
+    """
+
+
+class LiveStateAttribute(StrEnum):
+    """
+    The data attributes a plan page's script shows each pull request's live state by.
+    """
+
+    PULL_REQUEST = "data-live-pull-request"
+    """
+    On an item's pull request chip: that pull request's REST API address.
+    """
+
+    ITEM_STATUS = "data-item-status"
+    """
+    On an item's card: its status, as the page counts it.
+    """
+
+    STATUS_CHIP = "data-status-chip"
+    """
+    On an item's status chip.
+    """
+
+    STATUS_COUNT = "data-status-count"
+    """
+    On the page's count of one status: the status counted.
+    """
+
+
+class PlanTimeAttribute(StrEnum):
+    """
+    The data attributes of the times a plan page shows.
+    """
+
+    RELATIVE = "data-relative-time"
+    """
+    On a time the page's script shows relative to now.
+    """
+
+    REFRESHED = "data-refreshed-at"
+    """
+    On the time the page's states were last read from GitHub.
+    """
+
+    REFRESH_SOURCE = "data-refresh-source"
+    """
+    On the text saying where :attr:`REFRESHED` came from.
+    """
+
+
+class RefreshSource(StrEnum):
+    """
+    Where the states a plan page shows were last read from, as the page words it.
+    """
+
+    BUILD = "from the site build"
+    """
+    The build read them; the browser has not, or found nothing to read.
+    """
+
+    LIVE = "live from GitHub"
+    """
+    The browser read every pull request from GitHub.
+    """
+
+    REFUSED = "from the site build; GitHub refused the live check"
+    """
+    The browser asked GitHub, which refused or did not answer, as when the viewer's
+    hourly limit is spent.
+    """
+
+
 @dataclass
 class DependencyChip:
     """One ready-to-render ``needs`` chip on an item's card - see
-    :attr:`Item.dependency_chips`."""
+    :attr:`ItemCard.dependency_chips`."""
 
     dependency: Dependency
     """The dependency the chip stands for."""
@@ -81,6 +183,20 @@ class DependencyChip:
     def tooltip_separator(cls) -> str:
         """Joins the parts of a cross-plan chip's hover title."""
         return " · "
+
+    @classmethod
+    def of(
+        cls, dependency: Dependency, locate_plan_page: Callable[[str], str] | None
+    ) -> DependencyChip:
+        """Build the chip for a dependency, resolved or not.
+
+        :param dependency: The dependency this chip stands for.
+        :param locate_plan_page: Where another plan's page is published, given its id,
+            or ``None`` when plan pages have no known address.
+        """
+        if isinstance(dependency, UnresolvedDependency):
+            return cls.unresolved(dependency)
+        return cls.of_dependency(dependency, locate_plan_page)
 
     @classmethod
     def unresolved(cls, dependency: UnresolvedDependency) -> DependencyChip:
@@ -134,7 +250,7 @@ class DependencyChip:
 @dataclass(frozen=True)
 class ItemAction(ABC):
     """One not-done item's actionable button - see
-    :attr:`Item.action`. The label matches what the status actually calls
+    :attr:`ItemCard.action`. The label matches what the status actually calls
     for (starting fresh work reads differently from resolving a blocker),
     but every non-``done`` status gets one: there's always something
     actionable to do next besides waiting.
@@ -152,6 +268,9 @@ class ItemAction(ABC):
 
     item_identifier: str
     """The item this action's command targets."""
+
+    recommended_model: ModelAlias | None = None
+    """The model the button's picker preselects, or ``None`` to preselect none."""
 
     @classproperty
     @abstractmethod
@@ -191,46 +310,129 @@ class ResolveAction(ItemAction):
         return "/plan-item-resolve"
 
 
-class ModelOption(StrEnum):
-    """One choice in a action button's model dropdown, in the order the
-    dropdown lists them.
+# %% promotion button
 
-    Every model is offered on every page - not plan-specific, so declared once
-    here rather than threaded through :class:`Plan`. A member is its own model
-    id, the one to prepend as ``/model <value>`` before the copied command, or
-    ``""`` to copy the command alone and inherit whatever model the
-    pasted-into session is already running.
+
+@dataclass(frozen=True)
+class PromotionButton:
+    """
+    The button on an item's card that opens its pull request's prefilled form on the
+    upstream, or says why it cannot.
     """
 
-    label: str
-    """The human-readable label shown in the dropdown."""
+    upstream_repository: Repository
+    """
+    The repository the pull request would be opened in.
+    """
 
-    def __new__(cls, model_identifier: str, label: str) -> ModelOption:
-        """Make a member that is its own model id and carries its dropdown label.
+    form_url: str
+    """
+    The compare-and-create page, whether or not something blocks the promotion.
+    """
 
-        :param model_identifier: The model id, or ``""`` for the session default.
-        :param label: The human-readable label shown in the dropdown.
-        :return: The member.
+    blockers: list[PromotionBlocker]
+    """
+    Every reason the pull request may not be promoted yet.
+    """
+
+    @property
+    def url(self) -> str | None:
         """
-        member = str.__new__(cls, model_identifier)
-        member._value_ = model_identifier
-        member.label = label
-        return member
+        :return: :attr:`form_url`, ``None`` while something blocks the promotion.
+        """
+        return None if self.blockers else self.form_url
 
-    SESSION_DEFAULT = ("", "Session default")
-    """Inherit whatever model the pasted-into session is already running."""
+    @property
+    def is_draft(self) -> bool:
+        """
+        :return: Whether the pull request was a draft when the page was built.
+        """
+        return PromotionBlocker.DRAFT in self.blockers
 
-    OPUS_5 = ("claude-opus-5", "Opus 5")
-    """Claude Opus 5."""
+    @property
+    def checks_failed(self) -> bool:
+        """
+        :return: Whether failed checks block the promotion, so the card offers to
+            override them.
+        """
+        return PromotionBlocker.CHECKS_FAILED in self.blockers
 
-    SONNET_5 = ("claude-sonnet-5", "Sonnet 5")
-    """Claude Sonnet 5."""
+    @property
+    def other_blockers(self) -> list[str]:
+        """
+        :return: The reasons besides a draft, which the page's script does not re-check.
+        """
+        return [
+            blocker.value
+            for blocker in self.blockers
+            if blocker is not PromotionBlocker.DRAFT
+        ]
 
-    HAIKU_4_5 = ("claude-haiku-4-5-20251001", "Haiku 4.5")
-    """Claude Haiku 4.5."""
+    @property
+    def label(self) -> str:
+        """
+        :return: The button's text.
+        """
+        return "Contribute"
 
-    FABLE_5 = ("claude-fable-5", "Fable 5")
-    """Claude Fable 5."""
+    @property
+    def checks_override_label(self) -> str:
+        """
+        :return: The text of the checkbox overriding failed checks.
+        """
+        return "Ignore failed checks (bypass rules)"
+
+    @property
+    def enabled_title(self) -> str:
+        """
+        :return: The hover title of the button once nothing blocks it.
+        """
+        return f"Open a pull request on {self.upstream_repository}"
+
+    @property
+    def reason(self) -> str:
+        """
+        :return: Why the button is disabled, empty when it is not.
+        """
+        return "; ".join(blocker.value for blocker in self.blockers)
+
+
+# %% item cards
+
+
+@dataclass
+class ItemCard:
+    """
+    What one item's card shows beyond the item itself.
+    """
+
+    item: Item
+    """
+    The item the card shows.
+    """
+
+    dependency_chips: list[DependencyChip]
+    """
+    One chip per entry of the item's :attr:`Item.depends_on`.
+    """
+
+    action: ItemAction | None
+    """
+    The item's action button; ``None`` for a done item, and for a not-started item
+    until its dependencies are ready to build on.
+    """
+
+    pending_start_action: StartNowAction | None = None
+    """
+    The start action of a not-started item that only open draft dependencies hold back;
+    ``None`` for any other item.
+    """
+
+    promotion: PromotionButton | None = None
+    """
+    The button opening the item's pull request on the upstream; ``None`` unless the pull
+    request is open in a fork.
+    """
 
 
 # %% track and wave sections

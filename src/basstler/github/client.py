@@ -16,28 +16,27 @@ import urllib.parse
 import urllib.request
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
-from functools import cached_property
 from enum import StrEnum
+from functools import cached_property
 from http import HTTPStatus
 from http.client import HTTPResponse
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import Field
 
 from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
+from basstler.github.constants import GitHubExecutable
 from basstler.github.credential import CredentialProvider, GitHubCredential
-from basstler.json_model import ValidatedJSONModel
 from basstler.github.exceptions import (
-    GitHubCredentialUnavailableError,
     GitHubCallFailed,
+    GitHubCredentialUnavailableError,
     GitHubRequestFailed,
     GitHubUnreachableError,
 )
-from basstler.maintenance.constants import GitHubExecutable
-from basstler.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, HasRepository
+from basstler.json_model import ValidatedJSONModel
 
 # %% the interface
 
@@ -111,14 +110,9 @@ class GitHubWrite(ValidatedJSONModel, ABC):
         """
 
 
-class RepositoryWrite(GitHubWrite, ABC):
+class RepositoryWrite(GitHubWrite, HasRepository, ABC):
     """
     A change to a resource of one repository.
-    """
-
-    repository: Annotated[Repository, Field(exclude=True)]
-    """
-    The repository the resource belongs to.
     """
 
 
@@ -153,6 +147,13 @@ class GitHubAttemptClient(GitHubAttemptReader, GitHubWriter, ABC):
 class GitHubClient(GitHubReader, GitHubWriter, ABC):
     """
     Reading and writing REST resources.
+    """
+
+
+class GitHubFullClient(GitHubClient, GitHubAttemptClient, ABC):
+    """
+    Reading and writing REST resources, with a refusal raised or returned on the answer
+    as the caller chooses.
     """
 
 
@@ -259,6 +260,11 @@ class GitHubResponse:
     Why the call failed, ``None`` when it succeeded.
     """
 
+    waits: tuple[timedelta, ...] = ()
+    """
+    The wait before each time the call was asked again, first first.
+    """
+
     @property
     def is_server_error(self) -> bool:
         """
@@ -267,6 +273,17 @@ class GitHubResponse:
         return (
             isinstance(self.failure, GitHubRequestFailed)
             and self.failure.status in SERVER_ERROR_STATUSES
+        )
+
+    @property
+    def is_not_found(self) -> bool:
+        """
+        :return: Whether GitHub answered 404: no such resource, or none this credential
+            may see.
+        """
+        return (
+            isinstance(self.failure, GitHubRequestFailed)
+            and self.failure.status == HTTPStatus.NOT_FOUND
         )
 
     def raise_if_failed(self) -> Any:
@@ -280,7 +297,7 @@ class GitHubResponse:
 
 
 @dataclass(frozen=True)
-class GitHubRestClient(GitHubClient, GitHubAttemptClient):
+class GitHubRestClient(GitHubFullClient):
     """
     Plain authenticated HTTPS requests, through the proxy the environment names.
 
@@ -323,7 +340,7 @@ class GitHubRestClient(GitHubClient, GitHubAttemptClient):
         if executable is None:
             raise GitHubCredentialUnavailableError(tuple(GitHubCredentialVariable))
         login = subprocess.run(
-            [executable, "auth", "token"], capture_output=True, text=True
+            [executable, "auth", "token"], capture_output=True, encoding="utf-8"
         )
         if login.returncode != 0 or not login.stdout.strip():
             raise GitHubCredentialUnavailableError(tuple(GitHubCredentialVariable))
@@ -367,15 +384,17 @@ class GitHubRestClient(GitHubClient, GitHubAttemptClient):
         with a server error.
 
         :param path: The path below :attr:`api_root`.
-        :return: The last answer.
+        :return: The last answer, with the waits made before it.
         """
         response = self._exchange(HttpMethod.GET, path, None)
+        waits: list[timedelta] = []
         for delay in self.retry_policy.delays():
             if not response.is_server_error:
-                return response
+                break
             time.sleep(delay.total_seconds())
+            waits.append(delay)
             response = self._exchange(HttpMethod.GET, path, None)
-        return response
+        return replace(response, waits=tuple(waits))
 
     def _exchange(
         self, method: HttpMethod, path: str, payload: Mapping[str, Any] | None

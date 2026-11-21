@@ -10,18 +10,31 @@ from typing import Any
 import pytest
 
 from basstler.github.client import GitHubWrite
-from basstler.github.issue import ClosingReason, IssueClosing, IssueComment, IssueState
-from basstler.github.issue import NewIssue
+from basstler.github.issue import (
+    ClosingReason,
+    IssueClosing,
+    IssueComment,
+    IssueState,
+    NewIssue,
+)
 from basstler.github.label import LabelReplacement, NewLabel, RepositoryLabel
 from basstler.github.pull_request import NewPullRequest, PullRequestDescription
+from basstler.git.branch import Branch
+from basstler.github.file_proposal import NewBranch
+from basstler.github.fork_sync import ForkFastForward
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
-from basstler.repository import Repository
 
 # %% the writes and the bodies GitHub reads from them
 
 REPOSITORY = Repository("example-owner", "example-repo")
 LABEL = RepositoryLabel("bug", "Something is broken")
+
+FORK = Repository("a-forker", REPOSITORY.name)
+"""
+A fork of :data:`REPOSITORY`, carrying a branch proposed to it.
+"""
 
 WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     (
@@ -40,7 +53,11 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     (NewLabel(REPOSITORY, LABEL), LABEL.to_json()),
     (LabelReplacement(REPOSITORY, 1, ["bug"]), {"labels": ["bug"]}),
     (
-        NewPullRequest(REPOSITORY, "a title", "feature", "main"),
+        NewPullRequest(
+            RepositoryBranch("main", REPOSITORY),
+            RepositoryBranch("feature", REPOSITORY),
+            "a title",
+        ),
         {
             "title": "a title",
             "head": "feature",
@@ -48,6 +65,28 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
             "body": "",
             "draft": True,
         },
+    ),
+    (
+        NewPullRequest(
+            RepositoryBranch("main", REPOSITORY),
+            RepositoryBranch("feature", FORK),
+            "a title",
+        ),
+        {
+            "title": "a title",
+            "head": f"{FORK.owner}:feature",
+            "base": "main",
+            "body": "",
+            "draft": True,
+        },
+    ),
+    (
+        NewBranch(repository=REPOSITORY, object_hash="a-commit", name="feature"),
+        {"ref": Branch("feature").reference, "sha": "a-commit"},
+    ),
+    (
+        ForkFastForward(repository=FORK, object_hash="a-commit", branch=Branch("main")),
+        {"sha": "a-commit"},
     ),
     (PullRequestDescription(REPOSITORY, 1, "a description"), {"body": "a description"}),
     (

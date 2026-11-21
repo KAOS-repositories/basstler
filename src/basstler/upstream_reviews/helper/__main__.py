@@ -33,16 +33,16 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from basstler.upstream_reviews.helper import fetch
+from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.class_property import classproperty
-from basstler.repository import Repository
+from basstler.github.repository import Repository
+from basstler.github.states import CheckOutcome
 from basstler.standard_streams import StandardStreamHandler
-from basstler.upstream_reviews.exceptions import (
-    UpstreamReadError,
-)
+from basstler.github.exceptions import UpstreamReadError
 from basstler.upstream_reviews.failure_logs import (
     FailedJob,
 )
+from basstler.upstream_reviews.helper import fetch
 from basstler.upstream_reviews.helper.recording import (
     HelperChunk,
     HelperRecording,
@@ -56,7 +56,6 @@ from basstler.upstream_reviews.readers import (
 from basstler.upstream_reviews.request import (
     UpstreamReadRequest,
 )
-from basstler.github.states import CheckOutcome
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -173,7 +172,7 @@ class HelperScript:
         """
         :return: The shell command running the fetch module from its own source.
         """
-        source = self.code_only(Path(fetch.__file__).read_text())
+        source = self.code_only(Path(fetch.__file__).read_text(encoding="utf-8"))
         configuration = json.dumps(self.configuration, separators=(",", ":"))
         return "\n".join(
             [
@@ -274,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
             request.identifier, SessionTranscript.current().chunks(request.identifier)
         )
         logger.info(recording.report(request, arguments.include_resolved))
-    except UpstreamReadError as failure:
+    except (UpstreamReadError, GraphQLErrorsReturned) as failure:
         logger.error(failure)
         return 1
     return 0

@@ -5,21 +5,22 @@ cards, links and counts.
 
 from __future__ import annotations
 
-from basstler.plan_site.cards import TrackSection
-from ..fixture_plans import ForeignItemId, foreign_reference
-
-from basstler.maintenance.description import UpstreamPullRequestLink
-from basstler.plan.model import ItemStatus
-from basstler.plan_site.plan import Plan, Track, Wave
-from basstler.plan_site.plan_page import PlanPage
-from basstler.pull_request_state import (
+from basstler.github.pull_request_description import UpstreamPullRequestLink
+from basstler.github.pull_request_state import (
+    LivePullRequests,
     PullRequestRecord,
     PullRequestState,
 )
-from basstler.repository import Repository
+from basstler.github.repository import Repository
+from basstler.plan.model import ItemStatus
+from basstler.plan_site.cards import TrackSection
+from basstler.plan.structure import Plan, Track, Wave
+from basstler.plan_site.plan_page import PlanPage
 
 from ..fixture_plans import (
     PLAN_UNDER_TEST_ID,
+    ForeignItemId,
+    foreign_reference,
 )
 from .plan_page_builders import (
     STYLESHEET_URL,
@@ -45,8 +46,7 @@ def test_render_wires_an_item_into_its_wave_and_track_sections():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository={},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(),
     )
     output = renderer.render().html
     assert "Wave One" in output
@@ -75,8 +75,7 @@ def test_render_shows_placeholder_for_a_track_with_no_items():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository={},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(),
     )
     output = renderer.render().html
     assert "Nothing here yet." in output
@@ -123,8 +122,7 @@ def test_render_shows_pull_request_link_when_item_has_one():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository=pull_requests_by_repository,
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(pull_requests_by_repository),
     )
     output = renderer.render().html
     assert 'href="https://github.com/owner/repo/pull/5"' in output
@@ -152,8 +150,7 @@ def test_render_shows_ready_to_review_section_last_in_the_sidebar():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository=pull_requests_by_repository,
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(pull_requests_by_repository),
     )
     output = renderer.render().html
     assert output.index("Ready to review") > output.index("Ready to start")
@@ -173,8 +170,7 @@ def test_render_hides_done_items_by_default_with_a_sidebar_toggle():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository={},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(),
     )
     output = renderer.render().html
     assert 'id="plan-page"' in output
@@ -199,8 +195,7 @@ def test_render_gives_each_item_card_a_stable_id_anchor():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository={},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(),
     )
     output = renderer.render().html
     assert 'id="item-a"' in output
@@ -223,8 +218,7 @@ def test_render_links_a_ready_to_start_sidebar_entry_to_its_item_card():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository={},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(),
     )
     output = renderer.render().html
     assert 'href="#item-b"' in output
@@ -249,8 +243,7 @@ def test_render_links_a_drift_sidebar_entry_to_its_item_card():
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository=pull_requests_by_repository,
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(pull_requests_by_repository),
     )
     output = renderer.render().html
     assert 'href="#item-a"' in output
@@ -265,6 +258,15 @@ def test_status_counts_cover_every_status_even_when_zero():
     summary = renderer.render().overview
     assert summary.status_counts[ItemStatus.DONE] == 1
     assert summary.status_counts[ItemStatus.BLOCKED] == 0
+
+
+def test_items_that_landed_and_were_dropped_count_as_done():
+    renderer = make_renderer([item("a", ItemStatus.DONE)])
+    renderer.plan.landed_item_count = 2
+
+    summary = renderer.render().overview
+
+    assert summary.status_counts[ItemStatus.DONE] == 1 + renderer.plan.landed_item_count
 
 
 # %% track order

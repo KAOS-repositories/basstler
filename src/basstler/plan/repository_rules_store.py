@@ -9,10 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from basstler.class_property import classproperty
+from basstler.git.commands import GitCommandRunner
 from basstler.locations import ProjectLocation
-from basstler.maintenance.git_commands import GitCommandRunner
 from basstler.personal_notes.branch import (
     NotesBranchWriter,
+    NotesFileChanges,
     NotesWriteOutcome,
     PersonalNotesBranch,
     PersonalNotesLocation,
@@ -81,5 +82,5 @@ class RepositoryRulesStore:
         :return: Whether anything was pushed.
         """
         return NotesBranchWriter(self.branch).write(
-            {self.rules_path: rules.render()}, message
+            NotesFileChanges({self.rules_path: rules.render()}), message
         )

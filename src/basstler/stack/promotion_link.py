@@ -5,12 +5,15 @@ The one-click link that opens a fork branch's pull request on the upstream.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
-from urllib.parse import quote
 
 from basstler.class_property import classproperty
+from basstler.github.pull_request_form import (
+    PrefilledPullRequestLink,
+    PullRequestForm,
+)
+from basstler.github.repository import Repository, RepositoryBranch
 from basstler.locations import ProjectLocation
-from basstler.stack.configuration import (
+from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     MissingUpstreamRepositoryError,
 )
@@ -26,54 +29,28 @@ This module's logger, which is also what its command prints through.
 # %% promotion links
 
 
-class PromotionLinkParameter(StrEnum):
-    """The query parameters of a compare-and-create link."""
-
-    EXPAND = "expand"
-    """Opens the pull request form rather than only the comparison."""
-
-    TITLE = "title"
-    """The title to prefill."""
-
-    BODY = "body"
-    """The description to prefill."""
-
-
 @dataclass(frozen=True)
-class PromotionLink:
-    """A one-click compare-and-create link opening a fork branch's pull request upstream.
-
-    The prefill travels in the query string, so an unencoded character truncates it and an
-    oversized one is discarded whole by the server - both silently.
+class PromotionTarget:
+    """
+    Where a fork branch is promoted to: the upstream branch, and the fork the branch
+    lives in.
     """
 
-    @classproperty
-    def url_character_limit(cls) -> int:
-        """Longest URL to build, the conventional 8 KiB request-line limit servers accept."""
-        return 8192
+    upstream_base: RepositoryBranch
+    """
+    The upstream branch the pull request merges into, on the repository it is opened on.
+    """
 
-    @classproperty
-    def truncation_marker(cls) -> str:
-        """Appended to a body that had to be shortened, so the cut is visible in the prefill."""
-        return "..."
-
-    url: str
-    """The compare-and-create URL, ready to open."""
-
-    body_was_truncated: bool
-    """Whether the body had to be shortened to fit :attr:`url_character_limit`."""
+    fork: Repository
+    """
+    The fork the promoted branch lives in.
+    """
 
     @classmethod
-    def build(
-        cls, configuration: Configuration, branch: str, title: str, body: str
-    ) -> PromotionLink:
-        """Build the link promoting a fork branch to the upstream base.
-
+    def from_configuration(cls, configuration: Configuration) -> PromotionTarget:
+        """
         :param configuration: The resolved configuration naming both repositories.
-        :param branch: The fork branch to promote.
-        :param title: Title to prefill.
-        :param body: Description to prefill, shortened if the URL would not otherwise fit.
-        :return: The link, flagged if the body was shortened.
+        :return: The target it describes.
         :raises MissingUpstreamRepositoryError: If the project names no upstream.
         """
         upstream_repository = configuration.upstream_repository
@@ -82,38 +59,81 @@ class PromotionLink:
                 CommittedStackConfiguration().project_file,
                 ProjectLocation.PERSONAL_STACK_CONFIGURATION.value,
             )
-
-        def url_for(text: str) -> str:
-            return (
-                f"{upstream_repository.url}/compare/"
-                f"{configuration.upstream_base}..."
-                f"{configuration.fork_repository.owner}:{branch}"
-                f"?{PromotionLinkParameter.EXPAND}=1"
-                f"&{PromotionLinkParameter.TITLE}={quote(title)}"
-                f"&{PromotionLinkParameter.BODY}={quote(text)}"
-            )
-
-        if len(url_for(body)) <= cls.url_character_limit:
-            return cls(url_for(body), body_was_truncated=False)
-        if len(url_for(cls.truncation_marker)) > cls.url_character_limit:
-            raise PromotionLinkTooLongError(
-                branch, len(url_for("")), cls.url_character_limit
-            )
-        shortest, longest = 0, len(body)
-        while shortest < longest:
-            midpoint = (shortest + longest + 1) // 2
-            candidate = url_for(body[:midpoint] + cls.truncation_marker)
-            shortest, longest = (
-                (midpoint, longest)
-                if len(candidate) <= cls.url_character_limit
-                else (shortest, midpoint - 1)
-            )
         return cls(
-            url_for(body[:shortest] + cls.truncation_marker), body_was_truncated=True
+            upstream_base=RepositoryBranch(
+                configuration.upstream_base, upstream_repository
+            ),
+            fork=configuration.fork_repository,
         )
 
+
+@dataclass(frozen=True)
+class PromotionLink(PrefilledPullRequestLink):
+    """
+    A one-click compare-and-create link opening a fork branch's pull request upstream.
+    """
+
+    @classproperty
+    def url_character_limit(cls) -> int:
+        """
+        Longest URL to build, as :attr:`PullRequestForm.url_character_limit`.
+        """
+        return PullRequestForm.url_character_limit
+
+    @classproperty
+    def truncation_marker(cls) -> str:
+        """
+        Appended to a shortened body, as :attr:`PullRequestForm.truncation_marker`.
+        """
+        return PullRequestForm.truncation_marker
+
+    @classmethod
+    def build(
+        cls, configuration: Configuration, branch: str, title: str, body: str
+    ) -> PromotionLink:
+        """
+        Build the link promoting a fork branch to the upstream base.
+
+        :param configuration: The resolved configuration naming both repositories.
+        :param branch: The fork branch to promote.
+        :param title: Title to prefill.
+        :param body: Description to prefill, shortened if the URL would not otherwise
+            fit.
+        :return: The link, flagged if the body was shortened.
+        :raises MissingUpstreamRepositoryError: If the project names no upstream.
+        """
+        return cls.for_target(
+            PromotionTarget.from_configuration(configuration), branch, title, body
+        )
+
+    @classmethod
+    def for_target(
+        cls, target: PromotionTarget, branch: str, title: str, body: str
+    ) -> PromotionLink:
+        """
+        Build the link promoting a fork branch to a target.
+
+        :param target: Where the branch is promoted to.
+        :param branch: The fork branch to promote.
+        :param title: Title to prefill.
+        :param body: Description to prefill, shortened if the URL would not otherwise
+            fit.
+        :return: The link, flagged if the body was shortened.
+        """
+        form = PullRequestForm(
+            target.upstream_base, RepositoryBranch(branch, target.fork), title, body
+        )
+        link = form.link
+        if link is None:
+            raise PromotionLinkTooLongError(
+                branch, len(form.url_without_description), cls.url_character_limit
+            )
+        return cls(link.url, link.body_was_truncated)
+
     def print_url(self) -> None:
-        """Print the compare-and-create URL, reporting on stderr if the body was shortened."""
+        """
+        Print the compare-and-create URL, reporting on stderr if the body was shortened.
+        """
         logger.info(self.url)
         if self.body_was_truncated:
             logger.error("the description was shortened to fit the URL length limit")

@@ -17,63 +17,19 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from basstler.branch import Branch
-from basstler.github_labels import GitHubLabel
-from basstler.repository import Repository
-from basstler.stack.checkout import CurrentCheckout, LandedBranches
-from basstler.stack.exceptions import BaseBranchScopeError, BoardUnavailable
-from basstler.stack.settings import Configuration
+from basstler.git.commands import IntegrationStrategy
+from basstler.git.branch import Branch
+from basstler.github.repository import Repository
 from basstler.github.states import CombinedCheckState
+from basstler.github.tooling_labels import GitHubLabel
+from basstler.github.branch_pull_request import BranchPullRequest
+from basstler.stack.branch_status import BranchStatus
+from basstler.stack.checkout import CurrentCheckout, ForkRefresh, LandedBranches
+from basstler.stack.exceptions import BaseBranchScopeError, BoardUnavailable
+from basstler.stack.promotability import PromotionReadiness
+from basstler.stack.settings import Configuration
 
 # %% domain model
-
-
-class BranchStatus(StrEnum):
-    """A stack node's lifecycle position."""
-
-    DRAFT = "draft"
-    """Its author has not yet reviewed it themselves, so it may not be promoted."""
-
-    READY = "ready"
-    """Out of draft - reviewed by its author, and promotable once its parent has merged."""
-
-    IN_REVIEW = "in-review"
-    """Promoted to the upstream, where it waits on that queue rather than on us."""
-
-    MERGED = "merged"
-    """Its own commits are already contained in the upstream base."""
-
-    @classmethod
-    def derive(cls, draft: bool, merged: bool, in_review: bool) -> BranchStatus:
-        """Map a pull request's raw facts to a lifecycle status.
-
-        Precedence: a merged branch is ``merged``; a branch under upstream review is
-        ``in-review``; an un-drafted branch is ``ready`` (self-approved for promotion);
-        otherwise ``draft``.
-
-        :param draft: Whether the pull request is still a draft.
-        :param merged: Whether the branch has landed upstream (git ancestry).
-        :param in_review: Whether an upstream pull request opened from the branch is
-            open.
-        :return: The derived status.
-        """
-        if merged:
-            return cls.MERGED
-        if in_review:
-            return cls.IN_REVIEW
-        return cls.DRAFT if draft else cls.READY
-
-
-class IntegrationStrategy(StrEnum):
-    """How a branch integrates its parent's moved tip during a restack."""
-
-    MERGE = "merge"
-    """Merge the parent's tip in, replacing the merges earlier restacks left that only
-    brought in an older state of the parent, so the branch carries one such merge."""
-
-    REBASE = "rebase"
-    """Replay the branch onto the parent's tip, which rewrites published history and is
-    authorised only by the branch's own rebase label."""
 
 
 class SkipReason(StrEnum):
@@ -164,7 +120,7 @@ class PullRequest:
         """
         if not path.exists():
             raise BoardUnavailable(path)
-        board = json.loads(path.read_text())
+        board = json.loads(path.read_text(encoding="utf-8"))
         return [cls.from_board_entry(entry) for entry in board[BoardKey.PULL_REQUESTS]]
 
     @classmethod
@@ -303,18 +259,12 @@ class SkippedPullRequest:
 
 
 @dataclass(frozen=True)
-class Reparent:
+class Reparent(BranchPullRequest):
     """A pull request whose base has landed and must be retargeted at the upstream base.
 
     A child left on a landed base cannot reach the upstream, and is closed outright the
     moment that base branch is deleted.
     """
-
-    branch: str
-    """The child branch that has to move."""
-
-    pull_request_number: int
-    """The child's fork pull request."""
 
     current_base: str
     """The landed branch it is still targeting."""
@@ -368,6 +318,9 @@ class Stack:
     is_contained_by: Callable[[str, str], bool]
     """Maps a pair of branch names to whether the first's commits are in the second."""
 
+    fork_refresh: ForkRefresh = ForkRefresh()
+    """What refreshing the fork's references left out."""
+
     @classmethod
     def build(
         cls,
@@ -375,6 +328,7 @@ class Stack:
         pull_requests: list[PullRequest],
         is_merged: Callable[[str], bool],
         is_contained_by: Callable[[str, str], bool],
+        fork_refresh: ForkRefresh | None = None,
     ) -> Stack:
         """Assemble the stack from the pull request export and the two git facts it needs.
 
@@ -384,6 +338,8 @@ class Stack:
             the pure assembly logic can be tested without git.
         :param is_contained_by: Maps a pair of branch names to whether the first's commits
             are in the second, injected for the same reason.
+        :param fork_refresh: What refreshing the fork's references left out, nothing when
+            omitted.
         :return: The assembled stack.
         """
         return cls(
@@ -394,6 +350,7 @@ class Stack:
             ],
             is_merged=is_merged,
             is_contained_by=is_contained_by,
+            fork_refresh=fork_refresh or ForkRefresh(),
         )
 
     @classmethod
@@ -417,12 +374,15 @@ class Stack:
             if pull_request.skip_reason(configuration.fork_repository) is None
         }
         bases = {pull_request.base for pull_request in pull_requests}
-        CurrentCheckout.fetch(configuration, sorted(heads_on_fork | bases))
+        fork_refresh = CurrentCheckout.fetch(
+            configuration, sorted(heads_on_fork | bases)
+        )
         return cls.build(
             configuration,
             pull_requests,
             LandedBranches.from_checkout(configuration).contains,
             CurrentCheckout.containment_predicate(configuration),
+            fork_refresh,
         )
 
     def maintained_branches(self) -> list[StackBranch]:
@@ -607,6 +567,18 @@ class Stack:
         """
         return self.effective_parent(branch).branch
 
+    def readiness_of(self, branch: StackBranch) -> PromotionReadiness:
+        """
+        :param branch: A branch of the stack.
+        :return: The facts deciding whether it may be promoted, and what they say.
+        """
+        return PromotionReadiness(
+            status=branch.status,
+            parent_landed=self.parent_landed(branch),
+            withheld=self.needs_resolution(branch),
+            checks_failed=branch.checks_failed,
+        )
+
     def promotion_order(self) -> list[StackBranch]:
         """The branches to submit to the upstream next, in dependency order.
 
@@ -622,10 +594,7 @@ class Stack:
         return [
             branch
             for branch in self.maintained_branches()
-            if branch.status == BranchStatus.READY
-            and self.parent_landed(branch)
-            and not self.needs_resolution(branch)
-            and not branch.checks_failed
+            if self.readiness_of(branch).is_promotable
         ]
 
     def withheld_by_failing_checks(self) -> list[StackBranch]:

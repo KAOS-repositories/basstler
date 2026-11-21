@@ -42,15 +42,23 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -m basstler.actions_usage --repository "${{ github.repository }}" --github-actions
+        run: python -m basstler.github.actions_usage --repository "${{ github.repository }}" --github-actions
 
   lint:
     name: ruff
     if: github.event_name != 'push' || !github.event.repository.fork
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      BASE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
+      # The base commit is checked out in a worktree to compare its crossings.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -68,6 +76,22 @@ jobs:
 
       - name: Check the formatting
         run: ruff format --check .
+
+      - name: Install basstler
+        run: pip install --editable .
+
+      # Which files of the pull request need review, in the run's summary.
+      - name: Triage the files for review
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m basstler review-triage report
+          ${{ github.event.pull_request.number }}
+          --repository "${{ github.repository }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail on a crossing the base does not have
+        run: python -m basstler code-rules new-crossings "$BASE_COMMIT"
 
   # Past a daily ceiling a pull request's matrix is skipped, unless it carries the
   # budget-override label. A push to main always runs it, since its pass is what releases.

@@ -28,7 +28,7 @@ class PluginManifestKey(StrEnum):
 
     VERSION = "version"
     """
-    The key a manifest would pin a release with, which this plugin's leaves out.
+    The release a manifest names: only the released plugin's names one.
     """
 
 
@@ -49,7 +49,7 @@ class PluginManifest:
         :param path: A ``plugin.json``.
         :return: Its name.
         """
-        manifest = json.loads(path.read_text())
+        manifest = json.loads(path.read_text(encoding="utf-8"))
         return cls(
             name=manifest[PluginManifestKey.NAME],
         )
@@ -109,7 +109,9 @@ class PluginSource:
         """
         :return: Where this repository's marketplace serves the plugin from.
         """
-        marketplace = json.loads(RepositoryLocation.MARKETPLACE.read_text())
+        marketplace = json.loads(
+            RepositoryLocation.MARKETPLACE.read_text(encoding="utf-8")
+        )
         (plugin,) = marketplace[MarketplaceKey.PLUGINS]
         source = plugin[MarketplaceKey.SOURCE]
         return cls(

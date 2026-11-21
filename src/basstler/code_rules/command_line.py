@@ -13,10 +13,14 @@ from basstler.code_rules import rules
 from basstler.code_rules.checker import CodeRulesCheck, StagedLines
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.instructions import AgentsInstructions
+from basstler.code_rules.package_boundaries import (
+    PackageAtCommit,
+    PackageBoundaryChecker,
+)
 from basstler.code_rules.rule_module import RuleModule
 from basstler.exit_codes import ExitCode
+from basstler.git.commands import GitCommandRunner
 from basstler.locations import ProjectLocation
-from basstler.maintenance.git_commands import GitCommandRunner
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -37,7 +41,8 @@ class CodeRulesExitCode(ExitCode):
 
     CHANGES_NEEDED = 1
     """
-    Code breaks a rule, or ``AGENTS.md`` was rewritten or is out of date.
+    Code breaks a rule, a boundary crossing is new, or ``AGENTS.md`` was rewritten or
+    is out of date.
     """
 
 
@@ -68,6 +73,39 @@ def check(
     for violation in violations:
         logger.error(violation.render())
     if violations:
+        return CodeRulesExitCode.CHANGES_NEEDED
+    return CodeRulesExitCode.SUCCESS
+
+
+@code_rules_app.command(name=CodeRulesCommand.NEW_CROSSINGS)
+def report_new_crossings(base_commit: str) -> CodeRulesExitCode:
+    """
+    Report each boundary crossing of the package that *base_commit* does not have.
+
+    The base is read under its own package map, so a crossing only a change of the map
+    creates is new as well; a module moved since keeps the base's crossings.
+
+    :param base_commit: The commit the checked out package is compared with.
+    """
+    git = GitCommandRunner(Path.cwd())
+    checker = PackageBoundaryChecker()
+    with PackageAtCommit(git, base_commit, checker.package_directory) as base_checker:
+        if base_checker is None:
+            logger.info(
+                "%s declares no package map, so nothing is compared", base_commit
+            )
+            return CodeRulesExitCode.SUCCESS
+        base_crossings = base_checker.package_crossings()
+    renames = checker.module_renames(git, base_commit)
+    added = checker.package_crossings().added_since(base_crossings.renamed(renames))
+    for crossing in added:
+        logger.error(
+            "basstler.%s newly imports basstler.%s across a distribution boundary; "
+            "move the code or the import",
+            crossing.importing_module,
+            crossing.imported_module,
+        )
+    if added:
         return CodeRulesExitCode.CHANGES_NEEDED
     return CodeRulesExitCode.SUCCESS
 

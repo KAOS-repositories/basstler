@@ -11,18 +11,18 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from basstler.pull_request_state import PullRequestState
 from basstler.environment import GitHubCredentialVariable
 from basstler.exceptions import DataclassException
-from basstler.maintenance.board import (
+from basstler.git.commands import GitCommandRunner
+from basstler.github.client import GitHubRestClient
+from basstler.github.pull_request_record import (
     PullRequestField,
     PullRequestHeadKey,
     PullRequestRecord,
 )
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.github.client import GitHubRestClient
-from basstler.maintenance.github import GitHubRepository
-from basstler.repository import Repository
+from basstler.github.pull_request_state import PullRequestState
+from basstler.github.repository import Repository
+from basstler.github.repository_access import GitHubRepository
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -105,7 +105,7 @@ class ProgressNotesDirectory:
         :return: The branch every progress-notes file in the directory belongs to.
         """
         return sorted(
-            str(file.relative_to(self.path))[: -len(ProgressNotesFile.SUFFIX)]
+            file.relative_to(self.path).as_posix()[: -len(ProgressNotesFile.SUFFIX)]
             for file in self.path.rglob(f"*{ProgressNotesFile.SUFFIX}")
         )
 

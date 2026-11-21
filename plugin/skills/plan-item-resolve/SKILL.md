@@ -9,6 +9,9 @@ allowed-tools: Bash, Read, Grep, Glob, Edit, Write, AskUserQuestion, Skill, Ente
 Run commands as [`running-commands.md`](../running-commands.md) says, with
 `${CLAUDE_PLUGIN_ROOT}` as the `${BASSTLER_PLUGIN_ROOT}` it and every linked document name.
 
+Follow [`pull-request-rules.md`](../pull-request-rules.md) for every pull request it opens,
+pushes to or answers reviews on.
+
 Generic, plan-agnostic — nothing here may hardcode a specific plan id,
 item, or branch. Unlike `plan-item-kickoff` (for an item that hasn't
 started), this skill is for an item that already has real state - a
@@ -33,7 +36,11 @@ resume any other session.
 
 Follow [`plan-item-gathering.md`](../plan-item-kickoff/plan-item-gathering.md) end to end — the setup check, the
 stack pass, the item's brief, the tracking issue's comments and the project's
-rules. `plan-item-kickoff` runs the same procedure.
+rules. `plan-item-kickoff` runs the same procedure. Its setup gate is this skill's:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate --skill plan-item-resolve; echo "setup gate exit status: $?"
+```
 
 Then add the part only a resolve needs — **the live state of work that
 already exists**, which is where the cause of a stall almost always is:
@@ -185,7 +192,7 @@ item is already underway rather than being started:
   - **Ready, and not promoted** — nothing recorded says who marked it ready.
     Leave it as it is and ask the user whether the item is finished before
     pushing anything; never flip it back on a guess.
-  - **Draft** — keep it a draft, per the user's own convention.
+  - **Draft** — keep it a draft.
 
 Push the item's branch, from its checkout, only with
 `"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" maintenance push`: it checks the move

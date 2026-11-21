@@ -5,86 +5,38 @@ session's own credential.
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
 from http import HTTPStatus
 
 import pytest
 
 import basstler.plan_site.build_start
-
-from basstler.github.client import (
-    GitHubAttemptClient,
-    GitHubResponse,
-    HttpMethod,
-    GitHubWrite,
-)
-from basstler.github.credential import CredentialProvider
-from basstler.github.exceptions import GitHubRequestFailed
+from basstler.github.credential import GitHubCommand
+from basstler.github.repository import Repository
+from basstler.github.repository_attachment import SessionTool
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.plan_site.build_start import (
     BUILD_START_COMMAND,
     BuildStart,
     CodeFence,
-    GitHubCommand,
-    SessionTool,
+    PlanSiteRebuild,
     SiteAccess,
 )
 from basstler.plan_site.site_repository import SiteRepository
-from basstler.repository import Repository
 
-from ..constants.paths import DatasetLocation
+from .site_answering_client import SITE_DETAILS, SiteAnsweringClient
 
 SITE = SiteRepository(Repository.parse("an-owner/plans"))
 """
 The site repository whose build is started.
 """
 
-SITE_DETAILS = json.loads(DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text())
+ANOTHER_COMMAND = "python -m another.command"
 """
-The resource the stand-in site repository answers with.
+A command other than the build start to run once the site repository is reached.
 """
-
-# %% a site repository answering from memory
-
-
-@dataclass
-class SiteAnsweringClient(GitHubAttemptClient):
-    """
-    Answers the site repository's resource, or refuses it with :attr:`refusal`, and
-    accepts and records every write.
-    """
-
-    refusal: HTTPStatus | None = None
-    """
-    The status reading the site repository is refused with, ``None`` to answer it.
-    """
-
-    writes: list[GitHubWrite] = field(default_factory=list)
-    """
-    Every write sent, oldest first.
-    """
-
-    def attempt_get(self, path: str) -> GitHubResponse:
-        if self.refusal is None:
-            return GitHubResponse(SITE_DETAILS)
-        return GitHubResponse(
-            None,
-            failure=GitHubRequestFailed(
-                status=self.refusal,
-                detail="",
-                method=HttpMethod.GET,
-                path=path,
-                credential_origin=CredentialProvider.CALLER,
-            ),
-        )
-
-    def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
-        self.writes.append(write)
-        return GitHubResponse(None)
-
 
 # %% starting the build
 
@@ -102,7 +54,7 @@ def test_the_build_is_dispatched_on_the_site_s_default_branch():
         WorkflowDispatch(
             SITE.repository,
             WorkflowLocation.PLAN_SITE,
-            RepositoryDetails.from_json(SITE_DETAILS).default_branch,
+            RepositoryDetails.from_json(SITE_DETAILS).default_branch.name,
         )
     ]
 
@@ -186,6 +138,18 @@ def test_a_build_that_did_not_start_names_the_command_that_starts_it_again(
     assert BUILD_START_COMMAND in description
 
 
+@pytest.mark.parametrize("in_cloud_session", [True, False])
+def test_the_remedy_names_the_command_to_run_once_the_site_is_reached(
+    in_cloud_session: bool,
+):
+    """
+    The remedy ends with the command it was given, not always the build start.
+    """
+    access = SiteAccess(SITE, retry_command=ANOTHER_COMMAND)
+
+    assert ANOTHER_COMMAND in access.remedy(in_cloud_session)
+
+
 def test_the_retry_command_runs_this_module():
     assert BUILD_START_COMMAND.endswith(f"-m {basstler.plan_site.build_start.__name__}")
 
@@ -203,3 +167,10 @@ def test_a_cloud_session_that_cannot_read_the_site_repository_is_told_to_attach_
     missing = SiteAccess(SITE).missing_access(client, in_cloud_session=True)
 
     assert missing.endswith(SiteAccess(SITE).remedy(in_cloud_session=True))
+
+
+# %% after a maintenance pass
+
+
+def test_the_plan_site_rebuild_is_installed_as_a_follow_up_to_closing():
+    assert PlanSiteRebuild() in LandedClosingFollowUps.installed().follow_ups

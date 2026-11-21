@@ -10,15 +10,15 @@ from dataclasses import dataclass
 from enum import Enum, StrEnum
 
 from basstler.class_property import classproperty
-from basstler.repository import Repository
-from basstler.upstream_reviews.clients import (
-    JobLogReader,
-)
-from basstler.upstream_reviews.pull_request_models import (
+from basstler.github.pull_request_models import (
     CheckResult,
     CheckStatus,
 )
+from basstler.github.repository import Repository
 from basstler.github.states import CheckOutcome
+from basstler.upstream_reviews.clients import (
+    JobLogReader,
+)
 
 # %% the log behind a failed check
 
@@ -89,7 +89,9 @@ class FailedJob:
         """
         Where a check's own output link carries the job that produced it.
         """
-        return re.compile(rf"/actions/runs/\d+/job/(?P<{cls.identifier_group}>\d+)")
+        return re.compile(
+            rf"/actions/runs/[0-9]+/job/(?P<{cls.identifier_group}>[0-9]+)"
+        )
 
     @classmethod
     def behind(cls, result: CheckResult) -> FailedJob | None:

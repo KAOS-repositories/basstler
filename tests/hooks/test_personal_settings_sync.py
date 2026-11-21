@@ -15,17 +15,20 @@ import pytest
 
 from basstler.locations import PluginLocation, ProjectLocation, RepositoryStateLocation
 
+from ..bash_path import BashPath
 from ..constants.notes import ScratchBranch
 from ..constants.paths import DatasetLocation, PersonalNotesPath
 from ..scratch_repository import ScratchRepository
 
-PERSONAL_SETTINGS = (DatasetLocation.DIRECTORY / "personal-settings.json").read_text()
+PERSONAL_SETTINGS = (DatasetLocation.DIRECTORY / "personal-settings.json").read_text(
+    encoding="utf-8"
+)
 UPDATED_PERSONAL_SETTINGS = (
     DatasetLocation.DIRECTORY / "personal-settings-updated.json"
-).read_text()
+).read_text(encoding="utf-8")
 LOCALLY_EDITED_SETTINGS = (
     DatasetLocation.DIRECTORY / "personal-settings-locally-edited.json"
-).read_text()
+).read_text(encoding="utf-8")
 
 
 @pytest.fixture
@@ -78,7 +81,9 @@ def local_settings_of(repository: ScratchRepository) -> str:
     :param repository: The scratch repository to read from.
     :return: The file's content.
     """
-    return (repository.project_root / PersonalNotesPath.LOCAL_SETTINGS).read_text()
+    return (repository.project_root / PersonalNotesPath.LOCAL_SETTINGS).read_text(
+        encoding="utf-8"
+    )
 
 
 def settings_on_notes_branch(repository: ScratchRepository) -> str:
@@ -92,7 +97,9 @@ def settings_on_notes_branch(repository: ScratchRepository) -> str:
     checkout = repository.clone_notes_branch(
         repository.project_root.parent / "settings-verify-checkout"
     )
-    return (checkout / PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH).read_text()
+    return (checkout / PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH).read_text(
+        encoding="utf-8"
+    )
 
 
 # %% syncing settings out of the personal-notes branch
@@ -110,7 +117,7 @@ def test_writes_the_branch_settings_when_the_project_has_none(
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == PERSONAL_SETTINGS
     assert (
-        f"local settings:  synced to {PersonalNotesPath.LOCAL_SETTINGS}"
+        f"local settings:  synced to {PersonalNotesPath.LOCAL_SETTINGS.as_posix()}"
         in result.stdout
     )
 
@@ -126,7 +133,7 @@ def test_writes_no_settings_when_the_branch_has_none(
     ).exists()
     assert (
         f"local settings:  none on '{ScratchBranch.PERSONAL_NOTES}' "
-        f"({PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH})" in result.stdout
+        f"({PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH.as_posix()})" in result.stdout
     )
 
 
@@ -164,7 +171,7 @@ def test_keeps_settings_edited_since_the_last_sync(
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == LOCALLY_EDITED_SETTINGS
     assert (
-        f"local settings:  kept local edits to {PersonalNotesPath.LOCAL_SETTINGS} - run "
+        f"local settings:  kept local edits to {PersonalNotesPath.LOCAL_SETTINGS.as_posix()} - run "
         "save-personal-settings.sh to push them" in result.stdout
     )
 
@@ -221,8 +228,8 @@ def test_saving_without_local_settings_fails_with_a_clear_message(
 
     assert result.returncode == 1
     assert result.stderr.startswith(
-        f"No {PersonalNotesPath.LOCAL_SETTINGS} at the project root "
-        f"({settings_repository.project_root / PersonalNotesPath.LOCAL_SETTINGS})"
+        f"No {PersonalNotesPath.LOCAL_SETTINGS.as_posix()} at the project root "
+        f"({BashPath(settings_repository.project_root / PersonalNotesPath.LOCAL_SETTINGS).text})"
         " - nothing to save.\n"
     )
 
@@ -244,7 +251,7 @@ def test_records_the_settings_stamp_in_the_git_directory(
         RepositoryStateLocation.PERSONAL_SETTINGS_SYNC_STAMP
     )
     assert (
-        stamp.read_text().strip()
+        stamp.read_text(encoding="utf-8").strip()
         == settings_repository.run_git(
             "hash-object", str(PersonalNotesPath.LOCAL_SETTINGS)
         ).stdout.strip()

@@ -18,25 +18,27 @@ from typing import Any
 
 import pytest
 
-from basstler.github.label import NewLabel, RepositoryLabel
 from basstler.exceptions import MalformedEmailAddressError
 from basstler.exit_codes import PersonalNotesSetupExitCode
-from basstler.github_labels import GitHubLabel
+from basstler.github.client import GitHubClient, GitHubResponse, GitHubWrite
+from basstler.github.label import NewLabel, RepositoryLabel
+from basstler.github.pull_request_record import (
+    AccountField,
+)
+from basstler.github.repository import Repository
+from basstler.github.repository_access import (
+    GitHubPath,
+    GitHubRepository,
+)
+from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import (
     ClaudeCodeVariable,
     PluginLocation,
     PluginSkillLocation,
     ProjectLocation,
 )
-from basstler.github.client import GitHubClient, GitHubResponse, GitHubWrite
-from basstler.maintenance.board import AccountField
-from basstler.maintenance.github import (
-    GitHubPath,
-    GitHubRepository,
-)
 from basstler.plugin_root import PluginRoot
-from basstler.repository import Repository
-from basstler.setup.exceptions import ForeignNotesRemoteError
+from basstler.setup.exceptions import CheckSetupFailedError, ForeignNotesRemoteError
 from basstler.setup.personal_notes import (
     PersonalNotesSetup,
     SetupOption,
@@ -45,10 +47,14 @@ from basstler.setup.personal_notes import (
 from basstler.setup.report import CheckStatus, SetupCheck, SetupReport
 from basstler.setup.steps import PersonalNotesSetting
 
-from ..constants.environment import BashStubVariable
+from ..constants.environment import (
+    BashStubVariable,
+    CheckSetupStubVariable,
+    ShellExitStatus,
+)
 from ..constants.notes import ScratchBranch
-from ..constants.paths import PersonalNotesPath, RepositoryLocation
-from ..executable_stubs import ExecutableStubDirectory
+from ..constants.paths import DatasetLocation, RepositoryLocation
+from ..executable_stubs import ExecutableStubDirectory, NEEDS_SCRIPT_AS_EXECUTABLE
 from ..scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
 
 SCRIPTS_UNDER_TEST = (
@@ -94,6 +100,11 @@ class GitHubAnsweringFromMemory(GitHubClient):
     The account the credential belongs to.
     """
 
+    may_push: bool = False
+    """
+    Whether :attr:`login` may push to :attr:`repository`.
+    """
+
     present_labels: set[str] = field(default_factory=set)
     """
     The labels the repository carries.
@@ -105,6 +116,13 @@ class GitHubAnsweringFromMemory(GitHubClient):
     """
 
     def get(self, path: str) -> Any:
+        if path == self.repository.api_path:
+            return {
+                "default_branch": "main",
+                "fork": False,
+                "private": False,
+                "permissions": {"push": self.may_push},
+            }
         assert path == str(GitHubPath.AUTHENTICATED_USER)
         return {AccountField.LOGIN: self.login}
 
@@ -287,6 +305,7 @@ def test_completes_a_full_setup(setup_repository: ScratchRepository):
     assert check_setup_report(setup_repository).exit_code == exit_code
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     setup_repository: ScratchRepository, tmp_path: Path
 ):
@@ -310,7 +329,7 @@ def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     ]
     # session start's base-branch sync reads the stack configuration through
     # ``bash -c``, which runs in the configured bash too
-    assert call_log.read_text().splitlines() == [
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
         *(str(setup.plugin_root.path_of(script)) for script in scripts_before_the_sync),
         "-c",
         str(setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT)),
@@ -334,7 +353,9 @@ def test_leaves_a_new_notes_file_empty_without_starter_notes(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text() == ""
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == ""
 
 
 def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
@@ -347,11 +368,11 @@ def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
     ).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (
-        checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT
-    ).read_text() == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
         PluginSkillLocation.STARTER_NOTES
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
 
 def test_never_seeds_over_notes_that_already_exist(
@@ -368,9 +389,9 @@ def test_never_seeds_over_notes_that_already_exist(
     ).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (
-        checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT
-    ).read_text() == "my own notes\n"
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == "my own notes\n"
 
 
 def test_a_second_run_changes_nothing(setup_repository: ScratchRepository):
@@ -393,9 +414,7 @@ def test_records_the_git_identity_it_is_given(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    recorded = GitIdentity.from_git_config_file(
-        checkout / PersonalNotesPath.GIT_IDENTITY
-    )
+    recorded = GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
     assert recorded == SCRATCH_IDENTITY
 
 
@@ -408,6 +427,65 @@ def test_finishes_everything_else_when_given_no_identity(
     report = check_setup_report(setup_repository)
     assert report.results[SetupCheck.GIT_IDENTITY].status is CheckStatus.NEEDS_SETUP
     assert report.results[SetupCheck.NOTES_FILE].status is CheckStatus.OK
+
+
+# %% a check-setup.sh run that fails
+
+
+def test_stops_with_check_setup_failed_when_check_setup_sh_reports_nothing(
+    setup_repository: ScratchRepository,
+):
+    standard_error = "check-setup.sh: a-missing-command: command not found"
+    status = ShellExitStatus.COMMAND_NOT_FOUND
+    setup = setup_for(
+        setup_repository,
+        environment=setup_repository.runner_environment(
+            **{
+                CheckSetupStubVariable.ERROR: standard_error,
+                CheckSetupStubVariable.STATUS: str(status),
+            }
+        ),
+    )
+    shutil.copy(
+        DatasetLocation.FAILING_CHECK_SETUP_STUB,
+        setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT),
+    )
+
+    with pytest.raises(CheckSetupFailedError) as refusal:
+        setup.run()
+
+    assert refusal.value.exit_code is PersonalNotesSetupExitCode.CHECK_SETUP_FAILED
+    assert refusal.value.status == status
+    assert refusal.value.standard_error == f"{standard_error}\n"
+
+
+def test_a_failed_first_check_leaves_the_clone_s_git_config_unchanged(
+    setup_repository: ScratchRepository,
+):
+    """
+    The first check runs before any write, so a run it stops leaves nothing to undo.
+    """
+    setup = setup_for(
+        setup_repository,
+        environment=setup_repository.runner_environment(
+            **{
+                CheckSetupStubVariable.ERROR: "check-setup.sh: failed",
+                CheckSetupStubVariable.STATUS: str(ShellExitStatus.COMMAND_NOT_FOUND),
+            }
+        ),
+    )
+    shutil.copy(
+        DatasetLocation.FAILING_CHECK_SETUP_STUB,
+        setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT),
+    )
+
+    with pytest.raises(CheckSetupFailedError):
+        setup.run()
+
+    unset = setup_repository.run_git_allowing_failure(
+        "config", "--get", PersonalNotesSetting.REMOTE.git_config_key
+    )
+    assert unset.returncode != 0
 
 
 # %% the remote's owner
@@ -432,12 +510,62 @@ def test_refuses_a_remote_someone_else_owns_before_writing_anything(
     assert published_notes_commit(setup_repository) == ""
 
 
-def test_accepts_a_remote_whose_owner_differs_only_in_case():
+def test_accepts_a_remote_whose_owner_differs_only_in_case(
+    setup_repository: ScratchRepository,
+):
     github = GitHubAnsweringFromMemory(
         CREDENTIAL_OWNER, login=CREDENTIAL_OWNER.owner.upper()
     )
 
-    labels_setup(github=github).verify_notes_remote_owner()
+    setup_for(setup_repository, github=github).verify_notes_remote_access(
+        check_setup_report(setup_repository)
+    )
+
+
+# %% joining a notes branch colleagues share
+
+
+def test_a_colleague_who_may_push_joins_the_notes_branch_already_there(
+    setup_repository: ScratchRepository,
+):
+    setup_repository.publish_notes_branch(
+        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "shared notes\n"}
+    )
+    shared_commit = published_notes_commit(setup_repository)
+    setup_repository.resolve_notes_remote_to()
+    github = GitHubAnsweringFromMemory(SOMEONE_ELSE, may_push=True)
+
+    setup_for(setup_repository, github=github).verify_notes_remote_access(
+        check_setup_report(setup_repository)
+    )
+
+    assert published_notes_commit(setup_repository) == shared_commit
+
+
+def test_a_colleague_who_may_push_never_creates_a_notes_branch_for_the_owner(
+    setup_repository: ScratchRepository,
+):
+    github = GitHubAnsweringFromMemory(SOMEONE_ELSE, may_push=True)
+
+    with pytest.raises(ForeignNotesRemoteError):
+        setup_for(setup_repository, github=github).verify_notes_remote_access(
+            check_setup_report(setup_repository)
+        )
+
+
+def test_a_colleague_who_may_not_push_is_refused_even_where_notes_exist(
+    setup_repository: ScratchRepository,
+):
+    setup_repository.publish_notes_branch(
+        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "shared notes\n"}
+    )
+    setup_repository.resolve_notes_remote_to()
+    github = GitHubAnsweringFromMemory(SOMEONE_ELSE, may_push=False)
+
+    with pytest.raises(ForeignNotesRemoteError):
+        setup_for(setup_repository, github=github).verify_notes_remote_access(
+            check_setup_report(setup_repository)
+        )
 
 
 # %% pull request labels

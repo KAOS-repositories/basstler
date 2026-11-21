@@ -15,9 +15,9 @@ from typing import Any
 
 import yaml
 
+from basstler.github.repository import Repository
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.model import ManifestKey, PlanDocument, PlanManifest
-from basstler.repository import Repository
 
 from .constants.paths import DatasetLocation
 
@@ -98,7 +98,7 @@ def fixture_manifest(plan_id: str) -> dict[str, Any]:
     :param plan_id: The plan's id, which is also its directory's name.
     """
     manifest_path = DatasetLocation.PLANS / plan_id / PlanDocument.MANIFEST
-    return yaml.safe_load(manifest_path.read_text())
+    return yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
 
 
 def fixture_item(plan_id: str, item_identifier: str) -> dict[str, Any]:

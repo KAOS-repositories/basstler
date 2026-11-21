@@ -5,7 +5,6 @@ Patching one item's fields in a manifest's raw text.
 from __future__ import annotations
 
 import itertools
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -52,22 +51,27 @@ class ManifestText:
 
     def item_block_bounds(self) -> list[tuple[int, int]]:
         """
-        :return: The half-open line range of every item block, in manifest order.
+        :return: The half-open line range of every item block, in manifest order; the
+            entries of ``waves`` and ``tracks`` are not item blocks.
         """
+        section = self.top_level_section(ManifestKey.ITEMS.key)
+        if section is None:
+            return []
+        section_start, section_end = section
         starts = [
             index
-            for index, line in enumerate(self.lines)
-            if ManifestLinePattern.ITEM_START.matches(line)
+            for index in range(section_start + 1, section_end)
+            if ManifestLinePattern.ITEM_START.matches(self.lines[index])
         ]
         if not starts:
             return []
         end_of_items = next(
             (
                 index
-                for index in range(starts[-1] + 1, len(self.lines))
+                for index in range(starts[-1] + 1, section_end)
                 if ManifestLinePattern.TOP_LEVEL_KEY.matches(self.lines[index])
             ),
-            len(self.lines),
+            section_end,
         )
         return list(itertools.pairwise([*starts, end_of_items]))
 

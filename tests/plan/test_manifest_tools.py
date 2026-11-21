@@ -9,21 +9,11 @@ import sys
 from pathlib import Path
 
 import pytest
-
 import yaml
 
 import basstler.plan.manifest_tools
-
-from basstler.exceptions import PlanValidationError
-from basstler.plan.validation import PlanValidator
-from basstler.plan.merge import PlanVersion
-from basstler.plan.model import PlanDocument
-from basstler.plan.model import (
-    ItemNotTrackedError,
-    ItemStatus,
-    ItemSummaryKey,
-    ManifestKey,
-)
+from basstler.plan.exceptions import PlanValidationError
+from basstler.github.repository import Repository
 from basstler.plan.manifest_tools import (
     BranchIndex,
     ManifestToolsCommand,
@@ -33,8 +23,15 @@ from basstler.plan.manifest_tools import (
     YamlBooleanCoercionError,
     main,
 )
-
-from basstler.repository import Repository
+from basstler.plan.merge import PlanVersion
+from basstler.plan.model import (
+    ItemNotTrackedError,
+    ItemStatus,
+    ItemSummaryKey,
+    ManifestKey,
+    PlanDocument,
+)
+from basstler.plan.validation import PlanValidator
 
 from ..constants.paths import DatasetLocation
 from ..fixture_plans import (
@@ -72,7 +69,7 @@ def write_manifest(
     :return: The written file's path.
     """
     manifest_path = directory / name
-    manifest_path.write_text(f"id: {plan_id}\n")
+    manifest_path.write_text(f"id: {plan_id}\n", encoding="utf-8")
     return manifest_path
 
 
@@ -86,7 +83,7 @@ def test_reads_the_id_field(tmp_path):
 
 def test_defaults_to_empty_string_when_id_is_missing(tmp_path):
     manifest_path = tmp_path / PlanDocument.MANIFEST
-    manifest_path.write_text("title: No id here\n")
+    manifest_path.write_text("title: No id here\n", encoding="utf-8")
     assert PlanManifest(manifest_path).identifier == ""
 
 
@@ -103,7 +100,7 @@ def _write_plan(plans_directory: Path, plan_id: str, items_yaml: str) -> None:
     plan_directory = plans_directory / plan_id
     plan_directory.mkdir(parents=True)
     (plan_directory / PlanDocument.MANIFEST).write_text(
-        f"id: {plan_id}\nitems:\n{items_yaml}"
+        f"id: {plan_id}\nitems:\n{items_yaml}", encoding="utf-8"
     )
 
 
@@ -202,7 +199,7 @@ def test_main_dispatches_regenerate_branch_index(tmp_path, monkeypatch):
     )
     exit_code = main()
     assert exit_code == ManifestToolsExitCode.SUCCESS
-    assert output_path.read_text() == "branch-1\tplan-a\n"
+    assert output_path.read_text(encoding="utf-8") == "branch-1\tplan-a\n"
 
 
 # %% main - validating a manifest before it is saved
@@ -237,7 +234,9 @@ def test_validate_refuses_a_manifest_the_plan_site_rejects_and_says_why(
     """
     with pytest.raises(PlanValidationError) as expected:
         PlanValidator(
-            yaml.safe_load(DatasetLocation.PLAN_WITH_UNKNOWN_STATUS.read_text())
+            yaml.safe_load(
+                DatasetLocation.PLAN_WITH_UNKNOWN_STATUS.read_text(encoding="utf-8")
+            )
         ).validate()
 
     status = run_validate(monkeypatch, DatasetLocation.PLAN_WITH_UNKNOWN_STATUS.value)
@@ -265,7 +264,8 @@ def run_validate_against_plans(
     manifest_path.write_text(
         yaml.safe_dump(
             minimal_plan(items=[manifest_item("a", depends_on=[dependency_text])])
-        )
+        ),
+        encoding="utf-8",
     )
     monkeypatch.setattr(
         sys,
@@ -299,13 +299,13 @@ def test_validate_refuses_a_reference_to_a_plan_the_directory_lacks(
     ) == (ManifestToolsExitCode.INVALID_MANIFEST)
 
 
-# %% main - validating a manifest against the repository its notes are saved to
+# %% main - validating a manifest against the repository whose checkout saves it
 
 
-def run_validate_for_notes_remote(monkeypatch, notes_remote_url: str) -> int:
+def run_validate_for_origin(monkeypatch, origin_url: str) -> int:
     """
     :param monkeypatch: pytest's monkeypatch fixture.
-    :param notes_remote_url: The URL of the remote the manifest would be saved to.
+    :param origin_url: The URL of the ``origin`` of the checkout saving the manifest.
     :return: The exit status the command line returns for the dataset plan.
     """
     monkeypatch.setattr(
@@ -315,8 +315,8 @@ def run_validate_for_notes_remote(monkeypatch, notes_remote_url: str) -> int:
             SCRIPT_NAME,
             ManifestToolsCommand.VALIDATE,
             str(DatasetLocation.PLAN.value),
-            ManifestToolsOption.NOTES_REMOTE_URL,
-            notes_remote_url,
+            ManifestToolsOption.ORIGIN_URL,
+            origin_url,
         ],
     )
     return main()
@@ -327,33 +327,33 @@ def test_validate_refuses_a_plan_for_another_repository(monkeypatch):
     The command line refuses what the validator refuses.
     """
     another_repository = Repository("another-owner", "another-repository")
-    assert run_validate_for_notes_remote(monkeypatch, another_repository.url) == (
+    assert run_validate_for_origin(monkeypatch, another_repository.url) == (
         ManifestToolsExitCode.INVALID_MANIFEST
     )
 
 
-def test_validate_accepts_a_plan_saved_to_its_own_repository(monkeypatch):
+def test_validate_accepts_a_plan_saved_from_its_own_repository(monkeypatch):
     """
     A clone URL names the same repository as the plan's ``owner/name``.
     """
-    assert run_validate_for_notes_remote(
+    assert run_validate_for_origin(
         monkeypatch, dataset_plan_repository().clone_url
     ) == (ManifestToolsExitCode.SUCCESS)
 
 
-def test_validate_refuses_a_notes_remote_naming_no_repository(monkeypatch, tmp_path):
+def test_validate_refuses_an_origin_naming_no_repository(monkeypatch, tmp_path):
     """
-    A remote with no ``owner/name``, such as a local path, leaves nothing to compare the
-    plan's repository against, so the plan is not saved.
+    An ``origin`` with no ``owner/name``, such as a local path, leaves nothing to
+    compare the plan's repository against, so the plan is not saved.
     """
-    assert run_validate_for_notes_remote(monkeypatch, str(tmp_path)) == (
+    assert run_validate_for_origin(monkeypatch, str(tmp_path)) == (
         ManifestToolsExitCode.INVALID_MANIFEST
     )
 
 
-def test_validate_without_a_notes_remote_checks_no_repository(monkeypatch):
+def test_validate_without_an_origin_checks_no_repository(monkeypatch):
     """
-    A manifest validated with no save in mind has no notes remote to compare against.
+    A manifest validated with no save in mind has no ``origin`` to compare against.
     """
     monkeypatch.setattr(
         sys,
@@ -536,3 +536,75 @@ def test_main_refuses_an_item_both_writers_changed(monkeypatch, tmp_path: Path):
 
     assert status == ManifestToolsExitCode.CHANGED_SINCE_READ
     assert not (tmp_path / "output").exists()
+
+
+# %% main - a save requires a recommended model on a new item
+
+
+def run_validate_as_save(
+    monkeypatch, manifest_path: Path, plans_directory: Path
+) -> int:
+    """
+    :param monkeypatch: pytest's monkeypatch fixture.
+    :param manifest_path: The manifest about to be saved.
+    :param plans_directory: The plans, holding the manifest's saved copy if it has one.
+    :return: The exit status the command line returns.
+    """
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            SCRIPT_NAME,
+            ManifestToolsCommand.VALIDATE,
+            str(manifest_path),
+            ManifestToolsOption.PLANS_DIRECTORY,
+            str(plans_directory),
+            ManifestToolsOption.SAVING,
+        ],
+    )
+    return main()
+
+
+def write_plan(path: Path, item_identifiers: list[str]) -> Path:
+    """
+    :param path: The manifest to write.
+    :param item_identifiers: The items it holds, none with a recommended model.
+    :return: *path*.
+    """
+    items = [manifest_item(item, recommended_model=None) for item in item_identifiers]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(minimal_plan(items=items)), encoding="utf-8")
+    return path
+
+
+def test_a_save_refuses_a_new_item_without_a_recommended_model(monkeypatch, tmp_path):
+    plan_identifier = minimal_plan()[ManifestKey.IDENTIFIER.key]
+    plans = tmp_path / "plans"
+    write_plan(plans / plan_identifier / PlanDocument.MANIFEST, ["old"])
+    saving = write_plan(tmp_path / PlanDocument.MANIFEST, ["old", "new"])
+
+    assert run_validate_as_save(monkeypatch, saving, plans) == (
+        ManifestToolsExitCode.INVALID_MANIFEST
+    )
+
+
+def test_a_save_accepts_items_the_saved_plan_already_holds(monkeypatch, tmp_path):
+    plan_identifier = minimal_plan()[ManifestKey.IDENTIFIER.key]
+    plans = tmp_path / "plans"
+    write_plan(plans / plan_identifier / PlanDocument.MANIFEST, ["old"])
+    saving = write_plan(tmp_path / PlanDocument.MANIFEST, ["old"])
+
+    assert run_validate_as_save(monkeypatch, saving, plans) == (
+        ManifestToolsExitCode.SUCCESS
+    )
+
+
+def test_a_save_of_a_new_plan_refuses_items_without_a_recommended_model(
+    monkeypatch, tmp_path
+):
+    saving = write_plan(tmp_path / PlanDocument.MANIFEST, ["new"])
+    (tmp_path / "plans").mkdir()
+
+    assert run_validate_as_save(monkeypatch, saving, tmp_path / "plans") == (
+        ManifestToolsExitCode.INVALID_MANIFEST
+    )

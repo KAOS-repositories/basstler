@@ -10,16 +10,15 @@ from enum import Enum, IntEnum, StrEnum
 from urllib.parse import parse_qs as parse_query_string
 from urllib.parse import urlsplit as split_url
 
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 from basstler.stack.model import (
     PullRequest,
     Stack,
 )
-from basstler.stack.promotion_link import PromotionLinkParameter
+from basstler.github.pull_request_form import PullRequestFormParameter
 from basstler.stack.settings import Configuration
 
 from ..constants.stack import RemoteName, StackBranch, StackLabel
-
 
 # %% shared stack inputs
 
@@ -195,7 +194,7 @@ def build(
 # %% reading a compare-and-create link
 
 
-def prefilled(url: str, parameter: PromotionLinkParameter) -> str:
+def prefilled(url: str, parameter: PullRequestFormParameter) -> str:
     """
     :param url: A compare-and-create link.
     :param parameter: The prefill to read out of it.

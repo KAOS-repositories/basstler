@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -17,16 +18,20 @@ from pathlib import Path
 from cyclopts import App
 
 from basstler.exit_codes import StackExitCode
+from basstler.git.commands import GitCommandRunner
+from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import (
     GitHubAttemptClient,
     GitHubResponse,
     GitHubRestClient,
 )
+from basstler.github.credential import GitHubCommand
+from basstler.github.repository_attachment import RepositoryAttachment
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, WorkflowLocation
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.maintenance.remote_branch import RemoteBranch
+from basstler.maintenance.landed_closing import ClosedAsLanded
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUp
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.workflows import PlanSiteSecret
@@ -43,34 +48,6 @@ BUILD_START_COMMAND = f'"${{{BasstlerVariable.PYTHON}}}" -m {__spec__.name}'
 """
 The command line that starts the build again, once this session can.
 """
-
-
-class SessionTool(StrEnum):
-    """
-    The Claude Code tools a session is told to call when the build did not start.
-    """
-
-    ATTACH_REPOSITORY = "mcp__claude-code-remote__add_repo"
-    """
-    Attaches a repository to a cloud session, which lets its proxy answer that
-    repository's API.
-    """
-
-    ASK_USER = "AskUserQuestion"
-    """
-    Asks the user to choose between options.
-    """
-
-
-class GitHubCommand(StrEnum):
-    """
-    The ``gh`` command lines a local session is told to run when the build did not start.
-    """
-
-    LOG_IN = "gh auth login"
-    """
-    Logs ``gh`` in, which gives this command its credential.
-    """
 
 
 class CodeFence(StrEnum):
@@ -100,6 +77,19 @@ class SiteAccess:
     The repository whose build a plan save starts.
     """
 
+    retry_command: str = BUILD_START_COMMAND
+    """
+    The command that does what failed, once this session reaches :attr:`site`.
+    """
+
+    attachment_benefit: str = (
+        "every plan save then updates the plan site within a minute, without a stored "
+        "token"
+    )
+    """
+    What attaching :attr:`site` gives the user, said when asking them to allow it.
+    """
+
     def read(self, client: GitHubAttemptClient) -> GitHubResponse:
         """
         :param client: Reads the site repository.
@@ -127,29 +117,26 @@ class SiteAccess:
     def remedy(self, in_cloud_session: bool) -> str:
         """
         :param in_cloud_session: Whether this runs in a Claude Code cloud session.
-        :return: How this session gets the access, and the command that then starts the
-            build.
+        :return: How this session gets the access, and :attr:`retry_command` to run
+            then.
         """
         repository = self.site.repository
         if not in_cloud_session:
             return "\n".join(
                 [
                     f"Log gh in with an account that can run workflows in "
-                    f"{repository.full_name}, then run {BUILD_START_COMMAND}:",
+                    f"{repository.full_name}, then run {self.retry_command}:",
                     "",
                     CodeFence.BASH,
                     GitHubCommand.LOG_IN,
                     CodeFence.CLOSE,
                 ]
             )
-        return (
-            f"Attach the site repository to this session: call "
-            f"{SessionTool.ATTACH_REPOSITORY} with owner {repository.owner}, repo "
-            f"{repository.name} and access push, then run {BUILD_START_COMMAND}. If the "
-            f"attach is refused, ask the user with {SessionTool.ASK_USER} to allow it, with "
-            '"Attach it (Recommended)" as the first option: every plan save then '
-            "updates the plan site within a minute, without a stored token."
-        )
+        return RepositoryAttachment(
+            repository,
+            retry_command=self.retry_command,
+            benefit=self.attachment_benefit,
+        ).instruction()
 
 
 @dataclass(frozen=True)
@@ -183,7 +170,7 @@ class BuildStart:
             WorkflowDispatch(
                 site.repository,
                 WorkflowLocation.PLAN_SITE,
-                RepositoryDetails.from_json(read.body).default_branch,
+                RepositoryDetails.from_json(read.body).default_branch.name,
             )
         )
         return cls(site, dispatch)
@@ -210,6 +197,20 @@ class BuildStart:
         )
 
 
+# %% after a maintenance pass
+
+
+@dataclass(frozen=True)
+class PlanSiteRebuild(LandedClosingFollowUp):
+    """
+    Starts the plan site's build once a maintenance pass has closed pull requests, so the
+    site shows their items done.
+    """
+
+    def respond_to_closing(self, closed: Sequence[ClosedAsLanded]) -> str | None:
+        return start_recorded_build()
+
+
 # %% the command line
 
 app = App(help=__doc__)
@@ -232,6 +233,19 @@ def recorded_site() -> SiteRepository | None:
     )
 
 
+def start_recorded_build() -> str | None:
+    """
+    Start the build of the plan site this clone's notes branch records.
+
+    :return: What happened, ``None`` when no plan site lists this repository.
+    """
+    site = recorded_site()
+    if site is None:
+        return None
+    attempt = BuildStart.attempt(site, GitHubRestClient())
+    return attempt.describe(ClaudeCodeVariable.REMOTE.is_true())
+
+
 @app.default
 def start_build() -> StackExitCode:
     """
@@ -239,12 +253,11 @@ def start_build() -> StackExitCode:
 
     :return: :attr:`StackExitCode.SUCCESS`, also when the build did not start: the notes were saved either way.
     """
-    site = recorded_site()
-    if site is None:
+    outcome = start_recorded_build()
+    if outcome is None:
         logger.info("No plan site lists this repository, so no build was started.")
         return StackExitCode.SUCCESS
-    attempt = BuildStart.attempt(site, GitHubRestClient())
-    logger.info(attempt.describe(ClaudeCodeVariable.REMOTE.is_true()))
+    logger.info(outcome)
     return StackExitCode.SUCCESS
 
 

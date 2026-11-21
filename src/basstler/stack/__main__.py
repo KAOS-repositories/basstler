@@ -32,8 +32,10 @@ Commands (run from the repo root; ``--help`` on any of them for its flags)::
 The last five exist so the steps most easily got wrong by hand are computed rather than recalled: a
 label write replaces the whole set, a push whose two sides name different branches moves the wrong
 commits, an unencoded compare URL loses its prefill, and a landed parent is decided by git ancestry
-rather than by pull-request state. ``landed`` reports only - GitHub closes a pull request as merged
-by itself once its head is contained in its base, so nothing here has to close one.
+rather than by pull-request state. ``landed`` reports only. GitHub closes a pull request as merged
+by itself only when its head reaches its own base: the upstream's merge does that for a pull
+request based on the base branch, never for one stacked on another branch, which stays open
+and is what ``landed`` lists.
 """
 
 from __future__ import annotations
@@ -42,19 +44,19 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
-from cyclopts import App, Parameter, Token
+from cyclopts import App, Parameter
 
 from basstler.exit_codes import CommandFailure, ExitCode, StackExitCode
-from basstler.locations import RepositoryStateLocation
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.stack.merge_probe import MergeProbe
-from basstler.repository import Repository
+from basstler.git.commands import GitCommandRunner
 from basstler.stack.commit_move import (
     CommitMoveAction,
     CommitMoveChecks,
     ProposedCommitMove,
 )
+from basstler.github.repository_option import RepositoryOption
+from basstler.locations import RepositoryStateLocation
 from basstler.stack.label_write import LabelWrite
+from basstler.stack.merge_probe import MergeProbe
 from basstler.stack.model import Stack
 from basstler.stack.promotion_link import PromotionLink
 from basstler.stack.report import StackReport
@@ -172,25 +174,6 @@ def derived_stack() -> Stack:
         )
     )
 
-
-def parse_repository(_: type, tokens: tuple[Token, ...]) -> Repository:
-    """
-    Convert a command-line ``owner/name`` value.
-
-    :param tokens: The one token given for the option.
-    :return: The repository it names.
-    :raises MalformedRepositoryError: If the value is not ``owner/name``.
-    """
-    return Repository.parse(tokens[0].value)
-
-
-RepositoryOption = Annotated[
-    Repository | None,
-    Parameter(converter=parse_repository, n_tokens=1, accepts_keys=False),
-]
-"""
-An optional ``owner/name`` repository given on the command line.
-"""
 
 # %% commands
 

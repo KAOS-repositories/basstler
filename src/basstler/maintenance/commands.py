@@ -15,49 +15,49 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from basstler.exit_codes import StackExitCode
 from basstler.class_property import classproperty
 from basstler.command_line import Command
-from basstler.locations import RepositoryStateLocation
-from basstler.maintenance.board import BoardExport, UpstreamPullRequests
-from basstler.maintenance.fast_forward import fast_forward
-from basstler.maintenance.finish_summary import FinishSummary
-from basstler.maintenance.git_commands import (
+from basstler.exit_codes import StackExitCode
+from basstler.git.commands import GitCommandRunner, ProposedPush
+from basstler.stack.commit_move import (
     BranchAncestry,
-    GitCommandRunner,
-    ProposedPush,
+    CommitMoveAction,
+    CommitMoveChecks,
+    ProposedCommitMove,
 )
-from basstler.maintenance.github import GitHubRepository, PullRequestReader
+from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.client import GitHubRestClient
+from basstler.github.constants import MaintenanceNotice
+from basstler.github.repository_access import GitHubRepository, PullRequestReader
+from basstler.locations import RepositoryStateLocation
+from basstler.maintenance.board import BoardExport
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
+from basstler.upstream_reviews.action.open_pull_requests import (
+    OpenPullRequestsAnswer,
+    OpenPullRequestsRequest,
+    UpstreamPullRequests,
+)
+from basstler.maintenance.check_overview import CheckOverview
+from basstler.maintenance.fast_forward import fast_forward
+from basstler.maintenance.landed_closing import LandedPullRequestClosing
+from basstler.maintenance.finish_summary import FinishSummary
 from basstler.maintenance.promotion import (
     PromotionSummaries,
     clear_spent_promotion_labels,
     promote,
 )
 from basstler.maintenance.promotion_context import PromotionContextReader
-from basstler.maintenance.check_overview import CheckOverview
-from basstler.maintenance.constants import MaintenanceNotice
 from basstler.maintenance.report import MaintenanceReport
 from basstler.maintenance.restack_procedure import restack
-from basstler.maintenance.upstream_action import (
-    OpenPullRequestsAnswer,
-    OpenPullRequestsRequest,
-    UpstreamReadRoute,
-)
+from basstler.maintenance.upstream_read_route import UpstreamReadRoute
 from basstler.maintenance.upstream_pull_request_synchronization import (
     UpstreamPullRequestSynchronization,
-)
-from basstler.stack.commit_move import (
-    CommitMoveAction,
-    CommitMoveChecks,
-    ProposedCommitMove,
 )
 from basstler.stack.model import Stack
 from basstler.stack.settings import Configuration
 from basstler.standard_streams import StandardStreamHandler
-from basstler.maintenance.remote_branch import RemoteBranch
 from basstler.upstream_reviews.action.branch import ActionBranch
 from basstler.upstream_reviews.action.read import ActionRead
-from basstler.github.client import GitHubRestClient
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -100,6 +100,11 @@ class MaintenancePass:
     How many seconds a read through the fork's Action waits for its run.
     """
 
+    closing_follow_ups: LandedClosingFollowUps = LandedClosingFollowUps()
+    """
+    What a whole pass runs after closing pull requests whose work landed.
+    """
+
     @property
     def full_report(self) -> Path:
         """
@@ -130,7 +135,9 @@ class MaintenancePass:
                 self.upstream().open_pull_requests(), fork
             )
         read = ActionRead(
-            RemoteBranch(ActionBranch.NAME, self.git, self.configuration.fork_remote),
+            GitHubRemoteBranch(
+                ActionBranch.NAME, self.git, self.configuration.fork_remote
+            ),
             OpenPullRequestsRequest.fresh(self.configuration.upstream_repository, fork),
             GitHubRestClient(),
             answer_type=OpenPullRequestsAnswer,
@@ -275,7 +282,7 @@ class PrepareCommand(StackScopeArgument, MaintenanceCommand):
             PreparationKey.REPARENTS: [asdict(entry) for entry in stack.reparents()],
             PreparationKey.TO_SUMMARIZE: [asdict(context) for context in contexts],
         }
-        logger.info(json.dumps(document, ensure_ascii=False))
+        logger.info(json.dumps(document, ensure_ascii=False, default=str))
         return StackExitCode.SUCCESS
 
 
@@ -450,7 +457,7 @@ class PromoteCommand(MaintenanceCommand):
             ),
             promotion_labels_cleared=tuple(clear_spent_promotion_labels(stack, fork)),
             upstream_pull_request_synchronization_changes=tuple(
-                UpstreamPullRequestSynchronization(stack, fork).synchronize()
+                UpstreamPullRequestSynchronization(stack, fork).apply()
             ),
         )
         report.print_summary()
@@ -553,16 +560,26 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
         stack = maintenance.fresh_stack().scoped_to(stacked_on)
         fork = maintenance.fork()
         fast_forward_report = fast_forward(stack.configuration, maintenance.git)
+        restacked = restack(stack, maintenance.git, fork)
+        promoted = promote(stack, fork, summaries)
+        labels_cleared = clear_spent_promotion_labels(stack, fork)
+        synchronization = UpstreamPullRequestSynchronization(stack, fork).apply()
+        closed_as_landed = LandedPullRequestClosing(stack, fork).apply()
+        closing_follow_ups = maintenance.closing_follow_ups.respond_to_closing(
+            closed_as_landed
+        )
         report = MaintenanceReport.of_pass(
             stack,
             fast_forward_report,
-            restack(stack, maintenance.git, fork),
-            promote(stack, fork, summaries),
-            clear_spent_promotion_labels(stack, fork),
-            UpstreamPullRequestSynchronization(stack, fork).synchronize(),
+            restacked,
+            promoted,
+            labels_cleared,
+            synchronization,
+            closed_as_landed,
+            closing_follow_ups,
         )
         maintenance.board.unlink(missing_ok=True)
-        maintenance.full_report.write_text(report.as_json() + "\n")
+        maintenance.full_report.write_text(report.as_json() + "\n", encoding="utf-8")
         if as_json:
             logger.info(report.as_json())
             return report

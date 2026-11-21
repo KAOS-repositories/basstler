@@ -13,6 +13,11 @@ PLUGIN_ROOT="$(cd "${HOOKS_DIR}/.." && pwd)"
 # too (see basstler.plugin_root.PluginRoot).
 export BASSTLER_PLUGIN_ROOT="${PLUGIN_ROOT}"
 
+# Git Bash rewrites an argument holding ":" and "/" as a Windows path before git
+# sees it, breaking "refs/...:<path>" object names and "+refs/...:refs/..." refspecs.
+# basstler.environment.GitBashVariable.ARGUMENT_CONVERSION_EXCLUSIONS; ignored elsewhere.
+export MSYS2_ARG_CONV_EXCL="refs/;+refs/"
+
 # PROJECT_ROOT: the project the session works in - CLAUDE_PROJECT_DIR, which
 # Claude Code sets for every hook, else the top of the git repository the caller
 # runs in, for a script run by hand. Never derived from this file's location: the
@@ -27,6 +32,9 @@ if [ "$(git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree 2>/dev/null)" !
   exit 78
 fi
 CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
+# Whether Claude Code runs this in a cloud session (basstler.locations.ClaudeCodeVariable.REMOTE),
+# which setup-review-triage's skill reads; unset elsewhere, so it is "false" there.
+CLAUDE_CODE_REMOTE="${CLAUDE_CODE_REMOTE:-false}"
 
 # Every caller also does `git` operations (config, fetch, worktree, branch)
 # that assume they're running inside the project. Move there explicitly instead
@@ -226,6 +234,12 @@ pr_progress_path() {
 # with the same tool that reads it means the two can never disagree.
 PERSONAL_GIT_IDENTITY_PATH=".claude/personal/git-identity"
 
+# CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY: where everyone but the notes repository's
+# owner records their identity, one file per GitHub login, so colleagues sharing a
+# notes branch each author as themselves. Mirrors ProjectLocation in
+# basstler.locations; git_identity_path picks the file that applies.
+CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY=".claude/personal/git-identities"
+
 # format_git_identity: prints a name and email in the one form every message
 # about an identity uses, so the same pair can't be rendered two ways in two
 # different reports.
@@ -273,20 +287,36 @@ repository_local_git_identity() {
 # above: "nothing is recorded yet" and "what is recorded cannot be used" are
 # different answers needing different advice, and a single failing lookup
 # collapses them into one.
+#
+# Both read the file at $1, default git_identity_path's answer.
 recorded_git_identity_exists() {
-  git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${PERSONAL_GIT_IDENTITY_PATH}" 2>/dev/null
+  local identity_path="${1:-$(git_identity_path)}"
+  git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${identity_path}" 2>/dev/null
 }
 
 recorded_git_identity() {
-  recorded_git_identity_exists || return 1
+  local identity_path="${1:-$(git_identity_path)}"
+  recorded_git_identity_exists "${identity_path}" || return 1
   local identity_file name email
   identity_file="$(mktemp)"
-  git show "${PERSONAL_NOTES_REFERENCE}:${PERSONAL_GIT_IDENTITY_PATH}" > "${identity_file}"
+  git show "${PERSONAL_NOTES_REFERENCE}:${identity_path}" > "${identity_file}"
   name="$(git config --file "${identity_file}" --get user.name || true)"
   email="$(git config --file "${identity_file}" --get user.email || true)"
   rm -f "${identity_file}"
   [ -n "${name}" ] && [ -n "${email}" ] || return 1
   printf '%s\t%s\n' "${name}" "${email}"
+}
+
+# git_identity_path: prints where the notes branch records the identity of the
+# account this session works as - PERSONAL_GIT_IDENTITY_PATH for the notes
+# repository's owner, a file below CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY for anyone
+# else (see basstler.personal_notes.git_identity). The owner's path when the
+# package cannot run or GitHub does not say who the session is.
+git_identity_path() {
+  local identity_path
+  identity_path="$("${BASSTLER_PYTHON}" -m "${GIT_IDENTITY_MODULE}" 2>/dev/null)" \
+    || identity_path=""
+  printf '%s\n' "${identity_path:-${PERSONAL_GIT_IDENTITY_PATH}}"
 }
 
 # PLANS_DIR / PLAN_MANIFEST_FILENAME / PLAN_ROADMAP_FILENAME: the one,
@@ -341,7 +371,7 @@ PLAN_SITE_DISPATCH_WORKFLOW_PATH=".github/workflows/plan-site-dispatch.yml"
 # BASSTLER_CHECKOUT: the basstler source checkout this plugin sits in, when it
 # sits in one - a development clone, or a plugin run straight from a clone of
 # its repository. Empty for a plugin installed on its own, whose package comes
-# from its repository at the latest release instead (see
+# from its repository at the plugin's own release instead (see
 # basstler_package_source below).
 BASSTLER_CHECKOUT=""
 if [ -f "${PLUGIN_ROOT}/../pyproject.toml" ] && [ -d "${PLUGIN_ROOT}/../src/basstler" ]; then
@@ -368,6 +398,15 @@ PLAN_SITE_DISPATCH_CHECK_MODULE="basstler.plan_site.dispatch_check"
 # basstler.plan_site.build_start: starts the plan site's build with this session's own
 # GitHub credential, after a push to the notes branch.
 PLAN_SITE_BUILD_START_MODULE="basstler.plan_site.build_start"
+# basstler.plan_site.merge_workflow_refresh: proposes the current merge workflow when the
+# default branch holds an older one, and prints the step left to the user.
+PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE="basstler.plan_site.merge_workflow_refresh"
+# basstler.personal_notes.access: in a cloud session, prints how to attach a notes
+# repository other than the checkout's own when the session cannot reach it.
+NOTES_ACCESS_MODULE="basstler.personal_notes.access"
+# basstler.personal_notes.git_identity: prints where the notes branch records the
+# git identity of the account this session works as.
+GIT_IDENTITY_MODULE="basstler.personal_notes.git_identity"
 # basstler.plan.item_brief: prints one plan item's brief - the plan header, the item,
 # its dependencies' live readiness and the plan's standing rules.
 ITEM_BRIEF_MODULE="basstler.plan.item_brief"
@@ -382,9 +421,16 @@ PLAN_ITEM_MODE_MODULE="basstler.plan.item_mode"
 # basstler.plan.manifest_tools: reads a plan id out of a manifest and regenerates
 # the branch index - the manifest plumbing save-plan.sh calls.
 PLAN_MANIFEST_TOOLS_MODULE="basstler.plan.manifest_tools"
+# Its subcommand listing the items that carry no recommended model.
+PLAN_UNMODELLED_ITEMS_COMMAND="unmodelled-items"
 # basstler.plan.size_limits: prunes landed items and refuses a plan or progress
 # notes over their limits - the gate save-plan.sh and save-pr-progress.sh run.
 PLAN_SIZE_LIMITS_MODULE="basstler.plan.size_limits"
+# basstler.plan.merged_items: records a plan's items done whose pull requests GitHub
+# reports merged, so a save drops them - run by save-plan.sh and session-start.sh.
+PLAN_MERGED_ITEMS_MODULE="basstler.plan.merged_items"
+# Its subcommand recording every plan on the notes branch and pushing the result.
+PLAN_MERGED_ITEMS_EVERY_PLAN_COMMAND="every-plan"
 # basstler.document_references: names every module and skill a document cites
 # that this release no longer ships, and what replaced it.
 DOCUMENT_REFERENCES_MODULE="basstler.document_references"
@@ -418,12 +464,12 @@ UPSTREAM_REVIEWS_HELPER_MODULE="basstler.upstream_reviews.helper"
 # workflow and nothing of the project's.
 UPSTREAM_REVIEWS_ACTION_MODULE="basstler.upstream_reviews.action"
 UPSTREAM_REVIEWS_ACTION_BRANCH="basstler/upstream-reviews"
-# basstler.actions_usage: the last 24 hours of Actions runs and jobs per workflow against
+# basstler.github.actions_usage: the last 24 hours of Actions runs and jobs per workflow against
 # the budget's daily ceilings - run by session-start.sh and by the test workflow.
-ACTIONS_USAGE_MODULE="basstler.actions_usage"
-# basstler.main_failure: the one issue open while the default branch's tests fail -
+ACTIONS_USAGE_MODULE="basstler.github.actions_usage"
+# basstler.github.main_failure: the one issue open while the default branch's tests fail -
 # recorded by the test workflow, shown by session-start.sh.
-MAIN_FAILURE_MODULE="basstler.main_failure"
+MAIN_FAILURE_MODULE="basstler.github.main_failure"
 # dependencies: prints the package's requirements an environment does not
 # have - what missing_dependencies below calls.
 BASSTLER_DEPENDENCIES_MODULE="basstler.setup.dependencies"
@@ -560,7 +606,7 @@ recorded_site_url() {
     | awk '$1 == "site_url:" && $2 != "null" { print $2; exit }'
 }
 
-# plan_site_page_url: the address of this repository's page on the plan site,
+# plan_site_page_url: the address of the notes repository's page on the plan site,
 # of one of its plans ([<plan-id>]), or of one item's card ([<plan-id>
 # <item-id>]), from the fetched hub file. Fails when the notes branch has no
 # hub file, it names no site, or the package cannot run; the lookup's own error
@@ -575,18 +621,22 @@ plan_site_page_url() {
   hub_file="$(mktemp)"
   git show "${PERSONAL_NOTES_REFERENCE}:${PLAN_HUB_PATH}" > "${hub_file}"
   "${BASSTLER_PYTHON}" -m "${PLAN_HUB_MODULE}" page-url --hub "${hub_file}" \
-    --repository "$(repository_name)" \
+    --repository "$(repository_name "${ACTIVE_NOTES_REMOTE:-${NOTES_REMOTE}}")" \
     ${plan_id:+--plan "${plan_id}"} ${item_id:+--item "${item_id}"} \
     || status=$?
   rm -f "${hub_file}"
   return "${status}"
 }
 
-# repository_name: this clone's origin as owner/repo, whatever URL form the
-# remote takes, or "this repository" for a clone with no origin.
+# repository_name: the repository remote $1 (a name or a URL, default origin)
+# configures, as owner/repo whatever URL form it takes, or "this repository" for none.
 repository_name() {
+  local remote="${1:-origin}"
   local url
-  url="$(git remote get-url origin 2>/dev/null || true)"
+  case "${remote}" in
+    */*|*:*) url="${remote}" ;;
+    *) url="$(git config --get "remote.${remote}.url" 2>/dev/null || true)" ;;
+  esac
   if [ -z "${url}" ]; then
     printf 'this repository\n'
     return
@@ -634,30 +684,72 @@ tracked_plan_count() {
 
 # %% the package's own environment
 
-# BASSTLER_HOME: where the package's environment and anything installed for it
-# live - one per user rather than one per clone, so every project the plugin
-# serves shares one environment, and a fresh clone of any of them needs no
-# install of its own.
+# BASSTLER_HOME: where the package's environments and anything installed for
+# them live - one per user rather than one per clone.
 BASSTLER_HOME="${BASSTLER_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/basstler}"
-# BASSTLER_ENVIRONMENT_DIRECTORY: the package's own virtual environment, which
-# session-start.sh creates where it is missing and installs the package into.
-BASSTLER_ENVIRONMENT_DIRECTORY="${BASSTLER_HOME}/venv"
-# BASSTLER_INSTALL_LOCK: a directory held while the package's environment is
-# created or installed into, holding the holder's process id, so a caller that
-# finds the package missing waits for an install already running - typically a
-# session start's - rather than racing it.
-BASSTLER_INSTALL_LOCK="${BASSTLER_HOME}/install.lock"
+# BASSTLER_ENVIRONMENTS_DIRECTORY: holds one package environment per project,
+# so projects on different plugin releases never install over each other.
+BASSTLER_ENVIRONMENTS_DIRECTORY="${BASSTLER_HOME}/environments"
+# BASSTLER_INSTALL_LOCKS_DIRECTORY: holds the install lock of each environment,
+# under the environment's own name.
+BASSTLER_INSTALL_LOCKS_DIRECTORY="${BASSTLER_HOME}/install-locks"
+
+# basstler_project_directory: prints the main working tree of PROJECT_ROOT's
+# repository, so every worktree of a project names the same one.
+basstler_project_directory() {
+  local common_directory
+  common_directory="$(git -C "${PROJECT_ROOT}" rev-parse --path-format=absolute \
+    --git-common-dir)"
+  if [ "$(basename "${common_directory}")" = .git ]; then
+    dirname "${common_directory}"
+  else
+    printf '%s\n' "${common_directory}"
+  fi
+}
+
+# basstler_environment_name: prints the name of the environment of the project
+# directory $1 - its last component, then a checksum of the whole path, so two
+# projects of one name keep apart.
+basstler_environment_name() {
+  printf '%s-%s\n' "$(basename "$1")" "$(printf '%s' "$1" | cksum | cut -d ' ' -f 1)"
+}
+
+# BASSTLER_ENVIRONMENT_DIRECTORY: the package's virtual environment of the
+# session's project, which session-start.sh creates where it is missing and
+# installs the package into, and exports so every command of the session runs
+# it, whichever repository it runs in.
+BASSTLER_ENVIRONMENT_DIRECTORY="${BASSTLER_ENVIRONMENT_DIRECTORY:-${BASSTLER_ENVIRONMENTS_DIRECTORY}/$(basstler_environment_name "$(basstler_project_directory)")}"
+# BASSTLER_PROJECT_FILE_NAME: the file in an environment naming the project
+# directory it belongs to, so a session start can remove the environment once
+# that directory is gone.
+BASSTLER_PROJECT_FILE_NAME="basstler-project"
+BASSTLER_PROJECT_FILE="${BASSTLER_ENVIRONMENT_DIRECTORY}/${BASSTLER_PROJECT_FILE_NAME}"
+
+# basstler_install_lock_of: prints the install lock of the environment $1 - a
+# directory held while it is created or installed into, holding the holder's
+# process id, so a caller that finds the package missing waits for an install
+# already running - typically a session start's - rather than racing it.
+basstler_install_lock_of() {
+  printf '%s/%s\n' "${BASSTLER_INSTALL_LOCKS_DIRECTORY}" "$(basename "$1")"
+}
+
+# basstler_install_marker_of: prints the file holding the process id of whoever
+# holds the install lock $1.
+basstler_install_marker_of() {
+  printf '%s/pid\n' "$1"
+}
+
+BASSTLER_INSTALL_LOCK="$(basstler_install_lock_of "${BASSTLER_ENVIRONMENT_DIRECTORY}")"
 # BASSTLER_INSTALL_MARKER: the process id of whoever holds BASSTLER_INSTALL_LOCK,
 # so a check run meanwhile can tell "being installed" from "missing" - see
 # basstler_install_in_progress.
-BASSTLER_INSTALL_MARKER="${BASSTLER_INSTALL_LOCK}/pid"
+BASSTLER_INSTALL_MARKER="$(basstler_install_marker_of "${BASSTLER_INSTALL_LOCK}")"
 # BASSTLER_INSTALLED_SOURCE_FILE: what the environment's package was last
 # installed from, so a plugin update - which names a new source - reinstalls it.
 BASSTLER_INSTALLED_SOURCE_FILE="${BASSTLER_ENVIRONMENT_DIRECTORY}/basstler-source"
 # BASSTLER_INSTALLED_PLUGIN_DIGEST_FILE: plugin_content_digest of the plugin the
-# environment's package was last installed for. Outside a checkout the source
-# names the release recorded at session start, so a plugin synced later in the
-# session names no new source; this is how a hook still notices it.
+# environment's package was last installed for, so a hook running another copy
+# of the plugin readies the package for it again.
 BASSTLER_INSTALLED_PLUGIN_DIGEST_FILE="${BASSTLER_ENVIRONMENT_DIRECTORY}/basstler-plugin-digest"
 # BASSTLER_PYTHON_REQUIREMENT: the interpreters the package supports - the
 # requires-python of the package's pyproject.toml, which a test holds this
@@ -672,17 +764,12 @@ BASSTLER_INTERPRETER_CANDIDATES="python3.14 python3.13 python3.12"
 BASSTLER_UV_DIRECTORY="${BASSTLER_HOME}/uv"
 BASSTLER_INSTALLED_UV="${BASSTLER_UV_DIRECTORY}/bin/uv"
 # BASSTLER_REPOSITORY_URL: where an installed plugin's package comes from, at
-# its latest release.
+# the plugin's own release.
 BASSTLER_REPOSITORY_URL="${BASSTLER_REPOSITORY_URL:-https://github.com/KAOS-repositories/basstler}"
-# PLUGIN_MANIFEST: the plugin's manifest, which names no version: a release is
-# only a tag on its merge commit, and the marketplace serves the plugin from the
-# plugin release branch at that tag, with nothing committed after it to miss.
+# PLUGIN_MANIFEST: the plugin's manifest. The source tree's names no version;
+# the release workflow writes the release's into the plugin it serves, which is
+# how a plugin and its package are kept one release.
 PLUGIN_MANIFEST="${PLUGIN_ROOT}/.claude-plugin/plugin.json"
-# BASSTLER_RELEASE_FILE: the latest release tag last read from
-# BASSTLER_REPOSITORY_URL - the one the package is installed at, read once per
-# session start, and again by a hook running a plugin synced since the install,
-# rather than by every caller.
-BASSTLER_RELEASE_FILE="${BASSTLER_HOME}/release"
 
 # latest_basstler_release: prints the highest v<major>.<minor>.<patch> tag
 # BASSTLER_REPOSITORY_URL has; fails when it cannot be read or has none.
@@ -695,48 +782,53 @@ latest_basstler_release() {
     | sort -t . -k 1,1n -k 2,2n -k 3,3n | tail -1 | sed 's/^/v/' | grep .
 }
 
-# record_latest_basstler_release: records latest_basstler_release in
-# BASSTLER_RELEASE_FILE for a plugin outside a checkout. Keeps the last one
-# recorded when the repository cannot be read, so a session offline keeps the
-# package it has rather than reinstalling.
-record_latest_basstler_release() {
-  [ -z "${BASSTLER_CHECKOUT}" ] || return 0
-  local release
-  release="$(latest_basstler_release)" || return 0
-  mkdir -p "$(dirname "${BASSTLER_RELEASE_FILE}")"
-  printf '%s\n' "${release}" > "${BASSTLER_RELEASE_FILE}"
+# plugin_release: prints the tag of the release PLUGIN_MANIFEST names; fails
+# when it names none, as outside a released plugin.
+plugin_release() {
+  [ -f "${PLUGIN_MANIFEST}" ] || return 1
+  local version
+  version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*$/\1/p' \
+    "${PLUGIN_MANIFEST}")"
+  [ -n "${version}" ] || return 1
+  printf 'v%s\n' "${version}"
 }
 
 # basstler_package_source: prints what to install the package from - the
-# checkout this plugin sits in, else its repository at the latest release
-# recorded, or at its default branch before any was.
+# checkout this plugin sits in, else its repository at the plugin's release.
+# Fails for a plugin outside a checkout that names no release.
 basstler_package_source() {
   if [ -n "${BASSTLER_CHECKOUT}" ]; then
     printf '%s\n' "${BASSTLER_CHECKOUT}"
     return
   fi
-  local reference=""
-  [ -s "${BASSTLER_RELEASE_FILE}" ] && reference="@$(cat "${BASSTLER_RELEASE_FILE}")"
-  printf 'basstler @ git+%s%s\n' "${BASSTLER_REPOSITORY_URL}" "${reference}"
+  local release
+  release="$(plugin_release)" || return 1
+  printf 'basstler @ git+%s@%s\n' "${BASSTLER_REPOSITORY_URL}" "${release}"
 }
 
-# basstler_branch_or_tag: prints the basstler branch or tag the package is
-# installed at outside a checkout - the latest release recorded, or main before
-# any was - for a workflow that has to run the same package as the session.
+# basstler_branch_or_tag: prints the basstler branch or tag a workflow runs to
+# match the session's package - the plugin's release, or main in a checkout.
+# Fails for a plugin outside a checkout that names no release.
 basstler_branch_or_tag() {
-  if [ -s "${BASSTLER_RELEASE_FILE}" ]; then
-    cat "${BASSTLER_RELEASE_FILE}"
-  else
-    printf 'main\n'
-  fi
+  plugin_release && return
+  [ -n "${BASSTLER_CHECKOUT}" ] || return 1
+  printf 'main\n'
 }
 
 # basstler_install_in_progress: succeeds while a running process holds
 # BASSTLER_INSTALL_MARKER. A marker whose process has ended - a session start
 # that was killed - is not an install in progress.
 basstler_install_in_progress() {
-  [ -f "${BASSTLER_INSTALL_MARKER}" ] || return 1
-  kill -0 "$(cat "${BASSTLER_INSTALL_MARKER}")" 2>/dev/null
+  install_held_by_live_process "${BASSTLER_INSTALL_LOCK}"
+}
+
+# install_held_by_live_process: succeeds while a running process holds the
+# install lock $1.
+install_held_by_live_process() {
+  local marker
+  marker="$(basstler_install_marker_of "$1")"
+  [ -f "${marker}" ] || return 1
+  kill -0 "$(cat "${marker}")" 2>/dev/null
 }
 
 # wait_for_basstler_install: waits up to $1 seconds (300 by default) for an
@@ -839,7 +931,7 @@ BASSTLER_INSTALL_WAIT_SECONDS="${BASSTLER_INSTALL_WAIT_SECONDS:-600}"
 # live process holds it and taking it over from one that died holding it.
 # Returns 1 when it is still held after BASSTLER_INSTALL_WAIT_SECONDS.
 acquire_basstler_install_lock() {
-  mkdir -p "${BASSTLER_HOME}"
+  mkdir -p "${BASSTLER_INSTALL_LOCKS_DIRECTORY}"
   local waited=0 holder
   until mkdir "${BASSTLER_INSTALL_LOCK}" 2>/dev/null; do
     holder="$(cat "${BASSTLER_INSTALL_MARKER}" 2>/dev/null || true)"
@@ -869,7 +961,9 @@ release_basstler_install_lock() {
 #   locked              - another process held the lock past the wait
 #   environment-failed  - no environment could be created
 #   install-failed      - installing BASSTLER_PACKAGE_REQUIREMENTS failed
-# and returns 1 for the last four, when the package cannot be run.
+#   release-not-named   - outside a checkout, the plugin names no release to
+#                         install the package at
+# and returns 1 for the last five, when the package cannot be run.
 ensure_basstler_package() {
   BASSTLER_PACKAGE_REQUIREMENTS=""
   if ! acquire_basstler_install_lock; then
@@ -886,6 +980,10 @@ ensure_basstler_package() {
 # install_basstler_package_where_needed: ensure_basstler_package's work, run
 # while it holds the lock.
 install_basstler_package_where_needed() {
+  if ! basstler_package_source > /dev/null; then
+    BASSTLER_PACKAGE_STATE=release-not-named
+    return 1
+  fi
   if [ ! -x "${BASSTLER_ENVIRONMENT_INTERPRETER}" ]; then
     BASSTLER_PACKAGE_REQUIREMENTS="$(basstler_package_source)"
     if ! create_basstler_environment; then
@@ -893,12 +991,11 @@ install_basstler_package_where_needed() {
       return 1
     fi
     resolve_basstler_python
+    record_basstler_project
     install_basstler_package_or_fail created
     return
   fi
   if ! installed_package_is_current; then
-    # A plugin synced since the install may call what only a later release has.
-    installed_for_this_plugin || record_latest_basstler_release
     BASSTLER_PACKAGE_REQUIREMENTS="$(basstler_package_source)"
     install_basstler_package_or_fail installed
     return
@@ -926,6 +1023,29 @@ install_basstler_package_or_fail() {
   BASSTLER_PACKAGE_STATE="${state_when_installed}"
 }
 
+# record_basstler_project: writes basstler_project_directory to
+# BASSTLER_PROJECT_FILE.
+record_basstler_project() {
+  basstler_project_directory > "${BASSTLER_PROJECT_FILE}"
+}
+
+# remove_abandoned_basstler_environments: removes every environment whose
+# recorded project directory no longer exists, printing each one removed. Never
+# the session's own, one with no record, or one a live install holds.
+remove_abandoned_basstler_environments() {
+  local environment lock
+  for environment in "${BASSTLER_ENVIRONMENTS_DIRECTORY}"/*/; do
+    environment="${environment%/}"
+    [ "${environment}" = "${BASSTLER_ENVIRONMENT_DIRECTORY}" ] && continue
+    [ -f "${environment}/${BASSTLER_PROJECT_FILE_NAME}" ] || continue
+    [ -d "$(cat "${environment}/${BASSTLER_PROJECT_FILE_NAME}")" ] && continue
+    lock="$(basstler_install_lock_of "${environment}")"
+    install_held_by_live_process "${lock}" && continue
+    rm -rf "${environment}" "${lock}"
+    printf '%s\n' "${environment}"
+  done
+}
+
 # basstler_package_failure_line: prints, on one line, why the package cannot be
 # run after ensure_basstler_package failed, and what to do about it.
 basstler_package_failure_line() {
@@ -941,6 +1061,9 @@ basstler_package_failure_line() {
       printf 'could not install %s: %s - run: %s\n' "${BASSTLER_PACKAGE_REQUIREMENTS}" \
         "$(printf '%s' "${BASSTLER_INSTALL_OUTPUT}" | tail -1)" \
         "${BASSTLER_INSTALL_COMMAND[*]}" ;;
+    release-not-named)
+      printf 'the plugin at %s names no release in its plugin.json, so there is no basstler package of its release to run - reinstall the plugin from the marketplace\n' \
+        "${PLUGIN_ROOT}" ;;
     *)
       printf 'could not read what the basstler package requires for %s - run: pip --python %s install '"'"'%s'"'"'\n' \
         "${BASSTLER_PYTHON}" "${BASSTLER_PYTHON}" "$(basstler_package_source)" ;;
@@ -981,6 +1104,31 @@ require_basstler_python() {
   fi
 }
 
+# compare_plugin_and_package_releases: sets BASSTLER_INSTALLED_VERSION to the
+# version of the package BASSTLER_PYTHON imports, BASSTLER_PLUGIN_RELEASE to
+# plugin_release, and BASSTLER_RELEASE_STATE to one of
+#   checkout    - both are the source of the checkout the plugin sits in
+#   matching    - the package is the plugin's own release
+#   mismatched  - the package is another release than the plugin's
+#   not-named   - the plugin names no release, so nothing pins the package to it
+#   not-read    - the package's version could not be read
+compare_plugin_and_package_releases() {
+  BASSTLER_PLUGIN_RELEASE="$(plugin_release)" || BASSTLER_PLUGIN_RELEASE=""
+  if ! BASSTLER_INSTALLED_VERSION="$("${BASSTLER_PYTHON}" \
+      -m "${BASSTLER_COMMAND_MODULE}" --version 2>/dev/null)"; then
+    BASSTLER_INSTALLED_VERSION=""
+    BASSTLER_RELEASE_STATE=not-read
+  elif [ -n "${BASSTLER_CHECKOUT}" ]; then
+    BASSTLER_RELEASE_STATE=checkout
+  elif [ -z "${BASSTLER_PLUGIN_RELEASE}" ]; then
+    BASSTLER_RELEASE_STATE=not-named
+  elif [ "${BASSTLER_PLUGIN_RELEASE}" = "v${BASSTLER_INSTALLED_VERSION}" ]; then
+    BASSTLER_RELEASE_STATE=matching
+  else
+    BASSTLER_RELEASE_STATE=mismatched
+  fi
+}
+
 # create_basstler_environment: creates BASSTLER_ENVIRONMENT_DIRECTORY from an
 # interpreter satisfying BASSTLER_PYTHON_REQUIREMENT, leaving what the creating
 # tool said in BASSTLER_ENVIRONMENT_OUTPUT and returning its exit status.
@@ -991,19 +1139,20 @@ require_basstler_python() {
 # None of them installs pip into the environment:
 # install_basstler_into_environment runs the pip on PATH against it instead.
 create_basstler_environment() {
-  mkdir -p "${BASSTLER_HOME}"
+  mkdir -p "${BASSTLER_ENVIRONMENTS_DIRECTORY}"
   local uv
   if uv="$(available_uv)"; then
     create_basstler_environment_with "${uv}"
     return
   fi
-  local candidate
+  local candidate found=0
   for candidate in ${BASSTLER_INTERPRETER_CANDIDATES}; do
     command -v "${candidate}" > /dev/null 2>&1 || continue
+    found=1
     BASSTLER_ENVIRONMENT_OUTPUT="$("${candidate}" -m venv --without-pip \
-      "${BASSTLER_ENVIRONMENT_DIRECTORY}" 2>&1)"
-    return
+      "${BASSTLER_ENVIRONMENT_DIRECTORY}" 2>&1)" && return
   done
+  [ "${found}" = "0" ] || return 1
   if ! install_uv; then
     BASSTLER_ENVIRONMENT_OUTPUT="no uv and none of ${BASSTLER_INTERPRETER_CANDIDATES} on PATH, and uv could not be installed: $(printf '%s' "${BASSTLER_ENVIRONMENT_OUTPUT}" | tail -1)"
     return 1

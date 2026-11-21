@@ -8,34 +8,32 @@ none of these touch git or the network.
 
 from __future__ import annotations
 
-from collections.abc import Container
-
 import json
+from collections.abc import Container
 from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 
+from basstler.github.states import CombinedCheckState
 from basstler.locations import RepositoryStateLocation
+from basstler.stack.exceptions import BaseBranchScopeError
 from basstler.stack.model import (
     BoardKey,
     BranchStatus,
-    IntegrationStrategy,
     PullRequest,
     RestackPlanEntry,
     Stack,
 )
-from basstler.stack.exceptions import BaseBranchScopeError
-from basstler.github.states import CombinedCheckState
+from basstler.git.commands import IntegrationStrategy
 
 from ..constants.stack import StackBranch, StackLabel
-
 from .dataset import (
     StackRepository,
     StackSampleText,
     UpstreamPullRequestNumber,
-    make_configuration,
     build,
+    make_configuration,
 )
 
 # %% deriving a branch status
@@ -414,7 +412,9 @@ def test_the_board_reads_the_check_state_back_as_its_verdict(
 ):
     written = a_ready_branch_whose_checks_reached(state)
     board = tmp_path / RepositoryStateLocation.BOARD.name
-    board.write_text(json.dumps({BoardKey.PULL_REQUESTS: [asdict(written)]}))
+    board.write_text(
+        json.dumps({BoardKey.PULL_REQUESTS: [asdict(written)]}), encoding="utf-8"
+    )
 
     assert PullRequest.read_board(board) == [written]
 

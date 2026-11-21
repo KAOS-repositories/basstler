@@ -7,22 +7,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from dataclasses import asdict
 
 import pytest
 
 from basstler.exceptions import UnresolvableReferenceError
 from basstler.exit_codes import StackExitCode
-from basstler.repository import Repository
-from basstler.stack.model import (
-    IntegrationStrategy,
-    PullRequest,
-    SkippedPullRequest,
-    SkipReason,
-    Stack,
-)
-from basstler.stack.settings import Configuration
-
+from basstler.github.repository import Repository
 from basstler.locations import RepositoryStateLocation
 from basstler.maintenance.board import BoardExport
 from basstler.maintenance.commands import (
@@ -42,24 +34,27 @@ from basstler.maintenance.restack_steps import (
     BranchOutcome,
     RestackOutcome,
 )
+from basstler.stack.checkout import ForkRefresh
+from basstler.stack.model import PullRequest, SkippedPullRequest, SkipReason, Stack
+from basstler.git.commands import IntegrationStrategy
+from basstler.stack.settings import Configuration
 
 from ..constants.stack import RemoteName, StackBranch
-
 from .fork import (
-    StackPullRequestNumber,
-    PullRequestHeadRepository,
     UPSTREAM_BASE,
-    make_configuration,
     ForkCheckout,
+    PullRequestHeadRepository,
+    StackPullRequestNumber,
+    a_parent_and_child,
     a_stack,
     an_api_record,
     an_export,
-    a_parent_and_child,
+    make_configuration,
     the_board,
 )
 from .recorded_fork import (
-    RecordingPullRequests,
     AlreadyResolvedPass,
+    RecordingPullRequests,
     run_maintenance,
 )
 
@@ -103,7 +98,7 @@ def test_a_whole_pass_leaves_no_board_behind(fork_checkout: ForkCheckout):
     """
     a_parent_and_child(fork_checkout)
     maintenance = AlreadyResolvedPass.over(fork_checkout, the_board())
-    maintenance.board.write_text("{}")
+    maintenance.board.write_text("{}", encoding="utf-8")
 
     RunReportCommand().run(
         maintenance, argparse.Namespace(json=True, summaries=None, stacked_on=None)
@@ -228,6 +223,62 @@ def test_loading_the_stack_fetches_a_base_no_open_pull_request_has_as_its_head(
         fork_checkout.published_commit(RemoteName.ORIGIN, StackBranch.LONG_LIVED_BASE)
         == published
     )
+
+
+def test_loading_the_stack_names_a_base_the_fork_does_not_have(
+    fork_checkout: ForkCheckout, monkeypatch: pytest.MonkeyPatch
+):
+    fork_checkout.branch_from(StackBranch.PARENT, UPSTREAM_BASE)
+    board = BoardExport(
+        (
+            PullRequest(
+                number=StackPullRequestNumber.PARENT,
+                head=StackBranch.PARENT,
+                base=StackBranch.LONG_LIVED_BASE,
+                draft=False,
+                head_repository=PullRequestHeadRepository.FORK.value.full_name,
+            ),
+        )
+    ).write(fork_checkout.project_root / RepositoryStateLocation.BOARD.name)
+    monkeypatch.setattr(Configuration, "load", make_configuration)
+    monkeypatch.chdir(fork_checkout.project_root)
+
+    stack = Stack.load(board)
+
+    assert stack.fork_refresh == ForkRefresh(
+        missing_branches=(StackBranch.LONG_LIVED_BASE,)
+    )
+
+
+def test_the_report_carries_the_branches_the_fork_does_not_have():
+    stack = Stack.build(
+        make_configuration(),
+        [],
+        lambda branch: False,
+        lambda candidate, container: False,
+        fork_refresh=ForkRefresh(missing_branches=(StackBranch.LONG_LIVED_BASE,)),
+    )
+
+    report = MaintenanceReport.of_pass(stack, None, [])
+
+    assert report.fork_refresh == stack.fork_refresh
+
+
+def test_the_summary_warns_about_each_branch_the_fork_does_not_have(
+    caplog: pytest.LogCaptureFixture,
+):
+    report = MaintenanceReport(
+        fork_refresh=ForkRefresh(missing_branches=(StackBranch.LONG_LIVED_BASE,))
+    )
+
+    report.print_summary()
+
+    warnings = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING
+    ]
+    assert [StackBranch.LONG_LIVED_BASE in message for message in warnings] == [True]
 
 
 def test_comparing_against_a_reference_git_cannot_resolve_names_that_reference(

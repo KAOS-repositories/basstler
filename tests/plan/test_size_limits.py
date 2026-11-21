@@ -13,8 +13,7 @@ import pytest
 
 from basstler.exit_codes import SizeLimitExitCode
 from basstler.plan.dependencies import DependencyReference
-from basstler.plan.model import PlanDocument
-from basstler.plan.model import ItemStatus, ManifestKey, PlanManifest
+from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
 from basstler.plan.size_limits import (
     DocumentLocation,
     DocumentOverLimitError,
@@ -68,7 +67,9 @@ def manifest_violations(manifest: PlanManifest) -> list[Violation]:
     """
     :return: Every limit *manifest* breaks, measured beside a roadmap that breaks none.
     """
-    roadmap = Roadmap.from_text(DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text())
+    roadmap = Roadmap.from_text(
+        DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
+    )
     return Plan(manifest, roadmap).manifest_violations()
 
 
@@ -83,7 +84,10 @@ def saved_plan_with_over_limit_open_item(directory: Path) -> PlanFiles:
         notes="x" * (Measure.NOTE_LENGTH.maximum + 1)
     )
     over_limit.without_landed_items().write(saved.manifest)
-    saved.roadmap.write_text(DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text())
+    saved.roadmap.write_text(
+        DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     return saved
 
 
@@ -103,7 +107,7 @@ def edited_copy_of(saved: PlanFiles, directory: Path, **fields: object) -> PlanF
     PlanManifest({**manifest.content, ManifestKey.ITEMS.key: items}).write(
         copy.manifest
     )
-    copy.roadmap.write_text(saved.roadmap.read_text())
+    copy.roadmap.write_text(saved.roadmap.read_text(encoding="utf-8"), encoding="utf-8")
     return copy
 
 
@@ -158,10 +162,9 @@ def test_staging_writes_the_plan_without_its_landed_items(tmp_path):
     assert PlanManifest.from_file(destination.manifest) == (
         LandedItemsPlan.read().manifest.without_landed_items()
     )
-    assert (
-        destination.roadmap.read_text()
-        == DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text()
-    )
+    assert destination.roadmap.read_text(
+        encoding="utf-8"
+    ) == DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
 
 
 def test_staging_a_plan_with_nothing_landed_copies_its_text_unchanged(tmp_path):
@@ -172,13 +175,15 @@ def test_staging_a_plan_with_nothing_landed_copies_its_text_unchanged(tmp_path):
     ).stage(first)
     second = destination_in(tmp_path / "second")
     PlanFiles(first.manifest, first.roadmap).stage(second)
-    assert second.manifest.read_text() == first.manifest.read_text()
+    assert second.manifest.read_text(encoding="utf-8") == first.manifest.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_staging_a_plan_with_every_item_landed_removes_its_directory(tmp_path):
     destination = destination_in(tmp_path)
     destination.manifest.parent.mkdir()
-    destination.manifest.write_text("stale\n")
+    destination.manifest.write_text("stale\n", encoding="utf-8")
     staged = PlanFiles(
         DatasetLocation.PLAN_ALL_LANDED, DatasetLocation.ROADMAP_OF_STANDING_RULES
     ).stage(destination)
@@ -311,7 +316,9 @@ def test_an_unchanged_item_over_its_limit_is_a_warning_not_a_violation():
     stored = manifest_with_open_item_fields(
         notes="x" * (Measure.NOTE_LENGTH.maximum + 1)
     )
-    roadmap = Roadmap.from_text(DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text())
+    roadmap = Roadmap.from_text(
+        DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
+    )
     plan = Plan(stored, roadmap, stored_manifest=stored)
     assert plan.violations() == []
     assert plan.warnings() == [
@@ -326,7 +333,9 @@ def test_an_unchanged_item_over_its_limit_is_a_warning_not_a_violation():
 def test_an_item_the_stored_plan_lacks_is_held_to_its_limits():
     measured = Measure.NOTE_LENGTH.maximum + 1
     manifest = manifest_with_open_item_fields(notes="x" * measured)
-    roadmap = Roadmap.from_text(DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text())
+    roadmap = Roadmap.from_text(
+        DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
+    )
     plan = Plan(manifest, roadmap, stored_manifest=PlanManifest({}))
     assert plan.warnings() == []
     assert plan.violations() == [
@@ -411,7 +420,7 @@ def test_too_many_items_are_a_violation():
 
 
 def test_a_roadmap_of_entries_reads_each_entry_whole():
-    text = DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text()
+    text = DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
     roadmap = Roadmap.from_text(text)
     entry_lines = [
         line for line in text.splitlines() if re.match(RoadmapLine.ENTRY, line)
@@ -421,14 +430,16 @@ def test_a_roadmap_of_entries_reads_each_entry_whole():
 
 
 def test_a_continuation_line_joins_the_entry_above_it():
-    text = DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text()
+    text = DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
     roadmap = Roadmap.from_text(text)
     assert "\n" not in roadmap.entries[-1]
     assert roadmap.entries[-1].endswith(text.splitlines()[-1].strip())
 
 
 def test_a_dated_section_is_refused_as_a_format_violation():
-    roadmap = Roadmap.from_text(DatasetLocation.ROADMAP_WITH_DATED_SECTION.read_text())
+    roadmap = Roadmap.from_text(
+        DatasetLocation.ROADMAP_WITH_DATED_SECTION.read_text(encoding="utf-8")
+    )
     assert [type(violation) for violation in roadmap.violations()] == [
         RoadmapFormatViolation
     ]
@@ -468,7 +479,7 @@ def test_progress_notes_within_the_limit_have_no_violations():
 def test_progress_notes_over_the_limit_are_a_violation(tmp_path):
     measured = Measure.PROGRESS_LENGTH.maximum + 1
     progress_path = tmp_path / "progress.md"
-    progress_path.write_text("x" * measured)
+    progress_path.write_text("x" * measured, encoding="utf-8")
     with pytest.raises(DocumentOverLimitError) as raised:
         ProgressNotes.from_file(progress_path).check()
     assert raised.value == DocumentOverLimitError(
@@ -507,7 +518,7 @@ def test_the_command_line_accepts_progress_notes_within_the_limit(
     Notes at the limit pass.
     """
     progress_path = tmp_path / "progress.md"
-    progress_path.write_text("x" * Measure.PROGRESS_LENGTH.maximum)
+    progress_path.write_text("x" * Measure.PROGRESS_LENGTH.maximum, encoding="utf-8")
     assert run_check_progress(monkeypatch, progress_path) == SizeLimitExitCode.SUCCESS
 
 
@@ -518,7 +529,9 @@ def test_the_command_line_refuses_progress_notes_over_the_limit(
     Notes over the limit end the command with its own status, naming the violation.
     """
     progress_path = tmp_path / "progress.md"
-    progress_path.write_text("x" * (Measure.PROGRESS_LENGTH.maximum + 1))
+    progress_path.write_text(
+        "x" * (Measure.PROGRESS_LENGTH.maximum + 1), encoding="utf-8"
+    )
     with pytest.raises(DocumentOverLimitError) as raised:
         ProgressNotes.from_file(progress_path).check()
 

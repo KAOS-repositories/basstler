@@ -16,8 +16,9 @@ basstler is a Claude Code plugin, and this repository is its marketplace.
   `/plugin install basstler@basstler` - or enable it for everyone working on a project in
   its committed `.claude/settings.json` (`extraKnownMarketplaces` and `enabledPlugins`).
 
-The plugin's session start installs the package at the plugin's own version into
-`~/.local/share/basstler/venv` (`$BASSTLER_HOME/venv` when set) - nothing to install by hand.
+The plugin's session start installs the package at the plugin's own version into an
+environment of the project's own under `~/.local/share/basstler/environments`
+(`$BASSTLER_HOME/environments` when set) - nothing to install by hand.
 
 ## 1. Run the setup
 
@@ -31,10 +32,16 @@ It creates your notes branch, records the git identity your commits are authored
 with, installs what the package needs, and asks only about the decisions that
 are genuinely yours. Re-running it on a set-up project changes nothing.
 
+Colleagues can share one notes branch, and the plans on it. The repository's owner keeps
+their identity at `.claude/personal/git-identity`; everyone else records theirs at
+`.claude/personal/git-identities/<their GitHub login>`, so each session authors commits
+as the person it works for. A colleague who may push to the repository joins its notes
+branch by running the same setup once its owner has created it.
+
 Without a session, the same setup is one command, once the package's environment exists:
 
 ```bash
-~/.local/share/basstler/venv/bin/python -m basstler.setup.personal_notes \
+"$BASSTLER_PYTHON" -m basstler.setup.personal_notes \
   --remote <your-fork-remote-or-url> --name "Your Name" --email "you@example.com"
 ```
 
@@ -44,7 +51,7 @@ labels your fork lacks.
 ## 2. Do the steps no script can do
 
 ```bash
-~/.local/share/basstler/venv/bin/python -m basstler.setup.steps
+"$BASSTLER_PYTHON" -m basstler.setup.steps
 ```
 
 The session start created that environment; see the repository's [`README.md`](../README.md).
@@ -67,7 +74,7 @@ on to `.claude/personal/stack.toml` on your personal-notes branch, so the projec
 nothing of basstler's:
 
 ```bash
-~/.local/share/basstler/venv/bin/python -m basstler.setup.steps configure-upstream --repository <owner>/<name>
+"$BASSTLER_PYTHON" -m basstler.setup.steps configure-upstream --repository <owner>/<name>
 ```
 
 A project that wants every contributor to share the answer commits
@@ -81,12 +88,14 @@ fork's default branch carries a basstler file. `/setup-personal-notes` installs 
 an upstream is named; to do it yourself, or to bring it to a new release:
 
 ```bash
-~/.local/share/basstler/venv/bin/python -m basstler.setup.steps install-upstream-reviews-action --branch-or-tag <a basstler release tag, or main>
+"$BASSTLER_PYTHON" -m basstler.setup.steps install-upstream-reviews-action --branch-or-tag <a basstler release tag, or main>
 ```
 
 That writes `basstler/upstream-reviews` on your fork: a workflow calling basstler's
-reusable one, and a README. Each read pushes a request there, and the run commits what
-it read back to the same branch. The one step left to you: GitHub starts every fork with
+reusable one, and a README. Each read pushes a branch of its own from it under
+`basstler/upstream-reviews-requests/`, and the run commits what it read onto that
+branch - so any number of sessions can read at once. A session cannot delete a remote
+branch, so each run deletes the request branches that are over an hour old. The one step left to you: GitHub starts every fork with
 Actions off, so enable them once at `https://github.com/<your fork>/actions`.
 
 Until then, or wherever the Action cannot answer, the skill reads the upstream from the
@@ -105,7 +114,16 @@ A project that prefers a dispatch-only workflow on its default branch may still 
 the package, both from `main`; to pin a release instead, change both references to its
 tag.
 
-## 4. Check it worked
+## 4. For the review triage: choose how files are marked viewed
+
+Only if you use `basstler review-triage mark-viewed`. "Viewed" is kept for each GitHub
+account, and only GitHub's GraphQL API sets it, which a Claude Code cloud session cannot
+reach. There are two routes: marking from your own computer, where `gh` is logged in, or
+from a repository's Actions, which `basstler review-triage set-up-mark-viewed` sets up.
+[The review triage's README](review-triage/README.md) describes both and the steps for
+each; in Claude Code, `/setup-review-triage` walks you through them.
+
+## 5. Check it worked
 
 ```bash
 "${BASSTLER_PLUGIN_ROOT}/hooks/check-setup.sh"

@@ -1,6 +1,6 @@
 """
 Checks a freshly loaded plan.yaml against the schema rules in plan-schema.md, reporting
-every :class:`~basstler.exceptions.ValidationProblem` it carries at once.
+every :class:`~basstler.plan.exceptions.ValidationProblem` it carries at once.
 """
 
 from __future__ import annotations
@@ -12,33 +12,38 @@ from typing import Any
 
 import rustworkx
 
-from basstler.exceptions import (
+from basstler.plan.exceptions import (
     DependencyCycle,
     DuplicateItemId,
     InvalidBlockers,
     InvalidDependsOn,
+    InvalidLandedItemCount,
     InvalidManifestRoot,
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
+    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
+    RemovedItemStillNamed,
     SelfPlanReference,
+    SharedBranch,
     UnknownDependency,
     UnknownDependencyPlan,
+    UnknownRecommendedModel,
     UnknownStatus,
     UnknownTrack,
     UnknownWave,
     ValidationProblem,
 )
+from basstler.github.repository import Repository
 from basstler.plan.dependencies import (
     DependencyReference,
     PlanDirectory,
     ResolvedDependency,
 )
 from basstler.plan.model import ItemStatus, ManifestKey
-from basstler.repository import Repository
-
+from basstler.plan.model_alias import ModelAlias
 
 # %% dependency cycles
 
@@ -238,10 +243,17 @@ class PlanValidator:
     this plan's own items are available - in which case a cross-plan entry is
     a problem rather than a free pass."""
 
-    notes_repository: Repository | None = None
+    checkout_repository: Repository | None = None
     """
-    The repository whose notes branch the plan is saved to, or ``None`` when it is not
-    known.
+    The repository the ``origin`` of the checkout saving the plan names, or ``None``
+    when no save is being checked.
+    """
+
+    saved_item_identifiers: frozenset[str] | None = None
+    """
+    The items the plan's saved copy holds when a save is being checked, else ``None``.
+
+    An item outside it is new and must carry a ``recommended_model``.
     """
 
     def validate(self) -> None:
@@ -264,7 +276,10 @@ class PlanValidator:
             return [InvalidManifestRoot(self.manifest)]
         return [
             *self.schema_version_problems(),
+            *self.landed_item_count_problems(),
             *self.duplicate_identifier_problems(),
+            *self.shared_branch_problems(),
+            *self.removed_item_problems(),
             *(problem for item in self.items for problem in self.item_problems(item)),
             *self.cycle_problems(),
             *self.wave_problems(),
@@ -329,6 +344,19 @@ class PlanValidator:
             return []
         return [InvalidSchemaVersion(schema_version)]
 
+    def landed_item_count_problems(self) -> list[ValidationProblem]:
+        """
+        The problem with the manifest's ``landed_item_count``, if any.
+        """
+        landed_item_count = self.manifest.get(ManifestKey.LANDED_ITEM_COUNT.key, 0)
+        if (
+            isinstance(landed_item_count, int)
+            and not isinstance(landed_item_count, bool)
+            and landed_item_count >= 0
+        ):
+            return []
+        return [InvalidLandedItemCount(landed_item_count)]
+
     def duplicate_identifier_problems(self) -> list[ValidationProblem]:
         """
         The problem of two items sharing an effective id, if any.
@@ -341,6 +369,59 @@ class PlanValidator:
         if not duplicate_identifiers:
             return []
         return [DuplicateItemId(duplicate_identifiers)]
+
+    def shared_branch_problems(self) -> list[ValidationProblem]:
+        """
+        One problem per branch that more than one item names, counting the items of the
+        other plans when they are available.
+        """
+        claiming_items: dict[str, list[str]] = {}
+        for item in self.items:
+            branch = item.get(ManifestKey.BRANCH.key)
+            if isinstance(branch, str) and branch:
+                claiming_items.setdefault(branch, []).append(self.identifier_of(item))
+        references_by_branch = (
+            self.plan_directory.references_by_branch if self.plan_directory else {}
+        )
+        problems: list[ValidationProblem] = []
+        for branch, identifiers in claiming_items.items():
+            other_plans_items = [
+                reference.text
+                for reference in references_by_branch.get(branch, [])
+                if reference.plan_id != self.plan_id
+            ]
+            if len(identifiers) + len(other_plans_items) > 1:
+                problems.append(
+                    SharedBranch(branch, [*identifiers, *other_plans_items])
+                )
+        return problems
+
+    def removed_item_problems(self) -> list[ValidationProblem]:
+        """
+        :return: A problem for each item the save removes that another plan's item
+            still names; none when no save is being checked.
+        """
+        if self.saved_item_identifiers is None or self.plan_directory is None:
+            return []
+        problems: list[ValidationProblem] = []
+        for identifier in sorted(
+            self.saved_item_identifiers - set(self.item_identifiers)
+        ):
+            reference = DependencyReference(identifier, self.plan_id).text
+            named_by = self.plan_directory.items_naming(reference)
+            if named_by:
+                problems.append(RemovedItemStillNamed(reference, named_by))
+        return problems
+
+    def is_new_item(self, item_identifier: str) -> bool:
+        """
+        :param item_identifier: An item's effective id.
+        :return: Whether a save is being checked and the saved plan lacks that item.
+        """
+        return (
+            self.saved_item_identifiers is not None
+            and item_identifier not in self.saved_item_identifiers
+        )
 
     def item_problems(self, item: dict[str, Any]) -> list[ValidationProblem]:
         """
@@ -358,6 +439,13 @@ class PlanValidator:
             problems.append(
                 UnknownStatus(item_identifier, item.get(ManifestKey.STATUS.key))
             )
+        recommended_model = item.get(ManifestKey.RECOMMENDED_MODEL.key)
+        if recommended_model is None and self.is_new_item(item_identifier):
+            problems.append(MissingRecommendedModel(item_identifier))
+        elif recommended_model is not None and recommended_model not in list(
+            ModelAlias
+        ):
+            problems.append(UnknownRecommendedModel(item_identifier, recommended_model))
         depends_on = item.get(ManifestKey.DEPENDS_ON.key)
         if depends_on is not None and not isinstance(depends_on, list):
             problems.append(InvalidDependsOn(item_identifier, type(depends_on)))
@@ -437,22 +525,25 @@ class PlanValidator:
 
     def repository_problems(self) -> list[ValidationProblem]:
         """
-        The problem of the plan being saved to another repository's notes than the one
-        its ``default_repository`` names, if it is.
+        The problem of the plan being saved from a checkout of another repository than
+        the one its ``default_repository`` names, if it is.
         """
         default_repository = self.manifest.get(ManifestKey.DEFAULT_REPOSITORY.key)
         if (
-            self.notes_repository is None
+            self.checkout_repository is None
             or not isinstance(default_repository, str)
             or not Repository.is_full_name(default_repository)
         ):
             return []
-        if default_repository.casefold() == self.notes_repository.full_name.casefold():
+        if (
+            default_repository.casefold()
+            == self.checkout_repository.full_name.casefold()
+        ):
             return []
         return [
             PlanInAnotherRepository(
                 self.plan_id,
                 Repository.parse(default_repository),
-                self.notes_repository,
+                self.checkout_repository,
             )
         ]

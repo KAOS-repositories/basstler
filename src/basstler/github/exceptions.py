@@ -4,15 +4,14 @@ The failures of a call to the GitHub REST API.
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 from http import HTTPStatus
 
 from basstler.class_property import classproperty
-from basstler.exceptions import DataclassException
+from basstler.credential_origin import CredentialOrigin
+from basstler.exceptions import DataclassException, ExternalCallFailed
 from basstler.exit_codes import CommandFailure, StackExitCode
-from basstler.github.credential import CredentialOrigin
-from basstler.maintenance.exceptions import ExternalCallFailed
-
 
 REDIRECTION_STATUSES = range(HTTPStatus.MULTIPLE_CHOICES, HTTPStatus.BAD_REQUEST)
 """
@@ -178,3 +177,62 @@ class GitHubUnreachableError(GitHubCallFailed, ConnectionError):
 
     def suggest_correction(self) -> str:
         return "Check the network connection to GitHub, then run the command again."
+
+
+@dataclass
+class GraphQLErrorsReturned(DataclassException):
+    """
+    Raised when GitHub answers a GraphQL request with errors.
+    """
+
+    messages: tuple[str, ...]
+    """
+    Every message GitHub reported.
+    """
+
+    def error_message(self) -> str:
+        return "GitHub answered with errors: " + "; ".join(self.messages)
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that what the request names exists and that the account gh is "
+            "logged in as may read or change it: gh auth status"
+        )
+
+
+@dataclass
+class BasstlerSourceUnknown(DataclassException):
+    """
+    Raised when the installed package's metadata names no source repository.
+    """
+
+    distribution: str
+    """
+    The distribution whose metadata was read.
+    """
+
+    project_urls: tuple[str, ...]
+    """
+    Every ``Project-URL`` entry it declares.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"the {self.distribution} package's metadata names no Source among its "
+            f"project URLs ({', '.join(self.project_urls) or 'none'})"
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Reinstall {self.distribution} from its published release or repository, "
+            "whose pyproject.toml declares its Source URL"
+        )
+
+
+# %% reading an upstream pull request
+
+
+class UpstreamReadError(DataclassException, ABC):
+    """
+    Base class for every failure reading an upstream pull request.
+    """

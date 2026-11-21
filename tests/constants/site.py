@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import Enum, StrEnum
 from pathlib import Path
 
-from basstler.repository import Repository
+from basstler.github.repository import Repository
 
 from .paths import DatasetLocation
 
@@ -54,6 +54,11 @@ class SiteRepository(Enum):
     MISSING = Repository("owner", "missing")
     """
     A listed repository with no notes branch to fetch.
+    """
+
+    PROJECT = Repository("owner", "project")
+    """
+    A project repository whose notes are kept in :attr:`NOTES`.
     """
 
 

@@ -1,6 +1,6 @@
 """
-One read through the fork's Action, from the session's side: request it, wait for its
-result, replay it.
+One read through the fork's Action, from the session's side: request it on a branch of
+its own and wait for its result there; the run deletes the branch once it is abandoned.
 """
 
 from __future__ import annotations
@@ -9,19 +9,16 @@ import json
 import time
 from dataclasses import dataclass
 
+from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.client import GitHubReader
+from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.run_listing import RunListing
-from basstler.maintenance.remote_branch import RemoteBranch
 from basstler.upstream_reviews.action.branch import ActionBranch, ActionFile
 from basstler.upstream_reviews.action.exchange import (
     ActionAnswer,
     ActionRequest,
 )
-from basstler.upstream_reviews.action.recording import (
-    ActionJSONKey,
-    ActionResult,
-)
-from basstler.github.client import GitHubReader
-from basstler.github.exceptions import GitHubRequestFailed
+from basstler.upstream_reviews.action.recording import ActionJSONKey, ActionResult
 from basstler.upstream_reviews.exceptions import (
     ActionNotInstalled,
     ActionResultMissing,
@@ -38,9 +35,9 @@ class ActionRead[AnswerType: ActionAnswer]:
     One read through the fork's Action: request it, then wait for its answer.
     """
 
-    branch: RemoteBranch
+    branch: GitHubRemoteBranch
     """
-    The fork's Action branch.
+    The fork's Action branch, which every request's branch starts from.
     """
 
     request: ActionRequest
@@ -69,18 +66,33 @@ class ActionRead[AnswerType: ActionAnswer]:
     What the run answers the read with: a pull request's report unless named.
     """
 
+    @property
+    def request_branch(self) -> GitHubRemoteBranch:
+        """
+        :return: The branch carrying this request and, once its run answers, its result.
+        """
+        return GitHubRemoteBranch(
+            ActionBranch.for_request(self.request.identifier),
+            self.branch.git,
+            self.branch.remote,
+        )
+
     def send(self) -> str:
         """
-        Push the request, which starts the run.
+        Push the request on :attr:`request_branch`, which starts the run.
 
         :return: The pushed commit.
         :raises ActionNotInstalled: If the fork has no Action branch.
         """
-        if self.branch.fetch() is None:
+        installed = self.branch.fetch()
+        if installed is None:
             raise ActionNotInstalled(self.branch.remote)
-        return self.branch.write(
-            {ActionFile.REQUEST: json.dumps(self.request.as_sent(), indent=2)},
-            f"Request {self.request.kind} {self.request.identifier}",
+        return self.request_branch.create(
+            installed,
+            {ActionFile.REQUEST: self.request.as_sent()},
+            ActionBranch.request_commit_message(
+                f"Request {self.request.kind}", self.request.identifier
+            ),
         )
 
     def wait(self, timeout: float, commit: str | None = None) -> AnswerType:
@@ -109,16 +121,15 @@ class ActionRead[AnswerType: ActionAnswer]:
 
     def collect(self) -> AnswerType | None:
         """
-        :return: The result on the branch, when it answers this request; ``None`` for a
-            result answering another request, including one from a release whose results
-            named no request at all.
+        :return: The result on :attr:`request_branch` that answers this request, ``None``
+            until its run commits one. A result of another request, such as one the
+            Action branch carried when the request branch was cut from it, is not it.
         """
-        tip = self.branch.fetch()
-        text = self.branch.git.file_at(tip, ActionFile.RESULT) if tip else None
+        text = self.request_branch.read_latest(ActionFile.RESULT)
         if text is None:
             return None
         data = json.loads(text)
-        if data.get(ActionJSONKey.REQUEST_IDENTIFIER) != self.request.identifier:
+        if data[ActionJSONKey.REQUEST_IDENTIFIER] != self.request.identifier:
             return None
         return self.answer_type.from_json(data)
 
@@ -136,7 +147,7 @@ class ActionRead[AnswerType: ActionAnswer]:
         if self.runs is None or fork is None:
             return
         try:
-            listing = RunListing.read(self.runs, fork, ActionBranch.NAME)
+            listing = RunListing.read(self.runs, fork, self.request_branch.name)
         except GitHubRequestFailed:
             return
         run = listing.run_for_commit(commit)

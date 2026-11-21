@@ -42,20 +42,19 @@ from pathlib import Path
 
 from basstler.bash import Bash
 from basstler.class_property import classproperty
-from basstler.github_labels import GitHubLabel
+from basstler.git.commands import GitCommandFailed, GitCommandRunner
+from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.repository import Repository
+from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
-from basstler.maintenance.git_commands import GitCommandFailed, GitCommandRunner
 from basstler.plugin_root import PluginRoot
-from basstler.repository import Repository
 from basstler.shell_configuration import (
     FetchedBranchReference,
     ShellConfigurationFunction,
 )
-from basstler.stack.configuration import StackSetting
+from basstler.github.stack_configuration import StackSetting
 from basstler.standard_streams import StandardStreamHandler
-from basstler.maintenance.remote_branch import RemoteBranch
-from basstler.upstream_reviews.action.branch import ActionInstallation
-from basstler.upstream_reviews.action.branch import ActionBranch
+from basstler.upstream_reviews.action.branch import ActionBranch, ActionInstallation
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -154,7 +153,7 @@ def git_value(project_root: Path, *arguments: str) -> str | None:
         ["git", *arguments],
         cwd=project_root,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
     if completed.returncode != 0:
         return None
@@ -260,7 +259,7 @@ class PersonalNotesSetting(PersonalNotesSettingSpecification, Enum):
     PATH = PersonalNotesSettingSpecification(
         git_config_key="claude.personalNotesPath",
         environment_variable="CLAUDE_PERSONAL_NOTES_PATH",
-        default=str(ProjectLocation.PERSONAL_NOTES_DOCUMENT),
+        default=ProjectLocation.PERSONAL_NOTES_DOCUMENT.as_posix(),
     )
     """
     Where on that branch the notes file sits.
@@ -661,7 +660,7 @@ class PersonalUpstream:
             ],
             cwd=project_root,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
         )
         return shown.stdout if shown.returncode == 0 else ""
 
@@ -674,7 +673,9 @@ class PersonalUpstream:
         """
         with tempfile.TemporaryDirectory() as scratch_directory:
             scratch_file = Path(scratch_directory) / "stack.toml"
-            scratch_file.write_text(self.written_over(self.existing(project_root)))
+            scratch_file.write_text(
+                self.written_over(self.existing(project_root)), encoding="utf-8"
+            )
             written = subprocess.run(
                 Bash.locate(os.environ).command(
                     PluginRoot.locate(os.environ).path_of(
@@ -689,7 +690,7 @@ class PersonalUpstream:
                 ),
                 cwd=project_root,
                 capture_output=True,
-                text=True,
+                encoding="utf-8",
             )
         if written.returncode != 0:
             raise PersonalNotesWriteRefusedError(
@@ -788,7 +789,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if arguments.command == SetupCommand.INSTALL_UPSTREAM_REVIEWS_ACTION:
         remote = PersonalNotesSetting.REMOTE.resolve(project_root, os.environ)
-        branch = RemoteBranch(ActionBranch.NAME, GitCommandRunner(project_root), remote)
+        branch = GitHubRemoteBranch(
+            ActionBranch.NAME, GitCommandRunner(project_root), remote
+        )
         try:
             changed = ActionInstallation(arguments.branch_or_tag).install(branch)
         except GitCommandFailed as failure:

@@ -13,7 +13,14 @@ from pathlib import Path
 
 from basstler.environment import GitHubCredentialVariable
 from basstler.github.pull_request import NewPullRequest
-from basstler.maintenance.board import PullRequestField
+from basstler.github.pull_request_record import (
+    PullRequestField,
+)
+from basstler.github.repository import (
+    GitHubAddress,
+    PullRequestReference,
+    RepositoryBranch,
+)
 from basstler.plan.item_bootstrap.documents import PlanDocuments, ProjectCheckout
 from basstler.plan.item_bootstrap.exceptions import (
     BranchAlreadyPublishedError,
@@ -26,7 +33,6 @@ from basstler.plan.model import (
     ItemStatus,
     ManifestKey,
 )
-from basstler.repository import GitHubAddress, PullRequestReference
 
 # %% opening the work
 
@@ -64,7 +70,7 @@ class GitHubPullRequestOpener(PullRequestOpener):
 
     def open_pull_request(self, pull_request: NewPullRequest) -> PullRequestReference:
         http_request = urllib.request.Request(
-            f"{self.api_root}/{pull_request.repository.pull_requests_path}",
+            f"{self.api_root}/{pull_request.path}",
             data=json.dumps(pull_request.to_json()).encode(),
             method="POST",
             headers={
@@ -81,7 +87,7 @@ class GitHubPullRequestOpener(PullRequestOpener):
                 detail=f"{error.code} {error.read().decode(errors='replace').strip()}"
             ) from error
         return PullRequestReference(
-            pull_request.repository, created[PullRequestField.NUMBER.key]
+            pull_request.base.repository, created[PullRequestField.NUMBER.key]
         )
 
     @staticmethod
@@ -236,11 +242,10 @@ class WorkOpener:
             if request.pull_request_number is not None
             else opener.open_pull_request(
                 NewPullRequest(
-                    repository=repository,
+                    base=RepositoryBranch(request.base_branch, repository),
+                    head=RepositoryBranch(request.branch, repository),
                     title=request.pull_request_title,
                     body=request.pull_request_body,
-                    head=request.branch,
-                    base=request.base_branch,
                 )
             )
         )

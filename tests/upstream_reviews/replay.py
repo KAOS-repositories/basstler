@@ -14,14 +14,14 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from basstler.repository import Repository
 from basstler.github.client import GitHubAttemptReader, GitHubReader, GitHubResponse
+from basstler.github.pull_request_models import (
+    ReviewThreadsPageResult,
+)
+from basstler.github.repository import Repository
 from basstler.upstream_reviews.clients import (
     GraphQLClient,
     JobLogReader,
-)
-from basstler.upstream_reviews.pull_request_models import (
-    ReviewThreadsPageResult,
 )
 
 from ..constants.paths import DatasetLocation
@@ -46,7 +46,9 @@ class RecordedResponse(StrEnum):
 
     def load(self) -> dict[str, Any]:
         """:return: The recorded ``data`` object this response holds."""
-        return json.loads((RECORDED_RESPONSE_DIRECTORY / f"{self}.json").read_text())
+        return json.loads(
+            (RECORDED_RESPONSE_DIRECTORY / f"{self}.json").read_text(encoding="utf-8")
+        )
 
     def recorded(self) -> ReviewThreadsPageResult:
         """
@@ -118,7 +120,7 @@ class RecordedJobLog(StrEnum):
 
     def load(self) -> str:
         """:return: The recorded log, exactly as recorded."""
-        return (RECORDED_RESPONSE_DIRECTORY / f"{self}.log").read_text()
+        return (RECORDED_RESPONSE_DIRECTORY / f"{self}.log").read_text(encoding="utf-8")
 
 
 @dataclass(frozen=True)
@@ -198,7 +200,9 @@ class RecordedRestResponse(StrEnum):
 
     def load(self) -> Any:
         """:return: The recorded response."""
-        return json.loads((REST_RESPONSE_DIRECTORY / f"{self}.json").read_text())
+        return json.loads(
+            (REST_RESPONSE_DIRECTORY / f"{self}.json").read_text(encoding="utf-8")
+        )
 
 
 @dataclass

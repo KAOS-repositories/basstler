@@ -7,42 +7,48 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+import yaml
 
-from basstler.exceptions import (
+from basstler.plan.exceptions import (
     DependencyCycle,
     DuplicateItemId,
     InvalidBlockers,
     InvalidDependsOn,
+    InvalidLandedItemCount,
     InvalidManifestRoot,
     InvalidSchemaVersion,
     MalformedDependencyReference,
     MissingPlanDirectory,
+    MissingRecommendedModel,
     PlanInAnotherRepository,
     PlanValidationError,
     SelfPlanReference,
+    SharedBranch,
     UnknownDependency,
     UnknownDependencyPlan,
+    UnknownRecommendedModel,
     UnknownStatus,
     UnknownTrack,
     UnknownWave,
 )
+from basstler.github.repository import Repository
 from basstler.plan.dependencies import (
     DependencyReference,
     PlanDirectory,
 )
-from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.validation import PlanValidator
-from basstler.repository import Repository
 
 from ..constants.paths import DatasetLocation
 from ..fixture_plans import (
+    PLAN_UNDER_TEST_ID,
     FixturePlanId,
     ForeignItemId,
-    PLAN_UNDER_TEST_ID,
+    fixture_item,
     foreign_reference,
 )
 from ..manifest_builders import manifest_item, minimal_plan
-
 
 # %% plan validation
 
@@ -56,6 +62,19 @@ def test_validation_rejects_wrong_schema_version():
         PlanValidator(minimal_plan(schema_version=2)).validate()
     assert isinstance(error.value.problems[0], InvalidSchemaVersion)
     assert error.value.problems[0].actual_value == 2
+
+
+@pytest.mark.parametrize("landed_item_count", [-1, "two", True, 1.5])
+def test_validation_rejects_a_landed_item_count_that_is_not_a_whole_number(
+    landed_item_count,
+):
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(minimal_plan(landed_item_count=landed_item_count)).validate()
+    assert error.value.problems == [InvalidLandedItemCount(landed_item_count)]
+
+
+def test_validation_accepts_a_landed_item_count():
+    PlanValidator(minimal_plan(landed_item_count=2)).validate()  # must not raise
 
 
 def test_validation_rejects_duplicate_item_ids():
@@ -127,6 +146,58 @@ def test_validation_rejects_unknown_status():
     assert any(isinstance(problem, UnknownStatus) for problem in error.value.problems)
 
 
+def test_validation_rejects_a_recommended_model_that_is_no_alias():
+    items = [manifest_item("a", recommended_model="claude-opus-5")]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(minimal_plan(items=items)).validate()
+    assert any(
+        isinstance(problem, UnknownRecommendedModel) for problem in error.value.problems
+    )
+
+
+def test_validation_accepts_an_item_with_no_recommended_model():
+    items = [manifest_item("a", recommended_model=None)]
+    PlanValidator(minimal_plan(items=items)).validate()
+
+
+def test_a_save_requires_a_recommended_model_on_an_item_the_saved_plan_lacks():
+    items = [
+        manifest_item("old", recommended_model=None),
+        manifest_item("new", recommended_model=None),
+    ]
+    validator = PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset({"old"})
+    )
+    assert validator.problems == [MissingRecommendedModel(item_identifier="new")]
+
+
+def test_a_save_of_a_plan_not_saved_before_requires_a_model_on_every_item():
+    items = [
+        manifest_item("a", recommended_model=None),
+        manifest_item("b", recommended_model=None),
+    ]
+    validator = PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset()
+    )
+    assert validator.problems == [
+        MissingRecommendedModel(item_identifier="a"),
+        MissingRecommendedModel(item_identifier="b"),
+    ]
+
+
+def test_a_save_accepts_a_new_item_that_has_a_recommended_model():
+    items = [manifest_item("new", recommended_model=ModelAlias.OPUS)]
+    PlanValidator(
+        minimal_plan(items=items), saved_item_identifiers=frozenset()
+    ).validate()
+
+
+@pytest.mark.parametrize("recommended_model", list(ModelAlias))
+def test_validation_accepts_every_alias(recommended_model):
+    items = [manifest_item("a", recommended_model=recommended_model)]
+    PlanValidator(minimal_plan(items=items)).validate()
+
+
 @pytest.mark.parametrize("status", ["in_progress", ItemStatus.IN_PROGRESS.value])
 def test_validation_accepts_a_status_in_either_spelling(status):
     """
@@ -134,7 +205,14 @@ def test_validation_accepts_a_status_in_either_spelling(status):
     spaces, and stays readable beside the current one.
     """
     items = [
-        {"id": "a", "title": "A", "branch": "a", "track": "track-1", "status": status}
+        {
+            "id": "a",
+            "title": "A",
+            "branch": "a",
+            "track": "track-1",
+            "status": status,
+            "recommended_model": ModelAlias.SONNET.value,
+        }
     ]
     PlanValidator(minimal_plan(items=items)).validate()
 
@@ -326,32 +404,79 @@ def test_validation_rejects_a_cycle_that_runs_through_another_plan():
     assert error.value.problems == [DependencyCycle(["a", reference, "a"])]
 
 
-# %% the repository whose notes hold the plan
+# %% the repository whose checkout saves the plan
 
 
-def test_validation_rejects_a_plan_saved_to_another_repositorys_notes():
+def test_validation_rejects_a_plan_saved_from_another_repositorys_checkout():
     """
-    A plan lives in the notes of the repository its work is for.
+    A plan is saved only from a checkout of the repository its work is for.
     """
     plan = minimal_plan()
-    notes_repository = Repository("another-owner", "another-repository")
+    checkout_repository = Repository("another-owner", "another-repository")
     with pytest.raises(PlanValidationError) as error:
-        PlanValidator(plan, notes_repository=notes_repository).validate()
+        PlanValidator(plan, checkout_repository=checkout_repository).validate()
     assert error.value.problems == [
         PlanInAnotherRepository(
             PLAN_UNDER_TEST_ID,
             Repository.parse(plan[ManifestKey.DEFAULT_REPOSITORY.key]),
-            notes_repository,
+            checkout_repository,
         )
     ]
 
 
-def test_validation_accepts_a_plan_saved_to_its_own_repository_in_any_letter_case():
+def test_validation_accepts_a_plan_saved_from_its_own_repository_in_any_letter_case():
     """
     GitHub resolves a repository's name in any letter case.
     """
     plan = minimal_plan()
-    notes_repository = Repository.parse(
+    checkout_repository = Repository.parse(
         plan[ManifestKey.DEFAULT_REPOSITORY.key].upper()
     )
-    PlanValidator(plan, notes_repository=notes_repository).validate()
+    PlanValidator(plan, checkout_repository=checkout_repository).validate()
+
+
+# %% one item per branch
+
+
+def test_validation_rejects_two_items_of_one_plan_naming_one_branch():
+    items = [
+        manifest_item("a", branch="shared"),
+        manifest_item("b", branch="shared"),
+    ]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(
+            minimal_plan(items=items), PlanDirectory(DatasetLocation.PLANS)
+        ).validate()
+    assert error.value.problems == [SharedBranch("shared", ["a", "b"])]
+
+
+def test_validation_rejects_a_branch_an_item_of_another_plan_names():
+    foreign_item = fixture_item(FixturePlanId.OTHER, ForeignItemId.NOT_STARTED)
+    branch = foreign_item[ManifestKey.BRANCH.key]
+    items = [manifest_item("a", branch=branch)]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(
+            minimal_plan(items=items), PlanDirectory(DatasetLocation.PLANS)
+        ).validate()
+    assert error.value.problems == [
+        SharedBranch(branch, ["a", foreign_reference(ForeignItemId.NOT_STARTED)])
+    ]
+
+
+def test_validation_accepts_a_branch_the_saved_copy_of_the_same_plan_names(tmp_path):
+    """
+    A save validates against the notes branch, which still holds the plan as it was.
+    """
+    plan = minimal_plan()
+    saved_copy = tmp_path / PLAN_UNDER_TEST_ID / PlanDocument.MANIFEST
+    saved_copy.parent.mkdir()
+    saved_copy.write_text(yaml.safe_dump(plan), encoding="utf-8")
+    PlanValidator(plan, PlanDirectory(tmp_path)).validate()
+
+
+def test_a_sibling_plan_that_is_no_mapping_does_not_stop_the_branch_check(tmp_path):
+    sibling = tmp_path / FixturePlanId.ABSENT / PlanDocument.MANIFEST
+    sibling.parent.mkdir()
+    sibling.write_text("- not a plan\n", encoding="utf-8")
+
+    PlanValidator(minimal_plan(), PlanDirectory(tmp_path)).validate()

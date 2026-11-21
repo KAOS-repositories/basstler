@@ -24,6 +24,11 @@ class CodeRulesCommand(StrEnum):
     Report the code that breaks a rule a checker enforces.
     """
 
+    NEW_CROSSINGS = "new-crossings"
+    """
+    Report the boundary crossings a base commit does not have.
+    """
+
     AGENTS_MD = "agents-md"
     """
     Generate the repository's ``AGENTS.md`` from its rules.

@@ -1,0 +1,31 @@
+schema_version: 1
+id: upstream-work
+title: Upstream work
+description: The layers other work builds on.
+default_repository: owner/repo
+tracking_issue: 7
+waves:
+- id: wave-1
+  name: Wave 1
+tracks:
+- id: track-1
+  name: Track 1
+  wave: wave-1
+items:
+- id: base-layer
+  title: Land the base layer
+  branch: layer/base
+  pull_request_number: 11
+  track: track-1
+  depends_on: []
+  status: in_progress
+  recommended_model: sonnet
+  session: https://claude.ai/code/session_handover_fixture
+  notes: Stands on main alone.
+- id: top-layer
+  title: Land the top layer
+  track: track-1
+  depends_on:
+  - base-layer
+  status: not_started
+  recommended_model: haiku

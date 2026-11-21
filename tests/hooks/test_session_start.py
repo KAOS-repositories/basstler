@@ -13,32 +13,47 @@ personal-notes remote - no network access or real personal-notes branch involved
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
 from collections.abc import Mapping
 from enum import StrEnum
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
 
+from basstler.directory_tree import DirectoryTree
+from basstler.bash import Bash
 from basstler.document_references import CitedNames, ShippedModules
+from basstler.github.release_version import ReleaseVersion
 from basstler.locations import (
     BasstlerVariable,
+    PackageLocation,
     PluginLocation,
     ProjectLocation,
     WorkflowLocation,
 )
-from basstler.repository import Repository
+from basstler.personal_notes import access
+from basstler.plan.merged_items import __main__ as merged_items_command
+from basstler.plan.merged_items.every_plan import (
+    MergedItemsCommand,
+    MergedItemsSummary,
+)
+from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan_site import merge_workflow_refresh
+from basstler.plan_site.hub import SiteAddress
 from basstler.setup.report import CheckStatus, SetupCheck
 from basstler.shell_configuration import ShellConfigurationFunction
 from basstler.upstream_reviews.action.branch import InstallationState
-from basstler.plan.model import PlanDocument
-from basstler.plan.model import ItemStatus, ManifestKey, PlanManifest
 
+from ..bash_path import BashPath
 from ..constants.environment import (
     ConfigurationVariable,
     FileMode,
+    MergeWorkflowRefreshStubVariable,
+    PullRequestStubVariable,
     ScrubbedEnvironmentPrefix,
     SearchPathVariable,
 )
@@ -48,8 +63,13 @@ from ..constants.paths import (
     PersonalNotesPath,
     RepositoryLocation,
 )
+from ..constants.site import SiteRepository
+from ..executable_stubs import (
+    NEEDS_VERSIONED_INTERPRETER_NAME,
+    ExecutableStubDirectory,
+    path_hiding_executables,
+)
 from ..plan_dataset import LandedItemsPlan
-from ..executable_stubs import ExecutableStubDirectory, path_hiding_executables
 from ..plugin_manifest import PluginManifest
 from ..project_declaration import ProjectDeclaration
 from ..scratch_repository import (
@@ -152,11 +172,11 @@ class PackageManager(StrEnum):
     """
 
 
-PLAN_MANIFEST = (DatasetLocation.DIRECTORY / "plan.yaml").read_text()
+PLAN_MANIFEST = (DatasetLocation.DIRECTORY / "plan.yaml").read_text(encoding="utf-8")
 
 PLAN_MANIFEST_WITH_TRACKING_ISSUE = (
     DatasetLocation.DIRECTORY / "plan-with-tracking-issue.yaml"
-).read_text()
+).read_text(encoding="utf-8")
 
 TRACKING_ISSUE = "55"
 
@@ -188,7 +208,8 @@ def session_start_repository(
 ) -> ScratchRepository:
     """
     A scratch repository carrying the real session-start.sh and everything else a set up
-    clone has, with nothing published to the notes remote yet.
+    clone has, with nothing published to the notes remote yet, and a stand-in for
+    :mod:`basstler.plan.merged_items`'s command that finds no pull request merged.
 
     :param scratch_repository: The initialized scratch repository and notes remote.
     :return: The same repository, ready to publish a notes branch and run the hook.
@@ -199,8 +220,15 @@ def session_start_repository(
         PluginLocation.SESSION_START_SCRIPT.name,
         PluginLocation.SESSION_RULES.name,
         PluginLocation.SETUP_CHECK_SCRIPT.name,
+        PluginLocation.PLAN_SAVING_SCRIPT.name,
     )
     scratch_repository.install_package()
+    scratch_repository.replace_package_module(
+        merged_items_command, DatasetLocation.MERGED_ITEMS_STUB
+    )
+    scratch_repository.replace_package_module(
+        merge_workflow_refresh, DatasetLocation.MERGE_WORKFLOW_REFRESH_STUB
+    )
     scratch_repository.install_package_environment()
     scratch_repository.write_setup_prerequisites()
     scratch_repository.commit_everything("initial commit")
@@ -246,7 +274,7 @@ def publish_and_run(
     repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
-            PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
             **(notes_branch_files or {}),
         }
     )
@@ -266,9 +294,9 @@ def test_runs_in_a_project_with_no_claude_code_directory(
     session_start_repository.publish_notes_branch(
         {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n"}
     )
-    shutil.rmtree(
+    DirectoryTree(
         session_start_repository.project_root / ProjectLocation.CLAUDE_CODE_DIRECTORY
-    )
+    ).remove()
 
     result = run_session_start(session_start_repository)
 
@@ -292,11 +320,10 @@ def test_every_session_loads_the_session_rules(
     assert result.returncode == 0, result.stderr
     claude_local = (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
-    ).read_text()
-    assert (
-        ClaudeLocalSection.SESSION_RULES.within(claude_local)
-        == (RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name).read_text()
-    )
+    ).read_text(encoding="utf-8")
+    assert ClaudeLocalSection.SESSION_RULES.within(claude_local) == (
+        RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name
+    ).read_text(encoding="utf-8")
 
 
 def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
@@ -306,17 +333,16 @@ def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
     The session rules do not depend on the user having written any notes.
     """
     session_start_repository.publish_notes_branch(
-        {PersonalNotesPath.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
+        {ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
     )
     result = run_session_start(session_start_repository)
     assert result.returncode == 0, result.stderr
     claude_local = (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
-    ).read_text()
-    assert (
-        ClaudeLocalSection.SESSION_RULES.within(claude_local)
-        == (RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name).read_text()
-    )
+    ).read_text(encoding="utf-8")
+    assert ClaudeLocalSection.SESSION_RULES.within(claude_local) == (
+        RepositoryLocation.HOOKS / PluginLocation.SESSION_RULES.name
+    ).read_text(encoding="utf-8")
 
 
 # %% the names the personal notes cite
@@ -340,7 +366,7 @@ def test_every_name_the_notes_cite_that_is_no_longer_shipped_is_listed(
     Notes outlive the release they were written against, so a session is told up front
     which of their commands would fail, and what replaced each.
     """
-    notes = DatasetLocation.NOTES_CITING_RETIRED_NAMES.read_text()
+    notes = DatasetLocation.NOTES_CITING_RETIRED_NAMES.read_text(encoding="utf-8")
     stale = CitedNames.in_text(notes).stale(ShippedModules.installed())
 
     result = publish_and_run(
@@ -370,6 +396,63 @@ def test_reports_nothing_when_no_notes_branch_exists(
     assert not (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
     ).exists()
+
+
+# %% a notes repository the session cannot reach
+
+
+@pytest.fixture
+def unreachable_notes_repository(
+    session_start_repository: ScratchRepository,
+) -> ScratchRepository:
+    """
+    The scratch repository, with the access check reporting its notes repository as one
+    this session cannot reach.
+
+    :param session_start_repository: The scratch repository and notes remote.
+    :return: The same repository.
+    """
+    session_start_repository.replace_package_module(
+        access, DatasetLocation.NOTES_ACCESS_STUB
+    )
+    return session_start_repository
+
+
+def test_a_notes_repository_it_cannot_reach_is_reported_under_the_notes_line(
+    unreachable_notes_repository: ScratchRepository,
+):
+    result = publish_and_run(unreachable_notes_repository)
+
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.splitlines()
+    notes_line = lines.index(
+        next(
+            line
+            for line in lines
+            if line.startswith(f"  {SummaryLine.PERSONAL_NOTES}:")
+        )
+    )
+    assert lines[notes_line + 1] == f"    {access.__name__}"
+
+
+def test_a_notes_branch_it_cannot_fetch_from_an_unreachable_repository_is_reported(
+    unreachable_notes_repository: ScratchRepository,
+):
+    """
+    A notes branch that could not be fetched because its repository is not attached is
+    said, instead of the session starting with no word about its notes.
+    """
+    unreachable_notes_repository.run_git(
+        "checkout", "--quiet", "-b", ScratchBranch.WORK
+    )
+
+    result = run_session_start(unreachable_notes_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PERSONAL_NOTES) == summary_message(
+        SummaryMessage.NOTES_NOT_REACHED
+    )
+    assert f"    {access.__name__}" in result.stdout.splitlines()
 
 
 # %% the plan line
@@ -462,8 +545,80 @@ def test_reports_a_tracked_branch_whose_manifest_is_missing(
     assert summary_value(result.stdout, SummaryLine.PLAN) == summary_message(
         SummaryMessage.PLAN_MANIFEST_MISSING,
         PLAN_IDENTIFIER,
-        str(MANIFEST_PATH),
+        MANIFEST_PATH.as_posix(),
         ScratchBranch.PERSONAL_NOTES,
+    )
+
+
+# %% the recommended models line
+
+
+def test_reports_recommended_models_as_not_applicable_when_no_plan_tracks_the_branch(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(SummaryMessage.RECOMMENDED_MODELS_NOT_APPLICABLE)
+
+
+def without_recommended_model(
+    manifest: PlanManifest, item_identifier: str
+) -> PlanManifest:
+    """
+    :return: *manifest* with the named item's ``recommended_model`` removed.
+    """
+    items = [
+        (
+            {
+                key: value
+                for key, value in item.content.items()
+                if key != ManifestKey.RECOMMENDED_MODEL.key
+            }
+            if item.identifier == item_identifier
+            else item.content
+        )
+        for item in manifest.items
+    ]
+    return PlanManifest({**manifest.content, ManifestKey.ITEMS.key: items})
+
+
+def test_reports_every_item_of_the_tracked_plan_as_having_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    result = publish_tracked_plan_and_run(
+        session_start_repository, tracked_plan.manifest, tmp_path
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_ALL_SET, tracked_plan.manifest.identifier
+    )
+
+
+def test_names_the_items_of_the_tracked_plan_without_a_recommended_model(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    queued_item = tracked_plan.item_with_status(ItemStatus.NOT_STARTED)
+    manifest = without_recommended_model(tracked_plan.manifest, queued_item.identifier)
+
+    result = publish_tracked_plan_and_run(session_start_repository, manifest, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.RECOMMENDED_MODELS
+    ) == summary_message(
+        SummaryMessage.RECOMMENDED_MODELS_UNSET,
+        manifest.identifier,
+        queued_item.identifier,
     )
 
 
@@ -490,6 +645,40 @@ def tracked_plan() -> LandedItemsPlan:
     )
 
 
+def publish_tracked_plan_and_run(
+    repository: ScratchRepository,
+    manifest: PlanManifest,
+    scratch_directory: Path,
+    environment: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """
+    Publish *manifest* as the plan tracking the work branch and run session-start.sh.
+
+    :param scratch_directory: Where the manifest is written before it is published.
+    :param environment: Variables to set for the hook's run.
+    :return: The finished session-start.sh process.
+    """
+    manifest_path = scratch_directory / PlanDocument.MANIFEST
+    manifest.write(manifest_path)
+    plan_directory = ProjectLocation.PLANS / manifest.identifier
+    return publish_and_run(
+        repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: manifest.identifier}
+            ),
+            plan_directory / PlanDocument.MANIFEST: manifest_path.read_text(
+                encoding="utf-8"
+            ),
+            plan_directory
+            / PlanDocument.ROADMAP: DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(
+                encoding="utf-8"
+            ),
+        },
+        environment,
+    )
+
+
 def run_on_tracked_branch(
     repository: ScratchRepository, manifest: PlanManifest, scratch_directory: Path
 ) -> str:
@@ -499,22 +688,19 @@ def run_on_tracked_branch(
 
     :param scratch_directory: Where the manifest is written before it is published.
     """
-    manifest_path = scratch_directory / PlanDocument.MANIFEST
-    manifest.write(manifest_path)
-    plan_directory = ProjectLocation.PLANS / manifest.identifier
-    result = publish_and_run(
-        repository,
-        {
-            PersonalNotesPath.BRANCH_INDEX: branch_index(
-                {ScratchBranch.WORK: manifest.identifier}
-            ),
-            plan_directory / PlanDocument.MANIFEST: manifest_path.read_text(),
-            plan_directory
-            / PlanDocument.ROADMAP: DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(),
-        },
-    )
+    result = publish_tracked_plan_and_run(repository, manifest, scratch_directory)
     assert result.returncode == 0, result.stderr
-    return (repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS).read_text()
+    return (repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS).read_text(
+        encoding="utf-8"
+    )
+
+
+def published_manifest(repository: ScratchRepository, plan_identifier: str) -> Path:
+    """
+    :return: The plan's manifest in a fresh clone of the notes branch.
+    """
+    checkout = repository.clone_notes_branch(repository.project_root.parent / "verify")
+    return checkout / ProjectLocation.PLANS / plan_identifier / PlanDocument.MANIFEST
 
 
 def test_a_tracked_branch_loads_only_its_own_item(
@@ -541,10 +727,186 @@ def test_a_tracked_branch_loads_the_plan_s_standing_rules(
     claude_local = run_on_tracked_branch(
         session_start_repository, tracked_plan.manifest, tmp_path
     )
-    assert DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text() in claude_local
+    assert (
+        DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(encoding="utf-8")
+        in claude_local
+    )
 
 
 # %% branches no plan item can ever track
+
+
+# %% every plan's merged items
+
+
+def dropped_items_of(manifest: PlanManifest, *statuses: ItemStatus) -> list[str]:
+    """
+    :param manifest: A plan.
+    :param statuses: The statuses of the items dropped from it.
+    :return: Those items as the merged items line names them.
+    """
+    return sorted(
+        f"{manifest.identifier}/{item.identifier}"
+        for item in manifest.items
+        if item.status in statuses
+    )
+
+
+def test_a_merged_item_of_the_loaded_plan_is_recorded_done_and_dropped(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    """
+    The plan tracking the branch is saved without the item whose pull request merged.
+    """
+    in_progress = tracked_plan.item_with_status(ItemStatus.IN_PROGRESS)
+
+    result = publish_tracked_plan_and_run(
+        session_start_repository,
+        tracked_plan.manifest,
+        tmp_path,
+        {
+            PullRequestStubVariable.RECORDING: str(
+                DatasetLocation.IN_PROGRESS_ITEM_MERGED
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        summary_value(result.stdout, SummaryLine.MERGED_ITEMS)
+        == MergedItemsSummary(
+            dropped_items=dropped_items_of(
+                tracked_plan.manifest, ItemStatus.DONE, ItemStatus.IN_PROGRESS
+            )
+        ).line
+    )
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, tracked_plan.manifest.identifier)
+    )
+    assert (
+        saved
+        == tracked_plan.manifest.with_items_done(
+            {in_progress.identifier}
+        ).without_landed_items()
+    )
+
+
+def test_a_merged_item_of_a_plan_no_branch_here_tracks_is_recorded_done_and_dropped(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    """
+    Every plan on the notes branch is recorded, not only the one tracking this branch.
+    """
+    in_progress = tracked_plan.item_with_status(ItemStatus.IN_PROGRESS)
+    manifest_path = tmp_path / PlanDocument.MANIFEST
+    tracked_plan.manifest.write(manifest_path)
+    plan_directory = ProjectLocation.PLANS / tracked_plan.manifest.identifier
+
+    result = publish_and_run(
+        session_start_repository,
+        {
+            plan_directory / PlanDocument.MANIFEST: manifest_path.read_text(
+                encoding="utf-8"
+            ),
+            plan_directory
+            / PlanDocument.ROADMAP: DatasetLocation.ROADMAP_OF_STANDING_RULES.read_text(
+                encoding="utf-8"
+            ),
+        },
+        {
+            PullRequestStubVariable.RECORDING: str(
+                DatasetLocation.IN_PROGRESS_ITEM_MERGED
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, tracked_plan.manifest.identifier)
+    )
+    assert (
+        saved
+        == tracked_plan.manifest.with_items_done(
+            {in_progress.identifier}
+        ).without_landed_items()
+    )
+
+
+def test_plans_with_nothing_landed_are_left_as_they_were(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    unlanded = PlanManifest(
+        {
+            **tracked_plan.manifest.content,
+            ManifestKey.ITEMS.key: [
+                item.content
+                for item in tracked_plan.manifest.items
+                if item.status is not ItemStatus.DONE
+            ],
+        }
+    )
+
+    result = publish_tracked_plan_and_run(session_start_repository, unlanded, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        summary_value(result.stdout, SummaryLine.MERGED_ITEMS)
+        == MergedItemsSummary().line
+    )
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, unlanded.identifier)
+    )
+    assert saved == unlanded
+
+
+def test_unread_pull_requests_are_reported_and_leave_the_plan_as_it_was(
+    session_start_repository: ScratchRepository,
+    tracked_plan: LandedItemsPlan,
+    tmp_path: Path,
+):
+    """
+    Pull requests that cannot be read are reported as not checked.
+    """
+    result = publish_tracked_plan_and_run(
+        session_start_repository,
+        tracked_plan.manifest,
+        tmp_path,
+        {PullRequestStubVariable.RECORDING: str(tmp_path / "no-recording.json")},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.MERGED_ITEMS) == summary_message(
+        SummaryMessage.MERGED_ITEMS_NOT_CHECKED
+    )
+    saved = PlanManifest.from_file(
+        published_manifest(session_start_repository, tracked_plan.manifest.identifier)
+    )
+    assert saved == tracked_plan.manifest
+
+
+def test_the_every_plan_subcommand_matches_the_shell_configuration(
+    session_start_repository: ScratchRepository,
+):
+    assert session_start_repository.configuration_value(
+        "PLAN_MERGED_ITEMS_EVERY_PLAN_COMMAND"
+    ) == str(MergedItemsCommand.EVERY_PLAN)
+
+
+def test_reports_merged_items_as_not_applicable_when_the_notes_hold_no_plans(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.MERGED_ITEMS) == summary_message(
+        SummaryMessage.MERGED_ITEMS_NO_PLANS
+    )
 
 
 def test_reports_plan_as_not_applicable_on_the_default_branch(
@@ -693,7 +1055,7 @@ def environment_directory(repository: ScratchRepository) -> str:
     :param repository: The fixture-built scratch repository.
     :return: The package's own environment, as the summary line names it.
     """
-    return repository.configuration_value(ConfigurationVariable.ENVIRONMENT_DIRECTORY)
+    return repository.configuration_value(BasstlerVariable.ENVIRONMENT_DIRECTORY)
 
 
 def package_source(repository: ScratchRepository) -> str:
@@ -735,17 +1097,16 @@ def require_the_uninstallable(repository: ScratchRepository) -> None:
             name=ProjectDeclaration.of_this_package().name,
             dependencies=(UNINSTALLABLE_REQUIREMENT,),
         ).as_toml(),
+        encoding="utf-8",
     )
 
 
-def environment_interpreter(repository: ScratchRepository) -> Path:
+def environment_interpreter(repository: ScratchRepository) -> str:
     """
     :param repository: The fixture-built scratch repository.
-    :return: Where the package environment keeps its interpreter.
+    :return: Where the package environment keeps its interpreter, as the shell names it.
     """
-    return Path(
-        repository.configuration_value(ConfigurationVariable.ENVIRONMENT_INTERPRETER)
-    )
+    return repository.configuration_value(ConfigurationVariable.ENVIRONMENT_INTERPRETER)
 
 
 def pip_installer_call(repository: ScratchRepository) -> str:
@@ -842,7 +1203,7 @@ def test_installs_the_package_with_pip_when_a_requirement_is_missing(
         UNINSTALLABLE_REQUIREMENT,
         environment_directory(session_start_repository),
     )
-    assert call_log.read_text().splitlines() == [
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
         pip_installer_call(session_start_repository)
     ]
 
@@ -877,7 +1238,7 @@ def test_marks_the_install_in_progress_only_while_it_runs(
     )
 
     assert result.returncode == 0, result.stderr
-    assert marker_during_install.read_text().strip().isdigit()
+    assert marker_during_install.read_text(encoding="utf-8").strip().isdigit()
     assert not marker.exists()
 
 
@@ -911,7 +1272,7 @@ def test_installs_the_package_with_uv_where_there_is_one(
         UNINSTALLABLE_REQUIREMENT,
         environment_directory(session_start_repository),
     )
-    assert install_log.read_text().splitlines() == [
+    assert install_log.read_text(encoding="utf-8").splitlines() == [
         uv_installer_call(session_start_repository)
     ]
     assert not pip_log.exists()
@@ -966,7 +1327,9 @@ def test_reports_that_it_could_not_check_when_the_declaration_will_not_parse(
     with nothing missing - which is what an empty answer means, and would install
     nothing while saying everything was already there.
     """
-    declaration_file(session_start_repository).write_text("this is not toml\n")
+    declaration_file(session_start_repository).write_text(
+        "this is not toml\n", encoding="utf-8"
+    )
 
     result = publish_and_run(session_start_repository)
 
@@ -1017,7 +1380,7 @@ def test_reinstalls_the_package_when_the_plugin_names_another_source(
         session_start_repository.configuration_value(
             ConfigurationVariable.INSTALLED_SOURCE_FILE
         )
-    ).write_text("an earlier release\n")
+    ).write_text("an earlier release\n", encoding="utf-8")
     stub_bin.install(PackageManager.PIP)
     call_log = tmp_path / "pip-calls"
 
@@ -1037,7 +1400,7 @@ def test_reinstalls_the_package_when_the_plugin_names_another_source(
         package_source(session_start_repository),
         environment_directory(session_start_repository),
     )
-    assert call_log.read_text().splitlines() == [
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
         pip_installer_call(session_start_repository)
     ]
 
@@ -1049,7 +1412,7 @@ class SampleReleaseTag(StrEnum):
 
     OLDER = "v0.2.0"
     """
-    A release whose minor part sorts after :attr:`LATEST`'s as text, not as a number.
+    A release before :attr:`LATEST`, whose minor part sorts after its as text.
     """
 
     LATEST = "v0.10.0"
@@ -1067,6 +1430,11 @@ class SampleReleaseTag(StrEnum):
     A tag that names no version.
     """
 
+    @property
+    def version(self) -> str:
+        """:return: The version a released plugin's manifest names for this tag."""
+        return self.removeprefix(ReleaseVersion.tag_prefix)
+
 
 class BasstlerBranch(StrEnum):
     """
@@ -1075,90 +1443,156 @@ class BasstlerBranch(StrEnum):
 
     MAIN = "main"
     """
-    The default branch, which a workflow runs before any release is recorded.
+    The default branch, whose workflows a checkout runs.
     """
-
-
-def record_latest_release(repository: ScratchRepository, url: str) -> str:
-    """
-    Record the latest release of *url* as a session start does, then read the package
-    source back.
-
-    :param repository: The fixture-built scratch repository.
-    :param url: The repository standing in for the package's own.
-    :return: What the package would be installed from.
-    """
-    return repository.configuration_output(
-        f"{ShellConfigurationFunction.RECORD_LATEST_BASSTLER_RELEASE} && "
-        f"{ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE}",
-        **{ConfigurationVariable.REPOSITORY_URL: url},
-    ).strip()
 
 
 @pytest.fixture
 def tagged_release_repository(session_start_repository: ScratchRepository) -> str:
     """
-    :return: The scratch project, tagged with every :class:`SampleReleaseTag`, as a
-        repository URL a session start reads releases from.
+    :return: The scratch project, tagged with every :class:`SampleReleaseTag`, as the
+        repository URL a released plugin installs its package from.
     """
     for tag in SampleReleaseTag:
         session_start_repository.run_git("tag", tag)
     return str(session_start_repository.project_root)
 
 
-def test_a_plugin_outside_a_checkout_installs_the_latest_release_of_the_package(
+# %% the release the package is installed at
+
+
+def test_a_released_plugin_installs_the_package_at_its_own_release(
     session_start_repository: ScratchRepository, tagged_release_repository: str
 ):
     """
-    A release is only a tag on its merge commit, so an installed plugin installs the
-    highest one: a pre-release and a tag naming no version are not releases.
+    The package comes from the plugin's own release, never the latest one, so the hooks
+    never call the package with options from another release.
     """
     declaration_file(session_start_repository).unlink()
-    manifest = PluginManifest.of_this_plugin()
+    session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
 
-    source = record_latest_release(session_start_repository, tagged_release_repository)
+    source = session_start_repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE,
+        **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository},
+    ).strip()
 
     assert source == (
-        f"{manifest.name} @ git+{tagged_release_repository}@{SampleReleaseTag.LATEST}"
+        f"{PluginManifest.of_this_plugin().name} @ "
+        f"git+{tagged_release_repository}@{SampleReleaseTag.OLDER}"
     )
 
 
-def test_an_unreadable_repository_keeps_the_release_last_recorded(
+def test_a_plugin_naming_no_release_has_no_package_to_install(
     session_start_repository: ScratchRepository,
-    tagged_release_repository: str,
+):
+    """
+    A plugin that is not a release, as one copied from the source tree, names no package
+    of its own release, so nothing is guessed in its place.
+    """
+    declaration_file(session_start_repository).unlink()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        session_start_repository.configuration_output(
+            ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE
+        )
+
+
+def test_a_workflow_runs_the_plugin_s_release(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A workflow replaying for the session runs the same package, so it follows the
+    plugin's release.
+    """
+    declaration_file(session_start_repository).unlink()
+    session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
+
+    branch_or_tag = session_start_repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
+    ).strip()
+
+    assert branch_or_tag == SampleReleaseTag.OLDER
+
+
+def test_a_workflow_runs_the_default_branch_for_a_checkout(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A checkout's plugin names no release, and runs the default branch's workflows.
+    """
+    branch_or_tag = session_start_repository.configuration_output(
+        ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
+    ).strip()
+
+    assert branch_or_tag == BasstlerBranch.MAIN
+
+
+def test_a_workflow_has_no_release_to_run_for_a_plugin_naming_none(
+    session_start_repository: ScratchRepository,
+):
+    """
+    Outside a checkout, a plugin naming no release has no package for a workflow to run.
+    """
+    declaration_file(session_start_repository).unlink()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        session_start_repository.configuration_output(
+            ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
+        )
+
+
+def test_a_session_start_installs_nothing_for_a_plugin_naming_no_release(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
     tmp_path: Path,
 ):
     """
-    A session start offline keeps the package it has rather than reinstalling.
+    Session start says the plugin names no release instead of installing a package of
+    some other release for it.
     """
     declaration_file(session_start_repository).unlink()
-    record_latest_release(session_start_repository, tagged_release_repository)
+    stub_bin.install(PackageManager.PIP)
+    call_log = tmp_path / "pip-calls"
 
-    source = record_latest_release(session_start_repository, str(tmp_path / "missing"))
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_hiding_executables(tmp_path, PackageManager.UV)
+            ),
+            StubVariable.PIP_CALL_LOG: str(call_log),
+        },
+    )
 
-    assert source.endswith(f"@{SampleReleaseTag.LATEST}")
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_RELEASE_NOT_NAMED,
+        BashPath(session_start_repository.plugin_root).text,
+    )
+    assert not call_log.exists()
 
 
-# %% a plugin updated after the session start
+# %% a plugin of another release than the installed package
 
 
-def install_older_release_for_this_plugin(
+def install_latest_release_for_another_plugin(
     repository: ScratchRepository, release_repository: str
 ) -> None:
     """
-    Install the package, outside a checkout, at :attr:`SampleReleaseTag.OLDER`, as a
-    session start before :attr:`SampleReleaseTag.LATEST` was tagged did, then tag it.
+    Install the package, outside a checkout, at :attr:`SampleReleaseTag.LATEST` for a
+    plugin of that release, then make the plugin running now one of
+    :attr:`SampleReleaseTag.OLDER`, as when a sync leaves an older copy that the session
+    still runs.
 
     :param repository: The fixture-built scratch repository.
     :param release_repository: The repository standing in for the package's own.
     """
     declaration_file(repository).unlink()
-    repository.run_git("tag", SampleReleaseTag.OLDER)
-    record_latest_release(repository, release_repository)
+    repository.release_plugin_as(SampleReleaseTag.LATEST.version)
     repository.install_package_environment(
         **{ConfigurationVariable.REPOSITORY_URL: release_repository}
     )
-    repository.run_git("tag", SampleReleaseTag.LATEST)
+    repository.release_plugin_as(SampleReleaseTag.OLDER.version)
 
 
 def ready_package(
@@ -1191,118 +1625,134 @@ def ready_package(
     return call_log
 
 
-def test_a_plugin_updated_after_the_install_reinstalls_the_latest_release(
+def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
     session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
     stub_bin: ExecutableStubDirectory,
     tmp_path: Path,
 ):
     """
-    A plugin synced during a session can call what only a later release has, so a hook
-    finding the plugin changed since the install reads the latest release again and
-    installs it, rather than running the package the session start installed.
+    The reported case: an older plugin copy ran against the latest release's package,
+    which no longer accepted an option its hooks pass. A hook readies the package at
+    its own plugin's release instead.
     """
-    release_repository = str(session_start_repository.project_root)
-    install_older_release_for_this_plugin(session_start_repository, release_repository)
+    install_latest_release_for_another_plugin(
+        session_start_repository, tagged_release_repository
+    )
     session_start_repository.install_hook_scripts(
         PluginLocation.ENTRY_POINT_SCRIPT.name
     )
 
     call_log = ready_package(
-        session_start_repository, release_repository, stub_bin, tmp_path
+        session_start_repository, tagged_release_repository, stub_bin, tmp_path
     )
 
     manifest = PluginManifest.of_this_plugin()
-    assert call_log.read_text().splitlines() == [
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
         f"--python {environment_interpreter(session_start_repository)} install "
-        f"{manifest.name} @ git+{release_repository}@{SampleReleaseTag.LATEST}"
+        f"{manifest.name} @ git+{tagged_release_repository}@{SampleReleaseTag.OLDER}"
     ]
 
 
-def test_an_unchanged_plugin_keeps_the_release_its_package_was_installed_at(
+def test_an_unchanged_plugin_keeps_the_package_installed_for_it(
     session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
     stub_bin: ExecutableStubDirectory,
     tmp_path: Path,
 ):
     """
-    The latest release is read once per session start: a hook running with the plugin
-    the package was installed for installs nothing, whatever was released since.
+    A hook running with the plugin the package was installed for installs nothing,
+    whatever was released since.
     """
-    release_repository = str(session_start_repository.project_root)
-    install_older_release_for_this_plugin(session_start_repository, release_repository)
+    declaration_file(session_start_repository).unlink()
+    session_start_repository.release_plugin_as(SampleReleaseTag.OLDER.version)
+    session_start_repository.install_package_environment(
+        **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository}
+    )
 
     call_log = ready_package(
-        session_start_repository, release_repository, stub_bin, tmp_path
+        session_start_repository, tagged_release_repository, stub_bin, tmp_path
     )
 
     assert not call_log.exists()
 
 
-def test_a_plugin_outside_a_checkout_installs_the_default_branch_before_any_release(
+def test_a_hook_of_a_plugin_naming_no_release_stops(
     session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
 ):
     """
-    With no release recorded yet, as on a first session start offline, the package
-    still comes from its repository.
+    A hook readying the package for a plugin naming no release stops rather than running
+    against a package of some other release.
     """
+    session_start_repository.install_package_environment()
     declaration_file(session_start_repository).unlink()
-    manifest = PluginManifest.of_this_plugin()
-    repository = Repository.from_remote_url(
-        session_start_repository.configuration_value(
-            ConfigurationVariable.REPOSITORY_URL
+
+    with pytest.raises(subprocess.CalledProcessError):
+        ready_package(
+            session_start_repository,
+            session_start_repository.configuration_value(
+                ConfigurationVariable.REPOSITORY_URL
+            ),
+            stub_bin,
+            tmp_path,
         )
-    )
-
-    assert package_source(session_start_repository) == (
-        f"{manifest.name} @ git+{repository.url}"
-    )
 
 
-def test_a_workflow_runs_the_release_the_package_is_installed_at(
-    session_start_repository: ScratchRepository, tagged_release_repository: str
+def test_a_package_of_another_release_is_named_on_the_release_line(
+    session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
+    tmp_path: Path,
 ):
     """
-    A workflow replaying for the session runs the same package, so it follows the
-    release recorded for the install.
+    When the install fails, the package left in place is another release than the
+    plugin's, and the summary says so rather than leaving the hooks to fail on it.
     """
-    declaration_file(session_start_repository).unlink()
+    install_latest_release_for_another_plugin(
+        session_start_repository, tagged_release_repository
+    )
 
-    branch_or_tag = session_start_repository.configuration_output(
-        f"{ShellConfigurationFunction.RECORD_LATEST_BASSTLER_RELEASE} && "
-        f"{ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG}",
-        **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository},
-    ).strip()
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            ConfigurationVariable.REPOSITORY_URL: tagged_release_repository,
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: path_hiding_executables(
+                tmp_path, PackageManager.PIP, PackageManager.UV
+            ),
+        },
+    )
 
-    assert branch_or_tag == SampleReleaseTag.LATEST
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.RELEASE) == summary_message(
+        SummaryMessage.RELEASE_MISMATCHED,
+        SampleReleaseTag.OLDER,
+        version(PackageLocation.DIRECTORY.value.name),
+        session_start_repository.configuration_output(
+            ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE,
+            **{ConfigurationVariable.REPOSITORY_URL: tagged_release_repository},
+        ).strip(),
+    )
 
 
-def test_a_workflow_runs_the_default_branch_before_any_release(
+def test_a_package_of_the_plugin_s_release_is_named_on_the_release_line(
     session_start_repository: ScratchRepository,
 ):
     """
-    With no release recorded, the package comes from the default branch, and so does
-    the workflow.
+    The plugin and the package being one release is said too, naming that release.
     """
     declaration_file(session_start_repository).unlink()
+    installed_version = version(PackageLocation.DIRECTORY.value.name)
+    session_start_repository.release_plugin_as(installed_version)
+    session_start_repository.install_package_environment()
 
-    branch_or_tag = session_start_repository.configuration_output(
-        ShellConfigurationFunction.BASSTLER_BRANCH_OR_TAG
-    ).strip()
+    result = publish_and_run(session_start_repository)
 
-    assert branch_or_tag == BasstlerBranch.MAIN
-
-
-def test_a_plugin_in_a_checkout_records_no_release(
-    session_start_repository: ScratchRepository, tagged_release_repository: str
-):
-    """
-    A checkout installs itself, so a session start there reads no release.
-    """
-    record_latest_release(session_start_repository, tagged_release_repository)
-
-    release_file = Path(
-        session_start_repository.configuration_value(ConfigurationVariable.RELEASE_FILE)
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.RELEASE) == summary_message(
+        SummaryMessage.RELEASE_MATCHING,
+        f"{ReleaseVersion.tag_prefix}{installed_version}",
     )
-    assert not release_file.exists()
 
 
 def test_tells_the_session_where_the_plugin_is(
@@ -1320,17 +1770,16 @@ def test_tells_the_session_where_the_plugin_is(
     )
 
     exported = subprocess.run(
-        [
-            "bash",
+        Bash.locate(os.environ).command(
             "-c",
             f'source "$0" && printf "%s" "${{{BasstlerVariable.PLUGIN_ROOT}}}"',
             environment_file,
-        ],
+        ),
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     ).stdout
-    assert Path(exported) == session_start_repository.plugin_root
+    assert exported == BashPath(session_start_repository.plugin_root).text
 
 
 def test_tells_the_session_which_interpreter_runs_the_package(
@@ -1348,14 +1797,13 @@ def test_tells_the_session_which_interpreter_runs_the_package(
     )
 
     exported = subprocess.run(
-        [
-            "bash",
+        Bash.locate(os.environ).command(
             "-c",
             f'source "$0" && printf "%s" "${{{BasstlerVariable.PYTHON}}}"',
             environment_file,
-        ],
+        ),
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     ).stdout
     assert exported == session_start_repository.configuration_value(
@@ -1373,7 +1821,7 @@ def without_an_environment(repository: ScratchRepository) -> ScratchRepository:
     :param repository: The fixture-built scratch repository.
     :return: The same repository.
     """
-    shutil.rmtree(environment_directory(repository))
+    DirectoryTree(Path(environment_directory(repository))).remove()
     return repository
 
 
@@ -1408,13 +1856,14 @@ def test_creates_the_environment_with_uv_and_installs_the_package_into_it(
         environment_directory(session_start_repository),
         package_source(session_start_repository),
     )
-    assert environment_log.read_text().splitlines() == [
+    assert environment_log.read_text(encoding="utf-8").splitlines() == [
         environment_call(session_start_repository),
         uv_installer_call(session_start_repository),
     ]
     assert not install_log.exists()
 
 
+@NEEDS_VERSIONED_INTERPRETER_NAME
 def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
     session_start_repository: ScratchRepository,
     stub_bin: ExecutableStubDirectory,
@@ -1449,10 +1898,43 @@ def test_creates_the_environment_from_an_interpreter_found_by_name_without_uv(
             "import sys; print(sys.version_info >= (3, 12))",
         ],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     )
     assert version.stdout.strip() == str(True)
+
+
+@NEEDS_VERSIONED_INTERPRETER_NAME
+def test_skips_an_interpreter_on_the_path_that_cannot_run_when_creating_the_environment(
+    session_start_repository: ScratchRepository,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    A first candidate that cannot run does not stop the next one from being tried.
+    """
+    without_an_environment(session_start_repository)
+    stub_bin.install(PackageManager.PIP)
+    newest_candidate = configuration_value(
+        ConfigurationVariable.INTERPRETER_CANDIDATES
+    ).split()[0]
+    stub_bin.install(newest_candidate, "unusable_interpreter")
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: stub_bin.ahead_of(
+                path_hiding_executables(tmp_path, PackageManager.UV)
+            ),
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.DEPENDENCIES) == summary_message(
+        SummaryMessage.DEPENDENCIES_ENVIRONMENT_CREATED,
+        environment_directory(session_start_repository),
+        package_source(session_start_repository),
+    )
 
 
 def path_without_a_supported_interpreter(mirror_parent: Path) -> str:
@@ -1511,11 +1993,12 @@ def test_installs_uv_when_no_supported_interpreter_is_on_the_path(
         environment_directory(session_start_repository),
         package_source(session_start_repository),
     )
-    assert install_log.read_text().splitlines() == [
-        f"install --target {installed_uv_directory(session_start_repository)} "
+    assert install_log.read_text(encoding="utf-8").splitlines() == [
+        "install --target "
+        f"{session_start_repository.configuration_value(ConfigurationVariable.UV_DIRECTORY)} "
         f"{PackageManager.UV}"
     ]
-    assert environment_log.read_text().splitlines() == [
+    assert environment_log.read_text(encoding="utf-8").splitlines() == [
         environment_call(session_start_repository),
         uv_installer_call(session_start_repository),
     ]
@@ -1558,7 +2041,7 @@ def test_reuses_the_uv_it_installed_before(
         environment_directory(session_start_repository),
         package_source(session_start_repository),
     )
-    assert uv_log.read_text().splitlines() == [
+    assert uv_log.read_text(encoding="utf-8").splitlines() == [
         environment_call(session_start_repository),
         uv_installer_call(session_start_repository),
     ]
@@ -1595,7 +2078,7 @@ def test_reports_uv_it_could_not_install_and_finishes_the_run(
             "",
         ).split(" - ")[0]
     )
-    assert not environment_interpreter(session_start_repository).exists()
+    assert not Path(environment_interpreter(session_start_repository)).exists()
     assert (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
     ).exists()
@@ -1626,10 +2109,10 @@ def test_installs_into_the_interpreter_a_windows_environment_was_created_with(
 
     assert result.returncode == 0, result.stderr
     windows_interpreter = (
-        Path(environment_directory(session_start_repository))
-        / EnvironmentInterpreterLayout.WINDOWS
+        f"{environment_directory(session_start_repository)}"
+        f"/{EnvironmentInterpreterLayout.WINDOWS}"
     )
-    assert environment_log.read_text().splitlines()[-1] == (
+    assert environment_log.read_text(encoding="utf-8").splitlines()[-1] == (
         f"{PackageManager.PIP} install --python {windows_interpreter} --editable "
         f"{package_source(session_start_repository)}"
     )
@@ -1662,7 +2145,7 @@ def test_reports_an_environment_it_could_not_create_and_finishes_the_run(
             "",
         ).split(" - ")[0]
     )
-    assert not environment_interpreter(session_start_repository).exists()
+    assert not Path(environment_interpreter(session_start_repository)).exists()
     assert (
         session_start_repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS
     ).exists()
@@ -1679,14 +2162,17 @@ def test_runs_the_package_with_the_interpreter_of_a_windows_environment(
     ``python3``.
     """
     without_an_environment(session_start_repository)
-    windows_interpreter = write_interpreter_wrapper(
+    write_interpreter_wrapper(
         Path(environment_directory(session_start_repository))
         / EnvironmentInterpreterLayout.WINDOWS
     )
 
     assert session_start_repository.configuration_value(
         ConfigurationVariable.PYTHON
-    ) == str(windows_interpreter)
+    ) == (
+        f"{environment_directory(session_start_repository)}"
+        f"/{EnvironmentInterpreterLayout.WINDOWS}"
+    )
 
 
 # %% the plan site line
@@ -1727,6 +2213,101 @@ def test_links_a_tracked_branch_to_its_plan_on_the_site(
     site_line = summary_value(result.stdout, SummaryLine.PLAN_SITE)
     assert site_line.startswith(SITE_URL)
     assert site_line.endswith(f"/{PLAN_IDENTIFIER}/")
+
+
+def test_links_the_plan_under_the_notes_repository_the_site_lists(
+    session_start_repository: ScratchRepository,
+):
+    """
+    The site files plans under the notes repository, which need not be the checkout's.
+    """
+    session_start_repository.serve_origin_as(SiteRepository.PROJECT.value)
+    session_start_repository.serve_notes_remote_as(SiteRepository.NOTES.value)
+
+    result = publish_and_run(
+        session_start_repository,
+        {
+            PersonalNotesPath.BRANCH_INDEX: branch_index(
+                {ScratchBranch.WORK: PLAN_IDENTIFIER}
+            ),
+            MANIFEST_PATH: PLAN_MANIFEST,
+            ProjectLocation.PLAN_HUB: HUB_FILE,
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(result.stdout, SummaryLine.PLAN_SITE) == summary_message(
+        SummaryMessage.HUB_REGISTERED,
+        SITE_URL,
+        SiteAddress(SITE_URL).plan_url(SiteRepository.NOTES.value, PLAN_IDENTIFIER),
+    )
+
+
+# %% the plan site's merge workflow
+
+
+def publish_hub_and_run(
+    repository: ScratchRepository, environment: Mapping[str, str]
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run session-start.sh against a notes branch that lists a plan site.
+
+    :param repository: The fixture-built scratch repository.
+    :param environment: Variables to set for the hook's run.
+    :return: The finished session-start.sh process.
+    """
+    return publish_and_run(
+        repository, {ProjectLocation.PLAN_HUB: HUB_FILE}, environment
+    )
+
+
+def test_says_the_pull_request_that_brings_the_merge_workflow_up_to_date(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A merge workflow older than the release starts no build for some pull request
+    changes, so the session says what to merge instead of leaving the site stale.
+    """
+    result = publish_hub_and_run(
+        session_start_repository,
+        {
+            MergeWorkflowRefreshStubVariable.OUTPUT: str(
+                DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT
+            )
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        DatasetLocation.MERGE_WORKFLOW_REFRESH_OUTPUT.read_text(
+            encoding="utf-8"
+        ).rstrip("\n")
+        in result.stdout
+    )
+
+
+def test_says_nothing_of_the_merge_workflow_when_it_is_current(
+    session_start_repository: ScratchRepository,
+):
+    result = publish_hub_and_run(session_start_repository, {})
+
+    assert result.returncode == 0, result.stderr
+    assert "merge workflow" not in result.stdout
+
+
+def test_says_how_to_check_the_merge_workflow_by_hand_when_the_check_fails(
+    session_start_repository: ScratchRepository,
+):
+    failure = "GitHub refused the read"
+
+    result = publish_hub_and_run(
+        session_start_repository,
+        {MergeWorkflowRefreshStubVariable.FAILURE: failure},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert merge_workflow_refresh.__name__ in result.stdout
+    assert failure in result.stdout
 
 
 # %% the upstream-reviews Action line
@@ -1845,6 +2426,210 @@ def test_reports_main_s_tests_as_not_checked_where_the_repository_is_unknown(
     assert summary_value(result.stdout, SummaryLine.MAIN_TESTS) == summary_message(
         SummaryMessage.MAIN_TESTS_NOT_CHECKED
     )
+
+
+# %% one environment per project
+
+
+def other_project(repository: ScratchRepository) -> Path:
+    """
+    :param repository: The fixture-built scratch repository.
+    :return: A second git repository beside its project, sharing its package home.
+    """
+    project = repository.project_root.parent / "other-project"
+    project.mkdir()
+    repository.run_git("init", "--quiet", cwd=project)
+    return project
+
+
+def configuration_value_in(
+    repository: ScratchRepository, project: Path, variable_name: str, **overrides: str
+) -> str:
+    """
+    :param repository: The fixture-built scratch repository, whose plugin is sourced.
+    :param project: The project the session names as its own.
+    :param variable_name: A variable the shell configuration assigns.
+    :param overrides: Further variables the run sets.
+    :return: Its value once the configuration is sourced for *project*.
+    """
+    return repository.configuration_output(
+        f'printf "%s" "${{{variable_name}}}"',
+        **{ScrubbedEnvironmentPrefix.PROJECT_DIRECTORY: str(project), **overrides},
+    )
+
+
+def environment_of(repository: ScratchRepository, project: Path) -> Path:
+    """
+    Stand in for the environment a session start in *project* created, recording the
+    project it belongs to.
+
+    :param repository: The fixture-built scratch repository.
+    :param project: The project the environment belongs to.
+    :return: The environment's directory.
+    """
+    directory = Path(
+        configuration_value_in(
+            repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+        )
+    )
+    directory.mkdir(parents=True)
+    repository.configuration_output(
+        ShellConfigurationFunction.RECORD_BASSTLER_PROJECT,
+        **{ScrubbedEnvironmentPrefix.PROJECT_DIRECTORY: str(project)},
+    )
+    return directory
+
+
+def test_each_project_has_an_environment_of_its_own(
+    session_start_repository: ScratchRepository,
+):
+    """
+    Projects on different plugin releases no longer install over each other's package.
+    """
+    own = Path(environment_directory(session_start_repository))
+    other = Path(
+        configuration_value_in(
+            session_start_repository,
+            other_project(session_start_repository),
+            BasstlerVariable.ENVIRONMENT_DIRECTORY,
+        )
+    )
+
+    assert own != other
+    assert own.parent == other.parent
+
+
+def test_worktrees_of_one_project_share_its_environment(
+    session_start_repository: ScratchRepository,
+):
+    worktree = session_start_repository.project_root.parent / "worktree"
+    session_start_repository.run_git("worktree", "add", "--quiet", str(worktree))
+
+    assert configuration_value_in(
+        session_start_repository, worktree, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    ) == environment_directory(session_start_repository)
+
+
+def test_a_session_keeps_its_environment_in_another_repository(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A session with several repositories attached runs one plugin, so a command run in
+    any of them uses the environment the session start exported.
+    """
+    session_environment = environment_directory(session_start_repository)
+
+    assert (
+        configuration_value_in(
+            session_start_repository,
+            other_project(session_start_repository),
+            BasstlerVariable.ENVIRONMENT_DIRECTORY,
+            **{BasstlerVariable.ENVIRONMENT_DIRECTORY: session_environment},
+        )
+        == session_environment
+    )
+
+
+def test_tells_the_session_which_environment_runs_the_package(
+    session_start_repository: ScratchRepository, tmp_path: Path
+):
+    environment_file = tmp_path / "session-environment"
+
+    publish_and_run(
+        session_start_repository,
+        environment={ScrubbedEnvironmentPrefix.ENVIRONMENT_FILE: str(environment_file)},
+    )
+
+    exported = subprocess.run(
+        Bash.locate(os.environ).command(
+            "-c",
+            'source "$0" && printf "%s" "${!1}"',
+            environment_file,
+            BasstlerVariable.ENVIRONMENT_DIRECTORY,
+        ),
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+    assert exported == environment_directory(session_start_repository)
+
+
+def test_removes_the_environment_of_a_project_that_is_gone(
+    session_start_repository: ScratchRepository,
+):
+    project = other_project(session_start_repository)
+    abandoned = environment_of(session_start_repository, project)
+    abandoned_as_the_shell_names_it = configuration_value_in(
+        session_start_repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    )
+    DirectoryTree(project).remove()
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert not abandoned.exists()
+    assert summary_value(result.stdout, SummaryLine.ENVIRONMENTS) == summary_message(
+        SummaryMessage.ENVIRONMENTS_REMOVED, abandoned_as_the_shell_names_it
+    )
+
+
+def test_keeps_the_environment_of_a_project_that_still_exists(
+    session_start_repository: ScratchRepository,
+):
+    kept = environment_of(
+        session_start_repository, other_project(session_start_repository)
+    )
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert kept.is_dir()
+    assert Path(environment_directory(session_start_repository)).is_dir()
+    assert summary_value(result.stdout, SummaryLine.ENVIRONMENTS) == summary_message(
+        SummaryMessage.ENVIRONMENTS_NONE_REMOVED
+    )
+
+
+def test_keeps_the_environment_a_live_install_holds(
+    session_start_repository: ScratchRepository, running_shell_process_id: int
+):
+    project = other_project(session_start_repository)
+    installing = environment_of(session_start_repository, project)
+    marker = Path(
+        configuration_value_in(
+            session_start_repository, project, ConfigurationVariable.INSTALL_MARKER
+        )
+    )
+    marker.parent.mkdir(parents=True)
+    marker.write_text(f"{running_shell_process_id}\n", encoding="utf-8")
+    DirectoryTree(project).remove()
+
+    result = publish_and_run(session_start_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert installing.is_dir()
+
+
+def test_never_removes_the_environment_the_session_runs(
+    session_start_repository: ScratchRepository,
+):
+    """
+    A session exported an environment whose project has since gone; it still runs it.
+    """
+    project = other_project(session_start_repository)
+    running = environment_of(session_start_repository, project)
+    exported = configuration_value_in(
+        session_start_repository, project, BasstlerVariable.ENVIRONMENT_DIRECTORY
+    )
+    DirectoryTree(project).remove()
+
+    result = publish_and_run(
+        session_start_repository,
+        environment={BasstlerVariable.ENVIRONMENT_DIRECTORY: exported},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert running.is_dir()
 
 
 # %% every message renders

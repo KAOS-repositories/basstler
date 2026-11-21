@@ -6,17 +6,19 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from basstler.plan.dependencies import (
-    PlanDirectory,
-)
-from basstler.plan.model import ItemStatus
-from basstler.plan_site.plan import Item, Plan, Track, Wave
-from basstler.plan_site.plan_page import PlanPage
-from basstler.pull_request_state import (
+from basstler.github.pull_request_state import (
+    LivePullRequests,
     PullRequestRecord,
     PullRequestsByRepository,
     PullRequestState,
 )
+from basstler.plan.dependencies import (
+    PlanDirectory,
+)
+from basstler.plan.model import ItemStatus
+from basstler.plan.model_alias import ModelAlias
+from basstler.plan.structure import Item, Plan, Track, Wave
+from basstler.plan_site.plan_page import PlanPage
 
 from ..constants.paths import DatasetLocation, RepositoryLocation, SkillDirectory
 from ..fixture_plans import (
@@ -70,8 +72,7 @@ def make_renderer(
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository=pull_requests_by_repository or {},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(pull_requests_by_repository or {}),
         plan_directory=plan_directory,
         locate_plan_page=locate_plan_page,
     )
@@ -82,6 +83,7 @@ def item(
     status: ItemStatus,
     pull_request_number: int | None = None,
     depends_on: list[str] | None = None,
+    recommended_model: ModelAlias | None = None,
 ) -> Item:
     """
     Build one :class:`Item` whose title, branch and id are all *identifier*, on one
@@ -95,6 +97,7 @@ def item(
         id=identifier,
         pull_request_number=pull_request_number,
         depends_on=depends_on or [],
+        recommended_model=recommended_model,
     )
 
 
@@ -116,8 +119,7 @@ def a_renderer_carding_one_item(record: PullRequestRecord) -> PlanPage:
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository={"owner/repo": {"1": record}},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests({"owner/repo": {"1": record}}),
     )
 
 
@@ -192,8 +194,7 @@ def renderer_with_cards(
         stylesheet_url=STYLESHEET_URL,
         plan=plan,
         roadmap_text="",
-        pull_requests_by_repository={},
-        tracking_url=None,
+        live_pull_requests=LivePullRequests(),
         plan_directory=PlanDirectory(DatasetLocation.PLANS),
         locate_plan_page=locate_plan_page,
     )

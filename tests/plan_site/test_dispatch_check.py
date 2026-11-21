@@ -13,12 +13,15 @@ from pathlib import Path
 import pytest
 
 from basstler.environment import GitHubCredentialVariable
+from basstler.git.commands import GitCommandRunner
+from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import GitHubAttemptReader, GitHubResponse, HttpMethod
 from basstler.github.credential import CredentialProvider
 from basstler.github.exceptions import GitHubRequestFailed
+from basstler.github.repository import Repository
+from basstler.github.run_listing import RunListing
+from basstler.github.states import CheckOutcome
 from basstler.locations import ClaudeCodeVariable, ProjectLocation
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.maintenance.remote_branch import RemoteBranch
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.plan_site import dispatch_check
 from basstler.plan_site.dispatch_check import (
@@ -31,24 +34,20 @@ from basstler.plan_site.dispatch_check import (
     RepositoryDispatch,
     TokenSecret,
     UnreadableDispatch,
-    published_repositories,
 )
 from basstler.plan_site.exceptions import NotesRepositoryUnresolvedError
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.publication import PublicationOption
-from basstler.github.run_listing import RunListing
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.workflows import DispatchWorkflow, PlanSiteSecret
-from basstler.repository import Repository
 from basstler.setup.report import CheckResult, CheckStatus
 from basstler.setup.steps import PersonalNotesSetting
-from basstler.github.states import CheckOutcome
 
 from ..constants.paths import DatasetLocation
 from ..constants.stack import RemoteName
 from ..maintenance.fork import ForkCheckout
-from .test_hub import publish_notes
 from ..upstream_reviews.replay import ReplayingRestClient
+from .test_hub import publish_notes
 
 NOTES_REPOSITORY = Repository.parse("an-owner/a-repository")
 """
@@ -124,7 +123,7 @@ def stored(secret: DatasetLocation) -> GitHubResponse:
     :param secret: The recorded secret.
     :return: GitHub's answer with it.
     """
-    return GitHubResponse(json.loads(secret.read_text()))
+    return GitHubResponse(json.loads(secret.read_text(encoding="utf-8")))
 
 
 def runs_replaying(
@@ -136,7 +135,11 @@ def runs_replaying(
     :return: A client answering with that listing.
     """
     return ReplayingRestClient(
-        {RunListing.path(repository, NOTES_BRANCH): json.loads(listing.read_text())}
+        {
+            RunListing.path(repository, NOTES_BRANCH): json.loads(
+                listing.read_text(encoding="utf-8")
+            )
+        }
     )
 
 
@@ -494,15 +497,31 @@ def test_the_rows_are_the_verdict_then_one_per_other_repository():
 def notes_location() -> PersonalNotesLocation:
     """:return: Notes kept on the fork checkout's ``origin``."""
     return PersonalNotesLocation(
-        RemoteName.ORIGIN, NOTES_BRANCH, str(ProjectLocation.PERSONAL_NOTES_DOCUMENT)
+        RemoteName.ORIGIN,
+        NOTES_BRANCH,
+        (ProjectLocation.PERSONAL_NOTES_DOCUMENT).as_posix(),
+    )
+
+
+def notes_branch_of(
+    fork_checkout: ForkCheckout, notes_location: PersonalNotesLocation
+) -> RemoteBranch:
+    """:return: The notes branch *notes_location* names, in the fork checkout."""
+    return RemoteBranch(
+        notes_location.branch,
+        GitCommandRunner(fork_checkout.project_root),
+        notes_location.remote,
     )
 
 
 def test_without_a_hub_only_the_notes_repository_is_published(
     fork_checkout: ForkCheckout, notes_location: PersonalNotesLocation
 ):
-    assert published_repositories(
-        fork_checkout.project_root, notes_location, NOTES_REPOSITORY
+    """
+    A notes branch with no hub file publishes its own repository alone.
+    """
+    assert PlanHub.published_repositories(
+        notes_branch_of(fork_checkout, notes_location), NOTES_REPOSITORY
     ) == [NOTES_REPOSITORY]
 
 
@@ -511,6 +530,9 @@ def test_every_repository_the_registry_s_hub_lists_is_published(
     notes_location: PersonalNotesLocation,
     tmp_path: Path,
 ):
+    """
+    The registry's hub file, not the notes' own copy, lists what is published.
+    """
     own_copy = PlanHub(
         registry=OTHER_REPOSITORY.full_name, repositories=[NOTES_REPOSITORY.full_name]
     )
@@ -527,8 +549,10 @@ def test_every_repository_the_registry_s_hub_lists_is_published(
         {Path(ProjectLocation.PLAN_HUB.name): registry_copy.to_text()},
     )
 
-    assert published_repositories(
-        fork_checkout.project_root, notes_location, NOTES_REPOSITORY, str(tmp_path)
+    assert PlanHub.published_repositories(
+        notes_branch_of(fork_checkout, notes_location),
+        NOTES_REPOSITORY,
+        str(tmp_path),
     ) == [NOTES_REPOSITORY, OTHER_REPOSITORY]
 
 

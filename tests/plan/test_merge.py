@@ -18,7 +18,7 @@ from basstler.plan.merge import (
     PlanVersion,
     RoadmapPart,
 )
-from basstler.plan.model import ManifestKey
+from basstler.plan.model import ItemStatus, ManifestKey
 
 from ..constants.paths import DatasetLocation
 from .concurrent_edits import (
@@ -28,6 +28,7 @@ from .concurrent_edits import (
     deferred,
     read_version,
     with_added_item,
+    with_item_fields,
     with_roadmap,
     without_item,
 )
@@ -112,8 +113,8 @@ def flush_version() -> PlanVersion:
     :return: :attr:`DatasetLocation.FLUSH_SEQUENCES_PLAN` as the session read it.
     """
     return PlanVersion(
-        manifest_text=DatasetLocation.FLUSH_SEQUENCES_PLAN.read_text(),
-        roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(),
+        manifest_text=DatasetLocation.FLUSH_SEQUENCES_PLAN.read_text(encoding="utf-8"),
+        roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(encoding="utf-8"),
     )
 
 
@@ -128,9 +129,9 @@ def test_dropping_one_flush_item_keeps_the_others():
 
 def test_a_flush_plan_field_the_session_changed_is_merged_whole():
     session = PlanVersion(
-        manifest_text=DatasetLocation.FLUSH_SEQUENCES_PLAN.read_text().replace(
-            'name: "A track"', 'name: "A renamed track"'
-        ),
+        manifest_text=DatasetLocation.FLUSH_SEQUENCES_PLAN.read_text(
+            encoding="utf-8"
+        ).replace('name: "A track"', 'name: "A renamed track"'),
         roadmap_text=flush_version().roadmap_text,
     )
     latest = deferred(flush_version(), SECOND_ITEM)
@@ -145,10 +146,10 @@ def test_a_flush_plan_field_the_session_changed_is_merged_whole():
 
 def test_a_plan_field_the_session_changed_joins_an_item_edit():
     session = PlanVersion(
-        manifest_text=DatasetLocation.BOOTSTRAP_PLAN.read_text().replace(
-            "A plan under test", "A plan renamed by the session"
-        ),
-        roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(),
+        manifest_text=DatasetLocation.BOOTSTRAP_PLAN.read_text(
+            encoding="utf-8"
+        ).replace("A plan under test", "A plan renamed by the session"),
+        roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(encoding="utf-8"),
     )
     latest = deferred(read_version(), SECOND_ITEM)
 
@@ -166,6 +167,31 @@ def test_a_roadmap_edit_joins_an_item_edit():
     assert merged(session, latest) == with_roadmap(
         latest, DatasetLocation.ROADMAP_WITH_SESSION_RULE
     )
+
+
+# %% an item sharing its id with a wave and a track
+
+
+SHARED_IDENTIFIER = "experiment"
+"""
+The id of the wave, the track and the item in :attr:`DatasetLocation.SHARED_IDENTIFIER_PLAN`.
+"""
+
+
+def test_an_item_edit_sharing_its_id_with_a_wave_and_a_track_leaves_them_untouched():
+    read = PlanVersion(
+        manifest_text=DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text(
+            encoding="utf-8"
+        ),
+        roadmap_text=read_version().roadmap_text,
+    )
+    session = with_item_fields(
+        read, SHARED_IDENTIFIER, {ManifestKey.STATUS: ItemStatus.BLOCKED}
+    )
+
+    result = PlanMerge(read=read, session=session, latest=read).merged()
+
+    assert result.manifest_text == session.manifest_text
 
 
 # %% edits to the same part
@@ -202,10 +228,10 @@ def test_an_item_the_session_changed_but_another_writer_dropped_is_refused():
 def test_a_plan_field_both_writers_changed_differently_is_refused():
     def renamed(title: str) -> PlanVersion:
         return PlanVersion(
-            manifest_text=DatasetLocation.BOOTSTRAP_PLAN.read_text().replace(
-                "A plan under test", title
-            ),
-            roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(),
+            manifest_text=DatasetLocation.BOOTSTRAP_PLAN.read_text(
+                encoding="utf-8"
+            ).replace("A plan under test", title),
+            roadmap_text=DatasetLocation.BOOTSTRAP_ROADMAP.read_text(encoding="utf-8"),
         )
 
     with pytest.raises(ConcurrentEditError) as refusal:
@@ -259,3 +285,34 @@ def test_a_version_reads_back_the_documents_it_wrote(tmp_path: Path):
 
 def test_a_directory_without_the_plan_reads_as_absent(tmp_path: Path):
     assert PlanVersion.from_directory(tmp_path) == PlanVersion.absent()
+
+
+# %% the count of landed items, which only the save writes
+
+
+def with_landed_item_count(version: PlanVersion, count: int) -> PlanVersion:
+    """
+    :return: *version* recording *count* landed items, as a save writes it.
+    """
+    return PlanVersion(
+        manifest_text=yaml.safe_dump(
+            {
+                **yaml.safe_load(version.manifest_text),
+                ManifestKey.LANDED_ITEM_COUNT.key: count,
+            },
+            sort_keys=False,
+        ),
+        roadmap_text=version.roadmap_text,
+    )
+
+
+def test_the_landed_item_count_is_the_latest_writer_s_whatever_the_session_holds():
+    session = with_landed_item_count(blocked(read_version(), FIRST_ITEM), 1)
+    latest = with_landed_item_count(read_version(), 2)
+
+    result = merged(session, latest)
+
+    assert (
+        yaml.safe_load(result.manifest_text)[ManifestKey.LANDED_ITEM_COUNT.key]
+        == yaml.safe_load(latest.manifest_text)[ManifestKey.LANDED_ITEM_COUNT.key]
+    )

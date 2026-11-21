@@ -18,6 +18,7 @@ from basstler.plan.item_bootstrap.opening import WorkOpener, WorkOpenRequest
 from basstler.plan.item_bootstrap.record import ItemRecordRequest
 from basstler.plan.item_bootstrap.report import BootstrapReport, OperationReport
 from basstler.plan.item_bootstrap.update import ItemUpdateRequest
+from basstler.plan.model_alias import ModelAlias
 from basstler.plan.model import (
     ItemStatus,
     ManifestKey,
@@ -75,6 +76,7 @@ class RecordCommand(BootstrapCommand):
         parser.add_argument("--roadmap-entry")
         parser.add_argument("--title")
         parser.add_argument("--track")
+        parser.add_argument("--recommended-model", type=ModelAlias)
 
     def run(self, arguments: argparse.Namespace, project_root: Path) -> BootstrapReport:
         return ItemRecordRequest(
@@ -84,6 +86,7 @@ class RecordCommand(BootstrapCommand):
             roadmap_entry=arguments.roadmap_entry,
             title=arguments.title,
             track=arguments.track,
+            recommended_model=arguments.recommended_model,
         ).record(project_root)
 
 
@@ -129,12 +132,12 @@ class OpenCommand(BootstrapCommand):
                 session_url=arguments.session,
                 pull_request_title=arguments.pull_request_title,
                 pull_request_body=(
-                    arguments.pull_request_body.read_text()
+                    arguments.pull_request_body.read_text(encoding="utf-8")
                     if arguments.pull_request_body
                     else None
                 ),
                 pull_request_number=arguments.pull_request_number,
-            )
+            ),
         )
 
 
@@ -155,6 +158,7 @@ class UpdateCommand(BootstrapCommand):
         parser.add_argument("--branch")
         parser.add_argument("--pull-request-number", type=int)
         parser.add_argument("--session")
+        parser.add_argument("--recommended-model", type=ModelAlias)
         notes = parser.add_mutually_exclusive_group()
         notes.add_argument(
             "--notes", type=Path, help="A file whose text becomes the item's notes"
@@ -179,21 +183,27 @@ class UpdateCommand(BootstrapCommand):
                 (ManifestKey.BRANCH, arguments.branch),
                 (ManifestKey.PULL_REQUEST_NUMBER, arguments.pull_request_number),
                 (ManifestKey.SESSION, arguments.session),
+                (ManifestKey.RECOMMENDED_MODEL, arguments.recommended_model),
             )
             if value is not None
         }
         if arguments.notes:
-            values_by_key[ManifestKey.NOTES] = arguments.notes.read_text()
+            values_by_key[ManifestKey.NOTES] = arguments.notes.read_text(
+                encoding="utf-8"
+            )
         if arguments.blockers:
             values_by_key[ManifestKey.BLOCKERS] = [
-                blocker.read_text().strip() for blocker in arguments.blockers
+                blocker.read_text(encoding="utf-8").strip()
+                for blocker in arguments.blockers
             ]
         return ItemUpdateRequest(
             plan_identifier=arguments.plan,
             item_identifier=arguments.item,
             values_by_key=values_by_key,
             notes_to_append=(
-                arguments.append_notes.read_text() if arguments.append_notes else None
+                arguments.append_notes.read_text(encoding="utf-8")
+                if arguments.append_notes
+                else None
             ),
         ).update(project_root)
 
@@ -224,12 +234,12 @@ class CheckCommand(BootstrapCommand):
 @dataclass(frozen=True)
 class ResolveCommand(BootstrapCommand):
     """
-    Names the plan and the items a branch belongs to.
+    Names the plan and the item a branch belongs to.
     """
 
     @classproperty
     def description(cls) -> str:
-        return "Name the plan and items a branch belongs to"
+        return "Name the plan and item a branch belongs to"
 
     def declare_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--branch", required=True)
@@ -241,12 +251,12 @@ class ResolveCommand(BootstrapCommand):
 @dataclass(frozen=True)
 class BlockCommand(BootstrapCommand):
     """
-    Records an owner's blocker on every item a branch carries.
+    Records an owner's blocker on the item a branch carries.
     """
 
     @classproperty
     def description(cls) -> str:
-        return "Record your own blocker on every item a branch carries"
+        return "Record your own blocker on the item a branch carries"
 
     def declare_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--branch", required=True)
@@ -262,19 +272,19 @@ class BlockCommand(BootstrapCommand):
         return OwnedBlocker(
             branch=arguments.branch,
             owner=arguments.owner,
-            reason=arguments.reason.read_text().strip(),
+            reason=arguments.reason.read_text(encoding="utf-8").strip(),
         ).write(project_root)
 
 
 @dataclass(frozen=True)
 class UnblockCommand(BootstrapCommand):
     """
-    Withdraws an owner's blocker from every item a branch carries.
+    Withdraws an owner's blocker from the item a branch carries.
     """
 
     @classproperty
     def description(cls) -> str:
-        return "Clear your own blocker from every item a branch carries"
+        return "Clear your own blocker from the item a branch carries"
 
     def declare_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--branch", required=True)

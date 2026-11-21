@@ -1,10 +1,4 @@
-function planPageCopyActionCommand(button) {
-  var baseCommand = button.getAttribute("data-action-command");
-  var modelPicker = button.previousElementSibling;
-  var model = modelPicker && modelPicker.classList.contains("model-picker")
-    ? modelPicker.getAttribute("data-model")
-    : "";
-  var command = model ? "/model " + model + "\n" + baseCommand : baseCommand;
+function planPageCopyCommand(button, command, succeededLabel, missingLabel) {
   var originalLabel = button.textContent;
   var resetTimeoutMilliseconds = 1800;
 
@@ -19,7 +13,7 @@ function planPageCopyActionCommand(button) {
   }
 
   function onCopySucceeded() {
-    showResult("action-button-copied", "Copied!");
+    showResult("action-button-copied", succeededLabel);
   }
 
   function onCopyFailed() {
@@ -48,11 +42,58 @@ function planPageCopyActionCommand(button) {
     }
   }
 
-  if (navigator.clipboard && navigator.clipboard.writeText) {
+  if (command === null) {
+    showResult("action-button-failed", missingLabel);
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(command).then(onCopySucceeded, copyViaTemporaryTextarea);
   } else {
     copyViaTemporaryTextarea();
   }
+}
+
+function planPageCopyActionCommand(button) {
+  var modelPicker = button.previousElementSibling;
+  var model = modelPicker && modelPicker.classList.contains("model-picker")
+    ? modelPicker.getAttribute("data-model")
+    : "";
+  planPageCopyCommand(
+    button,
+    button.getAttribute("data-action-command"),
+    model ? "Copied - run /model " + model + " first" : "Copied!"
+  );
+}
+
+function planPageHandoverReceiver(text, repositoryName) {
+  var login = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+  var repository = /^[A-Za-z0-9._-]+$/;
+  var parts = text.trim().replace(/^@/, "").split("/");
+  if (parts.length === 1 && login.test(parts[0])) {
+    return {login: parts[0], repository: parts[0] + "/" + repositoryName};
+  }
+  if (parts.length === 2 && login.test(parts[0]) && repository.test(parts[1])) {
+    return {login: parts[0], repository: parts[0] + "/" + parts[1]};
+  }
+  return null;
+}
+
+function planPageCopyHandoverCommand(button) {
+  var input = button.parentElement.querySelector(".handover-receiver");
+  var receiver = planPageHandoverReceiver(input.value, button.getAttribute("data-repository-name"));
+  input.classList.toggle("handover-receiver-invalid", receiver === null);
+  if (receiver === null) {
+    input.focus();
+    planPageCopyCommand(button, null, "", "Type a GitHub login or owner/repository first");
+    return;
+  }
+  planPageCopyCommand(
+    button,
+    [
+      button.getAttribute("data-handover-command"),
+      button.getAttribute("data-receiver-repository-option"), receiver.repository,
+      button.getAttribute("data-receiver-login-option"), receiver.login
+    ].join(" "),
+    "Copied - run it in your checkout"
+  );
 }
 
 function planPageRevealItem(target) {

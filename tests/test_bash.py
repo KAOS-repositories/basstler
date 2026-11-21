@@ -9,6 +9,7 @@ platform being stood in for is the directory layout, not the machine running the
 from __future__ import annotations
 
 import os
+import sysconfig
 from pathlib import Path
 
 import pytest
@@ -27,10 +28,11 @@ def executable(directory: Path, program: LocatedProgram) -> Path:
     """
     :param directory: Where to put it, created if missing.
     :param program: The program it stands in for.
-    :return: An empty executable named for *program*, which a search finds.
+    :return: An empty executable named for *program*, with the extension the platform
+        gives programs, so a search finds it.
     """
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / program
+    path = directory / f"{program}{sysconfig.get_config_var('EXE')}"
     path.touch()
     path.chmod(FileMode.EXECUTABLE)
     return path

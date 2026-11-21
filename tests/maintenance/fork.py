@@ -10,39 +10,35 @@ from __future__ import annotations
 import dataclasses
 import shutil
 import subprocess
-from dataclasses import dataclass
-from enum import Enum, IntEnum, StrEnum
 from collections.abc import Iterable, Mapping
-from dataclasses import field as dataclasses_field
+from dataclasses import dataclass, field as dataclasses_field
+from enum import Enum, IntEnum, StrEnum
 from pathlib import Path
 
-from basstler.repository import Repository
+import basstler.maintenance.__main__
+import basstler.maintenance.restack_procedure
+from basstler.git.commands import GitCommandRunner
+from basstler.stack.commit_move import BranchAncestry
+from basstler.github.pull_request_record import (
+    CommitChecks,
+    PullRequestField,
+    PullRequestHeadKey,
+    PullRequestRecord,
+)
+from basstler.github.repository import Repository
+from basstler.github.states import CombinedCheckState
+from basstler.locations import ProjectLocation
+from basstler.maintenance.board import BoardExport
+from basstler.upstream_reviews.action.open_pull_requests import UpstreamPullRequests
 from basstler.stack.model import (
     PullRequest,
     Stack,
 )
 from basstler.stack.settings import Configuration
-from basstler.github.states import CombinedCheckState
 
-import basstler.maintenance.__main__
-import basstler.maintenance.restack_procedure
-from basstler.locations import ProjectLocation
-from basstler.maintenance.board import (
-    BoardExport,
-    CommitChecks,
-    PullRequestField,
-    PullRequestHeadKey,
-    PullRequestRecord,
-    UpstreamPullRequests,
-)
-from basstler.maintenance.git_commands import (
-    BranchAncestry,
-    GitCommandRunner,
-)
-
-from ..scratch_repository import initialize_bare_repository
 from ..constants.paths import DatasetLocation
 from ..constants.stack import RemoteName, StackBranch, StackLabel
+from ..scratch_repository import initialize_bare_repository
 
 # %% shared maintenance inputs
 
@@ -312,7 +308,7 @@ class ForkCheckout:
             ["git", *arguments],
             cwd=self.project_root,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
         )
         assert result.returncode == 0, result.stderr
         return result.stdout.strip()
@@ -325,7 +321,7 @@ class ForkCheckout:
         :param content: What to write into it.
         :return: The new commit's hash.
         """
-        (self.project_root / name).write_text(content)
+        (self.project_root / name).write_text(content, encoding="utf-8")
         self.run_git("add", name)
         self.run_git("commit", "--quiet", "-m", f"write {name}")
         return self.run_git("rev-parse", "HEAD")

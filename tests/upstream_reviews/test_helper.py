@@ -19,6 +19,10 @@ from pathlib import Path
 import pytest
 
 import basstler.upstream_reviews.helper.fetch
+from basstler.bash import Bash
+from basstler.github.rest_models import (
+    RestPullRequestSummary,
+)
 from basstler.locations import ClaudeCodeVariable
 from basstler.upstream_reviews.exceptions import (
     HelperOutputIncomplete,
@@ -48,11 +52,11 @@ from basstler.upstream_reviews.report import (
 from basstler.upstream_reviews.request import (
     UpstreamReadRequest,
 )
-from basstler.upstream_reviews.rest_models import (
-    RestPullRequestSummary,
-)
 
+from ..executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from ..constants.paths import DatasetLocation
+from .replay import RecordedRestResponse as Recorded
+from .replay import ReplayingRestClient
 from .test_rest import (
     NUMBER,
     ROUTE,
@@ -61,8 +65,6 @@ from .test_rest import (
     make_reader,
     pull_request_responses,
 )
-from .replay import RecordedRestResponse as Recorded
-from .replay import ReplayingRestClient
 
 FAILED_JOB = 22
 """
@@ -108,10 +110,13 @@ def stubbed_gh(tmp_path, monkeypatch) -> Path:
     installed.chmod(installed.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("PATH", f"{stub_directory}{os.pathsep}{os.environ['PATH']}")
     responses = tmp_path / "responses.json"
-    responses.write_text(json.dumps(pull_request_responses()))
+    responses.write_text(json.dumps(pull_request_responses()), encoding="utf-8")
     monkeypatch.setenv("STUB_GH_RESPONSES", str(responses))
     logs = tmp_path / "logs.json"
-    logs.write_text(json.dumps({UPSTREAM.job_log_path(FAILED_JOB): FAILED_JOB_LOG}))
+    logs.write_text(
+        json.dumps({UPSTREAM.job_log_path(FAILED_JOB): FAILED_JOB_LOG}),
+        encoding="utf-8",
+    )
     monkeypatch.setenv("STUB_GH_JOB_LOGS", str(logs))
     return responses
 
@@ -121,7 +126,10 @@ def add_responses(responses: Path, extra: dict[str, object]) -> None:
     :param responses: The file the stub reads.
     :param extra: More paths for it to answer.
     """
-    responses.write_text(json.dumps(json.loads(responses.read_text()) | extra))
+    responses.write_text(
+        json.dumps(json.loads(responses.read_text(encoding="utf-8")) | extra),
+        encoding="utf-8",
+    )
 
 
 def run_fetch(helper_request: UpstreamReadRequest) -> str:
@@ -132,9 +140,9 @@ def run_fetch(helper_request: UpstreamReadRequest) -> str:
     :return: What it printed.
     """
     completed = subprocess.run(
-        ["bash", "-c", HelperScript(helper_request).render()],
+        Bash.locate(os.environ).command("-c", HelperScript(helper_request).render()),
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     )
     return completed.stdout
@@ -180,6 +188,7 @@ def direct_report(include_resolved: bool = False, failure_logs: bool = False) ->
 
 
 @pytest.mark.parametrize("include_resolved", [False, True])
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_helper_read_reports_what_a_direct_read_does(
     stubbed_gh, include_resolved: bool
 ):
@@ -192,6 +201,7 @@ def test_the_helper_read_reports_what_a_direct_read_does(
     )
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_branch_is_chosen_by_the_reader_on_replay(stubbed_gh):
     add_responses(
         stubbed_gh,
@@ -241,6 +251,7 @@ def test_the_helper_reads_the_pull_request_the_reader_chooses(recorded):
     assert fetch.numbers() == chosen
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_branch_never_promoted_replays_into_the_same_answer(stubbed_gh):
     add_responses(
         stubbed_gh,
@@ -258,6 +269,7 @@ def test_a_branch_never_promoted_replays_into_the_same_answer(stubbed_gh):
         recording.report(helper_request, False)
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_log_behind_a_failed_check_is_read_and_quoted(stubbed_gh):
     helper_request = request(failure_logs=True)
 
@@ -267,12 +279,14 @@ def test_the_log_behind_a_failed_check_is_read_and_quoted(stubbed_gh):
     assert recording.report(helper_request, False) == direct_report(failure_logs=True)
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_no_log_is_read_unless_asked_for(stubbed_gh):
     helper_request = request()
 
     assert recording_of(helper_request, run_fetch(helper_request)).job_logs == []
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_the_helper_records_exactly_the_paths_a_direct_read_asks_for(stubbed_gh):
     helper_request = request()
     client = ReplayingRestClient(pull_request_responses())
@@ -285,8 +299,9 @@ def test_the_helper_records_exactly_the_paths_a_direct_read_asks_for(stubbed_gh)
     assert [response.path for response in recording.responses] == client.calls
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_a_failing_gh_fails_the_fetch_with_its_error(stubbed_gh):
-    stubbed_gh.write_text("{}")
+    stubbed_gh.write_text("{}", encoding="utf-8")
 
     with pytest.raises(subprocess.CalledProcessError) as raised:
         run_fetch(request())
@@ -318,13 +333,14 @@ def test_the_kept_fields_read_the_pull_request_the_whole_responses_do():
     ).read_current_state(NUMBER)
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_output_too_long_for_one_command_is_split_into_files(stubbed_gh, monkeypatch):
     monkeypatch.setattr(HelperChunk, "size", 100)
     helper_request = request()
 
     printed = run_fetch(helper_request)
     output = "".join(
-        Path(line.removeprefix("cat ")).read_text()
+        Path(line.removeprefix("cat ")).read_text(encoding="utf-8")
         for line in printed.splitlines()
         if line.startswith("cat ")
     )
@@ -341,13 +357,25 @@ def test_output_too_long_for_one_command_is_split_into_files(stubbed_gh, monkeyp
 
 def test_the_shipped_source_is_code_alone_and_runs_without_basstler():
     source = HelperScript.code_only(
-        Path(basstler.upstream_reviews.helper.fetch.__file__).read_text()
+        Path(basstler.upstream_reviews.helper.fetch.__file__).read_text(
+            encoding="utf-8"
+        )
     )
 
     assert '"""' not in source
     assert "import basstler" not in source
     assert "from basstler" not in source
     compile(source, "<helper>", "exec")
+
+
+def test_the_command_s_argument_holds_no_backslash():
+    """
+    Git Bash on Windows halves the backslashes of an argument it hands a native
+    program, so an argument holding one reaches the interpreter as other JSON.
+    """
+    argument_line = HelperScript(request()).render().splitlines()[0]
+
+    assert "\\" not in argument_line
 
 
 def test_the_prompt_carries_the_command_and_how_to_answer():
@@ -431,8 +459,12 @@ def test_a_chunk_is_found_however_deeply_the_transcript_quotes_it():
 def test_the_transcript_is_every_file_named_after_the_session(tmp_path):
     for project in ["-home-user", "-home-user-project"]:
         (tmp_path / "projects" / project).mkdir(parents=True)
-        (tmp_path / "projects" / project / "session.jsonl").write_text("")
-    (tmp_path / "projects" / "-home-user" / "other.jsonl").write_text("")
+        (tmp_path / "projects" / project / "session.jsonl").write_text(
+            "", encoding="utf-8"
+        )
+    (tmp_path / "projects" / "-home-user" / "other.jsonl").write_text(
+        "", encoding="utf-8"
+    )
 
     files = SessionTranscript("session", tmp_path).files
 
@@ -467,6 +499,7 @@ def test_report_before_any_prompt_says_so(session):
         UpstreamReadRequest.load()
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_prompt_then_report_reads_the_helper_output_from_the_transcript(
     stubbed_gh, session, capsys
 ):
@@ -486,7 +519,8 @@ def test_prompt_then_report_reads_the_helper_output_from_the_transcript(
     )
     capsys.readouterr()
     session.write_text(
-        json.dumps({"stdout": run_fetch(UpstreamReadRequest.load())}) + "\n"
+        json.dumps({"stdout": run_fetch(UpstreamReadRequest.load())}) + "\n",
+        encoding="utf-8",
     )
 
     assert main(["report"]) == 0

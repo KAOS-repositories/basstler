@@ -21,9 +21,8 @@ import basstler.setup.steps
 from basstler.locations import PluginLocation, ProjectLocation
 from basstler.setup.report import CheckResult, CheckStatus, SetupCheck, SetupReport
 from basstler.setup.steps import SetupCommand, SetupCommandOption
-from basstler.stack.configuration import StackSetting
+from basstler.github.stack_configuration import StackSetting
 
-from ..constants.paths import PersonalNotesPath
 from ..scratch_repository import SCRATCH_IDENTITY, ScratchRepository
 from ..script_runner import PythonModuleRunner
 
@@ -122,7 +121,9 @@ def published_stack_settings(
     """
     checkout = repository.clone_notes_branch(tmp_path / "published")
     return tomllib.loads(
-        (checkout / ProjectLocation.PERSONAL_STACK_CONFIGURATION).read_text()
+        (checkout / ProjectLocation.PERSONAL_STACK_CONFIGURATION).read_text(
+            encoding="utf-8"
+        )
     )
 
 
@@ -217,7 +218,7 @@ def test_an_upstream_the_step_saved_passes_the_check(
     result = upstream_row(upstream_repository, REQUIRE_UPSTREAM)
 
     assert result.status == CheckStatus.OK
-    assert str(ProjectLocation.PERSONAL_STACK_CONFIGURATION) in result.detail
+    assert (ProjectLocation.PERSONAL_STACK_CONFIGURATION).as_posix() in result.detail
 
 
 def test_an_upstream_the_project_commits_passes_the_check(
@@ -231,7 +232,7 @@ def test_an_upstream_the_project_commits_passes_the_check(
     result = upstream_row(upstream_repository, REQUIRE_UPSTREAM)
 
     assert result.status == CheckStatus.OK
-    assert str(ProjectLocation.PROJECT_STACK_CONFIGURATION) in result.detail
+    assert (ProjectLocation.PROJECT_STACK_CONFIGURATION).as_posix() in result.detail
 
 
 # %% the Action
@@ -310,7 +311,7 @@ def test_the_recorded_identity_is_read_after_the_action_check_fetched_its_branch
     upstream_repository: ScratchRepository,
 ):
     upstream_repository.update_notes_branch_file(
-        PersonalNotesPath.GIT_IDENTITY, SCRATCH_IDENTITY.as_git_config_file()
+        ProjectLocation.GIT_IDENTITY, SCRATCH_IDENTITY.as_git_config_file()
     )
     configure_upstream(upstream_repository, UpstreamSample.UPSTREAM)
     install_action(upstream_repository, "v0.0.1")

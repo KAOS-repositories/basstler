@@ -25,6 +25,16 @@ class RepositoryLocation(PathEnumeration):
     The repository root.
     """
 
+    TESTS = ROOT / "tests"
+    """
+    This test suite.
+    """
+
+    SCRIPTS = ROOT / "scripts"
+    """
+    The development scripts, such as the docstring formatter the pre-commit hook runs.
+    """
+
     MARKETPLACE = ROOT / ".claude-plugin" / "marketplace.json"
     """
     The marketplace that lists the plugin and says where it is served from.
@@ -63,6 +73,18 @@ class RepositoryLocation(PathEnumeration):
     PLAN_SITE_BUILD_WORKFLOW = WORKFLOWS / "plan-site-build.yml"
     """
     The reusable workflow that builds the plan site and deploys a changed one.
+    """
+
+    WINDOWS_SETUP_WORKFLOW = WORKFLOWS / "windows-setup.yml"
+    """
+    The workflow that runs the personal-notes setup on Windows for a pull request
+    changing what the setup runs.
+    """
+
+    WINDOWS_TESTS_WORKFLOW = WORKFLOWS / "windows-tests.yml"
+    """
+    The workflow that runs the whole suite on Windows for every pull request ready for
+    review.
     """
 
     MAIN_FAILURE_WORKFLOW = WORKFLOWS / "main-failure.yml"
@@ -123,6 +145,11 @@ class DatasetLocation(PathEnumeration):
     indented under it.
     """
 
+    SHARED_IDENTIFIER_PLAN = DIRECTORY / "shared-identifier-plan.yaml"
+    """
+    A plan whose only wave, track and item all carry the id ``experiment``.
+    """
+
     BOOTSTRAP_ROADMAP = DIRECTORY / "bootstrap-roadmap.md"
     """
     The item-bootstrap fixture plan's roadmap.
@@ -149,23 +176,44 @@ class DatasetLocation(PathEnumeration):
     the push it runs for.
     """
 
+    REJECTING_PRE_COMMIT_HOOK = DIRECTORY / "rejecting-pre-commit.sh"
+    """
+    A pre-commit hook that rejects every commit, as a project's checks do on a branch
+    that does not carry their configuration.
+    """
+
+    RECORDING_GH = DIRECTORY / "recording-gh.sh"
+    """
+    A ``gh`` that records each call's arguments, ``GH_TOKEN`` and standard input, and
+    fails a workflow run when ``GH_WORKFLOW_RUN_STATUS`` is non-zero.
+    """
+
     PROTECTED_MAIN_HOOK = DIRECTORY / "refuse-main-pre-receive.sh"
     """
     A pre-receive hook that refuses every push updating ``main``, as a protected default
     branch does.
     """
 
+    WORKFLOW_SCOPE_REFUSING_HOOK = DIRECTORY / "refuse-workflow-scope-pre-receive.sh"
+    """
+    A pre-receive hook that refuses every push as GitHub refuses a token without the
+    ``workflow`` scope.
+    """
+
+    PUSH_REFUSED_WITHOUT_CREDENTIAL = DIRECTORY / "push-refusals" / "no-credential.txt"
+    """
+    What git prints when it has no credential to push to GitHub over HTTPS.
+    """
+
+    PUSH_DECLINED = DIRECTORY / "push-refusals" / "declined.txt"
+    """
+    What git prints when a push is declined for a reason it does not name.
+    """
+
     PULL_REQUEST_DATA_KEYED_BY_NUMBER = DIRECTORY / "pr-data-keyed-by-number.json"
     """
     A ``pr_data.json`` missing its repository level: one pull request keyed by its
     number alone.
-    """
-
-    ACTION_RESULT_WITHOUT_REQUEST_IDENTIFIER = (
-        DIRECTORY / "action-result-without-request-identifier.json"
-    )
-    """
-    A result an Action release from before results named their request committed.
     """
 
     PLAN_SITE_RUNS_SUCCEEDED = DIRECTORY / "plan-site-runs-succeeded.json"
@@ -207,6 +255,11 @@ class DatasetLocation(PathEnumeration):
     A notes repository's token secret, set after its recorded failed dispatch run.
     """
 
+    PLAN_SITE_READ_TOKEN_STORED = DIRECTORY / "plan-site-read-token-stored.json"
+    """
+    A site repository's notes token secret, as stored.
+    """
+
     WORKFLOW_RUNS_NONE = DIRECTORY / "workflow-runs-none.json"
     """
     A run listing with no runs at all.
@@ -219,7 +272,18 @@ class DatasetLocation(PathEnumeration):
 
     REPOSITORY_NOT_FORK = DIRECTORY / "repository-not-fork.json"
     """
-    A repository's REST response for a repository that is not a fork.
+    A repository's REST response for a public repository that is not a fork.
+    """
+
+    SESSION_PROXY_REFUSAL = DIRECTORY / "session-proxy-refusal.json"
+    """
+    What a Claude Code cloud session's proxy answers, in GitHub's place, for a
+    repository not attached to the session.
+    """
+
+    REPOSITORY_PRIVATE = DIRECTORY / "repository-private.json"
+    """
+    A repository's REST response for a private repository that is not a fork.
     """
 
     REPOSITORY_TRUNK_DEFAULT_BRANCH = DIRECTORY / "repository-trunk-default-branch.json"
@@ -245,6 +309,12 @@ class DatasetLocation(PathEnumeration):
     MERGE_WORKFLOW_PULL_REQUEST = DIRECTORY / "merge-workflow-pull-request.json"
     """
     The REST response for the pull request proposing the plan site's merge workflow.
+    """
+
+    STALE_MERGE_WORKFLOW = DIRECTORY / "plan-site-merge-workflow-closed-only.yml"
+    """
+    The plan site's merge workflow as an earlier release wrote it, starting the build
+    only when a pull request closes.
     """
 
     PULL_REQUEST_REFUSED = DIRECTORY / "pull-request-refused.json"
@@ -291,10 +361,27 @@ class DatasetLocation(PathEnumeration):
     :class:`ProgressBranch` that has one.
     """
 
+    HANDOVER = DIRECTORY / "handover"
+    """
+    A plan handover: two plans, one depending on the other's item, the progress notes
+    of their items' branches and the repository's rules, laid out as
+    :class:`basstler.locations.PlanHandoverLocation` names them.
+    """
+
+    UNRELATED_PROGRESS_NOTE = DIRECTORY / "handover-notes" / "unrelated-branch.md"
+    """
+    The progress note of a branch no plan of :attr:`HANDOVER` tracks.
+    """
+
     PLANS = DIRECTORY / "plans"
     """
     A plans directory the cross-plan reference tests resolve against: one subdirectory
     per fixture plan.
+    """
+
+    BASH_PATH_SCRIPT = DIRECTORY / "bash-path.sh"
+    """
+    Prints a path as the bash running it writes it.
     """
 
     STUBS = DIRECTORY / "stubs"
@@ -320,6 +407,76 @@ class DatasetLocation(PathEnumeration):
     BUILD_START_STUB = STUBS / "build_start_prints_its_name.py"
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, printing its name.
+    """
+
+    GIT_IDENTITY_OF_A_COLLEAGUE_STUB = STUBS / "git_identity_of_a_colleague.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.git_identity`, printing the
+    identity path of a colleague who does not own the notes repository.
+    """
+
+    BUILD_START_NEEDS_ACCESS_STUB = STUBS / "build_start_needs_access.py"
+    """
+    A module standing in for :mod:`basstler.plan_site.build_start`, saying this session
+    cannot start the build yet.
+    """
+
+    BUILD_START_NEEDS_ACCESS_WINDOWS_LINES_STUB = (
+        STUBS / "build_start_needs_access_windows_lines.py"
+    )
+    """
+    :attr:`BUILD_START_NEEDS_ACCESS_STUB` with its lines ending in a carriage return and
+    a line feed, as Python writes them on Windows.
+    """
+
+    BUILD_START_HAS_ACCESS_STUB = STUBS / "build_start_has_access.py"
+    """
+    A module standing in for :mod:`basstler.plan_site.build_start`, saying nothing: the
+    session can start the build.
+    """
+
+    FAILING_CHECK_SETUP_STUB = STUBS / "check_setup_fails.sh"
+    """
+    A script standing in for check-setup.sh, failing before it prints a report.
+    """
+
+    MERGE_WORKFLOW_REFRESH_STUB = STUBS / "merge_workflow_refresh_from_environment.py"
+    """
+    A module standing in for :mod:`basstler.plan_site.merge_workflow_refresh`'s command,
+    printing what the environment says.
+    """
+
+    MERGE_WORKFLOW_REFRESH_OUTPUT = DIRECTORY / "merge-workflow-refresh-output.txt"
+    """
+    What the real command prints once it proposed the current merge workflow.
+    """
+
+    MERGED_ITEMS_STUB = STUBS / "merged_items_from_recording.py"
+    """
+    A module standing in for :mod:`basstler.plan.merged_items`'s command, reading the
+    pull requests from a recording.
+    """
+
+    IN_PROGRESS_ITEM_MERGED = DIRECTORY / "pull-requests-in-progress-item-merged.json"
+    """
+    A recording in which the in-progress item of :attr:`PLAN_WITH_LANDED_ITEMS` has merged.
+    """
+
+    NOTES_ACCESS_STUB = STUBS / "notes_access_prints_its_name.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.access`, printing its name as
+    the missing access.
+    """
+
+    NOTES_ACCESS_REACHED_STUB = STUBS / "notes_access_has_access.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.access`, saying nothing: the
+    session reaches the notes repository.
+    """
+
+    REVIEW_TRIAGE = DIRECTORY / "review-triage"
+    """
+    The file versions, descriptions and pull request the review triage is tested on.
     """
 
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
@@ -518,9 +675,19 @@ class SkillDirectory(PathEnumeration):
     The instructions for reading a branch's upstream review threads.
     """
 
+    SETUP_PERSONAL_NOTES = DIRECTORY / "setup-personal-notes"
+    """
+    The one-time setup, which works through check-setup.sh's rows.
+    """
+
     RUNNING_COMMANDS_DOCUMENT = DIRECTORY / "running-commands.md"
     """
     How every skill runs its commands, which each skill's instructions link.
+    """
+
+    PULL_REQUEST_RULES_DOCUMENT = DIRECTORY / "pull-request-rules.md"
+    """
+    The rules a skill acting on pull requests links, so they hold only while it runs.
     """
 
     MANIFEST_STALENESS_DOCUMENT = PLAN_CREATE / "manifest-staleness.md"
@@ -563,11 +730,6 @@ class PersonalNotesPath(PathEnumeration):
     reads a plan out of.
     """
 
-    GIT_IDENTITY = ProjectLocation.PERSONAL_NOTES / "git-identity"
-    """
-    The recorded git identity a clone with none of its own is given.
-    """
-
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"
     """
     The directory holding each pull request branch's progress notes, by branch name.
@@ -584,9 +746,30 @@ class PersonalNotesPath(PathEnumeration):
     and writes its own permission grants into.
     """
 
-    BRANCH_INDEX = ProjectLocation.PLANS / "_generated" / "branch-index.tsv"
+    BRANCH_INDEX = ProjectLocation.PLAN_BRANCH_INDEX
     """
     The generated reverse index mapping an item's branch to the plan tracking it.
+    """
+
+
+class AddressSnippet(PathEnumeration):
+    """
+    Python sources the address check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "address-building"
+    """
+    The directory holding them.
+    """
+
+    HAND_BUILT = DIRECTORY / "hand-built-addresses.py"
+    """
+    A REST path and a page each appended to a repository's address by hand.
+    """
+
+    FROM_THEIR_CLASS = DIRECTORY / "addresses-from-their-class.py"
+    """
+    An address the repository builds, and a repository's name in a sentence.
     """
 
 
@@ -670,4 +853,150 @@ class RuleSectionsFile(PathEnumeration):
     """
     The text of the sections in ``rule_sections.py``, with placeholders for the module's
     path and the commands' invocations.
+    """
+
+
+class BashByNameSnippet(PathEnumeration):
+    """
+    Source files the check for bash started by its name reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "bash-by-name"
+    """
+    The directory holding them.
+    """
+
+    SUBPROCESS_CALL = DIRECTORY / "subprocess-call.py"
+    """
+    A :mod:`subprocess` call running bash by its name, marked as a violation.
+    """
+
+    RETURNED_COMMAND = DIRECTORY / "returned-command.py"
+    """
+    A function returning a command line that runs bash by its name, marked as a
+    violation.
+    """
+
+    LOCATED_BASH = DIRECTORY / "located-bash.py"
+    """
+    A run of the located bash, and a tuple of names starting with bash that is no
+    command.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls running bash by its name through :mod:`subprocess` imported under other
+    names, marked as violations.
+    """
+
+
+class LocaleEncodingSnippet(PathEnumeration):
+    """
+    Source files the check for text read or written in the locale encoding reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "locale-encoding"
+    """
+    The directory holding them.
+    """
+
+    LOCALE_TEXT = DIRECTORY / "locale-text.py"
+    """
+    Every kind of text read or written in the locale encoding, one per marked line.
+    """
+
+    UTF_8_TEXT = DIRECTORY / "utf-8-text.py"
+    """
+    Text read and written as UTF-8, bytes read and written without an encoding, and a
+    request opened, which is no file.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls decoding output in the locale encoding through :mod:`subprocess` imported
+    under other names, marked as violations.
+    """
+
+
+class TreeRemovalSnippet(PathEnumeration):
+    """
+    Source files the check for directories removed with :func:`shutil.rmtree` reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "tree-removal"
+    """
+    The directory holding them.
+    """
+
+    SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
+    """
+    Two calls to :func:`shutil.rmtree`, marked as violations.
+    """
+
+    IMPORTED_RMTREE = DIRECTORY / "imported-rmtree.py"
+    """
+    Three calls to :func:`shutil.rmtree` through an aliased module and through names
+    imported from it, marked as violations.
+    """
+
+    OTHER_RMTREE = DIRECTORY / "other-rmtree.py"
+    """
+    A function and a method named ``rmtree`` that are not :func:`shutil.rmtree`.
+    """
+
+
+class SourceModuleSnippet(PathEnumeration):
+    """
+    Source files the tests of resolving names in a parsed file read.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "source-module"
+    """
+    The directory holding them.
+    """
+
+    REMOVES_NOTHING = DIRECTORY / "removes-nothing.py"
+    """
+    One call of :func:`shutil.copytree`, in a file that never spells ``rmtree``.
+    """
+
+    BUILTIN_OPEN = DIRECTORY / "builtin-open.py"
+    """
+    One call of the builtin :func:`open`.
+    """
+
+
+class PackageBoundarySnippet(PathEnumeration):
+    """
+    A package of two distributions the package boundary check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "package-boundaries"
+    """
+    The directory holding them.
+    """
+
+    PACKAGE = DIRECTORY / "basstler"
+    """
+    The package directory, claimed by a lower and a higher distribution.
+    """
+
+    PACKAGE_MAP = PACKAGE / "package_map.py"
+    """
+    The map the package declares for itself.
+    """
+
+    LISTED_IMPORT = PACKAGE / "high" / "caller.py"
+    """
+    The higher distribution importing the lower one it lists, in both import forms.
+    """
+
+    UNLISTED_IMPORT = PACKAGE / "low" / "upward.py"
+    """
+    The lower distribution importing the higher one.
+    """
+
+    UNCLAIMED_MODULE = PACKAGE / "stray.py"
+    """
+    A module neither distribution claims.
     """

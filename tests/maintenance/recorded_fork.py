@@ -6,36 +6,42 @@ the maintenance suites run against a scratch fork.
 from __future__ import annotations
 
 import subprocess
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclasses_field
 from enum import StrEnum
+from pathlib import Path
 
+from basstler.environment import GitHubCredentialVariable
+from basstler.git.commands import GitCommandRunner
+from basstler.github.constants import GitHubExecutable
+from basstler.github.pull_request_record import (
+    PullRequestField,
+)
+from basstler.github.repository_access import ForkPullRequests
+from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
+from basstler.maintenance.commands import (
+    MaintenanceCommand,
+    MaintenancePass,
+)
+from basstler.maintenance.landed_closing import ClosedAsLanded
+from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUp
 from basstler.stack.model import (
     PullRequest,
     Stack,
 )
 
-from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
-from basstler.maintenance.board import PullRequestField
-from basstler.maintenance.commands import (
-    MaintenanceCommand,
-    MaintenancePass,
-)
-from basstler.environment import GitHubCredentialVariable
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.maintenance.github import ForkPullRequests
-
+from ..constants.environment import SearchPathVariable
+from ..executable_stubs import path_hiding_executables
 from ..script_runner import PythonModuleRunner
-
 from .fork import (
-    PromotionSampleText,
     MAINTENANCE_MODULE,
-    make_configuration,
     ForkCheckout,
+    PromotionSampleText,
     a_stack,
+    make_configuration,
 )
-
 
 # %% reporting a branch back to its owner
 
@@ -140,6 +146,11 @@ class RecordingPullRequests(ForkPullRequests):
     Every description written, in order.
     """
 
+    closed: list[int] = dataclasses_field(default_factory=list)
+    """
+    The number of every pull request closed, in order.
+    """
+
     def open_pull_requests(self) -> list[dict]:
         """
         :return: Every pull request this stand-in has been given state for, in number
@@ -187,6 +198,12 @@ class RecordingPullRequests(ForkPullRequests):
         """
         self.description_writes.append(RecordedDescription(number, body))
         self.descriptions[number] = body
+
+    def close_pull_request(self, number: int) -> None:
+        """
+        :param number: The pull request to close.
+        """
+        self.closed.append(number)
 
 
 @dataclass(frozen=True)
@@ -244,6 +261,30 @@ class PullRequestsRefusingToReport(RecordingPullRequests):
         :raises ReportingRefused: Always.
         """
         raise ReportingRefused
+
+
+# %% following up on closed pull requests
+
+
+@dataclass(frozen=True)
+class RecordingFollowUp(LandedClosingFollowUp):
+    """
+    A follow-up to closing that records each call instead of doing any work.
+    """
+
+    outcome: str = "Followed up on the closed pull requests."
+    """
+    What each call reports for the finish summary.
+    """
+
+    calls: list[tuple[ClosedAsLanded, ...]] = dataclasses_field(default_factory=list)
+    """
+    The pull requests each call was given, in call order.
+    """
+
+    def respond_to_closing(self, closed: Sequence[ClosedAsLanded]) -> str | None:
+        self.calls.append(tuple(closed))
+        return self.outcome
 
 
 # %% the command line a caller acts on the exit status of
@@ -318,8 +359,10 @@ def maintenance_runner(checkout: ForkCheckout) -> PythonModuleRunner:
     """
     :param checkout: The fork checkout to run in.
     :return: A runner for the executor, as on a machine with no credential outside a
-        cloud session: no token variable, a ``gh`` with no login, and no cloud session
-        marker.
+        cloud session: no token variable, no ``gh`` on the search path, and no cloud
+        session marker. ``gh`` is hidden rather than logged out because on Windows it
+        reads its login from the credential store, which no configuration directory
+        replaces.
     """
     return PythonModuleRunner(
         project_root=checkout.project_root,
@@ -331,7 +374,11 @@ def maintenance_runner(checkout: ForkCheckout) -> PythonModuleRunner:
             LoggedOutCommandLine.CONFIGURATION_DIRECTORY_VARIABLE: str(
                 checkout.project_root.parent
                 / LoggedOutCommandLine.CONFIGURATION_DIRECTORY
-            )
+            ),
+            SearchPathVariable.EXECUTABLE_SEARCH_PATH: path_hiding_executables(
+                Path(tempfile.mkdtemp(dir=checkout.project_root.parent)),
+                GitHubExecutable.COMMAND_LINE,
+            ),
         },
         module_name=MAINTENANCE_MODULE,
     )

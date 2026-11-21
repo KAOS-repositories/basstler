@@ -15,14 +15,14 @@ from typing import Annotated, Any
 import yaml
 from cyclopts import App, Parameter
 
-from basstler.exceptions import NotesRemoteNamesNoRepository, PlanValidationError
+from basstler.command_line import plan_item_selection
+from basstler.exit_codes import CommandFailure, ExitCode, ManifestToolsExitCode
+from basstler.github.repository import Repository
+from basstler.plan import model
 from basstler.plan.dependencies import PlanDirectory
+from basstler.plan.exceptions import OriginNamesNoRepository, PlanValidationError
 from basstler.plan.merge import PlanMerge, PlanVersion
 from basstler.plan.validation import PlanValidator
-from basstler.plan import model
-from basstler.repository import Repository
-from basstler.exit_codes import CommandFailure, ExitCode, ManifestToolsExitCode
-from basstler.command_line import plan_item_selection
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -54,6 +54,11 @@ class ManifestToolsCommand(StrEnum):
     ITEM = "item"
     """
     Print the plan's header and one item's entry.
+    """
+
+    UNMODELLED_ITEMS = "unmodelled-items"
+    """
+    Print the identifiers of the items that carry no recommended model.
     """
 
     MERGE = "merge"
@@ -113,9 +118,14 @@ class ManifestToolsOption(StrEnum):
     The branch whose item to print.
     """
 
-    NOTES_REMOTE_URL = "--notes-remote-url"
+    ORIGIN_URL = "--origin-url"
     """
-    The URL of the remote whose notes branch the manifest is saved to.
+    The URL of the ``origin`` of the checkout saving the manifest.
+    """
+
+    SAVING = "--saving"
+    """
+    Marks the manifest as one about to be saved over the copy in ``--plans-dir``.
     """
 
 
@@ -146,7 +156,7 @@ class PlanManifest:
         """
         :return: The manifest, parsed.
         """
-        with self.path.open() as manifest_file:
+        with self.path.open(encoding="utf-8") as manifest_file:
             return yaml.safe_load(manifest_file)
 
     @property
@@ -156,6 +166,16 @@ class PlanManifest:
         :return: The manifest's ``id`` field, or an empty string if it has none.
         """
         return self.string_field(self.content.get("id", ""), "id")
+
+    @property
+    def item_identifiers(self) -> frozenset[str]:
+        """
+        :return: Every item's ``id``, or its ``branch`` for an item with no id.
+        """
+        return frozenset(
+            item.get("id") or item.get("branch")
+            for item in self.content.get("items") or []
+        )
 
     @property
     def item_branches(self) -> list[str]:
@@ -178,21 +198,51 @@ class PlanManifest:
     def validate(
         self,
         plan_directory: PlanDirectory | None = None,
-        notes_repository: Repository | None = None,
+        checkout_repository: Repository | None = None,
+        saved_item_identifiers: frozenset[str] | None = None,
     ) -> None:
         """
         Check the manifest against the same rules a plan page is built under, so nothing
-        is saved that no page could then be built from, nor to another repository's
-        notes than the one its work is for.
+        is saved that no page could then be built from, nor from a checkout of another
+        repository than the one its work is for.
 
         :param plan_directory: The plans a ``<plan-id>/<item-id>`` entry resolves
             against; without one, such an entry is refused.
-        :param notes_repository: The repository whose notes the manifest is saved to, or
-            ``None`` when it is not known.
+        :param checkout_repository: The repository the ``origin`` of the checkout saving
+            the manifest names, or ``None`` when no save is being checked.
+        :param saved_item_identifiers: The items the plan's saved copy holds, or ``None``
+            when no save is being checked.
         :raises PlanValidationError: If it breaks any rule, carrying every problem
             found.
         """
-        PlanValidator(self.content, plan_directory, notes_repository).validate()
+        PlanValidator(
+            self.content, plan_directory, checkout_repository, saved_item_identifiers
+        ).validate()
+
+    @staticmethod
+    def checkout_repository(origin_url: str | None) -> Repository | None:
+        """
+        :param origin_url: The URL of the saving checkout's ``origin``, or ``None`` when
+            no save is being checked.
+        :return: The repository that URL names, or ``None`` for no URL.
+        :raises PlanValidationError: If the URL names no repository.
+        """
+        if origin_url is None:
+            return None
+        if not Repository.names_a_repository(origin_url):
+            raise PlanValidationError([OriginNamesNoRepository(origin_url)])
+        return Repository.from_remote_url(origin_url)
+
+    def saved_item_identifiers(self, plans_directory: Path) -> frozenset[str]:
+        """
+        :param plans_directory: The directory holding every plan as
+            ``<plan-id>/plan.yaml``.
+        :return: The items this plan's copy there holds, none for a plan not saved yet.
+        """
+        saved = plans_directory / self.identifier / model.PlanDocument.MANIFEST
+        if not saved.is_file():
+            return frozenset()
+        return PlanManifest(saved).item_identifiers
 
     def string_field(self, value: object, field_name: str) -> str:
         """
@@ -281,20 +331,6 @@ class BranchIndex:
 # %% command line
 
 
-def notes_repository(notes_remote_url: str | None) -> Repository | None:
-    """
-    :param notes_remote_url: The notes remote's URL, or ``None`` when no save is being
-        checked.
-    :return: The repository that URL names, or ``None`` for no URL.
-    :raises PlanValidationError: If the URL names no repository.
-    """
-    if notes_remote_url is None:
-        return None
-    if not Repository.names_a_repository(notes_remote_url):
-        raise PlanValidationError([NotesRemoteNamesNoRepository(notes_remote_url)])
-    return Repository.from_remote_url(notes_remote_url)
-
-
 manifest_tools_app = App(
     name="basstler.plan.manifest_tools",
     help="The plan.yaml manifest utilities save-plan.sh calls.",
@@ -323,21 +359,26 @@ def validate(
     plans_directory: Annotated[
         Path | None, Parameter(name=ManifestToolsOption.PLANS_DIRECTORY)
     ] = None,
-    notes_remote_url: Annotated[
-        str | None, Parameter(name=ManifestToolsOption.NOTES_REMOTE_URL)
+    origin_url: Annotated[
+        str | None, Parameter(name=ManifestToolsOption.ORIGIN_URL)
     ] = None,
+    saving: Annotated[bool, Parameter(name=ManifestToolsOption.SAVING)] = False,
 ) -> ManifestToolsExitCode:
     """
     Check a manifest against the rules a plan page is built under.
 
     :param manifest_path: The manifest to check.
     :param plans_directory: The plans a ``<plan-id>/<item-id>`` entry resolves against.
-    :param notes_remote_url: The remote the manifest is saved to; a plan for another
-        repository, or a remote naming none, is refused.
+    :param origin_url: The origin of the checkout saving the manifest; a plan for
+        another repository, or an origin naming none, is refused.
+    :param saving: Refuse an item the saved copy of the plan lacks unless it has a
+        recommended_model.
     """
-    PlanManifest(manifest_path).validate(
+    manifest = PlanManifest(manifest_path)
+    manifest.validate(
         PlanDirectory(plans_directory) if plans_directory else None,
-        notes_repository(notes_remote_url),
+        PlanManifest.checkout_repository(origin_url),
+        manifest.saved_item_identifiers(plans_directory) if saving else None,
     )
     return ManifestToolsExitCode.SUCCESS
 
@@ -365,7 +406,21 @@ def regenerate_branch_index(
     :param output: Where to write the index.
     """
     index = BranchIndex(scratch_directory, plans_directory, manifest_filename)
-    output.write_text(index.render())
+    output.write_text(index.render(), encoding="utf-8")
+    return ManifestToolsExitCode.SUCCESS
+
+
+@manifest_tools_app.command(name=ManifestToolsCommand.UNMODELLED_ITEMS)
+def unmodelled_items(manifest_path: Path, /) -> ManifestToolsExitCode:
+    """
+    Print the items that carry no recommended model, comma separated.
+
+    :param manifest_path: The manifest to read.
+    """
+    manifest = model.PlanManifest.from_file(manifest_path)
+    logger.info(
+        ", ".join(item.identifier for item in manifest.items_without_recommended_model)
+    )
     return ManifestToolsExitCode.SUCCESS
 
 

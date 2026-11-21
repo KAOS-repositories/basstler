@@ -46,9 +46,10 @@ title: "Human-readable title"
 description: >
   One short paragraph.
 default_repository: <owner>/<repo>   # used by every item unless it sets its own `repository`
-                                     # and the repository whose notes hold the plan
+                                     # and the repository whose checkout saves the plan
                                        # (roadmap.md is a fixed sibling filename, not configurable)
 tracking_issue: <int, optional> # see "Proposing structural changes" below
+landed_item_count: <int, optional> # written by the save: items that landed and were dropped
 
 waves:                         # ordered phases, purely organizational
   - id: <wave-id>
@@ -70,7 +71,8 @@ items:                         # the actual trackable units of work - flat,
                                  # which case a readable id is worth the
                                  # divergence.
     title: "What this item does"
-    branch: <branch-name>       # the actual git branch, once one exists
+    branch: <branch-name>       # the actual git branch, once one exists; no other
+                                 # item, in this plan or another, names it
     repository: null            # optional, overrides default_repository
     pull_request_number: <int or null>  # the real GitHub PR number, once one exists
     track: <track-id>
@@ -78,6 +80,8 @@ items:                         # the actual trackable units of work - flat,
                                    # an item of this plan, <plan-id>/<item-id> for
                                    # one in another plan (see below)
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
+    recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
+                                               # difficulty; see "Choosing the recommended model"
     session: <url or omitted>
     notes: "short, freeform"
     blockers: ["freeform reasons", ...]   # optional, defaults to []
@@ -87,6 +91,26 @@ Validation is not documentation-only: `plan/validation.py` enforces this
 schema on every plan site build and every `save-plan.sh`, and `/plan-create` drafts against the
 same checks. If this document and that module ever disagree, the module is
 the authority.
+
+### Choosing the recommended model
+
+The skill that creates an item sets its `recommended_model` from how hard the task is,
+and the plan site preselects it on the item's action buttons. The values are the Claude
+Code aliases, which always resolve to the newest model of the family:
+
+- `haiku` - mechanical, well-specified edits that follow a pattern already in the code.
+- `sonnet` - ordinary implementation: a feature or fix whose design the item's `notes`
+  already settle.
+- `opus` - design-heavy, cross-cutting or ambiguous work, where the item must decide how
+  something should be built.
+
+Every new item carries one: `save-plan.sh` refuses an item the saved plan does not hold yet
+unless it has a `recommended_model`, `item_bootstrap record` refuses a new item without
+`--recommended-model`, and `/plan-create` and `/add-plan-item` set it from the task's
+difficulty. An item saved before the field existed may keep none, and nothing fills in a
+default for it. Session start names the branch's plan's items that have none (the
+`recommended models` line): judge each by difficulty and set it with `item_bootstrap update
+--recommended-model`.
 
 ### Why `status` is deliberately thin
 
@@ -101,7 +125,8 @@ that's still open) — this is the actual mechanism that replaces
 **One exception, shown without a flag.** Most drift needs a person to interpret
 it, but "GitHub confirms this PR is merged" has exactly one correct state: `done`.
 The page shows a merged item as `done` whatever its `status` says; the manifest
-changes only when someone next edits the plan.
+follows at the next session start, which records every plan's merged items done
+and drops them.
 
 ### Depending on an item in another plan
 
@@ -133,6 +158,11 @@ Four rules, each rejected outright rather than passed over:
   (`--plans-dir`, see [`SKILL.md`](./SKILL.md)). Accepting it unchecked is how
   an unresolvable dependency used to count as *ready*.
 
+A save also refuses removing an item that another plan's item still names. To
+move items into another plan, save them there first, then every plan that names
+them with their new `<plan-id>/<item-id>`, and only then the plan they leave. A
+finished item is marked done instead of removed.
+
 The cycle check runs over the resulting union graph, so a loop that closes
 through another plan is caught even though neither manifest can see it alone.
 Indentation is unaffected: an item's indent level is its depth in the
@@ -157,7 +187,9 @@ the plan's page.
 ## The generated reverse index
 
 `.claude/personal/plans/_generated/branch-index.tsv` maps every item's
-`branch` (across every plan) to that plan's `id`. It is regenerated by
+`branch` (across every plan) to that plan's `id`. A branch carries exactly one
+item: a save refuses a branch another item already names, so an item folded into
+another leaves its `branch` off and says in its `notes` where it lands. It is regenerated by
 [`save-plan.sh`](../../hooks/save-plan.sh) in the same commit as any
 `plan.yaml`/`roadmap.md` push, by scanning every `plans/*/plan.yaml` — never
 hand-maintained, so it cannot drift out of sync with the manifests it's

@@ -11,8 +11,9 @@ from pathlib import Path
 import pytest
 
 from basstler.environment import GitHubCredentialVariable
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.maintenance.github import GitHubRepository
+from basstler.git.commands import GitCommandRunner
+from basstler.github.repository import Repository
+from basstler.github.repository_access import GitHubRepository
 from basstler.personal_notes.progress_notes import (
     BranchPullRequests,
     EmptyRemoteBranchListError,
@@ -22,13 +23,14 @@ from basstler.personal_notes.progress_notes import (
     ProgressNotesPruning,
     UnreadableRemoteError,
 )
-from basstler.repository import Repository
 
 from ..constants.notes import ProgressBranch
 from ..constants.paths import DatasetLocation
 from ..scratch_repository import ScratchRepository, initialize_bare_repository
 
-PULL_REQUESTS = json.loads(DatasetLocation.PULL_REQUESTS_BY_BRANCH.read_text())
+PULL_REQUESTS = json.loads(
+    DatasetLocation.PULL_REQUESTS_BY_BRANCH.read_text(encoding="utf-8")
+)
 """
 Pull requests of ``owner/repo``: one branch open, one merged, one reopened after a
 closed attempt, and two from elsewhere.
@@ -54,7 +56,7 @@ def progress_directory(tmp_path: Path, *branches: str) -> ProgressNotesDirectory
     for branch in branches:
         file = tmp_path / f"{branch}{ProgressNotesFile.SUFFIX}"
         file.parent.mkdir(parents=True, exist_ok=True)
-        file.write_text("- Next: a step.\n")
+        file.write_text("- Next: a step.\n", encoding="utf-8")
     return ProgressNotesDirectory(tmp_path)
 
 

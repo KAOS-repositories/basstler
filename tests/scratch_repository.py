@@ -11,6 +11,7 @@ project it serves.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -19,11 +20,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from types import ModuleType
 
-from .script_runner import BashScriptRunner
+import basstler
+from basstler.directory_tree import DirectoryTree
+from basstler.bash import Bash
+from basstler.git.commands import GitCommandRunner
+from basstler.github.repository import Repository
 from basstler.locations import PackageLocation, PluginLocation
-from basstler.maintenance.git_commands import GitCommandRunner
-from basstler.repository import Repository
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.shell_configuration import ShellConfigurationFunction
 
@@ -34,6 +38,8 @@ from .constants.environment import (
 )
 from .constants.notes import ScratchBranch
 from .constants.paths import DatasetLocation, RepositoryLocation, SkillDirectory
+from .plugin_manifest import PluginManifest, PluginManifestKey
+from .script_runner import BashScriptRunner
 
 
 class PackageSourceFile(StrEnum):
@@ -101,7 +107,9 @@ def write_interpreter_wrapper(destination: Path) -> Path:
     :return: *destination*.
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+    destination.write_text(
+        f'#!/bin/sh\nexec "{sys.executable}" "$@"\n', encoding="utf-8"
+    )
     destination.chmod(FileMode.EXECUTABLE)
     return destination
 
@@ -118,7 +126,7 @@ class SetupPrerequisiteFile(StrEnum):
 
     PLUGIN_MANIFEST = ".claude-plugin/plugin.json"
     """
-    The plugin's manifest, naming its version.
+    The plugin's manifest, which names a version only once the plugin is released.
     """
 
     PLAN_SCHEMA = str(SkillDirectory.PLAN_CREATE / "plan-schema.md")
@@ -177,7 +185,7 @@ def read_git_config_value(path: Path, key: str) -> str:
     result = subprocess.run(
         ["git", "config", "--file", str(path), "--get", key],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
     assert result.returncode == 0, result.stderr
     return result.stdout.strip()
@@ -227,8 +235,7 @@ class ScratchRepository:
     work_remote_path: Path | None = None
     """
     The bare repository standing in for the project's own remote, created only by
-    :meth:`add_work_remote` so a test that never publishes a work branch has no
-    ``origin`` it did not ask for.
+    :meth:`serve_origin_as`, so a test that names no ``origin`` has none.
     """
 
     @property
@@ -268,7 +275,9 @@ class ScratchRepository:
             project_root,
             initialize_bare_repository(parent_directory / "personal-notes.git"),
         )
-        repository.run_git("init", "--quiet")
+        repository.run_git(
+            "init", "--quiet", f"--initial-branch={ScratchBranch.INITIAL}"
+        )
         repository.run_git("config", "user.name", SCRATCH_IDENTITY.name)
         repository.run_git("config", "user.email", SCRATCH_IDENTITY.email)
         # A throwaway repository has no reason to sign, and an environment that signs
@@ -343,7 +352,7 @@ class ScratchRepository:
             ["git", *arguments],
             cwd=cwd or self.project_root,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
         )
 
     def install_hook_scripts(self, *script_names: str) -> None:
@@ -372,7 +381,7 @@ class ScratchRepository:
             / PackageLocation.STACK_CONFIGURATION.value.name
         )
         written.parent.mkdir(parents=True, exist_ok=True)
-        written.write_text(content)
+        written.write_text(content, encoding="utf-8")
         return written
 
     def install_package(self) -> None:
@@ -380,6 +389,21 @@ class ScratchRepository:
         Copy the real :mod:`basstler` package into the scratch checkout.
         """
         install_package_into(self.checkout_root)
+
+    def replace_package_module(self, module: ModuleType, stand_in: Path) -> None:
+        """
+        Put *stand_in* in place of *module* in the scratch checkout's package.
+
+        :param module: The real module, whose file is replaced.
+        :param stand_in: The module to run in its place.
+        """
+        package_root = Path(basstler.__file__).parent.parent
+        shutil.copy(
+            stand_in,
+            self.checkout_root
+            / PackageSourceFile.SOURCE
+            / Path(module.__file__).relative_to(package_root),
+        )
 
     def configuration_value(self, variable_name: str) -> str:
         """
@@ -404,10 +428,10 @@ class ScratchRepository:
             / PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.value.name
         )
         return subprocess.run(
-            ["bash", "-c", f'source "{script}" && {command}'],
+            Bash.locate(os.environ).command("-c", f'source "{script}" && {command}'),
             cwd=self.project_root,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             check=True,
             env=self.runner_environment(**overrides),
         ).stdout
@@ -434,12 +458,14 @@ class ScratchRepository:
         ).write_text(
             self.configuration_output(
                 ShellConfigurationFunction.BASSTLER_PACKAGE_SOURCE, **overrides
-            )
+            ),
+            encoding="utf-8",
         )
         Path(
             self.configuration_value(ConfigurationVariable.INSTALLED_PLUGIN_DIGEST_FILE)
         ).write_text(
-            self.configuration_output(ShellConfigurationFunction.PLUGIN_CONTENT_DIGEST)
+            self.configuration_output(ShellConfigurationFunction.PLUGIN_CONTENT_DIGEST),
+            encoding="utf-8",
         )
         return interpreter
 
@@ -458,6 +484,21 @@ class ScratchRepository:
         shutil.copytree(
             DatasetLocation.SET_UP_PROJECT, self.project_root, dirs_exist_ok=True
         )
+
+    def release_plugin_as(self, version: str) -> None:
+        """
+        Make the scratch plugin a released one, its manifest naming *version* as the
+        release workflow's does.
+
+        :param version: The version the manifest names, without the tag's ``v``.
+        """
+        manifest = {
+            PluginManifestKey.NAME: PluginManifest.of_this_plugin().name,
+            PluginManifestKey.VERSION: version,
+        }
+        manifest_path = self.plugin_root / SetupPrerequisiteFile.PLUGIN_MANIFEST
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     def runner_environment(self, **overrides: str) -> dict[str, str]:
         """
@@ -525,7 +566,7 @@ class ScratchRepository:
         """
         destination = self.project_root / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(content)
+        destination.write_text(content, encoding="utf-8")
         return destination
 
     def commit_everything(self, message: str) -> None:
@@ -604,7 +645,7 @@ class ScratchRepository:
         :param content: The content to commit there.
         """
         checkout = self.project_root.parent / "notes-update-checkout"
-        shutil.rmtree(checkout, ignore_errors=True)
+        DirectoryTree(checkout).remove()
         self.clone_notes_branch(checkout)
         self.run_git("config", "user.name", SCRATCH_IDENTITY.name, cwd=checkout)
         self.run_git("config", "user.email", SCRATCH_IDENTITY.email, cwd=checkout)
@@ -612,26 +653,33 @@ class ScratchRepository:
 
         destination = checkout / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(content)
+        destination.write_text(content, encoding="utf-8")
         self.run_git("add", relative_path, cwd=checkout)
         self.run_git("commit", "--quiet", "-m", f"Set {relative_path}", cwd=checkout)
         self.run_git(
             "push", "--quiet", "origin", ScratchBranch.PERSONAL_NOTES, cwd=checkout
         )
-        shutil.rmtree(checkout)
+        DirectoryTree(checkout).remove()
 
-    def add_work_remote(self) -> Path:
+    def serve_origin_as(self, repository: Repository) -> None:
         """
-        Create a bare repository standing in for the project's own remote and register
-        it as ``origin``, for a hook that publishes a work branch rather than notes.
+        Name ``origin`` by *repository*'s clone URL, which git serves from a bare
+        repository standing in for the project's own remote.
 
-        :return: The work remote's path.
+        :param repository: The repository ``origin`` is to name.
         """
-        self.work_remote_path = initialize_bare_repository(
-            self.project_root.parent / "work-remote.git"
+        if self.work_remote_path is None:
+            self.work_remote_path = initialize_bare_repository(
+                self.project_root.parent / "work-remote.git"
+            )
+            self.run_git("remote", "add", "origin", repository.clone_url)
+        else:
+            self.run_git("remote", "set-url", "origin", repository.clone_url)
+        self.run_git(
+            "config",
+            self.url_rewriting_key(str(self.work_remote_path)),
+            repository.clone_url,
         )
-        self.run_git("remote", "add", "origin", str(self.work_remote_path))
-        return self.work_remote_path
 
     def serve_notes_remote_as(self, repository: Repository) -> None:
         """

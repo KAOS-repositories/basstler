@@ -1,11 +1,32 @@
 name: Windows tests
 
-# Runs the whole suite on a Windows runner for every pull request ready for review, since
-# what breaks only on Windows passes the Linux tests unnoticed. A draft and a push to main
-# run nothing here: a Windows runner costs twice the minutes of a Linux one.
+# Runs the whole suite on a Windows runner, since what breaks only on Windows passes the
+# Linux tests unnoticed. Every push to main runs it as a job of the tests, which the
+# release waits for. A pull request runs it only when it changes what Windows is known
+# to treat differently; the portability code rules cover the rest on Linux, and any
+# branch can be run here by hand. A Windows runner costs twice the minutes of a Linux one.
 on:
+  workflow_call:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/windows-tests.yml"
+      - ".gitattributes"
+      - "plugin/hooks/**"
+      - "pyproject.toml"
+      - "src/basstler/bash.py"
+      - "src/basstler/directory_tree.py"
+      - "src/basstler/environment.py"
+      - "src/basstler/git/**"
+      - "src/basstler/locations.py"
+      - "src/basstler/plugin_root.py"
+      - "src/basstler/setup/**"
+      - "src/basstler/shell_configuration.py"
+      - "tests/bash_path.py"
+      - "tests/conftest.py"
+      - "tests/executable_stubs.py"
+      - "tests/suite_shard.py"
 
 concurrency:
   group: windows-tests-${{ github.ref }}

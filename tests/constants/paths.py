@@ -83,8 +83,8 @@ class RepositoryLocation(PathEnumeration):
 
     WINDOWS_TESTS_WORKFLOW = WORKFLOWS / "windows-tests.yml"
     """
-    The workflow that runs the whole suite on Windows for every pull request ready for
-    review.
+    The workflow that runs the whole suite on Windows for every push to main, and for a
+    pull request changing what Windows is known to treat differently.
     """
 
     MAIN_FAILURE_WORKFLOW = WORKFLOWS / "main-failure.yml"

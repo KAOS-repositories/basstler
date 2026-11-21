@@ -4,9 +4,11 @@ Actions that change a module and know their exact inverse, and plans composing t
 
 from __future__ import annotations
 
+import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import takewhile
 from types import ModuleType
 
 import libcst
@@ -213,9 +215,27 @@ class ImportInsertion(ModuleTransformation):
             AddImportsVisitor.add_needed_import(context, self.imported.__name__)
         else:
             AddImportsVisitor.add_needed_import(
-                context, self.imported.__module__, self.imported.__name__
+                context, self.exporting_module(self.imported), self.imported.__name__
             )
         return AddImportsVisitor(context).transform_module(module)
+
+    @staticmethod
+    def exporting_module(imported: type) -> str:
+        """
+        :param imported: A class to import.
+        :return: The public module above the private one *imported* is defined in, when
+            it exports *imported*; otherwise the module it is defined in.
+        """
+        components = imported.__module__.split(".")
+        public = list(
+            takewhile(lambda component: not component.startswith("_"), components)
+        )
+        if not public or len(public) == len(components):
+            return imported.__module__
+        public_module = importlib.import_module(".".join(public))
+        if public_module.__dict__.get(imported.__name__) is not imported:
+            return imported.__module__
+        return public_module.__name__
 
 
 # %% plans

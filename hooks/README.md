@@ -300,6 +300,14 @@ command line that chains, pipes, redirects or substitutes anything (`;`, `&&`, `
 backticks), any other program, and a script path that is not this plugin's own root, gets no answer, so Claude Code asks as before. As with the attach hook,
 Claude Code's own permission classifier may still have the last word.
 
+## Marking the session's pull request viewed
+
+A `Stop` hook ([`basstler.review_triage.stop_hook`](../../src/basstler/review_triage/stop_hook.py))
+runs `basstler review-triage mark-viewed` for the open pull request of the checked-out branch when a turn ends.
+It does so once for each head commit GitHub reports, recorded under the git directory's `basstler/`, so a turn that
+pushed nothing costs one read. A branch without an open pull request is left alone, and a marking that fails
+is reported and tried again at the next turn.
+
 ## Safety
 
 - Does nothing until you create the notes branch: `git fetch` finds nothing, so `CLAUDE.local.md` is

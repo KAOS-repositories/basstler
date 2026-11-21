@@ -33,7 +33,7 @@ from basstler.review_triage.python_source import (
     ContainerKind,
     PythonSource,
 )
-from basstler.review_triage.renames import RenameMap
+from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
 from basstler.review_triage.signatures import (
     STATIC_METHOD,
     Signature,
@@ -118,8 +118,36 @@ class CallScope:
     The base version of the file holding the call, ``None`` when unknown.
     """
 
+    def defined_class_name(self, name: str) -> str:
+        """
+        :param name: A class name as the file spells it.
+        :return: The name the class is defined under, which differs from *name* when
+            the file imports it under another name.
+        """
+        bindings = self.imports.bindings.get(name, ())
+        if len(bindings) == 1 and isinstance(bindings[0], ImportedDefinition):
+            return bindings[0].defined_name
+        return name
+
 
 # %% targets
+
+
+@dataclass(frozen=True)
+class ReachableDefinition:
+    """
+    One definition a call may reach, with the signature of calling it.
+    """
+
+    qualified_name: str
+    """
+    Its name, after the name of the class defining it for a method.
+    """
+
+    signature: Signature | None
+    """
+    The signature of calling it, ``None`` when it cannot be read.
+    """
 
 
 class CallTarget(ABC):
@@ -128,11 +156,12 @@ class CallTarget(ABC):
     """
 
     @abstractmethod
-    def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
+    def reachable_definitions(
+        self, reader: SignatureReader
+    ) -> list[ReachableDefinition]:
         """
         :param reader: Reads the base commit's signatures.
-        :return: The signature of each definition the call may reach, ``None`` for
-            one that cannot be read.
+        :return: Each definition the call may reach.
         """
 
     @abstractmethod
@@ -169,11 +198,17 @@ class NamedTarget(CallTarget):
     The last name of the called expression.
     """
 
-    def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
+    def reachable_definitions(
+        self, reader: SignatureReader
+    ) -> list[ReachableDefinition]:
         if self.callee.startswith("__"):
             return []
-        definitions = reader.definitions.definitions_of(self.callee)
-        return list(map(reader.signature_of, definitions))
+        return [
+            ReachableDefinition(
+                definition.qualified_name, reader.signature_of(definition)
+            )
+            for definition in reader.definitions.definitions_of(self.callee)
+        ]
 
     def in_base(self, renames: RenameMap) -> CallTarget:
         return replace(self, callee=renames.original_identifier(self.callee))
@@ -229,10 +264,14 @@ class MethodTarget(CallTarget):
     Which related classes may define the method reached.
     """
 
-    def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
+    def reachable_definitions(
+        self, reader: SignatureReader
+    ) -> list[ReachableDefinition]:
         index = reader.definitions
         if not index.reads_hierarchy_of(self.class_name):
-            return [None]
+            return [
+                ReachableDefinition(self.qualified_method_name(self.class_name), None)
+            ]
         lower = [
             *index.classes_named(self.class_name),
             *index.subclasses_of(self.class_name),
@@ -242,10 +281,20 @@ class MethodTarget(CallTarget):
         if self.reach is ClassReach.ANCESTORS:
             classes = [definition for definition in upper if definition not in lower]
         return [
-            reader.method_signature(definition, self.callee)
+            ReachableDefinition(
+                self.qualified_method_name(definition.name),
+                reader.method_signature(definition, self.callee),
+            )
             for definition in classes
             if reader.defines(definition, self.callee)
         ]
+
+    def qualified_method_name(self, class_name: str) -> str:
+        """
+        :param class_name: The name of a class the method may be defined in.
+        :return: The method's name after the class's.
+        """
+        return f"{class_name}{DOTTED_NAME_SEPARATOR}{self.callee}"
 
     def in_base(self, renames: RenameMap) -> CallTarget:
         return replace(
@@ -266,15 +315,22 @@ class ClassTarget(CallTarget):
     The class's name.
     """
 
-    def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
+    def reachable_definitions(
+        self, reader: SignatureReader
+    ) -> list[ReachableDefinition]:
         index = reader.definitions
         if not index.reads_hierarchy_of(self.class_name):
-            return [None]
+            return [ReachableDefinition(self.class_name, None)]
         classes: list[ClassDefinition] = [
             *index.classes_named(self.class_name),
             *index.subclasses_of(self.class_name),
         ]
-        return list(map(reader.signature_of, classes))
+        return [
+            ReachableDefinition(
+                definition.qualified_name, reader.signature_of(definition)
+            )
+            for definition in classes
+        ]
 
     def in_base(self, renames: RenameMap) -> CallTarget:
         return replace(self, class_name=renames.original_identifier(self.class_name))
@@ -302,11 +358,13 @@ class AttributeMethodTarget(CallTarget):
     The attribute's name.
     """
 
-    def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
+    def reachable_definitions(
+        self, reader: SignatureReader
+    ) -> list[ReachableDefinition]:
         declared = reader.attribute_class(self.owner_class, self.attribute)
         if declared is None:
-            return NamedTarget(self.callee).reachable_signatures(reader)
-        return MethodTarget(self.callee, declared).reachable_signatures(reader)
+            return NamedTarget(self.callee).reachable_definitions(reader)
+        return MethodTarget(self.callee, declared).reachable_definitions(reader)
 
     def in_base(self, renames: RenameMap) -> CallTarget:
         return replace(
@@ -369,11 +427,13 @@ class InferredMethodTarget(CallTarget):
             return None
         return found
 
-    def reachable_signatures(self, reader: SignatureReader) -> list[Signature | None]:
+    def reachable_definitions(
+        self, reader: SignatureReader
+    ) -> list[ReachableDefinition]:
         owner = self.receiver_class(reader)
         if owner is None:
-            return NamedTarget(self.callee).reachable_signatures(reader)
-        return MethodTarget(self.callee, owner).reachable_signatures(reader)
+            return NamedTarget(self.callee).reachable_definitions(reader)
+        return MethodTarget(self.callee, owner).reachable_definitions(reader)
 
     def in_base(self, renames: RenameMap) -> CallTarget:
         return replace(
@@ -445,7 +505,7 @@ class AnnotationInference(ReceiverInference):
 class ReceiverWalk:
     """
     One search of :class:`AnnotationInference` for what the expressions of one scope
-    are, every name being followed through all of its bindings.
+    are, every name being followed through each of its bindings that may reach it.
     """
 
     scope: CallScope
@@ -473,7 +533,7 @@ class ReceiverWalk:
             ``None`` when not found.
         """
         if isinstance(expression, ast.Name):
-            return self.name_type(expression.id, followed)
+            return self.name_type(expression, followed)
         if isinstance(expression, ast.Call):
             return self.returned_type(expression, followed)
         if isinstance(expression, ast.Attribute):
@@ -542,19 +602,33 @@ class ReceiverWalk:
             return (ImportedDefinition(name),)
         return imported
 
+    def reaching_bindings(self, use: ast.Name) -> tuple[NameBinding, ...] | None:
+        """
+        :param use: A name the innermost scope reads.
+        :return: :meth:`visible_bindings` of the name, narrowed to the bindings the
+            order of the innermost scope's statements shows reach the use.
+        """
+        scopes = self.scope.name_scopes
+        if scopes and use.id in scopes[-1].bindings:
+            order = scopes[-1].statement_order
+            reaching = None if order is None else order.reaching_bindings(use)
+            if reaching is not None:
+                return reaching
+        return self.visible_bindings(use.id)
+
     def name_type(
-        self, name: str, followed: frozenset[NameBinding]
+        self, use: ast.Name, followed: frozenset[NameBinding]
     ) -> AnnotatedType | None:
         """
-        :param name: A name the innermost scope uses.
+        :param use: A name the innermost scope reads.
         :param followed: The bindings whose values the search is inside of.
         :return: What the value it refers to is.
         """
-        if name == ReceiverName.INSTANCE and self.scope.enclosing_class is not None:
+        if use.id == ReceiverName.INSTANCE and self.scope.enclosing_class is not None:
             return AnnotatedType(
                 self.renames.original_identifier(self.scope.enclosing_class)
             )
-        bindings = self.visible_bindings(name)
+        bindings = self.reaching_bindings(use)
         if not bindings or followed & set(bindings):
             return None
         return self.agreed_type(
@@ -890,7 +964,8 @@ class ParameterMethod(CalleeResolution):
             and function.value.id in scope.parameter_types
         ):
             return None
-        return MethodTarget(function.attr, scope.parameter_types[function.value.id])
+        annotated = scope.parameter_types[function.value.id]
+        return MethodTarget(function.attr, scope.defined_class_name(annotated))
 
 
 @dataclass(frozen=True)

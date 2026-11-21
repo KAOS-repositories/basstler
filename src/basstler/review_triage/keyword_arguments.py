@@ -12,6 +12,7 @@ from enum import StrEnum
 
 from basstler.class_property import classproperty
 from basstler.review_triage.calls import (
+    ReachableDefinition,
     CALLEE_RESOLUTIONS,
     CalleeResolution,
     CallTarget,
@@ -113,9 +114,18 @@ class UnprovenKeywordCall(ReviewReason):
     Why it is not shown.
     """
 
+    unproven_definitions: tuple[str, ...]
+    """
+    The qualified names of the definitions the call may reach that bind its arguments
+    otherwise or have an unreadable signature.
+    """
+
     @property
     def explanation(self) -> str:
-        return f"`{self.callee}` - {self.cause}"
+        if not self.unproven_definitions:
+            return f"`{self.callee}` - {self.cause}"
+        listed = ", ".join(f"`{name}`" for name in self.unproven_definitions)
+        return f"`{self.callee}` - {self.cause}: {listed}"
 
 
 @dataclass(frozen=True)
@@ -185,39 +195,46 @@ class KeywordConversion(Finding):
         arguments binds each to the parameter of its keyword, and at least one takes
         them.
         """
-        cause = self.unproven_binding(reader, renames)
-        if cause is None:
-            return None
-        return UnprovenKeywordCall(self.line, self.callee, cause)
-
-    def unproven_binding(
-        self, reader: SignatureReader, renames: RenameMap
-    ) -> UnprovenBinding | None:
-        """
-        :param reader: Reads the base commit's signatures.
-        :param renames: The renames the pull request makes throughout.
-        :return: Why the call is not shown to bind its arguments as before, ``None``
-            when it is.
-        """
         target = self.target.in_base(renames)
-        signatures = target.reachable_signatures(reader)
-        if None in signatures:
-            return UnprovenBinding.UNREADABLE_SIGNATURE
+        definitions = target.reachable_definitions(reader)
+        unreadable = [found for found in definitions if found.signature is None]
+        if unreadable:
+            return self.reason(UnprovenBinding.UNREADABLE_SIGNATURE, unreadable)
         keywords = tuple(map(renames.original_identifier, self.keywords))
         taking = [
-            signature
-            for signature in signatures
-            if signature.accepts(self.first_position + len(keywords))
+            found
+            for found in definitions
+            if found.signature.accepts(self.first_position + len(keywords))
         ]
         if not taking:
-            return UnprovenBinding.NO_DEFINITION
-        if all(signature.binds(self.first_position, keywords) for signature in taking):
+            return self.reason(UnprovenBinding.NO_DEFINITION, [])
+        differing = [
+            found
+            for found in taking
+            if not found.signature.binds(self.first_position, keywords)
+        ]
+        if not differing:
             return None
         if not target.known_by_name_only(reader):
-            return UnprovenBinding.BINDS_DIFFERENTLY
+            return self.reason(UnprovenBinding.BINDS_DIFFERENTLY, differing)
         if self.calls_method:
-            return UnprovenBinding.RECEIVER_CLASS_UNKNOWN
-        return UnprovenBinding.SEVERAL_DEFINITIONS
+            return self.reason(UnprovenBinding.RECEIVER_CLASS_UNKNOWN, differing)
+        return self.reason(UnprovenBinding.SEVERAL_DEFINITIONS, differing)
+
+    def reason(
+        self, cause: UnprovenBinding, unproven: list[ReachableDefinition]
+    ) -> UnprovenKeywordCall:
+        """
+        :param cause: Why the call is not shown to bind its arguments as before.
+        :param unproven: The definitions it may reach that are not shown to.
+        :return: The reason for review naming them.
+        """
+        return UnprovenKeywordCall(
+            self.line,
+            self.callee,
+            cause,
+            tuple(sorted({found.qualified_name for found in unproven})),
+        )
 
     def looked_up_names(self, renames: RenameMap) -> frozenset[str]:
         """

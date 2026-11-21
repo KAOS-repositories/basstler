@@ -13,6 +13,8 @@ import sys
 from dataclasses import dataclass
 from typing import TextIO
 
+from tqdm import tqdm
+
 
 @dataclass(eq=False)
 class StandardStreamHandler(logging.Handler):
@@ -47,11 +49,12 @@ class StandardStreamHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         """
-        Write *record*'s message, and a line break, to its standard stream.
+        Write *record*'s message, and a line break, to its standard stream, above any
+        progress bar drawn at the time.
 
         :param record: The record to write.
         """
-        self.stream_for(record).write(f"{self.format(record)}\n")
+        tqdm.write(self.format(record), file=self.stream_for(record))
 
     @staticmethod
     def import_name(module_name: str) -> str:

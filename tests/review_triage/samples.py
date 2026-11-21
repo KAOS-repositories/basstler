@@ -39,6 +39,9 @@ class FileSample(StrEnum):
     IMPORT_SOURCE_CHANGED = "import-source-changed"
     IMPORTS_REORDERED = "imports-reordered"
     KEYWORD_ARGUMENTS_ADDED = "keyword-arguments-added"
+    KEYWORD_ARGUMENTS_ADDED_THROUGH_IMPORT_ALIAS = (
+        "keyword-arguments-added-through-import-alias"
+    )
     KEYWORD_ARGUMENTS_REORDERED = "keyword-arguments-reordered"
     KEYWORD_ARGUMENTS_SWAPPED = "keyword-arguments-swapped"
     KEYWORD_ARGUMENTS_UNKNOWN_CALLEE = "keyword-arguments-unknown-callee"
@@ -46,9 +49,11 @@ class FileSample(StrEnum):
     MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
     MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
     RECEIVER_BINDS_DIFFERENTLY = "receiver-binds-differently"
+    RECEIVER_REBOUND_OUT_OF_ORDER = "receiver-rebound-out-of-order"
     RECEIVER_TYPE_AMBIGUOUS = "receiver-type-ambiguous"
     RECEIVER_TYPE_FOLLOWED = "receiver-type-followed"
     RECEIVER_TYPE_INFERRED = "receiver-type-inferred"
+    RECEIVER_TYPE_REASSIGNED = "receiver-type-reassigned"
     RECEIVER_TYPE_UNKNOWN = "receiver-type-unknown"
     RELATIVE_IMPORT_MOVED = "relative-import-moved"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
@@ -111,6 +116,24 @@ class DescriptionSample(StrEnum):
         :return: The description.
         """
         return (DatasetLocation.REVIEW_TRIAGE / self).read_text()
+
+
+# %% scopes
+
+
+class ScopeSample(StrEnum):
+    """
+    A module whose scopes bind names in a particular way, by its file name.
+    """
+
+    GLOBAL_IN_NESTED_FUNCTION = "global-in-nested-function.py"
+    INVALID_ESCAPE_SEQUENCE = "invalid-escape-sequence.py"
+
+    def read(self) -> str:
+        """
+        :return: The module's text.
+        """
+        return (DatasetLocation.REVIEW_TRIAGE / "scopes" / self).read_text()
 
 
 # %% the pull request

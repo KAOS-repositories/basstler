@@ -4,9 +4,13 @@ A whole pull request triaged: its renames and the verdict on each file it change
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
+from basstler.git.commit_range import FileVersions
+from basstler.progress import ProgressStep, ProgressUnit
 from basstler.github.pull_request_changes import (
     PullRequestChanges,
     RestPullRequest,
@@ -39,8 +43,8 @@ from basstler.review_triage.referents import MemberResolver
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
-from basstler.review_triage.renames import RenameMap
-from basstler.review_triage.rules import TriageRule
+from basstler.review_triage.renames import RenameDecisions, RenameMap
+from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
 
 # %% the outcome
@@ -119,9 +123,25 @@ class PullRequestTriager:
     The judgments of each file, the first one applying to a file deciding it.
     """
 
-    rules: frozenset[TriageRule] = frozenset()
+    rules: frozenset[TriageRule] = DEFAULT_RULES
     """
-    The opt-in rules in force.
+    The rules in force.
+    """
+
+    workers: int | None = None
+    """
+    The most processes judging files at once, ``None`` for one per processor.
+    """
+
+    files_per_worker: int = 25
+    """
+    The fewest files each process judging them is started for; fewer files are judged in
+    this process alone.
+    """
+
+    files_per_batch: int = 10
+    """
+    The files a judging process is handed at a time.
     """
 
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
@@ -132,33 +152,88 @@ class PullRequestTriager:
         """
         separated = BaseBranchMergeDetection().separate(changes)
         own_changes = separated.own
-        renames = RenameMap.from_decisions(
-            source.decisions(own_changes) for source in self.rename_sources
-        )
-        base_modules = CommitModules(own_changes.commits.base_tree)
-        base_definitions = DefinitionIndex(base_modules)
-        triager = FileTriager(
-            JudgmentContext(
-                renames,
-                base_definitions,
-                DefinitionMoveDetection().moved_definitions(own_changes, renames),
-                RenameMap.from_decisions(
-                    [SubclassSubstitutionDetection().decisions(own_changes)]
-                ),
-                self.rules,
-                MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
-            ),
-            self.judgments,
-        )
+        context = self.context(own_changes)
         verdicts: dict[PurePosixPath, FileVerdict] = {
             change.path: MechanicalFile(
                 change, frozenset({MechanicalChange.BASE_BRANCH_MERGE})
             )
             for change in separated.merged
-        } | {change.path: triager.triage(change) for change in own_changes.files}
+        }
+        verdicts |= self.judged_files(
+            FileTriager(context, self.judgments), own_changes.files
+        )
         return TriageOutcome(
             changes.pull_request,
-            renames,
+            context.renames,
             tuple(verdicts[change.path] for change in changes.files),
             changes.start,
+        )
+
+    def judged_files(
+        self, triager: FileTriager, changes: tuple[FileVersions, ...]
+    ) -> dict[PurePosixPath, FileVerdict]:
+        """
+        :param triager: What judges each file.
+        :param changes: The files to judge.
+        :return: The verdict on each file, by its path, judged by up to :attr:`workers`
+            processes at once when there are files enough for more than one.
+        """
+        batches = [
+            changes[start : start + self.files_per_batch]
+            for start in range(0, len(changes), self.files_per_batch)
+        ]
+        worker_count = min(
+            self.workers or os.cpu_count() or 1,
+            len(changes) // self.files_per_worker,
+        )
+        verdicts: dict[PurePosixPath, FileVerdict] = {}
+        with ProgressStep.JUDGING_FILES.bar(
+            len(changes), ProgressUnit.FILE
+        ) as progress:
+            if worker_count <= 1:
+                for change in changes:
+                    verdicts[change.path] = triager.triage(change)
+                    progress.update()
+                return verdicts
+            with ProcessPoolExecutor(worker_count) as pool:
+                judging = [pool.submit(triager.triage_each, batch) for batch in batches]
+                for judged in as_completed(judging):
+                    for verdict in judged.result():
+                        verdicts[verdict.change.path] = verdict
+                    progress.update(len(judged.result()))
+        return verdicts
+
+    def context(self, changes: PullRequestChanges) -> JudgmentContext:
+        """
+        :param changes: A pull request's own changes, without merges of its base branch.
+        :return: What its files are judged against: the renames every source of
+            :attr:`rename_sources` finds in them, and the definitions they move.
+        """
+        moves = DefinitionMoveDetection()
+        substitutions = SubclassSubstitutionDetection()
+        decisions: list[RenameDecisions] = []
+        with ProgressStep.FINDING_RENAMES_AND_MOVES.bar(
+            len((*self.rename_sources, moves, substitutions)), ProgressUnit.DETECTION
+        ) as progress:
+            for source in self.rename_sources:
+                progress.set_postfix_str(source.label)
+                decisions.append(source.decisions(changes))
+                progress.update()
+            renames = RenameMap.from_decisions(decisions)
+            progress.set_postfix_str(moves.label)
+            moved_definitions = moves.moved_definitions(changes, renames)
+            progress.update()
+            progress.set_postfix_str(substitutions.label)
+            substitution_renames = RenameMap.from_decisions(
+                [substitutions.decisions(changes)]
+            )
+            progress.update()
+        base_modules = CommitModules(changes.commits.base_tree)
+        return JudgmentContext(
+            renames,
+            DefinitionIndex(base_modules),
+            moved_definitions,
+            substitution_renames,
+            self.rules,
+            MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
         )

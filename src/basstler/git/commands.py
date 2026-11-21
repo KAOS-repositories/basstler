@@ -14,6 +14,7 @@ import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import cached_property
 from pathlib import Path, PurePath, PurePosixPath
 
 from basstler.class_property import classproperty
@@ -35,6 +36,19 @@ How many fields ``git cat-file --batch`` prints before an object it found: its n
 type and size in bytes.
 """
 
+
+class ObjectHeaderStatus(StrEnum):
+    """
+    What ``git cat-file --batch`` prints after a name in place of an object's type and
+    size.
+    """
+
+    MISSING = "missing"
+    """
+    The repository has no object of that name.
+    """
+
+
 MERGE_CONFLICT_EXIT_STATUS = 1
 """
 The status ``git merge-tree`` exits with when the merge conflicts.
@@ -50,12 +64,10 @@ class RemoteSubcommand(StrEnum):
     """
     Updates references from a remote.
     """
-
     LIST_REMOTE = "ls-remote"
     """
     Lists the references a remote has.
     """
-
     PUSH = "push"
     """
     Publishes references to a remote.
@@ -102,17 +114,14 @@ class GitCommandResult:
     """
     The git subcommand and its arguments, as invoked.
     """
-
     exit_status: int
     """
     The status git exited with.
     """
-
     output: str
     """
     Git's stripped stdout.
     """
-
     error_output: str
     """
     Git's stripped stderr.
@@ -145,7 +154,6 @@ class MergeCommit:
     """
     The merge commit, git's conflict markers left in the files it conflicts on.
     """
-
     conflicted_paths: frozenset[PurePosixPath]
     """
     The files the merge conflicts on, by their path in the merge commit.
@@ -168,12 +176,10 @@ class ProposedPush:
     """
     The remote to publish to.
     """
-
     refspec: str
     """
     What to publish, as ``<source>:<destination>``.
     """
-
     with_lease: bool = False
     """
     Whether published history may be overwritten, and then only if the remote is where
@@ -208,6 +214,72 @@ class ProposedPush:
         )
 
 
+@dataclass
+class ObjectStream:
+    """
+    One ``git cat-file --batch`` kept running in a checkout, answering object names one
+    at a time with the objects' contents.
+    """
+
+    working_directory: Path
+    """
+    The checkout whose objects are read.
+    """
+
+    @classproperty
+    def arguments(cls) -> tuple[str, ...]:
+        """
+        The git subcommand that reads the objects, and its arguments.
+        """
+        return ("cat-file", "--batch")
+
+    def __getstate__(self) -> dict[str, Path]:
+        """
+        :return: The stream without its running command, which a copy of it made in
+            another process starts anew.
+        """
+        return {"working_directory": self.working_directory}
+
+    @cached_property
+    def process(self) -> subprocess.Popen[bytes]:
+        """
+        The running command, which ends once its input closes, at the latest when this
+        process exits.
+        """
+        return subprocess.Popen(
+            ["git", *self.arguments],
+            cwd=self.working_directory,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    def content(self, name: str) -> bytes | None:
+        """
+        :param name: An object git names, such as ``<commit>:<path>`` for a file.
+        :return: The object's content, ``None`` when the repository has no object of
+            that name.
+        :raises GitCommandFailed: If git has ended or answers the name ambiguously.
+        """
+        self.process.stdin.write(f"{name}\n".encode(GIT_TEXT_ENCODING))
+        self.process.stdin.flush()
+        header_line = self.process.stdout.readline()
+        header = header_line.split()
+        if (
+            header
+            and header[-1].decode(GIT_TEXT_ENCODING) == ObjectHeaderStatus.MISSING
+        ):
+            return None
+        if len(header) != OBJECT_HEADER_FIELDS:
+            detail = header_line or self.process.stderr.read()
+            raise GitCommandFailed(
+                status=self.process.poll() or 0,
+                detail=detail.decode(GIT_TEXT_ENCODING).strip(),
+                arguments=self.arguments,
+            )
+        return self.process.stdout.read(int(header[-1]) + 1)[:-1]
+
+
 @dataclass(frozen=True)
 class GitCommandRunner:
     """
@@ -225,7 +297,10 @@ class GitCommandRunner:
     """
 
     def attempt(
-        self, *arguments: str, environment: Mapping[str, str] | None = None
+        self,
+        *arguments: str,
+        environment: Mapping[str, str] | None = None,
+        standard_input: str | None = None,
     ) -> GitCommandResult:
         """
         Run a command whose failure is an expected outcome.
@@ -233,6 +308,8 @@ class GitCommandRunner:
         :param arguments: The git subcommand and its arguments.
         :param environment: Variables to set for this command on top of the process's
             own.
+        :param standard_input: What the command reads from standard input, nothing when
+            ``None``.
         :return: The finished command.
         """
         completed = subprocess.run(
@@ -241,6 +318,7 @@ class GitCommandRunner:
             capture_output=True,
             encoding=GIT_TEXT_ENCODING,
             env={**os.environ, **(environment or {})},
+            input=standard_input,
         )
         return GitCommandResult(
             arguments=arguments,
@@ -355,41 +433,40 @@ class GitCommandRunner:
     def object_texts(self, names: tuple[str, ...]) -> dict[str, str]:
         """
         :param names: Objects git names, such as ``<commit>:<path>`` for a file.
-        :return: The text of each, as :meth:`run` of ``git show`` prints it, all read
-            by one command.
+        :return: The text of each, as :meth:`run` of ``git show`` prints it.
         :raises GitCommandFailed: If git fails or has no object of one of the names.
         """
-        if not names:
-            return {}
-        arguments = ("cat-file", "--batch")
-        completed = subprocess.run(
-            ["git", *arguments],
-            cwd=self.working_directory,
-            input="".join(f"{name}\n" for name in names).encode(GIT_TEXT_ENCODING),
-            capture_output=True,
-        )
-        error_output = completed.stderr.decode(GIT_TEXT_ENCODING).strip()
-        if completed.returncode:
+        texts = self.existing_object_texts(names)
+        missing = [name for name in names if name not in texts]
+        if missing:
             raise GitCommandFailed(
-                status=completed.returncode, detail=error_output, arguments=arguments
+                status=0,
+                detail=f"{missing[0]} {ObjectHeaderStatus.MISSING}",
+                arguments=ObjectStream.arguments,
             )
-        texts: dict[str, str] = {}
-        output = completed.stdout
-        start = 0
-        for name in names:
-            header_end = output.index(b"\n", start)
-            header = output[start:header_end].split()
-            if len(header) != OBJECT_HEADER_FIELDS:
-                raise GitCommandFailed(
-                    status=completed.returncode,
-                    detail=output[start:header_end].decode(GIT_TEXT_ENCODING),
-                    arguments=arguments,
-                )
-            start = header_end + 1 + int(header[-1])
-            content = output[header_end + 1 : start].decode(GIT_TEXT_ENCODING)
-            texts[name] = content.replace("\r\n", "\n").replace("\r", "\n").strip()
-            start += 1
         return texts
+
+    def existing_object_texts(self, names: tuple[str, ...]) -> dict[str, str]:
+        """
+        :param names: Objects git names, such as ``<commit>:<path>`` for a file.
+        :return: The text of each that exists, as :meth:`run` of ``git show`` prints
+            it; a name git has no object of is left out.
+        :raises GitCommandFailed: If git fails or answers a name ambiguously.
+        """
+        texts: dict[str, str] = {}
+        for name in names:
+            content = self.object_stream.content(name)
+            if content is not None:
+                text = content.decode(GIT_TEXT_ENCODING)
+                texts[name] = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        return texts
+
+    @cached_property
+    def object_stream(self) -> ObjectStream:
+        """
+        The objects of this checkout, read through one ``git cat-file`` kept running.
+        """
+        return ObjectStream(self.working_directory)
 
     def commit_files(
         self,
@@ -606,7 +683,6 @@ class TransientGitSetting:
     """
     The setting's key, such as ``user.name``.
     """
-
     value: str
     """
     The value it takes.
@@ -640,13 +716,11 @@ class CommitTrailer(StrEnum):
     Names the parent a restack merged in, marking the merge as the restack's own rather
     than one a person made.
     """
-
     RESTACKED_PARENT_COMMIT = "Restacked-parent-commit"
     """
     The commit of the parent a restack merged in, which a restack's own merge records as
     its second parent.
     """
-
     ACTION_REQUEST = "Basstler-request"
     """
     The identifier of the upstream-reviews request whose branch the commit is on,
@@ -658,12 +732,18 @@ class CommitTrailer(StrEnum):
 
 
 class IntegrationStrategy(StrEnum):
-    """How a branch integrates its parent's moved tip during a restack."""
+    """
+    How a branch integrates its parent's moved tip during a restack.
+    """
 
     MERGE = "merge"
-    """Merge the parent's tip in, replacing the merges earlier restacks left that only
-    brought in an older state of the parent, so the branch carries one such merge."""
+    """
+    Merge the parent's tip in, replacing the merges earlier restacks left that only
+    brought in an older state of the parent, so the branch carries one such merge.
+    """
 
     REBASE = "rebase"
-    """Replay the branch onto the parent's tip, which rewrites published history and is
-    authorised only by the branch's own rebase label."""
+    """
+    Replay the branch onto the parent's tip, which rewrites published history and is
+    authorised only by the branch's own rebase label.
+    """

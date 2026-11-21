@@ -20,7 +20,7 @@ from basstler.github.pull_request import NewPullRequest
 from basstler.github.pull_request_ends import PullRequestOpening
 from basstler.github.repository_access import PullRequestListState
 from basstler.github.basstler_project import BasstlerProject
-from basstler.github.repository import GitHubAddress, NewTokenPage, Repository
+from basstler.github.repository import NewTokenPage, GitHubAddress, Repository
 from basstler.github.rest_models import RestPullRequestSummary
 from basstler.github.run_listing import ListedRun
 from basstler.github.token_form import (

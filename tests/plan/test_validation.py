@@ -14,6 +14,7 @@ from basstler.plan.exceptions import (
     DuplicateItemId,
     InvalidBlockers,
     InvalidDependsOn,
+    InvalidExternalDependencies,
     InvalidLandedItemCount,
     InvalidManifestRoot,
     InvalidSchemaVersion,
@@ -137,6 +138,22 @@ def test_validation_rejects_blockers_that_is_not_a_list():
     with pytest.raises(PlanValidationError) as error:
         PlanValidator(minimal_plan(items=items)).validate()
     assert any(isinstance(problem, InvalidBlockers) for problem in error.value.problems)
+
+
+def test_validation_rejects_external_dependencies_that_is_not_a_list():
+    items = [manifest_item("a", external_dependencies="other-plan/some-item")]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(minimal_plan(items=items)).validate()
+    assert any(
+        isinstance(problem, InvalidExternalDependencies)
+        for problem in error.value.problems
+    )
+
+
+def test_validation_accepts_external_dependencies_that_resolve_to_nothing():
+    items = [manifest_item("a", external_dependencies=["other-plan/some-item"])]
+
+    PlanValidator(minimal_plan(items=items)).validate()
 
 
 def test_validation_rejects_unknown_status():

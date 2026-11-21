@@ -84,6 +84,10 @@ None.
 {% else %}
 - **Depends on:** nothing
 {% endif %}
+{% if item.external_dependencies %}
+- **Stacked on, not handed over:** {% for dependency in item.external_dependencies %}`{{ dependency }}`{{ ", " if not loop.last }}{% endfor %}
+
+{% endif %}
 {% if item.notes %}
 
 {{ item.notes }}

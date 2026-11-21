@@ -430,6 +430,30 @@ class InvalidBlockers(ValidationProblem):
 
 
 @dataclass
+class InvalidExternalDependencies(ValidationProblem):
+    """
+    An item's ``external_dependencies`` isn't a list, so a string would be misread as
+    one dependency per character.
+    """
+
+    item_identifier: str
+    """
+    The offending item's effective id.
+    """
+
+    actual_type: type
+    """
+    The type ``external_dependencies`` actually held, instead of ``list``.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"item {self.item_identifier!r} external_dependencies must be a list, "
+            f"got {self.actual_type.__name__}"
+        )
+
+
+@dataclass
 class UnknownDependency(ValidationProblem):
     """
     An item's ``depends_on`` names an id that doesn't resolve to another item.
@@ -684,7 +708,10 @@ class PlanOutsideHandoverError(DataclassException, ValueError):
         )
 
     def suggest_correction(self) -> str:
-        return "Hand those plans over together with it."
+        return (
+            "Hand those plans over together with it, or pass "
+            f"{PlanHandoverOption.WITHOUT_DEPENDENCIES} to hand it over alone."
+        )
 
 
 @dataclass

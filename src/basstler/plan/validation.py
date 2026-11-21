@@ -23,6 +23,7 @@ from basstler.plan.exceptions import (
     DuplicateItemId,
     InvalidBlockers,
     InvalidDependsOn,
+    InvalidExternalDependencies,
     InvalidLandedItemCount,
     InvalidManifestRoot,
     InvalidSchemaVersion,
@@ -455,6 +456,15 @@ class PlanValidator:
                 for entry in depends_on or []
                 if (problem := self.dependency_problem(item_identifier, entry))
                 is not None
+            )
+        external_dependencies = item.get(ManifestKey.EXTERNAL_DEPENDENCIES.key)
+        if external_dependencies is not None and not isinstance(
+            external_dependencies, list
+        ):
+            problems.append(
+                InvalidExternalDependencies(
+                    item_identifier, type(external_dependencies)
+                )
             )
         blockers = item.get(ManifestKey.BLOCKERS.key)
         if blockers is not None and not isinstance(blockers, list):

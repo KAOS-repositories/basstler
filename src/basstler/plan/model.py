@@ -347,6 +347,12 @@ class ManifestKey(KeySpecification, Enum):
     The items this one stacks on, by id.
     """
 
+    EXTERNAL_DEPENDENCIES = ("external_dependencies", ValueStyle.SEQUENCE)
+    """
+    The items of plans not kept alongside this one that it stacked on, by
+    ``<plan-id>/<item-id>``; recorded for the reader and never resolved.
+    """
+
     STATUS = ("status",)
     """
     The session's own planning assessment - see :class:`ItemStatus`.
@@ -600,6 +606,39 @@ class PlanItem:
             str(dependency)
             for dependency in self.content.get(ManifestKey.DEPENDS_ON.key) or []
         ]
+
+    @property
+    def external_dependencies(self) -> list[str]:
+        """
+        :return: The items of plans not kept alongside this one that it stacked on, as
+            ``<plan-id>/<item-id>``.
+        """
+        return [
+            str(dependency)
+            for dependency in self.content.get(ManifestKey.EXTERNAL_DEPENDENCIES.key)
+            or []
+        ]
+
+    def with_dependencies_made_external(self, identifiers: set[str]) -> PlanItem:
+        """
+        :param identifiers: ``depends_on`` entries to stop depending on.
+        :return: This item with every dependency on *identifiers* moved from its
+            dependencies to its external dependencies.
+        """
+        moved = [
+            dependency for dependency in self.dependencies if dependency in identifiers
+        ]
+        if not moved:
+            return self
+        return PlanItem(
+            {
+                **self.without_dependencies(identifiers).content,
+                ManifestKey.EXTERNAL_DEPENDENCIES.key: [
+                    *self.external_dependencies,
+                    *moved,
+                ],
+            }
+        )
 
     def without_dependencies(self, identifiers: set[str]) -> PlanItem:
         """

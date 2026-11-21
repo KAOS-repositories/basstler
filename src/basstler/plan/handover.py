@@ -96,6 +96,30 @@ class HandoverPlan:
             ),
         )
 
+    def detached_from_plans(self, plan_identifiers: set[str]) -> HandoverPlan:
+        """
+        :param plan_identifiers: The ids of plans the handover leaves out.
+        :return: This plan with every item's dependency on an item of those plans
+            recorded as an external dependency instead.
+        """
+        items = [
+            item.with_dependencies_made_external(
+                {
+                    dependency
+                    for dependency in item.dependencies
+                    if DependencyReference.from_text(dependency).plan_id
+                    in plan_identifiers
+                }
+            ).content
+            for item in self.manifest.items
+        ]
+        return HandoverPlan(
+            manifest=PlanManifest(
+                {**self.manifest.content, ManifestKey.ITEMS.key: items}
+            ),
+            roadmap_text=self.roadmap_text,
+        )
+
     def without_sessions(self) -> HandoverPlan:
         """
         :return: This plan with no item naming a session, since only the person who ran
@@ -264,7 +288,11 @@ class PlanHandover:
 
     @classmethod
     def from_notes_branch(
-        cls, *, project_root: Path, plan_identifiers: list[str]
+        cls,
+        *,
+        project_root: Path,
+        plan_identifiers: list[str],
+        leaves_out_dependencies: bool = False,
     ) -> PlanHandover:
         """
         Read plans off the freshly fetched notes branch, without the sessions their
@@ -272,6 +300,8 @@ class PlanHandover:
 
         :param project_root: The repository whose notes branch holds the plans.
         :param plan_identifiers: The ids of the plans to hand over.
+        :param leaves_out_dependencies: Whether to hand the plans over without the
+            plans they depend on, recording those dependencies as external ones.
         :raises UnknownPlanError: If the notes branch has no such plan.
         :return: The handover.
         """
@@ -285,6 +315,11 @@ class PlanHandover:
                 for identifier in plan_identifiers
             )
         )
+        if leaves_out_dependencies:
+            plans = tuple(
+                plan.detached_from_plans(plan.depended_on_plans - set(plan_identifiers))
+                for plan in plans
+            )
         checkout = ProjectCheckout(project_root)
         held_paths = set(
             checkout.notes_branch_paths(ProjectLocation.PULL_REQUEST_PROGRESS)

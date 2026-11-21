@@ -174,6 +174,12 @@ class Item:
     The identifiers of items that must complete before this one can start.
     """
 
+    external_dependencies: list[str] = field(default_factory=list)
+    """
+    The ``<plan-id>/<item-id>`` entries of plans not kept alongside this one that the
+    item stacked on, recorded for the reader and never resolved.
+    """
+
     blockers: list[str] = field(default_factory=list)
     """
     Free-text descriptions of what's currently blocking this item.
@@ -318,6 +324,9 @@ class Item:
             ),
             notes=notes.strip() if notes else None,
             depends_on=list(data.get(ManifestKey.DEPENDS_ON.key) or []),
+            external_dependencies=list(
+                data.get(ManifestKey.EXTERNAL_DEPENDENCIES.key) or []
+            ),
             blockers=list(data.get(ManifestKey.BLOCKERS.key) or []),
         )
 

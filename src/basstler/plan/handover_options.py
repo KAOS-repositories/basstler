@@ -82,3 +82,8 @@ class PlanHandoverOption(StrEnum):
     """
     The receiver's GitHub login.
     """
+
+    WITHOUT_DEPENDENCIES = "--without-dependencies"
+    """
+    Hand plans over without the plans they depend on.
+    """

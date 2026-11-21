@@ -111,6 +111,14 @@ hub_line_not_registered() {
     "${notes_branch}"
 }
 
+# merge_workflow_refresh_line_failed: the check that the plan site's merge workflow is
+# current could not run, so it may be out of date.
+merge_workflow_refresh_line_failed() {
+  local error="$1"
+  local command="$2"
+  printf "could not check that the merge workflow is current (%s) - run: %s" "${error}" "${command}"
+}
+
 # hub_line_registered: the plan site, and where this session's work sits on it.
 hub_line_registered() {
   local site_url="$1"

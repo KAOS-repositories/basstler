@@ -21,15 +21,22 @@ When the permission system or its classifier denies a command or tool call a ski
 
 A plan save starts the plan site's build itself, with this session's credential (`basstler.plan_site.build_start`). In a cloud session that works only once the site repository is attached:
 
-- When the session-start summary's `plan site` line says a plan save cannot start the build yet, attach the site repository it names before the first save: call `mcp__claude-code-remote__add_repo` with it and `access: "push"`.
+- When the session-start summary's `plan site` line says a plan save cannot start the build yet, attach the site repository it names before the first save: call `mcp__claude-code-remote__add_repo` with it and `access: "push"`. The build needs only the attachment's credential: skip the clone and the `mcp__claude-code-remote__register_repo_root` call the attach answer asks for.
 - When a save prints that the build did not start, attach it the same way, then run the command the save names, `"${BASSTLER_PYTHON}" -m basstler.plan_site.build_start`. Saving again does not retry it: a save with no changes starts no build.
 - If the attach is refused, ask the user with `AskUserQuestion` to allow it, with "Attach it (Recommended)" first, saying why: every plan save then updates the plan site within a minute, without a stored token.
+
+## The plan site's merge workflow is kept current
+
+A pull request changing state starts the plan site's build only through the merge workflow on the notes repository's default branch. Session start proposes the current one in a pull request when that branch holds an older one (`basstler.plan_site.merge_workflow_refresh`):
+
+- When the session-start summary's `plan site` line says the merge workflow is out of date and names a pull request to merge, say so in your first reply: the pull request, the command it gives, and why - until it merges, marking a pull request ready or back to draft leaves the site showing the old state. Merging it is the user's; never merge it yourself.
+- When the line says the check could not run, run the command it names once; if it fails again, tell the user the error.
 
 ## A separate notes repository is attached in a cloud session
 
 When the notes live in another repository than the checkout's, a cloud session reads and saves them only once that repository is attached (`basstler.personal_notes.access`):
 
-- When the session-start summary's `personal notes` line, or a refused save, says this session cannot reach the notes repository, call `mcp__claude-code-remote__add_repo` with the repository it names and `access: "push"`, then run the command it names.
+- When the session-start summary's `personal notes` line, or a refused save, says this session cannot reach the notes repository, call `mcp__claude-code-remote__add_repo` with the repository it names and `access: "push"`, then run the command it names. Only the attachment's credential is needed: skip the clone and the `mcp__claude-code-remote__register_repo_root` call the attach answer asks for.
 - If the attach is refused, ask the user with `AskUserQuestion` to allow it, with "Attach it (Recommended)" first, saying why: the session then reads and saves the notes, plans and PR progress kept there.
 
 ## Every pull request keeps a plan, what is done and what is next

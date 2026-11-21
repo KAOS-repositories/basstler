@@ -313,6 +313,19 @@ if SITE_URL="$(recorded_site_url)"; then
       check-access 2>/dev/null)" && [ -n "${SITE_ACCESS}" ]; then
     SUMMARY_HUB="$(printf '%s\n    %s' "${SUMMARY_HUB}" "${SITE_ACCESS}")"
   fi
+  # A merge workflow older than this release's starts no build for some pull request
+  # changes, so it is proposed again now and the pull request to merge is said here.
+  if MERGE_WORKFLOW_REFRESH="$("${BASSTLER_PYTHON}" \
+      -m "${PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE}" 2>&1)"; then
+    MERGE_WORKFLOW_REFRESH_LINE="${MERGE_WORKFLOW_REFRESH}"
+  else
+    MERGE_WORKFLOW_REFRESH_LINE="$(merge_workflow_refresh_line_failed \
+      "$(printf '%s\n' "${MERGE_WORKFLOW_REFRESH}" | tail -n 1)" \
+      "\"\${BASSTLER_PYTHON}\" -m ${PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE}")"
+  fi
+  if [ -n "${MERGE_WORKFLOW_REFRESH_LINE}" ]; then
+    SUMMARY_HUB="$(printf '%s\n    %s' "${SUMMARY_HUB}" "${MERGE_WORKFLOW_REFRESH_LINE}")"
+  fi
 fi
 
 if [ "${WROTE_ANYTHING}" = "1" ]; then
@@ -321,13 +334,15 @@ else
   rm -f "${OUTPUT_FILE}"
 fi
 
-# Git identity from the notes branch, only where the clone has no local one.
-if ! recorded_git_identity_exists; then
+# Git identity from the notes branch, only where the clone has no local one: the
+# identity of the account this session works as (git_identity_path).
+GIT_IDENTITY_PATH="$(git_identity_path)"
+if ! recorded_git_identity_exists "${GIT_IDENTITY_PATH}"; then
   SUMMARY_GIT_IDENTITY="$(git_identity_line_not_recorded \
-    "${NOTES_BRANCH}" "${PERSONAL_GIT_IDENTITY_PATH}")"
-elif ! RECORDED_GIT_IDENTITY="$(recorded_git_identity)"; then
+    "${NOTES_BRANCH}" "${GIT_IDENTITY_PATH}")"
+elif ! RECORDED_GIT_IDENTITY="$(recorded_git_identity "${GIT_IDENTITY_PATH}")"; then
   SUMMARY_GIT_IDENTITY="$(git_identity_line_incomplete \
-    "${PERSONAL_GIT_IDENTITY_PATH}" "${NOTES_BRANCH}")"
+    "${GIT_IDENTITY_PATH}" "${NOTES_BRANCH}")"
 elif LOCAL_GIT_IDENTITY="$(repository_local_git_identity)"; then
   IFS=$'\t' read -r LOCAL_NAME LOCAL_EMAIL <<< "${LOCAL_GIT_IDENTITY}"
   SUMMARY_GIT_IDENTITY="$(git_identity_line_already_set \
@@ -337,7 +352,7 @@ else
   git config --local user.name "${RECORDED_NAME}"
   git config --local user.email "${RECORDED_EMAIL}"
   SUMMARY_GIT_IDENTITY="$(git_identity_line_written "${NOTES_BRANCH}" \
-    "${PERSONAL_GIT_IDENTITY_PATH}" \
+    "${GIT_IDENTITY_PATH}" \
     "$(format_git_identity "${RECORDED_NAME}" "${RECORDED_EMAIL}")")"
 fi
 

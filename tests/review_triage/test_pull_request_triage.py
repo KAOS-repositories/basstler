@@ -207,7 +207,9 @@ def test_the_report_names_why_a_file_needs_review(sample_changes: PullRequestCha
     Each reason a file needs review is listed under it, with its line.
     """
     triage = PullRequestTriager().triage(sample_changes)
-    reason = UnprovenKeywordCall(3, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN)
+    reason = UnprovenKeywordCall(
+        3, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN, ("GoalPlotter.plot",)
+    )
     explained = replace(triage.files_needing_review[0], reasons=(reason,))
     triage = replace(
         triage,

@@ -13,6 +13,7 @@ from enum import StrEnum
 from functools import cached_property
 
 from basstler.review_triage.python_source import AnnotatedType, PythonSource
+from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR
 
 # %% names the reading recognises
 
@@ -154,6 +155,15 @@ class FunctionDefinition:
     of, its return annotation being the type variable ``T``.
     """
 
+    @property
+    def qualified_name(self) -> str:
+        """
+        Its name, after the name of the class defining it for a method.
+        """
+        if self.owner is None:
+            return self.name
+        return f"{self.owner}{DOTTED_NAME_SEPARATOR}{self.name}"
+
 
 @dataclass(frozen=True, slots=True)
 class DataclassField:
@@ -239,6 +249,13 @@ class ClassDefinition:
     The attributes it declares a class for: in its body, on ``self`` in its methods
     or as the return of its properties.
     """
+
+    @property
+    def qualified_name(self) -> str:
+        """
+        Its name, as :attr:`FunctionDefinition.qualified_name` names a function.
+        """
+        return self.name
 
     def method(self, name: str) -> FunctionDefinition | None:
         """

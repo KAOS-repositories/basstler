@@ -132,4 +132,17 @@ items:
   notes: Commits made and signed by an identity only the tool holds (a key or a CI app), verified
     by the triage before it trusts them, so nobody can fake one; replay stays the proof for
     every other commit. Decide the identity and how it is verified.
+
+- id: override-parameter-fixes
+  title: Rename the parameters of overrides the triage flags as Liskov violations
+  track: pattern-fixes
+  status: not started
+  recommended_model: opus
+  depends_on:
+  - action-plan-triage
+  notes: 'review-triage fix-overrides: for each INCOMPATIBLE_OVERRIDES call (#266), rename the flagged
+    overrides'' parameter to the hierarchy''s name in signature, body and in-repo keyword calls, as a
+    replayable modification plan action-plan-triage proves mechanical. Refuse on a name clash in the override''s
+    scope, a **kwargs forward, or exported API unless confirmed. Build scope-aware actions next to #245''s
+    module-wide SymbolRename. Case: cram2 PR 1040, Gaussian log_likelihood(x) vs events.'
 landed_item_count: 1

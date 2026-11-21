@@ -1,5 +1,5 @@
 """
-Choosing which opt-in rules a triage applies: the project's settings and the options.
+Choosing which rules a triage applies: the project's settings and the options.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from basstler.review_triage.command_line import TriagePublication
 from basstler.review_triage.declaration import TriageDeclaration
 from basstler.review_triage.rules import (
+    DEFAULT_RULES,
     ReviewTriageSettings,
     RuleSelection,
     TriageRule,
@@ -35,7 +36,7 @@ def test_a_project_selects_rules_in_its_pyproject():
 
 def test_a_project_without_settings_selects_no_rule():
     """
-    A ``pyproject.toml`` without the settings table leaves every opt-in rule off.
+    A ``pyproject.toml`` without the settings table chooses no rule.
     """
     settings = ReviewTriageSettings.from_checkout(RULE_SETTINGS / "without-table")
     assert settings.selection == RuleSelection()
@@ -43,7 +44,7 @@ def test_a_project_without_settings_selects_no_rule():
 
 def test_a_checkout_without_a_pyproject_selects_no_rule(tmp_path):
     """
-    A checkout holding no ``pyproject.toml`` leaves every opt-in rule off.
+    A checkout holding no ``pyproject.toml`` chooses no rule.
     """
     assert ReviewTriageSettings.from_checkout(tmp_path).selection == RuleSelection()
 
@@ -57,6 +58,21 @@ def test_an_unknown_rule_in_the_settings_is_refused():
 
 
 # %% combining the project's choice with the options
+
+
+def test_the_default_rules_are_on_when_nothing_chooses():
+    """
+    With no choice made by the project or the options, the default rules are on.
+    """
+    assert RuleSelection().applied_to(RuleSelection()) == DEFAULT_RULES
+
+
+def test_a_project_ignores_a_default_rule():
+    """
+    A project ignoring a default rule turns it off.
+    """
+    project = RuleSelection(ignore=DEFAULT_RULES)
+    assert RuleSelection().applied_to(project) == frozenset()
 
 
 def test_an_option_selects_a_rule_the_project_does_not():

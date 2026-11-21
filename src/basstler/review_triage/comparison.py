@@ -17,7 +17,7 @@ from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameDecisions, RenameMap
-from basstler.review_triage.rules import TriageRule
+from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
 
 # %% what a mechanical change consists of
@@ -224,9 +224,9 @@ class JudgmentContext:
     Classes a file may replace by a subclass the pull request adds, as renames.
     """
 
-    rules: frozenset[TriageRule] = frozenset()
+    rules: frozenset[TriageRule] = DEFAULT_RULES
     """
-    The opt-in rules in force.
+    The rules in force.
     """
 
     member_renamer: MemberRenamer | None = None

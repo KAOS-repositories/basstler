@@ -138,4 +138,17 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
+
+- id: pyrefly-receiver-fallback
+  title: Answer receivers the triage's inference leaves open with Pyrefly
+  track: triage
+  branch: review-triage-pyrefly-fallback
+  pull_request_number: 240
+  depends_on:
+  - keyword-argument-triage
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #240 at 1b6fb9f6, stacked on #238 (experiments package, untracked) on #214. Pins
+    pyrefly==1.4.1; reveals receivers once per pull request; --no-type-checker. Conflicts with its
+    base (needs-resolution), CI not read. Next: restack onto #238.'
 landed_item_count: 5

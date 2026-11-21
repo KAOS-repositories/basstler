@@ -6,4 +6,4 @@
 - Review: stamp now reuses `PullRequestAtHead` (thread resolved); `SessionPullRequest` extends `HasRepository`.
 
 ## Next
-- Thread on `SessionPullRequest` is open: waiting for the reviewer to confirm what "relate to the pull request class" means.
+- Two threads open, waiting on the reviewer: what "relate to the pull request class" means for `SessionPullRequest`, and how to tie the checkout to the repository (`Repository` carries no git runner).

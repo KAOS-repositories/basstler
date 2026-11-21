@@ -37,20 +37,19 @@ items:
   pull_request_number: 223
   session: https://claude.ai/code/session_01JxHGiNXmsDWbDmd81sWCfP
   blockers:
-    - >-
-      #222, which this branch is stacked on, sits on #220, and #220 conflicts with main in
-      review_triage/outputs.py and test_pull_request_triage.py (maintenance comment on #220); the
-      stack pass leaves #222 and #223 unpublished until #220 is resolved.
-  depends_on:
-  - code-rule-fixes/rule-fixes
+  - '#222, which this branch is stacked on, sits on #220, and #220 conflicts with main in
+    review_triage/outputs.py and test_pull_request_triage.py (maintenance comment on #220);
+    the stack pass leaves #222 and #223 unpublished until #220 is resolved.'
+  depends_on: []
   status: in progress
   recommended_model: sonnet
-  notes: >
-    Draft #223, stacked on #222, merged with its head 293015cf at 25bbd5ca (pushed); review triage
-    is its own basstler-review-triage. Next: read CI at 25bbd5ca; hub's browser tests were not run
-    locally. Open: confirm dropping main's interpreter-candidate session start for the uv install;
-    commit the move's script for code-rule-fixes/action-plan-triage; shared test helpers pull the
-    stack into lower dev groups.
+  notes: 'Draft #223, stacked on #222, merged with its head 293015cf at 25bbd5ca (pushed);
+    review triage is its own basstler-review-triage. Next: read CI at 25bbd5ca; hub''s browser
+    tests were not run locally. Open: confirm dropping main''s interpreter-candidate session
+    start for the uv install; commit the move''s script for code-rule-fixes/action-plan-triage;
+    shared test helpers pull the stack into lower dev groups.
+
+    '
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split

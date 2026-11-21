@@ -84,7 +84,17 @@ class UnprovenBinding(StrEnum):
 
     BINDS_DIFFERENTLY = "the callee binds the arguments to other parameters"
     """
-    The keywords name other parameters than the arguments were bound to.
+    Every definition taking the arguments binds them to other parameters than the
+    keywords name.
+    """
+
+    INCOMPATIBLE_OVERRIDES = (
+        "these overrides name the parameters otherwise than the rest of the class"
+        " hierarchy, so they cannot stand in for it (a Liskov substitution violation)"
+    )
+    """
+    The receiver's class is known, and some definitions in its hierarchy bind the
+    arguments to the parameters the keywords name while others do not.
     """
 
     NO_DEFINITION = "no definition of the callee in the base commit takes the arguments"
@@ -216,6 +226,8 @@ class KeywordConversion(Finding):
         if not differing:
             return None
         if not target.known_by_name_only(reader):
+            if len(differing) < len(taking):
+                return self.reason(UnprovenBinding.INCOMPATIBLE_OVERRIDES, differing)
             return self.reason(UnprovenBinding.BINDS_DIFFERENTLY, differing)
         if self.calls_method:
             return self.reason(UnprovenBinding.RECEIVER_CLASS_UNKNOWN, differing)

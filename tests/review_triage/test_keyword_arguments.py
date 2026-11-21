@@ -136,6 +136,15 @@ def test_a_method_of_a_receiver_whose_class_is_inferred_is_resolved(
                 14, "plot", UnprovenBinding.BINDS_DIFFERENTLY, ("GoalPlotter.plot",)
             ),
         ),
+        (
+            FileSample.RECEIVER_OVERRIDES_INCOMPATIBLE,
+            UnprovenKeywordCall(
+                20,
+                "plot",
+                UnprovenBinding.INCOMPATIBLE_OVERRIDES,
+                ("GoalPlotter.plot",),
+            ),
+        ),
     ],
 )
 def test_a_call_not_shown_to_bind_as_before_is_the_reason_for_review(

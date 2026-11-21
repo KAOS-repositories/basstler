@@ -49,6 +49,7 @@ class FileSample(StrEnum):
     MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
     MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
     RECEIVER_BINDS_DIFFERENTLY = "receiver-binds-differently"
+    RECEIVER_OVERRIDES_INCOMPATIBLE = "receiver-overrides-incompatible"
     RECEIVER_REBOUND_OUT_OF_ORDER = "receiver-rebound-out-of-order"
     RECEIVER_TYPE_AMBIGUOUS = "receiver-type-ambiguous"
     RECEIVER_TYPE_FOLLOWED = "receiver-type-followed"

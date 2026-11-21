@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import urllib.parse
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
@@ -18,6 +18,7 @@ from basstler.github.issue import IssueClosing, IssueComment
 from basstler.github.pull_request import NewPullRequest, PullRequestDescription
 from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.repository_access import ListingParameter
+from basstler.locations import PlanHandoverLocation
 from basstler.plan.exceptions import HandoverPullRequestNotChosenError
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.handover import HandoverPlan, PlanHandover
@@ -323,6 +324,30 @@ def test_an_offer_opens_one_draft_pull_request_marked_as_a_handover(
     assert isinstance(opening, NewPullRequest)
     assert opening.draft
     assert HandoverPullRequestDescription.marker in opening.body
+
+
+def test_each_plan_in_the_description_links_to_its_section_of_the_guide(
+    sender_reaching_the_receiver: ScratchRepository,
+    hosting_client: PullRequestHostingClient,
+):
+    """
+    The description holds no section of a plan, so the plan's link opens the plan's
+    section of the guide on the handover branch.
+    """
+    offer = offer_to_receiver(sender_reaching_the_receiver, hosting_client)
+
+    (opening,) = hosting_client.sent
+    guide_url = offer.handover_branch.repository.file_url(
+        offer.handover_branch,
+        (
+            PurePosixPath(PlanHandoverLocation.PULL_REQUEST_DIRECTORY)
+            / PlanHandoverLocation.GUIDE
+        ).as_posix(),
+    )
+    assert all(
+        f"]({guide_url}#plan-{plan.identifier})" in opening.body
+        for plan in offer.handover.plans
+    )
 
 
 def test_offering_the_same_plans_again_updates_the_open_pull_request(

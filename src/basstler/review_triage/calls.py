@@ -456,7 +456,7 @@ class AnnotationInference(ReceiverInference):
 class ReceiverWalk:
     """
     One search of :class:`AnnotationInference` for what the expressions of one scope
-    are, every name being followed through all of its bindings.
+    are, every name being followed through each of its bindings that may reach it.
     """
 
     scope: CallScope
@@ -484,7 +484,7 @@ class ReceiverWalk:
             ``None`` when not found.
         """
         if isinstance(expression, ast.Name):
-            return self.name_type(expression.id, followed)
+            return self.name_type(expression, followed)
         if isinstance(expression, ast.Call):
             return self.returned_type(expression, followed)
         if isinstance(expression, ast.Attribute):
@@ -553,19 +553,33 @@ class ReceiverWalk:
             return (ImportedDefinition(name),)
         return imported
 
+    def reaching_bindings(self, use: ast.Name) -> tuple[NameBinding, ...] | None:
+        """
+        :param use: A name the innermost scope reads.
+        :return: :meth:`visible_bindings` of the name, narrowed to the bindings the
+            order of the innermost scope's statements shows reach the use.
+        """
+        scopes = self.scope.name_scopes
+        if scopes and use.id in scopes[-1].bindings:
+            order = scopes[-1].statement_order
+            reaching = None if order is None else order.reaching_bindings(use)
+            if reaching is not None:
+                return reaching
+        return self.visible_bindings(use.id)
+
     def name_type(
-        self, name: str, followed: frozenset[NameBinding]
+        self, use: ast.Name, followed: frozenset[NameBinding]
     ) -> AnnotatedType | None:
         """
-        :param name: A name the innermost scope uses.
+        :param use: A name the innermost scope reads.
         :param followed: The bindings whose values the search is inside of.
         :return: What the value it refers to is.
         """
-        if name == ReceiverName.INSTANCE and self.scope.enclosing_class is not None:
+        if use.id == ReceiverName.INSTANCE and self.scope.enclosing_class is not None:
             return AnnotatedType(
                 self.renames.original_identifier(self.scope.enclosing_class)
             )
-        bindings = self.visible_bindings(name)
+        bindings = self.reaching_bindings(use)
         if not bindings or followed & set(bindings):
             return None
         return self.agreed_type(

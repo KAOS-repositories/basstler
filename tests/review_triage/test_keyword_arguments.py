@@ -153,6 +153,32 @@ def test_a_name_bound_to_different_classes_leaves_the_receiver_unknown():
     )
 
 
+# %% receivers rebound in order
+
+
+def test_a_receiver_reassigned_has_the_class_of_its_last_assignment():
+    """
+    A name reassigned has, at a call, the class of the assignment that last ran before
+    it, through branches that do not rebind it and calls of the name itself.
+    """
+    sample = FileSample.RECEIVER_TYPE_REASSIGNED
+    assert triaged(sample, RenameMap()) == MechanicalFile(
+        sample.change(), frozenset({KeywordChange.KEYWORD_ARGUMENTS})
+    )
+
+
+def test_a_receiver_that_may_be_rebound_before_the_call_has_no_class():
+    """
+    A name a loop, a closure, a ``try`` body or a condition may rebind before the call
+    gives the receiver no class.
+    """
+    reasons = triaged(FileSample.RECEIVER_REBOUND_OUT_OF_ORDER, RenameMap()).reasons
+    assert reasons == tuple(
+        UnprovenKeywordCall(line, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN)
+        for line in (17, 28, 38, 44)
+    )
+
+
 # %% the comparison of trees
 
 

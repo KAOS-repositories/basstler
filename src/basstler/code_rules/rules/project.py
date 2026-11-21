@@ -13,9 +13,11 @@ from basstler.code_rules import rules
 from basstler.code_rules.bash_by_name import BashByNameChecker
 from basstler.code_rules.checker import CodeRuleChecker
 from basstler.code_rules.commands import CodeRulesCommand
+from basstler.code_rules.file_uri import FileUriChecker
 from basstler.code_rules.fixes import CodeFix, FixableChecker
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 from basstler.code_rules.package_boundaries import PackageBoundaryChecker
+from basstler.code_rules.posix_path_text import PosixPathTextChecker
 from basstler.code_rules.rule import CodeReference, Section
 from basstler.code_rules.text_file_usage import TextFileChecker
 from basstler.code_rules.tree_removal import TreeRemovalChecker
@@ -100,6 +102,21 @@ class PortabilityRules(Section):
         "that cannot encode most of Unicode",
         (),
         LocaleEncodingChecker(),
+    )
+
+    BUILD_FILE_URLS_WITH_AS_URI = (
+        "Build a file URL with `Path.as_uri()`, never by putting a path after "
+        "`file://`: a Windows path gives no valid URL that way",
+        (),
+        FileUriChecker(),
+    )
+
+    WRITE_PATHS_AS_POSIX_TEXT = (
+        "Turn a path into text with `as_posix()`, never with `str()`, an f-string "
+        "field or a bare `os.path.relpath`: Windows separates the parts with `\\`, "
+        "where git, the documents and every comparison expect `/`",
+        (),
+        PosixPathTextChecker(),
     )
 
     REMOVE_TREES_THROUGH_DIRECTORY_TREE = (

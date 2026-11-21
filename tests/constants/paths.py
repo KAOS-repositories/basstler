@@ -311,6 +311,12 @@ class DatasetLocation(PathEnumeration):
     The REST response for the pull request proposing the plan site's merge workflow.
     """
 
+    STALE_MERGE_WORKFLOW = DIRECTORY / "plan-site-merge-workflow-closed-only.yml"
+    """
+    The plan site's merge workflow as an earlier release wrote it, starting the build
+    only when a pull request closes.
+    """
+
     PULL_REQUEST_REFUSED = DIRECTORY / "pull-request-refused.json"
     """
     GitHub's answer refusing to open a pull request for a token without the right.
@@ -414,6 +420,17 @@ class DatasetLocation(PathEnumeration):
     FAILING_CHECK_SETUP_STUB = STUBS / "check_setup_fails.sh"
     """
     A script standing in for check-setup.sh, failing before it prints a report.
+    """
+
+    MERGE_WORKFLOW_REFRESH_STUB = STUBS / "merge_workflow_refresh_from_environment.py"
+    """
+    A module standing in for :mod:`basstler.plan_site.merge_workflow_refresh`'s command,
+    printing what the environment says.
+    """
+
+    MERGE_WORKFLOW_REFRESH_OUTPUT = DIRECTORY / "merge-workflow-refresh-output.txt"
+    """
+    What the real command prints once it proposed the current merge workflow.
     """
 
     MERGED_ITEMS_STUB = STUBS / "merged_items_from_recording.py"
@@ -722,6 +739,27 @@ class PersonalNotesPath(PathEnumeration):
     """
 
 
+class AddressSnippet(PathEnumeration):
+    """
+    Python sources the address check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "address-building"
+    """
+    The directory holding them.
+    """
+
+    HAND_BUILT = DIRECTORY / "hand-built-addresses.py"
+    """
+    A REST path and a page each appended to a repository's address by hand.
+    """
+
+    FROM_THEIR_CLASS = DIRECTORY / "addresses-from-their-class.py"
+    """
+    An address the repository builds, and a repository's name in a sentence.
+    """
+
+
 class ProseSnippet(PathEnumeration):
     """
     Python sources the prose length check measures.
@@ -869,6 +907,12 @@ class CodeModificationSnippet(PathEnumeration):
     :mod:`os`.
     """
 
+    IMPORTS_WITH_FUTURE = DIRECTORY / "imports-with-future.py.txt"
+    """
+    :attr:`IMPORTS` with :class:`concurrent.futures.Future` imported from the public
+    module that exports it.
+    """
+
     IMPORTS_OF_TEXT_FILE_MODULE = DIRECTORY / "imports-of-text-file-module.py.txt"
     """
     A module that imports :data:`~basstler.text_file.UTF_8` and nothing else from
@@ -1008,6 +1052,47 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
     A function and a method that are not :func:`open`, given a file name and a binary
     mode.
+    """
+
+
+class PosixPathTextSnippet(PathEnumeration):
+    """
+    Source files the check for paths turned into text other than as POSIX reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "posix-path-text"
+    """
+    The directory holding them.
+    """
+
+    OTHER_TEXT = DIRECTORY / "other-text.py"
+    """
+    Text that is no path, or a path of a type the module does not show, and paths
+    already written as POSIX text.
+    """
+
+
+class FileUriSnippet(PathEnumeration):
+    """
+    Source files the check for file URLs built by putting a path after ``file://``
+    reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "file-uri"
+    """
+    The directory holding them.
+    """
+
+    PATH_AFTER_SCHEME = DIRECTORY / "path-after-scheme.py"
+    """
+    Two file URLs built by putting a path after ``file://``, on lines 10 and 11.
+    """
+
+    OTHER_URLS = DIRECTORY / "other-urls.py"
+    """
+    A URL from :meth:`pathlib.PurePath.as_uri`, a web URL, a file URL with more text
+    after the path, a converted path after ``file://``, the bare scheme, and a file URL
+    concatenated with another string literal.
     """
 
 

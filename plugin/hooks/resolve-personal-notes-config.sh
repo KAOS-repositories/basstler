@@ -32,6 +32,9 @@ if [ "$(git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree 2>/dev/null)" !
   exit 78
 fi
 CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
+# Whether Claude Code runs this in a cloud session (basstler.locations.ClaudeCodeVariable.REMOTE),
+# which setup-review-triage's skill reads; unset elsewhere, so it is "false" there.
+CLAUDE_CODE_REMOTE="${CLAUDE_CODE_REMOTE:-false}"
 
 # Every caller also does `git` operations (config, fetch, worktree, branch)
 # that assume they're running inside the project. Move there explicitly instead
@@ -373,6 +376,9 @@ PLAN_SITE_DISPATCH_CHECK_MODULE="basstler.plan_site.dispatch_check"
 # basstler.plan_site.build_start: starts the plan site's build with this session's own
 # GitHub credential, after a push to the notes branch.
 PLAN_SITE_BUILD_START_MODULE="basstler.plan_site.build_start"
+# basstler.plan_site.merge_workflow_refresh: proposes the current merge workflow when the
+# default branch holds an older one, and prints the step left to the user.
+PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE="basstler.plan_site.merge_workflow_refresh"
 # basstler.personal_notes.access: in a cloud session, prints how to attach a notes
 # repository other than the checkout's own when the session cannot reach it.
 NOTES_ACCESS_MODULE="basstler.personal_notes.access"

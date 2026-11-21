@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from basstler.github.comparison import ComparisonStatus
+from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import (
     PullRequestField,
@@ -175,6 +176,79 @@ def test_github_source_reading_no_check_states_leaves_an_open_pull_requests_unre
         reads_check_states=False,
     )
     assert source.pull_request(OPEN_PULL_REQUEST).check_state is None
+
+
+# %% reading mergeable states
+
+
+def a_source_reading_mergeable_states(
+    listed: dict[str, Any],
+    own_read: dict[str, Any],
+    reads_mergeable_states: bool = True,
+) -> GitHubPullRequestSource:
+    """
+    :param listed: The pull request as the repository's listing gives it.
+    :param own_read: The pull request as reading it on its own gives it.
+    :param reads_mergeable_states: Whether the source reads mergeable states.
+    :return: A source that reads no check states.
+    """
+    return GitHubPullRequestSource(
+        RecordedGitHubClient(
+            responses={
+                **details_of(OPEN_PULL_REQUEST.repository),
+                pull_request_path(OPEN_PULL_REQUEST): own_read,
+            },
+            pages={listing_path(OPEN_PULL_REQUEST.repository): [[listed]]},
+        ),
+        reads_check_states=False,
+        reads_mergeable_states=reads_mergeable_states,
+    )
+
+
+@pytest.mark.parametrize("mergeable_state", list(MergeableState))
+def test_github_source_reads_the_mergeable_state_of_an_open_pull_request_on_its_own(
+    mergeable_state: MergeableState,
+):
+    source = a_source_reading_mergeable_states(
+        listed=api_pull_request(OPEN_PULL_REQUEST),
+        own_read=api_pull_request(
+            OPEN_PULL_REQUEST, {PullRequestField.MERGEABLE_STATE: mergeable_state.value}
+        ),
+    )
+    assert source.pull_request(OPEN_PULL_REQUEST).mergeable_state is mergeable_state
+
+
+def test_github_source_reading_no_mergeable_states_leaves_them_unread():
+    source = a_source_reading_mergeable_states(
+        listed=api_pull_request(OPEN_PULL_REQUEST),
+        own_read=api_pull_request(
+            OPEN_PULL_REQUEST, {PullRequestField.MERGEABLE_STATE: MergeableState.DIRTY}
+        ),
+        reads_mergeable_states=False,
+    )
+    assert source.pull_request(OPEN_PULL_REQUEST).mergeable_state is None
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {PullRequestField.STATE: PullRequestState.CLOSED.value},
+        {PullRequestField.DRAFT: True},
+    ],
+)
+def test_github_source_leaves_the_mergeable_state_of_a_closed_or_draft_pull_request_unread(
+    overrides: dict[PullRequestField, Any],
+):
+    source = a_source_reading_mergeable_states(
+        listed=api_pull_request(OPEN_PULL_REQUEST, overrides),
+        own_read=api_pull_request(
+            OPEN_PULL_REQUEST, {PullRequestField.MERGEABLE_STATE: MergeableState.DIRTY}
+        ),
+    )
+    assert source.pull_request(OPEN_PULL_REQUEST).mergeable_state is None
+
+
+# %% reading issue urls
 
 
 def test_github_source_reads_an_issue_url():
@@ -487,3 +561,20 @@ def test_github_source_records_the_upstream_pull_request_of_each_fork_branch():
     assert live_pull_requests.upstream_pull_requests == {
         str(PLAN_REPOSITORY): {"a-branch": 7}
     }
+
+
+def test_github_source_reading_no_upstream_pull_requests_leaves_the_upstream_unread():
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
+    upstream = Repository.parse(fork["parent"]["full_name"])
+    client = RecordedGitHubClient(
+        responses={f"/{PLAN_REPOSITORY.api_path}": fork},
+        pages={
+            listing_path(PLAN_REPOSITORY): [[]],
+            listing_path(upstream, PullRequestListState.OPEN): [[]],
+        },
+    )
+    source = GitHubPullRequestSource(client, reads_upstream_pull_requests=False)
+    source.live_pull_requests_of(DependencyResolver(FIRST_PLAN).pull_request_references)
+    assert [
+        path for path in client.reads if path.startswith(f"/{upstream.api_path}/")
+    ] == []

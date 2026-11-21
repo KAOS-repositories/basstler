@@ -5,6 +5,8 @@ and undoing both exactly.
 
 from __future__ import annotations
 
+from concurrent.futures import Future
+
 import libcst
 import pytest
 
@@ -118,6 +120,18 @@ def test_an_import_follows_the_last_import_of_the_module(imports):
 
     assert applied.module.code == (
         TextFile(CodeModificationSnippet.IMPORTS_WITH_TEXT_FILE).read()
+    )
+
+
+def test_a_class_defined_in_a_private_module_is_imported_from_its_public_one(imports):
+    """
+    A class is imported from the module that exports it, never from the private module
+    it is defined in.
+    """
+    applied = ImportInsertion(Future).apply(imports)
+
+    assert applied.module.code == (
+        TextFile(CodeModificationSnippet.IMPORTS_WITH_FUTURE).read()
     )
 
 

@@ -782,7 +782,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         logger.info(
             f"{StackSetting.UPSTREAM_REPOSITORY} = {arguments.repository.full_name} "
-            f"saved to {ProjectLocation.PERSONAL_STACK_CONFIGURATION} on the "
+            f"saved to {ProjectLocation.PERSONAL_STACK_CONFIGURATION.as_posix()} on the "
             "personal-notes branch"
         )
         return 0

@@ -42,15 +42,20 @@ CRLF_TEXT = "first\r\nsecond\nthird\r\n"
 Lines ended both ways, as a checkout with another newline setting leaves them.
 """
 
+LF_TEXT = "first\nsecond\nthird\n"
+"""
+:data:`CRLF_TEXT` with every line ended by a line feed alone.
+"""
 
-def test_reading_keeps_every_line_ending_as_stored(tmp_path: Path):
+
+def test_reading_ends_every_line_with_a_line_feed(tmp_path: Path):
     """
-    The text read has the line endings the file's bytes have, none translated.
+    The text read ends each line with ``\\n``, however the file's bytes end it.
     """
     stored = tmp_path / "stored.txt"
     stored.write_bytes(CRLF_TEXT.encode(UTF_8))
 
-    assert TextFile(stored).read() == CRLF_TEXT
+    assert TextFile(stored).read() == LF_TEXT
 
 
 def test_writing_keeps_every_line_ending_as_given(tmp_path: Path):

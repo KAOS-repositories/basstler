@@ -41,9 +41,9 @@ class TextFileFix(CodeFix[Specification]):
         return BehaviourDeclaration(
             BehaviourEffect.CHANGED,
             "Text is read and written as UTF-8 instead of in the locale encoding, and "
-            "line endings are kept as stored instead of translated to the platform's; "
-            "nothing changes where the locale encoding is UTF-8 and lines end in a "
-            "line feed.",
+            "text is written with its line endings as given instead of translated to "
+            "the platform's; nothing changes where the locale encoding is UTF-8 and "
+            "the platform ends lines in a line feed.",
         )
 
     @classproperty

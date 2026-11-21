@@ -224,6 +224,12 @@ items:
   title: "Move each shared test helper into the distribution that owns its subject"
   branch: null
   track: package-split
+  notes: >
+    Each distribution's dev group lists only what its tests import, so every distribution but the
+    meta-package runs its tests in an environment of its own requirements. Start from #223's list:
+    scratch_repository (imports setup.steps from notes) and maintenance/fork. Notes' and plan's dev
+    groups also list the meta-package. Done when uv sync --package <name> plus the dev group runs
+    each distribution's tests alone.
   depends_on: []
   status: not started
   recommended_model: opus

@@ -36,8 +36,7 @@ items:
   branch: ccr-6ee4aeab-7j9mi2
   pull_request_number: 223
   session: https://claude.ai/code/session_01JxHGiNXmsDWbDmd81sWCfP
-  blockers:
-    - ""
+  blockers: []
   depends_on: []
   status: in progress
   recommended_model: sonnet

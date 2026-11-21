@@ -18,7 +18,11 @@ from basstler.plan_site.__main__ import RepositorySite
 
 from basstler_testing.fixture_plans import PLAN_UNDER_TEST_ID
 from basstler_testing.github.pull_request_api import api_pull_request
-from .first_plan import FIRST_PLAN, OPEN_PULL_REQUEST, PLAN_REPOSITORY
+from basstler_testing.plan_site.first_plan import (
+    FIRST_PLAN,
+    OPEN_PULL_REQUEST,
+    PLAN_REPOSITORY,
+)
 from .plan_page_builders import item, make_renderer
 from .test_live_states import answers_with, open_first_plan_page
 

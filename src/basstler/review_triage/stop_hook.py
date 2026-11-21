@@ -18,47 +18,19 @@ from cyclopts import App
 from basstler.exit_codes import StackExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubReader, GitHubRestClient
-from basstler.github.repository import Repository
-from basstler.github.rest_models import RestPullRequestSummary
-from basstler.json_model import ValidatedJSONModel
+from basstler.github.repository import HasRepository, Repository
+from basstler.github.rest_models import PullRequestAtHead, RestPullRequestSummary
 from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
 from basstler.review_triage.command_line import mark_viewed
-
-# %% what was marked
-
-
-class MarkedHead(ValidatedJSONModel):
-    """
-    The pull request the files were last marked viewed on, at one head commit.
-    """
-
-    pull_request: int
-    """
-    The pull request's number.
-    """
-
-    head_commit: str
-    """
-    The commit its branch pointed at when the files were marked.
-    """
-
-    @classmethod
-    def of_pull_request(cls, pull_request: RestPullRequestSummary) -> MarkedHead:
-        """
-        :param pull_request: A pull request.
-        :return: Its number and the head it has now.
-        """
-        return cls(pull_request.number, pull_request.head.object_hash)
-
 
 # %% the pull request of the session
 
 
 @dataclass(frozen=True)
-class SessionPullRequest:
+class SessionPullRequest(HasRepository):
     """
-    The open pull request of the branch a session has checked out, and whether the files
-    of its current head are marked viewed.
+    The open pull request of the branch a session has checked out in its repository, and
+    whether the files of its current head are marked viewed.
     """
 
     git: GitCommandRunner
@@ -69,11 +41,6 @@ class SessionPullRequest:
     client: GitHubReader
     """
     Reads the repository's pull requests.
-    """
-
-    repository: Repository
-    """
-    The repository the pull request is opened on, which the branch is pushed to.
     """
 
     @property
@@ -103,18 +70,21 @@ class SessionPullRequest:
         if not listed:
             return None
         pull_request = listed[0]
-        if self.marked_head() == MarkedHead.of_pull_request(pull_request):
+        marked = self.marked_head()
+        if marked is not None and marked.is_at(pull_request):
             return None
         return pull_request
 
-    def marked_head(self) -> MarkedHead | None:
+    def marked_head(self) -> PullRequestAtHead | None:
         """
         :return: The head the files were last marked viewed at, ``None`` when they never
             were.
         """
         if not self.stamp.exists():
             return None
-        return MarkedHead.from_json(json.loads(self.stamp.read_text(encoding="utf-8")))
+        return PullRequestAtHead.from_json(
+            json.loads(self.stamp.read_text(encoding="utf-8"))
+        )
 
     def record_marked(self, pull_request: RestPullRequestSummary) -> None:
         """
@@ -123,7 +93,7 @@ class SessionPullRequest:
         """
         self.stamp.parent.mkdir(parents=True, exist_ok=True)
         self.stamp.write_text(
-            json.dumps(MarkedHead.of_pull_request(pull_request).to_json()),
+            json.dumps(PullRequestAtHead.from_json(pull_request.to_json()).to_json()),
             encoding="utf-8",
         )
 
@@ -149,7 +119,7 @@ def mark_session_pull_request() -> StackExitCode:
     )
     git = GitCommandRunner(project_root)
     session = SessionPullRequest(
-        git, GitHubRestClient(), Repository.from_name_or_remote(None, git)
+        Repository.from_name_or_remote(None, git), git, GitHubRestClient()
     )
     pull_request = session.unmarked()
     if pull_request is not None:

@@ -88,12 +88,12 @@ def session_reading(
     :return: The session, as it reads GitHub then.
     """
     return SessionPullRequest(
-        scratch_repository.git,
-        BranchSearchReader(
+        repository=SAMPLE_REPOSITORY,
+        git=scratch_repository.git,
+        client=BranchSearchReader(
             SAMPLE_REPOSITORY.open_pull_requests_from_branch_path(SESSION_BRANCH),
             [pull_request_at(head_commit)],
         ),
-        SAMPLE_REPOSITORY,
     )
 
 

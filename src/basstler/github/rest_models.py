@@ -68,9 +68,9 @@ class RestPullRequestHead(PullRequestEnd):
     """
 
 
-class PullRequestPage(WebPage):
+class PullRequestNumber(ValidatedJSONModel):
     """
-    A pull request as every REST resource of one names it: by its number and its page.
+    A pull request as every REST resource of one names it: by its number.
     """
 
     number: int
@@ -79,7 +79,34 @@ class PullRequestPage(WebPage):
     """
 
 
-class RestPullRequestSummary(RestResponse, PullRequestPage):
+class PullRequestPage(PullRequestNumber, WebPage):
+    """
+    A pull request named by its number and its page.
+    """
+
+
+class PullRequestAtHead(PullRequestNumber):
+    """
+    A pull request and the commit its branch points at.
+    """
+
+    head: PullRequestEnd
+    """
+    The branch it was opened from.
+    """
+
+    def is_at(self, other: PullRequestAtHead) -> bool:
+        """
+        :param other: A pull request.
+        :return: Whether it is the same pull request at the same head commit.
+        """
+        return (
+            self.number == other.number
+            and self.head.object_hash == other.head.object_hash
+        )
+
+
+class RestPullRequestSummary(RestResponse, PullRequestAtHead, PullRequestPage):
     """
     One pull request as REST describes it, whether listed or read on its own.
     """
@@ -101,7 +128,7 @@ class RestPullRequestSummary(RestResponse, PullRequestPage):
 
     head: RestPullRequestHead
     """
-    The branch it was opened from.
+    The branch it was opened from, with whoever owns it.
     """
 
     base: PullRequestEnd

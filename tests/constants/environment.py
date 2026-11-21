@@ -127,6 +127,11 @@ class ConfigurationVariable(StrEnum):
     The ref the personal-notes branch is fetched into.
     """
 
+    PULL_REQUEST_PROGRESS_DIRECTORY = "PR_PROGRESS_DIRECTORY"
+    """
+    The notes branch's directory of progress notes.
+    """
+
 
 class SearchPathVariable(EnvironmentVariable):
     """
@@ -152,6 +157,34 @@ class FileMode(IntEnum):
     EXECUTABLE = 0o755
     """
     Readable and runnable by everyone, writable by its owner.
+    """
+
+    READ_ONLY_DIRECTORY = 0o555
+    """
+    A directory everyone can list and enter but no one can add to or delete from.
+    """
+
+
+class InterpreterName(StrEnum):
+    """
+    The names the hooks run a Python interpreter by.
+    """
+
+    PYTHON3 = "python3"
+    """
+    The name the shell configuration falls back to before the package environment
+    exists, which a Windows virtual environment does not provide.
+    """
+
+
+class InterpreterVariable(StrEnum):
+    """
+    Variables the Python interpreter reads when it starts.
+    """
+
+    HASH_SEED = "PYTHONHASHSEED"
+    """
+    The seed the interpreter hashes strings with.
     """
 
 

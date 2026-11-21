@@ -201,7 +201,7 @@ report_plan_site_access() {
     report plan_site_access info "no plan site lists this repository, so no build is started"
     return 0
   fi
-  access="$("${BASSTLER_PYTHON}" -m "${PLAN_SITE_BUILD_START_MODULE}" check-access 2>/dev/null | tr '\n' ' ')" \
+  access="$("${BASSTLER_PYTHON}" -m "${PLAN_SITE_BUILD_START_MODULE}" check-access 2>/dev/null | tr -d '\r' | tr '\n' ' ')" \
     || access=""
   access="${access% }"
   if [ -z "${access}" ]; then
@@ -337,16 +337,17 @@ if fetch_personal_notes_branch; then
   else
     IFS=$'\t' read -r EFFECTIVE_NAME EFFECTIVE_EMAIL <<< "${EFFECTIVE_GIT_IDENTITY}"
     EFFECTIVE_DISPLAY="$(format_git_identity "${EFFECTIVE_NAME}" "${EFFECTIVE_EMAIL}")"
-    if ! RECORDED_GIT_IDENTITY="$(recorded_git_identity)"; then
+    GIT_IDENTITY_PATH="$(git_identity_path)"
+    if ! RECORDED_GIT_IDENTITY="$(recorded_git_identity "${GIT_IDENTITY_PATH}")"; then
       report git_identity needs-setup \
-        "no complete '${PERSONAL_GIT_IDENTITY_PATH}' on '${NOTES_BRANCH}' - commits here are authored as ${EFFECTIVE_DISPLAY}, and a fresh clone gets no identity at all - run ./save-git-identity.sh --name <your name> --email <your email>"
+        "no complete '${GIT_IDENTITY_PATH}' on '${NOTES_BRANCH}' - commits here are authored as ${EFFECTIVE_DISPLAY}, and a fresh clone gets no identity at all - run ./save-git-identity.sh --name <your name> --email <your email>"
     elif [ "${RECORDED_GIT_IDENTITY}" = "${EFFECTIVE_GIT_IDENTITY}" ]; then
       report git_identity ok \
-        "commits here are authored as ${EFFECTIVE_DISPLAY}, matching '${PERSONAL_GIT_IDENTITY_PATH}' on '${NOTES_BRANCH}'"
+        "commits here are authored as ${EFFECTIVE_DISPLAY}, matching '${GIT_IDENTITY_PATH}' on '${NOTES_BRANCH}'"
     else
       IFS=$'\t' read -r RECORDED_NAME RECORDED_EMAIL <<< "${RECORDED_GIT_IDENTITY}"
       report git_identity needs-setup \
-        "'${PERSONAL_GIT_IDENTITY_PATH}' records $(format_git_identity "${RECORDED_NAME}" "${RECORDED_EMAIL}"), but commits here are authored as ${EFFECTIVE_DISPLAY} - $(git_identity_precedence_note)"
+        "'${GIT_IDENTITY_PATH}' records $(format_git_identity "${RECORDED_NAME}" "${RECORDED_EMAIL}"), but commits here are authored as ${EFFECTIVE_DISPLAY} - $(git_identity_precedence_note)"
     fi
   fi
 else

@@ -7,10 +7,10 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import StrEnum
 
 from basstler.class_property import classproperty
 from basstler.github.actions_secret import ActionsSecret
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository import NewTokenPage, Repository
 from basstler.github.user_steps import UserStep
 from basstler.github.web_form import PrefilledForm, UrlQueryParameter
@@ -60,30 +60,6 @@ class RepositoryPermission(UrlQueryParameter):
     """
     The repository's pull requests, their reviews and their files' viewed state.
     """
-
-
-class PermissionLevel(StrEnum):
-    """
-    The access a fine-grained token's permission grants.
-    """
-
-    READ = "read"
-    """
-    Read only.
-    """
-
-    WRITE = "write"
-    """
-    Read and write.
-    """
-
-    @classmethod
-    def broadest(cls, levels: list[PermissionLevel]) -> PermissionLevel:
-        """
-        :param levels: The levels several jobs need on one permission, at least one.
-        :return: The level that grants all of them.
-        """
-        return cls.WRITE if cls.WRITE in levels else cls.READ
 
 
 # %% the filled-in form

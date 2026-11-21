@@ -53,8 +53,8 @@ from ..constants.environment import (
     ShellExitStatus,
 )
 from ..constants.notes import ScratchBranch
-from ..constants.paths import DatasetLocation, PersonalNotesPath, RepositoryLocation
-from ..executable_stubs import ExecutableStubDirectory
+from ..constants.paths import DatasetLocation, RepositoryLocation
+from ..executable_stubs import ExecutableStubDirectory, NEEDS_SCRIPT_AS_EXECUTABLE
 from ..scratch_repository import SCRATCH_IDENTITY, GitIdentity, ScratchRepository
 
 SCRIPTS_UNDER_TEST = (
@@ -100,6 +100,11 @@ class GitHubAnsweringFromMemory(GitHubClient):
     The account the credential belongs to.
     """
 
+    may_push: bool = False
+    """
+    Whether :attr:`login` may push to :attr:`repository`.
+    """
+
     present_labels: set[str] = field(default_factory=set)
     """
     The labels the repository carries.
@@ -111,6 +116,13 @@ class GitHubAnsweringFromMemory(GitHubClient):
     """
 
     def get(self, path: str) -> Any:
+        if path == self.repository.api_path:
+            return {
+                "default_branch": "main",
+                "fork": False,
+                "private": False,
+                "permissions": {"push": self.may_push},
+            }
         assert path == str(GitHubPath.AUTHENTICATED_USER)
         return {AccountField.LOGIN: self.login}
 
@@ -293,6 +305,7 @@ def test_completes_a_full_setup(setup_repository: ScratchRepository):
     assert check_setup_report(setup_repository).exit_code == exit_code
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     setup_repository: ScratchRepository, tmp_path: Path
 ):
@@ -316,7 +329,7 @@ def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     ]
     # session start's base-branch sync reads the stack configuration through
     # ``bash -c``, which runs in the configured bash too
-    assert call_log.read_text().splitlines() == [
+    assert call_log.read_text(encoding="utf-8").splitlines() == [
         *(str(setup.plugin_root.path_of(script)) for script in scripts_before_the_sync),
         "-c",
         str(setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT)),
@@ -340,7 +353,9 @@ def test_leaves_a_new_notes_file_empty_without_starter_notes(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text() == ""
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == ""
 
 
 def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
@@ -353,11 +368,11 @@ def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
     ).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (
-        checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT
-    ).read_text() == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
         PluginSkillLocation.STARTER_NOTES
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
 
 def test_never_seeds_over_notes_that_already_exist(
@@ -374,9 +389,9 @@ def test_never_seeds_over_notes_that_already_exist(
     ).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    assert (
-        checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT
-    ).read_text() == "my own notes\n"
+    assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
+        encoding="utf-8"
+    ) == "my own notes\n"
 
 
 def test_a_second_run_changes_nothing(setup_repository: ScratchRepository):
@@ -399,9 +414,7 @@ def test_records_the_git_identity_it_is_given(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    recorded = GitIdentity.from_git_config_file(
-        checkout / PersonalNotesPath.GIT_IDENTITY
-    )
+    recorded = GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
     assert recorded == SCRATCH_IDENTITY
 
 
@@ -497,12 +510,62 @@ def test_refuses_a_remote_someone_else_owns_before_writing_anything(
     assert published_notes_commit(setup_repository) == ""
 
 
-def test_accepts_a_remote_whose_owner_differs_only_in_case():
+def test_accepts_a_remote_whose_owner_differs_only_in_case(
+    setup_repository: ScratchRepository,
+):
     github = GitHubAnsweringFromMemory(
         CREDENTIAL_OWNER, login=CREDENTIAL_OWNER.owner.upper()
     )
 
-    labels_setup(github=github).verify_notes_remote_owner()
+    setup_for(setup_repository, github=github).verify_notes_remote_access(
+        check_setup_report(setup_repository)
+    )
+
+
+# %% joining a notes branch colleagues share
+
+
+def test_a_colleague_who_may_push_joins_the_notes_branch_already_there(
+    setup_repository: ScratchRepository,
+):
+    setup_repository.publish_notes_branch(
+        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "shared notes\n"}
+    )
+    shared_commit = published_notes_commit(setup_repository)
+    setup_repository.resolve_notes_remote_to()
+    github = GitHubAnsweringFromMemory(SOMEONE_ELSE, may_push=True)
+
+    setup_for(setup_repository, github=github).verify_notes_remote_access(
+        check_setup_report(setup_repository)
+    )
+
+    assert published_notes_commit(setup_repository) == shared_commit
+
+
+def test_a_colleague_who_may_push_never_creates_a_notes_branch_for_the_owner(
+    setup_repository: ScratchRepository,
+):
+    github = GitHubAnsweringFromMemory(SOMEONE_ELSE, may_push=True)
+
+    with pytest.raises(ForeignNotesRemoteError):
+        setup_for(setup_repository, github=github).verify_notes_remote_access(
+            check_setup_report(setup_repository)
+        )
+
+
+def test_a_colleague_who_may_not_push_is_refused_even_where_notes_exist(
+    setup_repository: ScratchRepository,
+):
+    setup_repository.publish_notes_branch(
+        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "shared notes\n"}
+    )
+    setup_repository.resolve_notes_remote_to()
+    github = GitHubAnsweringFromMemory(SOMEONE_ELSE, may_push=False)
+
+    with pytest.raises(ForeignNotesRemoteError):
+        setup_for(setup_repository, github=github).verify_notes_remote_access(
+            check_setup_report(setup_repository)
+        )
 
 
 # %% pull request labels

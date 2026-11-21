@@ -579,7 +579,7 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
             closing_follow_ups,
         )
         maintenance.board.unlink(missing_ok=True)
-        maintenance.full_report.write_text(report.as_json() + "\n")
+        maintenance.full_report.write_text(report.as_json() + "\n", encoding="utf-8")
         if as_json:
             logger.info(report.as_json())
             return report

@@ -24,6 +24,7 @@ from basstler.locations import ReviewTriageLocation
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.detection import RenameDetection
+from basstler.review_triage.exceptions import PullRequestHeadMoved
 from basstler.review_triage.outputs import MarkdownReport, ViewedFile, ViewedMarking
 from basstler.review_triage.renames import Rename, RenameDecisions
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
@@ -31,6 +32,8 @@ from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 from ..scratch_repository import ScratchRepository
 from .conftest import (
     SAMPLE_REPOSITORY,
+    FileListingWriter,
+    listing_of,
     OnePullRequestReader,
     RecordingWriter,
     RefusingWriter,
@@ -143,7 +146,9 @@ def test_the_report_lists_renames_and_both_groups_of_files(
     ones.
     """
     triage = PullRequestTriager().triage(sample_changes)
-    expected = PullRequestSample.REPORT.path.read_text().removesuffix("\n")
+    expected = PullRequestSample.REPORT.path.read_text(encoding="utf-8").removesuffix(
+        "\n"
+    )
     assert MarkdownReport().render(triage) == expected
 
 
@@ -152,16 +157,56 @@ def test_each_mechanical_file_is_marked_viewed(sample_changes: PullRequestChange
     One mutation is sent per mechanical file, naming the pull request and the file.
     """
     triage = PullRequestTriager().triage(sample_changes)
-    writer = RecordingWriter({"data": {}})
+    writer = listing_of(triage)
     ViewedMarking(writer).publish(triage)
-    document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
-    assert writer.sent == [
+    document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text(encoding="utf-8")
+    assert [request for request in writer.sent if request.query == document] == [
         GraphQLRequest(
             document,
             ViewedFile(triage.pull_request.node_identifier, path).to_json(),
         )
         for path in MECHANICAL_KINDS
     ]
+
+
+def test_a_file_github_does_not_list_is_not_marked_viewed(
+    sample_changes: PullRequestChanges,
+):
+    """
+    A mechanical file GitHub does not count in the pull request, such as the old path of
+    a file whose move GitHub pairs and git does not, is left out of the marking.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    unlisted, *listed = MECHANICAL_KINDS
+    writer = FileListingWriter(triage.pull_request.head.commit, (tuple(listed),))
+    ViewedMarking(writer).publish(triage)
+    assert writer.marked_paths == listed
+
+
+def test_a_file_on_a_later_page_is_marked_viewed(sample_changes: PullRequestChanges):
+    """
+    Every page of GitHub's listing counts, not only the first.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    writer = FileListingWriter(
+        triage.pull_request.head.commit,
+        tuple((file.change.path,) for file in triage.files),
+    )
+    ViewedMarking(writer).publish(triage)
+    assert writer.marked_paths == list(MECHANICAL_KINDS)
+
+
+def test_a_pull_request_pushed_to_since_its_triage_has_nothing_marked(
+    sample_changes: PullRequestChanges,
+):
+    """
+    When the head commit moved after the triage, no file is marked viewed.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    writer = replace(listing_of(triage), head_commit=triage.pull_request.base.commit)
+    with pytest.raises(PullRequestHeadMoved):
+        ViewedMarking(writer).publish(triage)
+    assert writer.marked_paths == []
 
 
 def test_a_viewed_path_is_sent_with_forward_slashes():

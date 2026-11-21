@@ -258,6 +258,56 @@ class InstructionsTemplate(PathEnumeration):
     """
 
 
+class PlanHandoverLocation(PathEnumeration):
+    """
+    The files a plan handover holds, relative to its directory.
+    """
+
+    GUIDE = Path("HANDOVER.md")
+    """
+    The instructions a coding agent continues the handed-over plans from without basstler.
+    """
+
+    PLANS = Path("plans")
+    """
+    One directory per plan, holding its documents as the notes branch does.
+    """
+
+    PULL_REQUEST_PROGRESS = Path("pr-progress")
+    """
+    The progress note of each handed-over item's branch, named after the branch.
+    """
+
+    REPOSITORY_RULES = Path("repository-rules.yaml")
+    """
+    The rules every plan of the repository follows, in the notes branch's format.
+    """
+
+    GUIDE_TEMPLATE = PackageLocation.TEMPLATES.value / "plan_handover_guide.md.jinja"
+    """
+    The template :attr:`GUIDE` is rendered from.
+    """
+
+    TAKEN_OVER_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "plan_handover_taken_over.md.jinja"
+    )
+    """
+    The template of the comment a handover pull request is closed with.
+    """
+
+    PULL_REQUEST_DIRECTORY = Path("plan-handover")
+    """
+    Where a handover pull request's commit holds the handover, relative to its root.
+    """
+
+    PULL_REQUEST_TEMPLATE = (
+        PackageLocation.TEMPLATES.value / "plan_handover_pull_request.md.jinja"
+    )
+    """
+    The template a handover pull request's description is rendered from.
+    """
+
+
 class ReviewTriageLocation(PathEnumeration):
     """
     The files the review triage reads beside its modules.
@@ -270,6 +320,14 @@ class ReviewTriageLocation(PathEnumeration):
     )
     """
     The GraphQL mutation marking one file of a pull request viewed.
+    """
+
+    PULL_REQUEST_FILES = (
+        PackageLocation.DIRECTORY.value / "review_triage" / "pull_request_files.graphql"
+    )
+    """
+    The GraphQL query reading one page of the files GitHub lists in a pull request,
+    with its head commit.
     """
 
     REPORT_TEMPLATE = PackageLocation.TEMPLATES.value / "review_triage_report.md.jinja"
@@ -468,6 +526,23 @@ class ProjectLocation(PathEnumeration):
     :attr:`PackageLocation.STACK_CONFIGURATION`.
     """
 
+    GIT_IDENTITY = PERSONAL_NOTES / "git-identity"
+    """
+    The git identity of the notes repository's owner, which a clone with none of its
+    own is given.
+
+    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
+    CONTRIBUTOR_GIT_IDENTITIES = PERSONAL_NOTES / "git-identities"
+    """
+    The git identities of everyone else who shares the notes branch, one file per GitHub
+    login.
+
+    Mirrors ``CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY`` in
+    ``resolve-personal-notes-config.sh``.
+    """
+
     PERSONAL_NOTES_DOCUMENT = PERSONAL_NOTES / "notes.md"
     """
     The notes file itself, unless a clone's settings put it elsewhere.
@@ -498,6 +573,14 @@ class ProjectLocation(PathEnumeration):
     PLAN_RULES = PLANS / "_rules.yaml"
     """
     The rules every plan of the repository follows, one entry per rule.
+    """
+
+    PULL_REQUEST_PROGRESS = PERSONAL_NOTES / "pr-progress"
+    """
+    Where the personal-notes branch keeps each branch's progress note, named after the
+    branch.
+
+    Mirrors ``PR_PROGRESS_DIRECTORY`` in ``resolve-personal-notes-config.sh``.
     """
 
     PERSONAL_STACK_CONFIGURATION = PERSONAL_NOTES / "stack.toml"

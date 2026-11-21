@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from basstler.github.permission_level import PermissionLevel
 from basstler.git.branch import Branch
 from basstler.github.actions_settings import (
     ActionsEnabling,
@@ -26,7 +27,6 @@ from basstler.github.pull_request import NewPullRequest
 from basstler.github.repository import Repository, RepositoryBranch
 from basstler.github.repository_details import RepositoryDetails
 from basstler.github.token_form import (
-    PermissionLevel,
     RepositoryPermission,
     TokenUse,
 )
@@ -509,7 +509,9 @@ def test_basstler_s_own_caller_marks_every_pull_request():
     Basstler's own repository marks files viewed on every pull request with the workflow
     the setup writes.
     """
-    installed = (RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read_text()
+    installed = (RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read_text(
+        encoding="utf-8"
+    )
     assert (
         installed
         == MarkViewedSetup(

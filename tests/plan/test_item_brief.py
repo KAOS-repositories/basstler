@@ -5,12 +5,16 @@ item.
 
 from __future__ import annotations
 
+import json
+import sys
 from typing import Any
 
 import pytest
 import yaml
 
+from basstler.github import pull_request_source as pull_request_source_module
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
+from basstler.github.repository_access import PullRequestListState
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import PluginLocation, ProjectLocation
@@ -22,6 +26,7 @@ from basstler.plan.item_brief import (
     ItemBriefOption,
     ItemByBranch,
     ItemByIdentifier,
+    main,
 )
 from basstler.plan.model import (
     ItemNotTrackedError,
@@ -34,6 +39,8 @@ from basstler.plan.size_limits import Roadmap
 
 from ..constants.paths import DatasetLocation
 from ..fixture_plans import FixturePlanId, ForeignItemId
+from ..github.pull_request_api import listing_path
+from ..github.recorded_client import RecordedGitHubClient
 from ..recorded_pull_requests import RecordedPullRequestSource
 from ..scratch_repository import ScratchRepository
 
@@ -114,16 +121,18 @@ def briefed_repository(scratch_repository: ScratchRepository) -> ScratchReposito
         {
             PlanDocument.MANIFEST.path_within_notes_branch(
                 BRIEFED_MANIFEST.identifier
-            ): DatasetLocation.BRIEF_PLAN.read_text(),
+            ): DatasetLocation.BRIEF_PLAN.read_text(encoding="utf-8"),
             PlanDocument.ROADMAP.path_within_notes_branch(
                 BRIEFED_MANIFEST.identifier
-            ): DatasetLocation.BRIEF_ROADMAP.read_text(),
-            ProjectLocation.PLAN_RULES: DatasetLocation.REPOSITORY_RULES.read_text(),
+            ): DatasetLocation.BRIEF_ROADMAP.read_text(encoding="utf-8"),
+            ProjectLocation.PLAN_RULES: DatasetLocation.REPOSITORY_RULES.read_text(
+                encoding="utf-8"
+            ),
             PlanDocument.MANIFEST.path_within_notes_branch(
                 FOREIGN_MANIFEST.identifier
             ): (
                 DatasetLocation.PLANS / FixturePlanId.OTHER / PlanDocument.MANIFEST
-            ).read_text(),
+            ).read_text(encoding="utf-8"),
         }
     )
     scratch_repository.resolve_notes_remote_to()
@@ -203,7 +212,9 @@ def test_the_brief_holds_the_plans_standing_rules(
 
     assert (
         brief[ItemBriefKey.STANDING_RULES]
-        == Roadmap.from_text(DatasetLocation.BRIEF_ROADMAP.read_text()).entries
+        == Roadmap.from_text(
+            DatasetLocation.BRIEF_ROADMAP.read_text(encoding="utf-8")
+        ).entries
     )
 
 
@@ -216,7 +227,7 @@ def test_the_brief_holds_the_repositorys_rules(
     assert brief[ItemBriefKey.REPOSITORY_RULES] == [
         {"id": rule.identifier, "text": rule.text}
         for rule in RepositoryRules.from_yaml(
-            DatasetLocation.REPOSITORY_RULES.read_text()
+            DatasetLocation.REPOSITORY_RULES.read_text(encoding="utf-8")
         ).rules
     ]
 
@@ -277,3 +288,40 @@ def test_the_command_prints_the_brief(
     assert yaml.safe_load(capsys.readouterr().out) == read_brief(
         briefed_repository, pull_request_source
     )
+
+
+def test_the_command_leaves_the_upstream_of_a_forked_plan_repository_unread(
+    briefed_repository: ScratchRepository,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    plan_repository = Repository.parse(
+        BRIEFED_MANIFEST.content[ManifestKey.DEFAULT_REPOSITORY.key]
+    )
+    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
+    upstream = Repository.parse(fork["parent"]["full_name"])
+    client = RecordedGitHubClient(
+        responses={f"/{plan_repository.api_path}": fork},
+        pages={
+            listing_path(plan_repository): [[]],
+            listing_path(upstream, PullRequestListState.OPEN): [[]],
+        },
+    )
+    monkeypatch.setattr(pull_request_source_module, "GitHubRestClient", lambda: client)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "item_brief",
+            ItemBriefOption.PLAN,
+            BRIEFED_MANIFEST.identifier,
+            ItemBriefOption.ITEM,
+            BRIEFED_ITEM.identifier,
+        ],
+    )
+    monkeypatch.chdir(briefed_repository.project_root)
+
+    main()
+
+    assert [
+        path for path in client.reads if path.startswith(f"/{upstream.api_path}/")
+    ] == []

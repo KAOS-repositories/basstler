@@ -83,5 +83,6 @@ def shared_identifier_plan_repository(
         one id.
     """
     return repository_publishing(
-        scratch_repository, DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text()
+        scratch_repository,
+        DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text(encoding="utf-8"),
     )

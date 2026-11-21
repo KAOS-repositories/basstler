@@ -329,6 +329,8 @@ def test_updating_an_item_sharing_its_id_with_a_wave_and_a_track_leaves_them_unt
     published = yaml.safe_load(
         published_plan(shared_identifier_plan_repository)[PlanDocument.MANIFEST]
     )
-    expected = yaml.safe_load(DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text())
+    expected = yaml.safe_load(
+        DatasetLocation.SHARED_IDENTIFIER_PLAN.read_text(encoding="utf-8")
+    )
     expected[ManifestKey.ITEMS.key][0][ManifestKey.STATUS.key] = ItemStatus.BLOCKED
     assert published == expected

@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
 from basstler.plan_site.hub import PlanHub
@@ -102,11 +103,7 @@ class SiteRepository:
             token_name,
             f"Starts the plan site build in {self.repository.full_name}",
             self.repository.owner,
-            {
-                token_form.RepositoryPermission.ACTIONS: (
-                    token_form.PermissionLevel.WRITE
-                )
-            },
+            {token_form.RepositoryPermission.ACTIONS: PermissionLevel.WRITE},
         ).url
 
     def token_use(self, stored_on: Sequence[Repository]) -> token_form.TokenUse:
@@ -117,11 +114,7 @@ class SiteRepository:
         return token_form.TokenUse(
             f"starts the plan site build in {self.repository.full_name}",
             (self.repository,),
-            {
-                token_form.RepositoryPermission.ACTIONS: (
-                    token_form.PermissionLevel.WRITE
-                )
-            },
+            {token_form.RepositoryPermission.ACTIONS: PermissionLevel.WRITE},
             PlanSiteSecret.TOKEN,
             tuple(stored_on),
         )

@@ -27,6 +27,7 @@ from basstler.github.issue import IssueComment
 from basstler.github.label import LabelReplacement
 from basstler.github.repository import Repository
 
+from ..executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from ..constants.environment import SearchPathVariable
 from .api_stand_in import (
     CannedResponse,
@@ -409,6 +410,7 @@ def test_the_credential_comes_from_the_first_token_variable_set(
     )
 
 
+@NEEDS_SCRIPT_AS_EXECUTABLE
 def test_with_no_token_variable_the_credential_comes_from_gh(
     monkeypatch, no_token_variables, stub_bin
 ):

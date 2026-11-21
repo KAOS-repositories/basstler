@@ -34,7 +34,7 @@ def invocation(tmp_path: Path) -> EntryPointInvocation:
     return EntryPointInvocation(PluginRoot(tmp_path))
 
 
-ENTRY_POINT = f"${{{BasstlerVariable.PLUGIN_ROOT}}}/{PluginLocation.ENTRY_POINT_SCRIPT}"
+ENTRY_POINT = f"${{{BasstlerVariable.PLUGIN_ROOT}}}/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}"
 """
 The entry point script as a skill writes it.
 """
@@ -94,9 +94,21 @@ def test_an_expanded_path_to_this_plugin_is_allowed(
     """
     script = invocation.plugin_root.path_of(PluginLocation.ENTRY_POINT_SCRIPT)
 
-    answer = invocation.permit(shell(f'"{script}" maintenance'))
+    answer = invocation.permit(shell(f'"{script.as_posix()}" maintenance'))
 
     assert answer.allowed.decision is PermissionDecision.ALLOW
+
+
+def test_an_expanded_root_on_a_windows_drive_is_read_as_that_root():
+    """
+    A plugin root expanded below a Windows drive is read whole, drive included.
+    """
+    root = "D:/plugins/basstler"
+    command = f'"{root}/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}" maintenance'
+
+    match = EntryPointInvocation.command_line.fullmatch(command)
+
+    assert match.group("expanded_root") == root
 
 
 # %% leaving the decision alone
@@ -179,7 +191,7 @@ def test_the_plugin_runs_the_hook_before_the_shell_tool():
     """
     plugin_root = Path(os.environ[BasstlerVariable.PLUGIN_ROOT])
     manifest = json.loads(
-        (plugin_root / PluginLocation.HOOKS / "hooks.json").read_text()
+        (plugin_root / PluginLocation.HOOKS / "hooks.json").read_text(encoding="utf-8")
     )
 
     (registration,) = [
@@ -189,6 +201,6 @@ def test_the_plugin_runs_the_hook_before_the_shell_tool():
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{PluginLocation.ENTRY_POINT_SCRIPT} "
+        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
         f"{basstler.plan_site.entry_point_approval.__spec__.name.removeprefix('basstler.')}"
     )

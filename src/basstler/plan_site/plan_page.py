@@ -10,12 +10,14 @@ from dataclasses import dataclass, field
 
 from basstler.class_property import classproperty
 from basstler.github.pull_request_state import LivePullRequests
+from basstler.github.repository import Repository
 from basstler.locations import SiteTemplate
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
 from basstler.plan.model import ItemStatus
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.model_alias import ModelAlias
 from basstler.plan_site.cards import ItemCard, TrackSection, WaveSection
+from basstler.plan_site.handover_button import HandoverButton
 from basstler.plan_site.item_classifier import ItemClassifier
 from basstler.plan.structure import Item, Plan
 from basstler.plan_site.plan_overview import NextSteps, PlanOverview
@@ -45,6 +47,11 @@ class RenderedPlanPage:
     cards_by_identifier: Mapping[str, ItemCard]
     """
     The card the page shows for each item, by item id.
+    """
+
+    handover_button: HandoverButton
+    """
+    The button copying the command that offers the plan to another person.
     """
 
 
@@ -128,6 +135,13 @@ class PlanPage(TemplatePage):
         ).classify()
         next_steps = NextSteps.of_plan(self.plan, self.dependencies)
         overview = PlanOverview.of_plan(self.plan, next_steps)
+        handover_button = HandoverButton(
+            plan_identifiers=(
+                self.plan.id,
+                *self.dependencies.collect_plans_depended_on(),
+            ),
+            plan_repository=Repository.parse(self.plan.default_repository),
+        )
         html = self.render_template(
             stylesheet_url=self.stylesheet_url,
             script_template=SiteTemplate.PLAN_SCRIPT.name,
@@ -147,9 +161,13 @@ class PlanPage(TemplatePage):
             waves=self._wave_sections(),
             cards_by_identifier=cards_by_identifier,
             available_models=list(ModelAlias),
+            handover_button=handover_button,
         )
         return RenderedPlanPage(
-            html=html, overview=overview, cards_by_identifier=cards_by_identifier
+            html=html,
+            overview=overview,
+            cards_by_identifier=cards_by_identifier,
+            handover_button=handover_button,
         )
 
     def _wave_sections(self) -> list[WaveSection]:

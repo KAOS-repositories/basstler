@@ -165,14 +165,14 @@ line on standard error that says why and what to run, and prints no
 `check-setup.sh` report. That exit is not the setup's own status 1. Report the
 line, do once what it says, then run step 5 again.
 
-It refuses a remote GitHub says someone else owns (exit 3) before writing
-anything. It records the remote in git config, creates the notes branch if
-it's missing, seeds a notes file only if it didn't exist yet, records the
-identity, and runs `session-start.sh`, which installs the package's
-dependencies and writes `CLAUDE.local.md`. Then it reports which labels this
-tooling uses are missing from the repository, and ends by printing
-`check-setup.sh`'s report. It exits with that report's status: 0 when
-nothing is left, 1 when something is or could not be verified.
+Before writing anything it refuses (exit 3) a remote someone else owns unless
+it holds a notes branch the user may push to, which they join. It records the
+remote in git config, creates a missing notes branch, seeds notes only if
+none existed, records the identity, and runs `session-start.sh`, which
+installs the package with what it requires and writes `CLAUDE.local.md`. Then it
+reports the labels this tooling uses that the repository lacks, and ends with
+`check-setup.sh`'s report, whose status it exits with: 0 when nothing is left,
+1 when something is or could not be verified.
 Exit 4 means a hook script failed; its own output above says why. Exit 5
 means `check-setup.sh` itself failed, or printed a report missing a check or
 holding a row the package cannot read; the error names its status, the rows

@@ -4,9 +4,9 @@ The plan site's token steps when its token also marks files viewed.
 
 from __future__ import annotations
 
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.basstler_project import BasstlerProject
 from basstler.github.token_form import (
-    PermissionLevel,
     RepositoryPermission,
     SharedToken,
     TokenUse,

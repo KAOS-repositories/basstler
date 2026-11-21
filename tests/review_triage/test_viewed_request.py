@@ -30,9 +30,9 @@ from basstler.review_triage.viewed_request import (
 from .conftest import (
     SAMPLE_REPOSITORY,
     WORKFLOW_REPOSITORY_DETAILS,
-    RecordingWriter,
     RefusingWriter,
     WorkflowRepositoryClient,
+    listing_of,
 )
 
 # %% the request
@@ -151,7 +151,7 @@ def routes(
 
 def test_files_marked_directly_ask_no_workflow(sample_triage: TriageOutcome):
     client = WorkflowRepositoryClient()
-    routes(RecordingWriter({"data": {}}), client).mark(sample_triage)
+    routes(listing_of(sample_triage), client).mark(sample_triage)
     assert client.sent == []
 
 
@@ -164,7 +164,7 @@ def test_a_refused_direct_marking_asks_the_workflow(sample_triage: TriageOutcome
 def test_a_cloud_session_asks_the_workflow_without_marking_directly(
     sample_triage: TriageOutcome,
 ):
-    writer = RecordingWriter({"data": {}})
+    writer = listing_of(sample_triage)
     client = WorkflowRepositoryClient()
     routes(writer, client, in_cloud_session=True).mark(sample_triage)
     assert (writer.sent, [type(write) for write in client.sent]) == (

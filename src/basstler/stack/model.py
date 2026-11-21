@@ -17,8 +17,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from basstler.git.commands import IntegrationStrategy
 from basstler.git.branch import Branch
+from basstler.git.commands import IntegrationStrategy
 from basstler.github.repository import Repository
 from basstler.github.states import CombinedCheckState
 from basstler.github.tooling_labels import GitHubLabel
@@ -28,6 +28,7 @@ from basstler.stack.checkout import CurrentCheckout, ForkRefresh, LandedBranches
 from basstler.stack.exceptions import BaseBranchScopeError, BoardUnavailable
 from basstler.stack.promotability import PromotionReadiness
 from basstler.stack.settings import Configuration
+from basstler.text_file import TextFile
 
 # %% domain model
 
@@ -120,7 +121,7 @@ class PullRequest:
         """
         if not path.exists():
             raise BoardUnavailable(path)
-        board = json.loads(path.read_text(encoding="utf-8"))
+        board = json.loads(TextFile(path).read())
         return [cls.from_board_entry(entry) for entry in board[BoardKey.PULL_REQUESTS]]
 
     @classmethod

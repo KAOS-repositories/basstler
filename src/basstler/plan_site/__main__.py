@@ -35,7 +35,6 @@ from typing import Any
 
 import yaml
 
-from basstler.plan.exceptions import PlanValidationError
 from basstler.github.pull_request_source import (
     GitHubPullRequestSource,
     PullRequestSource,
@@ -43,8 +42,10 @@ from basstler.github.pull_request_source import (
 from basstler.github.repository import GitHubAddress, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
+from basstler.plan.exceptions import PlanValidationError
 from basstler.plan.model import PlanDocument
 from basstler.plan.repository_rules import RepositoryRules
+from basstler.plan.structure import Plan
 from basstler.plan.validation import PlanValidator
 from basstler.plan_site.cards import PlanTimeAttribute
 from basstler.plan_site.hub import NotesBranch, PlanHub, SiteAddress
@@ -60,10 +61,10 @@ from basstler.plan_site.hub_page import (
     SkippedPage,
 )
 from basstler.plan_site.item_classifier import ItemClassifier
-from basstler.plan.structure import Plan
 from basstler.plan_site.plan_page import PlanPage, RenderedPlanPage
 from basstler.plan_site.plan_page_header import PlanPageHeader
 from basstler.standard_streams import StandardStreamHandler
+from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -144,9 +145,7 @@ class SiteDigest:
         """
         Write :attr:`value` to the site's :attr:`SiteFile.DIGEST`.
         """
-        (self.site_directory / SiteFile.DIGEST).write_text(
-            f"{self.value}\n", encoding="utf-8"
-        )
+        TextFile(self.site_directory / SiteFile.DIGEST).write(f"{self.value}\n")
 
 
 # %% a plan as the notes branch stores it
@@ -184,12 +183,8 @@ class PlanSource:
         roadmap = directory / PlanDocument.ROADMAP
         return cls(
             directory_name=directory.name,
-            manifest=yaml.safe_load(
-                (directory / PlanDocument.MANIFEST).read_text(encoding="utf-8")
-            ),
-            roadmap_text=roadmap.read_text(encoding="utf-8")
-            if roadmap.exists()
-            else "",
+            manifest=yaml.safe_load(TextFile(directory / PlanDocument.MANIFEST).read()),
+            roadmap_text=TextFile(roadmap).read() if roadmap.exists() else "",
         )
 
     @classmethod
@@ -271,7 +266,7 @@ class SiteSection[SectionCard: ProgressCard](ABC):
         :param html: The page's rendered HTML.
         """
         directory.mkdir(parents=True, exist_ok=True)
-        (directory / SiteFile.PAGE).write_text(html, encoding="utf-8")
+        TextFile(directory / SiteFile.PAGE).write(html)
 
 
 @dataclass
@@ -457,9 +452,7 @@ class HubSite(SiteSection[SiteSummary]):
             ]
         summary = SiteSummary.over_repositories(repositories)
         self.write_page(output, HubPage(summary, self.stylesheet_url).render())
-        (output / SiteFile.STYLESHEET).write_text(
-            SiteStylesheet().render(), encoding="utf-8"
-        )
+        TextFile(output / SiteFile.STYLESHEET).write(SiteStylesheet().render())
         (output / SiteFile.NO_JEKYLL).touch()
         SiteDigest(output).write()
         return summary

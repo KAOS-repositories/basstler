@@ -11,15 +11,16 @@ from pathlib import Path
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.repository_access import GitHubRepository
-from basstler.upstream_reviews.action.open_pull_requests import (
-    OpenPullRequestsAnswer,
-    OpenPullRequestsRequest,
-)
+from basstler.text_file import TextFile
 from basstler.upstream_reviews.action.branch import ActionBranch, ActionFile
 from basstler.upstream_reviews.action.exchange import (
     ActionAnswer,
     ActionRequest,
     ActionRequestKind,
+)
+from basstler.upstream_reviews.action.open_pull_requests import (
+    OpenPullRequestsAnswer,
+    OpenPullRequestsRequest,
 )
 from basstler.upstream_reviews.action.recording import ActionResult
 from basstler.upstream_reviews.clients import GitHubCommandLineClient
@@ -54,7 +55,7 @@ class ActionRun:
         """
         :return: The upstream read as the pushed request asks.
         """
-        data = json.loads(self.request_file.read_text(encoding="utf-8"))
+        data = json.loads(TextFile(self.request_file).read())
         if ActionRequest.kind_of(data) is ActionRequestKind.OPEN_PULL_REQUESTS:
             request = OpenPullRequestsRequest.from_json(data)
             return OpenPullRequestsAnswer.answering(

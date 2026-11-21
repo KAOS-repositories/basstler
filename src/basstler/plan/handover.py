@@ -38,6 +38,7 @@ from basstler.plan.repository_rules_store import RepositoryRulesStore
 from basstler.plan.size_limits import Roadmap
 from basstler.render_common import TemplatePage
 from basstler.shell_configuration import FetchedBranchReference
+from basstler.text_file import TextFile
 
 # %% one handed-over plan
 
@@ -382,9 +383,9 @@ class PlanHandover:
         """
         return cls.from_files(
             {
-                PurePosixPath(path.relative_to(directory).as_posix()): path.read_text(
-                    encoding="utf-8"
-                )
+                PurePosixPath(path.relative_to(directory).as_posix()): TextFile(
+                    path
+                ).read()
                 for path in directory.rglob("*")
                 if path.is_file()
             }
@@ -399,7 +400,7 @@ class PlanHandover:
         for path, text in self.files.items():
             target = directory / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(text, encoding="utf-8")
+            TextFile(target).write(text)
 
     def save_to_notes_branch(self, *, project_root: Path) -> None:
         """

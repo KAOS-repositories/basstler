@@ -38,6 +38,7 @@ from basstler.shell_configuration import (
     FetchedBranchReference,
     ShellConfigurationFunction,
 )
+from basstler.text_file import TextFile
 
 # %% the plan on the personal-notes branch
 
@@ -126,12 +127,11 @@ class ProjectCheckout:
                 continue
             manifest = destination / path.parent.name / PlanDocument.MANIFEST
             manifest.parent.mkdir(parents=True)
-            manifest.write_text(
+            TextFile(manifest).write(
                 self.run_git(
                     "show", FetchedBranchReference.PERSONAL_NOTES.file_at(path)
                 )
-                + "\n",
-                encoding="utf-8",
+                + "\n"
             )
         return PlanDirectory(destination)
 

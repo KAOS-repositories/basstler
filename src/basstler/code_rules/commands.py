@@ -24,6 +24,11 @@ class CodeRulesCommand(StrEnum):
     Report the code that breaks a rule a checker enforces.
     """
 
+    FIX = "fix"
+    """
+    Apply the fix of every rule that has one.
+    """
+
     NEW_CROSSINGS = "new-crossings"
     """
     Report the boundary crossings a base commit does not have.

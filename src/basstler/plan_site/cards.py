@@ -12,11 +12,10 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from basstler.class_property import classproperty
-from basstler.plan.model_alias import ModelAlias
 from basstler.github.repository import Repository
-from basstler.stack.promotability import PromotionBlocker
-
 from basstler.plan.dependencies import UnresolvedDependency
+from basstler.plan.model_alias import ModelAlias
+from basstler.stack.promotability import PromotionBlocker
 
 if TYPE_CHECKING:
     from basstler.github.repository import PullRequestReference

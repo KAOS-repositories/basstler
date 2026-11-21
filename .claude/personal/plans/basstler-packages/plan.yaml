@@ -41,12 +41,13 @@ items:
   status: in progress
   recommended_model: sonnet
   notes: >
-    Draft #223 on main: #222 and #220 merged, and main is merged in at 4e9345f3 with no conflicts.
-    Local tests pass except the hub's browser tests, which this container cannot launch. Next: read
-    CI at 4e9345f3. Open: confirm dropping main's interpreter-candidate session start for the uv
-    install; commit the move's script for code-rule-fixes/action-plan-triage; shared test helpers
-    pull the stack into lower dev groups (a review thread asks about it). Review threads on the
-    shared conftest and uv.lock are answered.
+    Draft #223 on main (64146fad), merged at d7360166 with a clean merge probe. Next: read CI at
+    58a76a3f, which the push started. The mark-viewed workflow now installs from a clone of the ref
+    (its review thread is answered, left open).
+
+    Open: confirm dropping main's interpreter-candidate session start; commit the move's script for
+    code-rule-fixes/action-plan-triage; shared test helpers pull the stack into lower dev groups.
+    Not checked: Windows, the hub's browser tests.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split

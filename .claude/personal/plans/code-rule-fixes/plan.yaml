@@ -12,6 +12,9 @@ tracks:
 - id: pattern-fixes
   name: Rule fixes applied and proven mechanical
   wave: fixes
+- id: refactorings
+  name: Refactorings applied as replayable modification plans
+  wave: fixes
 items:
 - id: directory-and-bash-fixes
   title: Fixes for directory removal and bash started by name
@@ -124,4 +127,61 @@ items:
     Refuse on a name clash in the override''s scope, a **kwargs forward, or exported API unless
     confirmed. Build scope-aware actions next to #245''s module-wide SymbolRename. Case: cram2
     PR 1040, Gaussian log_likelihood(x) vs events.'
+
+- id: symbol-rename-actions
+  title: Rename a symbol and relocate an import with reversible actions
+  track: refactorings
+  branch: feature/rename-symbol-action
+  pull_request_number: 245
+  session: https://claude.ai/code/session_018wfiv9ZTuSyVJjxRueXDTi
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #245 at 932c111c on main (#222 landed): SymbolRename, ImportRelocation and basstler
+    code-modification rename|relocate-import. Pre-workspace layout; #271 moves code_modification
+    into packages/rules, so whichever lands second restacks. CI not read.'
+
+- id: field-to-mixin
+  title: Move a redeclared field into its Has<Field> mixin
+  track: refactorings
+  depends_on:
+  - symbol-rename-actions
+  status: not started
+  recommended_model: opus
+  notes: 'Remove the field and its docstring, inherit the mixin, add the import, rewrite positional
+    constructor calls to keywords across the repository. Refuse a mutable class inheriting a frozen
+    mixin, or a differing type. Ship a FixableChecker for the field-declared-once rule. Source case:
+    #257 (HasRepository, owned branches).'
+
+- id: shared-receiver-inference
+  title: Share receiver inference between the review triage and code modification
+  track: refactorings
+  depends_on:
+  - review-triage/pyrefly-receiver-fallback
+  - symbol-rename-actions
+  status: not started
+  recommended_model: sonnet
+  notes: Move ReceiverInference, AnnotationInference, CombinedInference, TypeChecker/Pyrefly and
+    RevealedReceivers where both packages import them, so a rewrite the applier makes is one the
+    triage confirms. One inference, never a copy.
+
+- id: field-through-holder
+  title: Reach a moved field through the object that holds it
+  track: refactorings
+  depends_on:
+  - shared-receiver-inference
+  status: not started
+  recommended_model: opus
+  notes: 'x.field becomes x.holder.field (self.git to self.repository.git); a receiver neither basstler
+    nor Pyrefly resolves is refused and listed. Source case: #257 (HasRepository, owned branches).'
+
+- id: method-move
+  title: Move a method to another class, swapping receiver and argument
+  track: refactorings
+  depends_on:
+  - shared-receiver-inference
+  status: not started
+  recommended_model: opus
+  notes: 'head.name_from(repository) becomes repository.head_name(head), the definition moving with
+    it; unresolved receivers refused and listed. Source case: #257 (HasRepository, owned branches).'
 landed_item_count: 2

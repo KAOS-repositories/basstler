@@ -230,7 +230,7 @@ items:
     scratch_repository (imports setup.steps from notes) and maintenance/fork. Notes' and plan's dev
     groups also list the meta-package. Done when uv sync --package <name> plus the dev group runs
     each distribution's tests alone.
-  depends_on: []
+  depends_on: [uv-workspace]
   status: not started
   recommended_model: opus
 landed_item_count: 3

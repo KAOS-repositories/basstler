@@ -30,6 +30,10 @@ you: the token, stored as that repository's `REVIEW_TRIAGE_VIEWER_TOKEN` secret,
 [route 2](#route-2-from-a-repositorys-actions-from-anywhere). Run it again until nothing
 is left.
 
+- **When it runs:** when a pull request is opened, reopened or pushed to - not when it
+  is marked ready for review. A Claude Code session with the basstler plugin also marks
+  the pull request of its checked-out branch when each turn ends, once for each head
+  commit, by marking directly or by asking this workflow where the session cannot.
 - **Where it runs:** on the repository the pull requests are opened on, since a fork
   never sees its parent's pull request events. That needs a repository whose workflows
   and secrets you may change - one you maintain.

@@ -19,7 +19,7 @@ on:
   # that changes again. pull_request_target hands the secret to pull requests from
   # forks too; the run reads their commits but runs none of their code.
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize]
 
 concurrency:
   group: mark-viewed-${{ inputs.pull_request || github.event.pull_request.number }}

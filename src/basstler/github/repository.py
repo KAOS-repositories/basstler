@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from pydantic import Field
 
@@ -360,6 +360,14 @@ class Repository:
         :return: The REST path of that pull request.
         """
         return f"{self.pull_requests_path}/{number}"
+
+    def open_pull_requests_from_branch_path(self, branch: str) -> str:
+        """
+        :param branch: A branch of this repository itself.
+        :return: The REST path listing the open pull requests opened from that branch.
+        """
+        query = urlencode({"head": f"{self.owner}:{branch}", "state": "open"}, safe=":")
+        return f"{self.pull_requests_path}?{query}"
 
     def compare_path(self, base: str) -> str:
         """

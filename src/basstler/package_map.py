@@ -308,6 +308,7 @@ PACKAGE_MAP = PackageMap(
                 "package_layout",
                 "package_map",
                 "plugin_root",
+                "progress",
                 "render_common",
                 "shell_configuration",
                 "standard_streams",
@@ -342,7 +343,12 @@ PACKAGE_MAP = PackageMap(
             Distribution.REVIEW_TRIAGE,
             Layer.COLLABORATION,
             ("review_triage",),
-            (Distribution.CORE, Distribution.GIT, Distribution.GITHUB),
+            (
+                Distribution.CORE,
+                Distribution.GIT,
+                Distribution.RULES,
+                Distribution.GITHUB,
+            ),
         ),
         DistributionDeclaration(
             Distribution.STACK,

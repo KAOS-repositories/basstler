@@ -263,7 +263,7 @@ class PluginRootUnsetError(DataclassException, LookupError):
 
     def suggest_correction(self) -> str:
         return (
-            f"source {PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT} from the "
+            f"source {PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.as_posix()} from the "
             f"plugin's root first, or export {BasstlerVariable.PLUGIN_ROOT} as that root"
         )
 
@@ -285,7 +285,7 @@ class PluginRootNotADirectoryError(DataclassException, NotADirectoryError):
     def suggest_correction(self) -> str:
         return (
             f"export {BasstlerVariable.PLUGIN_ROOT} as the directory holding the "
-            f"plugin's {PluginLocation.HOOKS} directory"
+            f"plugin's {PluginLocation.HOOKS.as_posix()} directory"
         )
 
 

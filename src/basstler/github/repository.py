@@ -349,6 +349,13 @@ class Repository:
         """
         return f"{self.pull_requests_path}/{number}"
 
+    def pull_request_reviews_path(self, number: int) -> str:
+        """
+        :param number: The pull request's number.
+        :return: The REST path listing that pull request's reviews, oldest first.
+        """
+        return f"{self.pull_request_path(number)}/reviews"
+
     def compare_path(self, base: str) -> str:
         """
         :param base: What the head is compared with: a branch, or ``owner:branch`` for

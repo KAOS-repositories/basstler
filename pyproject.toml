@@ -40,6 +40,7 @@ dependencies = [
     "cyclopts>=5.3",
     "pydantic>=2.11",
     "libcst>=1.8",
+    "tqdm>=4.66",
 ]
 dynamic = ["version"]
 
@@ -139,6 +140,12 @@ ban-relative-imports = "all"
     "S101",     # tests assert
     "TID252",   # a test imports another test module relatively
     "B018",     # a bare attribute access inside pytest.raises is the call under test
+]
+"tests/dataset/**" = [
+    "F403",     # a triage sample star-imports to test how the triage resolves names
+    "F405",     # and uses a name a star import may bind
+    "F401",     # a triage sample imports a name it never uses
+    "E402",     # a triage sample imports after code, as notebook-style documents do
 ]
 # Imports a fixture from a sibling test module, which pytest finds by its parameter name.
 "tests/upstream_reviews/test_open_pull_requests_action.py" = ["F401", "F811"]

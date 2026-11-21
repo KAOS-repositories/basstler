@@ -9,24 +9,32 @@ import json
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from pathlib import PurePosixPath
+from pathlib import Path
 from typing import Any
 
 import pytest
 
+from basstler.environment import GitHubCredentialVariable
 from basstler.github.client import (
     GitHubAttemptClient,
-    GitHubReader,
+    GitHubFullReader,
     GitHubResponse,
     GitHubWrite,
     GitHubWriter,
     HttpMethod,
 )
+from basstler.git.commit_range import CommitRange
 from basstler.github.credential import CredentialProvider
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.graphql import GraphQLRequest, GraphQLResponse
+from basstler.github.repository_access import GitHubPath
 from basstler.github.pull_request_changes import (
+    MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
+    RestPullRequest,
+    StartCommit,
+    StartReason,
 )
 from basstler.github.repository import Repository
 from basstler.github.review_models import PageInfo
@@ -38,14 +46,15 @@ from basstler.review_triage.outputs import (
     ListedFilesAnswer,
     ListedFilesPage,
     ListedPullRequest,
-    ViewedFile,
+    ViewedFilesVariable,
 )
 from basstler.review_triage.renames import Rename, RenameMap
 from basstler.review_triage.triage import TriageOutcome
 
 from ..constants.paths import DatasetLocation
 from ..scratch_repository import ScratchRepository
-from .samples import DescriptionSample, PullRequestSample
+from .samples import DescriptionSample, PullRequestSample, SampleTrees
+from basstler.text_file import TextFile
 
 # %% stand-ins for GitHub
 
@@ -56,7 +65,7 @@ The repository the sample pull request is opened on.
 
 
 @dataclass(frozen=True)
-class OnePullRequestReader(GitHubReader):
+class OnePullRequestReader(GitHubFullReader):
     """
     Answers every read with one pull request's payload.
     """
@@ -70,6 +79,49 @@ class OnePullRequestReader(GitHubReader):
         return self.payload
 
     def get_pages(self, path: str) -> list[Any]:
+        return [self.payload]
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        return GitHubResponse(self.payload)
+
+
+@dataclass(frozen=True)
+class ReviewedPullRequestReader(OnePullRequestReader):
+    """
+    Answers the reads of the authenticated account and of the pull request's reviews,
+    and every other read with the pull request's payload.
+    """
+
+    account: dict[str, Any] | None
+    """
+    The account the credential belongs to, as REST describes it; ``None`` for a
+    credential GitHub names no account for, whose read of it is refused.
+    """
+
+    reviews: list[dict[str, Any]]
+    """
+    The pull request's reviews, as REST lists them on one page.
+    """
+
+    def attempt_get(self, path: str) -> GitHubResponse:
+        if path != GitHubPath.AUTHENTICATED_USER:
+            return GitHubResponse(self.payload)
+        if self.account is None:
+            return GitHubResponse(
+                None,
+                failure=GitHubRequestFailed.for_status(
+                    HTTPStatus.FORBIDDEN,
+                    "Resource not accessible by integration",
+                    HttpMethod.GET,
+                    path,
+                    GitHubCredentialVariable.GITHUB_TOKEN,
+                ),
+            )
+        return GitHubResponse(self.account)
+
+    def get_pages(self, path: str) -> list[Any]:
+        if path == SAMPLE_REPOSITORY.pull_request_reviews_path(self.payload["number"]):
+            return [self.reviews]
         return [self.payload]
 
 
@@ -117,23 +169,29 @@ class FileListingWriter(GitHubWriter):
     """
 
     @property
+    def markings(self) -> list[GraphQLRequest]:
+        """
+        Every request sent other than the queries for the listing, oldest first.
+        """
+        listing = TextFile(ReviewTriageLocation.PULL_REQUEST_FILES).read()
+        return [request for request in self.sent if request.query != listing]
+
+    @property
     def marked_paths(self) -> list[PurePosixPath]:
         """
-        The path of every file a mutation marked viewed, in the order they were sent.
+        The path of every file a request marked viewed, in the order they were sent.
         """
-        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text(encoding="utf-8")
         return [
-            ViewedFile.from_json(request.variables).path
-            for request in self.sent
-            if request.query == document
+            PurePosixPath(value)
+            for request in self.markings
+            for name, value in request.variables.items()
+            if name != ViewedFilesVariable.PULL_REQUEST
         ]
 
     def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
         assert isinstance(write, GraphQLRequest)
         self.sent.append(write)
-        if write.query != ReviewTriageLocation.PULL_REQUEST_FILES.read_text(
-            encoding="utf-8"
-        ):
+        if write.query != TextFile(ReviewTriageLocation.PULL_REQUEST_FILES).read():
             return GitHubResponse(GraphQLResponse(data={}).to_json())
         cursor = FilesPageRequest.from_json(write.variables).cursor
         index = int(cursor) if cursor else 0
@@ -192,7 +250,7 @@ class RefusingWriter(GitHubWriter):
 
 
 WORKFLOW_REPOSITORY_DETAILS: dict[str, Any] = json.loads(
-    DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text(encoding="utf-8")
+    TextFile(DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH).read()
 )
 """
 The resource the stand-in workflow repository answers with.
@@ -243,6 +301,53 @@ def old_name_renamed() -> RenameMap:
     return RenameMap((Rename("old_name", "new_name", RenameDetection()),))
 
 
+def commit_trees(
+    scratch_repository: ScratchRepository,
+    base_files: dict[Path, str],
+    head_files: dict[Path, str],
+) -> CommitRange:
+    """
+    Commit a base tree, then a head tree replacing it.
+
+    :param scratch_repository: The repository to commit in.
+    :param base_files: The base tree's files, by path.
+    :param head_files: The head tree's files, by path.
+    :return: The two commits.
+    """
+    for path, text in base_files.items():
+        scratch_repository.write(path, text)
+    scratch_repository.commit_everything("base")
+    base_commit = scratch_repository.git.commit_at("HEAD")
+    scratch_repository.run_git("rm", "-r", "--quiet", ".")
+    for path, text in head_files.items():
+        scratch_repository.write(path, text)
+    scratch_repository.commit_everything("head")
+    return CommitRange(
+        scratch_repository.git, base_commit, scratch_repository.git.commit_at("HEAD")
+    )
+
+
+def committed_pull_request(
+    scratch_repository: ScratchRepository, base: SampleTrees, head: SampleTrees
+) -> PullRequestChanges:
+    """
+    :param scratch_repository: The repository to commit in.
+    :param base: The sample's base tree.
+    :param head: The sample's head tree.
+    :return: The sample pull request between the two trees, once committed.
+    """
+    commits = commit_trees(scratch_repository, base.files(), head.files())
+    payload = PullRequestSample.PAYLOAD.payload()
+    payload["base"]["sha"] = commits.base_commit
+    payload["head"]["sha"] = commits.head_commit
+    return PullRequestChanges(
+        RestPullRequest.from_json(payload),
+        commits,
+        commits.file_versions(),
+        StartCommit(commits.base_commit, StartReason.MERGE_BASE),
+    )
+
+
 @pytest.fixture
 def sample_payload(scratch_repository: ScratchRepository) -> dict[str, Any]:
     """
@@ -251,17 +356,14 @@ def sample_payload(scratch_repository: ScratchRepository) -> dict[str, Any]:
     :param scratch_repository: The repository to commit in.
     :return: The pull request's payload, naming the two commits.
     """
-    for path, text in PullRequestSample.BASE_TREE.files().items():
-        scratch_repository.write(path, text)
-    scratch_repository.commit_everything("base")
-    base_commit = scratch_repository.git.commit_at("HEAD")
-    scratch_repository.run_git("rm", "-r", "--quiet", ".")
-    for path, text in PullRequestSample.HEAD_TREE.files().items():
-        scratch_repository.write(path, text)
-    scratch_repository.commit_everything("head")
+    commits = commit_trees(
+        scratch_repository,
+        PullRequestSample.BASE_TREE.files(),
+        PullRequestSample.HEAD_TREE.files(),
+    )
     payload = PullRequestSample.PAYLOAD.payload()
-    payload["base"]["sha"] = base_commit
-    payload["head"]["sha"] = scratch_repository.git.commit_at("HEAD")
+    payload["base"]["sha"] = commits.base_commit
+    payload["head"]["sha"] = commits.head_commit
     return payload
 
 
@@ -279,7 +381,7 @@ def read_sample(
     payload["body"] = description.read()
     return PullRequestChangesReader(
         scratch_repository.git, OnePullRequestReader(payload)
-    ).read(SAMPLE_REPOSITORY, payload["number"])
+    ).read(SAMPLE_REPOSITORY, payload["number"], MergeBaseStart())
 
 
 @pytest.fixture

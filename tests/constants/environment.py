@@ -183,6 +183,33 @@ class BashStubVariable(StrEnum):
     """
 
 
+class RecordingPythonStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/recording_python.sh`` reads.
+    """
+
+    CALL_LOG = "STUB_PYTHON_CALL_LOG"
+    """
+    The file every argument the stub is given is recorded in, one per line.
+    """
+
+
+class ReviewTriageScriptVariable(StrEnum):
+    """
+    The variables ``scripts/review-triage.sh`` reads.
+    """
+
+    HOME = "BASSTLER_HOME"
+    """
+    Where the script keeps basstler's environment and the repositories' clones.
+    """
+
+    REFERENCE = "BASSTLER_REF"
+    """
+    The basstler branch, tag or commit the script runs.
+    """
+
+
 class ShellExitStatus(IntEnum):
     """
     Statuses bash itself exits with, rather than a script it runs.

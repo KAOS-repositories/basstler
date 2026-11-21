@@ -49,6 +49,7 @@ from basstler.plan_site.workflows import PlanSiteSecret
 from ..constants.paths import RepositoryLocation
 from ..github.path_answering_client import PathAnsweringClient
 from .conftest import WORKFLOW_REPOSITORY_DETAILS
+from basstler.text_file import TextFile
 
 # %% a stand-in for GitHub
 
@@ -509,9 +510,7 @@ def test_basstler_s_own_caller_marks_every_pull_request():
     Basstler's own repository marks files viewed on every pull request with the workflow
     the setup writes.
     """
-    installed = (RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read_text(
-        encoding="utf-8"
-    )
+    installed = TextFile(RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read()
     assert (
         installed
         == MarkViewedSetup(

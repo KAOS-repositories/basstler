@@ -34,10 +34,10 @@ from .recorded_fork import (
 # %% the checkout the pass was invoked in
 
 
-TOOLING_PATH = str(
-    Path(basstler.maintenance.__main__.__file__).relative_to(
-        RepositoryLocation.ROOT.value
-    )
+TOOLING_PATH = (
+    Path(basstler.maintenance.__main__.__file__)
+    .relative_to(RepositoryLocation.ROOT.value)
+    .as_posix()
 )
 """
 Where the pass's own tooling sits: tracked content, so a branch cut before it landed

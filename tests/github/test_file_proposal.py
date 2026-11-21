@@ -15,6 +15,7 @@ from basstler.github.git_objects import EncodedContent
 from basstler.github.repository import Repository, RepositoryBranch
 
 from ..constants.paths import DatasetLocation
+from basstler.text_file import TextFile
 
 # %% a committed file
 
@@ -26,7 +27,7 @@ The repository every file here is committed to.
 COMMIT = FileCommit(
     RepositoryBranch("trunk", REPOSITORY),
     ".github/workflows/a-workflow.yml",
-    DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text(encoding="utf-8"),
+    TextFile(DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH).read(),
     "Add a workflow",
 )
 """

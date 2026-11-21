@@ -19,6 +19,7 @@ from basstler.review_triage.triage import PullRequestTriager
 from ..scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
 from .samples import (
+    DefinitionMovePackageRootSample,
     SECTIONED_BOARD,
     DefinitionMoveFromMovedModuleSample,
     DefinitionMoveSample,
@@ -262,3 +263,21 @@ def test_a_module_receiving_a_definition_and_more_needs_review(
         with_moved_in_module(definition_move, head_text)
     )
     assert MOVED_IN_MODULE in {file.change.path for file in triage.files_needing_review}
+
+
+# %% a package kept under a directory that is not a package
+
+
+def test_relative_imports_following_a_moved_definition_are_mechanical(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A relative import of a moved class follows it, though the package sits under a
+    directory that is not itself a package.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DefinitionMovePackageRootSample.BASE_TREE,
+        DefinitionMovePackageRootSample.HEAD_TREE,
+    )
+    assert PullRequestTriager().triage(changes).files_needing_review == ()

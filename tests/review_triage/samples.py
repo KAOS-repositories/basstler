@@ -242,6 +242,34 @@ class DefinitionMoveSample(SampleTrees):
         return "definition-move"
 
 
+class DefinitionMovePackageRootSample(SampleTrees):
+    """
+    A pull request moving a class into a new module of a package moved out of ``src/``,
+    a directory that is not a package, and importing it from there relatively.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-package-root"
+
+
+class SubclassSubstitutionSourceLayoutSample(SampleTrees):
+    """
+    A pull request switching a caller to a new subclass in a package kept under
+    ``src/``, importing both classes relatively.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "subclass-substitution-source-layout"
+
+
 class DefinitionMoveFromMovedModuleSample(SampleTrees):
     """
     A pull request moving a module and, out of it, one class into a module it adds.

@@ -105,6 +105,7 @@ class DefinitionMoveDetection(RenameSource):
                     name,
                     source.previous_path or source.path,
                     source.base_text,
+                    base.package(source.previous_path or source.path),
                     target.path,
                     rename.old,
                     rename.new,
@@ -179,8 +180,13 @@ class DefinitionMoveComparison(FileJudgment):
             if change.base_text is None:
                 return None
             return self.comparison.changes(change, context)
-        head = PythonSource.from_text(change.head_text, change.path.parent.parts)
-        base = PythonSource.from_text(change.base_text or "", base_path.parent.parts)
+        head = PythonSource.from_text(
+            change.head_text, context.package_of(context.head_modules, change.path)
+        )
+        base = PythonSource.from_text(
+            change.base_text or "",
+            context.package_of(context.base_modules, base_path),
+        )
         head_rest = head.without(self.spans(head, arriving, base))
         base_rest = base.without(self.spans(base, leaving, head))
         arrival_kinds = self.arrival_changes(head, arriving, context)

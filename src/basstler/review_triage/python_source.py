@@ -16,8 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
 from functools import cache, cached_property
 
-from basstler.review_triage.name_scopes import STAR_IMPORT
-from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
+from basstler.review_triage.renames import RenameMap
 
 # %% names in the syntax tree
 
@@ -457,26 +456,6 @@ class ImportBindings:
         """
         return frozenset(binding.bound_name for binding in self.bindings)
 
-    def binds_only_respellings(
-        self, other: ImportBindings, referenced_names: frozenset[str]
-    ) -> bool:
-        """
-        :param other: The bindings of another version of the file.
-        :param referenced_names: The names this version's code refers to.
-        :return: Whether every name only these bindings bind is one the code refers to
-            and both versions reached through the same star import of its module.
-        """
-        star_sources = self.sources_of(STAR_IMPORT)
-        return star_sources == other.sources_of(STAR_IMPORT) and all(
-            binding.bound_name in referenced_names
-            and binding.source.rpartition(DOTTED_NAME_SEPARATOR)[0]
-            + DOTTED_NAME_SEPARATOR
-            + STAR_IMPORT
-            in star_sources
-            for binding in self.bindings
-            if binding.bound_name not in other.bound_names
-        )
-
     def agrees_with(self, other: ImportBindings) -> bool:
         """
         :param other: The bindings of another version of the file.
@@ -711,17 +690,6 @@ class PythonSource:
             node.id
             for target in targets
             for node in ast.walk(target)
-            if isinstance(node, ast.Name)
-        )
-
-    def referenced_names(self, renames: RenameMap) -> frozenset[str]:
-        """
-        :param renames: The renames to apply first.
-        :return: The bare names the file's code, imports aside, refers to.
-        """
-        return frozenset(
-            node.id
-            for node in ast.walk(self.code_tree(renames))
             if isinstance(node, ast.Name)
         )
 

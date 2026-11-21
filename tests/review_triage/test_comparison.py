@@ -34,7 +34,6 @@ from .samples import TEMPLATE_REINDENTED, FileSample
     ("sample", "kinds"),
     [
         (FileSample.IMPORTS_REORDERED, {MechanicalChange.IMPORTS}),
-        (FileSample.IMPORT_ADDED_UNDER_STAR_IMPORT, {MechanicalChange.IMPORTS}),
         (
             FileSample.IDENTIFIER_RENAMED,
             {MechanicalChange.IMPORTS, MechanicalChange.RENAME},
@@ -86,6 +85,7 @@ def test_a_future_import_added_is_mechanical():
         FileSample.IMPORT_ADDED_UNUSED,
         FileSample.IMPORT_REMOVED_UNUSED,
         FileSample.IMPORT_ADDED_FROM_OTHER_MODULE,
+        FileSample.IMPORT_ADDED_UNDER_STAR_IMPORT,
         FileSample.STRING_LITERAL_RENAMED,
         FileSample.DOCSTRING_REWORDED,
         FileSample.BEHAVIOUR_CHANGED,
@@ -95,9 +95,9 @@ def test_a_change_of_meaning_needs_review(
     sample: FileSample, old_name_renamed: RenameMap
 ):
     """
-    A changed import source, an import the code does not use, an import of a name another
-    module's star import supplied, or a changed string literal, docstring wording or
-    expression needs review, renames or not.
+    A changed import source, an import added or removed, even of a name a star import
+    supplies, or a changed string literal, docstring wording or expression needs review,
+    renames or not.
     """
     change = sample.change()
     assert FileTriager(JudgmentContext(old_name_renamed)).triage(
@@ -239,8 +239,8 @@ The rename of a definition to the same name in another module.
 
 def test_a_documented_import_of_a_moved_definition_is_mechanical():
     """
-    An import line in documentation that only follows the module a definition moved
-    to is mechanical, like the import of a Python file.
+    An import line in documentation that only follows the module a definition moved to
+    is mechanical, like the import of a Python file.
     """
     change = FileSample.DOCUMENTATION_IMPORT_MOVED.change()
     assert FileTriager(JudgmentContext(DEFINITION_MOVED)).triage(

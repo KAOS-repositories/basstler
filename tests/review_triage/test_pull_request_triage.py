@@ -6,6 +6,7 @@ triage.
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -13,6 +14,7 @@ from typing import Any
 import pytest
 
 from basstler.git.commands import GitCommandRunner
+from basstler.github.client import RetryPolicy
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.pull_request_changes import (
     MergeBaseStart,
@@ -40,12 +42,18 @@ from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 from ..scratch_repository import ScratchRepository
 from .conftest import (
     SAMPLE_REPOSITORY,
+    FlakyWriter,
     OnePullRequestReader,
     RecordingWriter,
     RefusingWriter,
     read_sample,
 )
 from .samples import DescriptionSample, PullRequestSample
+
+INSTANT_RETRIES = RetryPolicy(first_delay=timedelta(0))
+"""
+A retry policy that asks again at once, so no test waits.
+"""
 
 # %% renames
 
@@ -267,6 +275,36 @@ def test_mechanical_files_beyond_one_request_are_marked_in_several(
         ViewedFiles(node, paths[:3]).request(),
         ViewedFiles(node, paths[3:]).request(),
     ]
+
+
+def test_a_request_answered_with_a_server_error_is_sent_again(
+    sample_changes: PullRequestChanges,
+):
+    """
+    Marking files viewed is idempotent, so a request GitHub answers with a server error
+    is sent again, and the marking succeeds once GitHub answers.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    writer = FlakyWriter({"data": {}}, failures=2)
+    ViewedMarking(writer, retry_policy=INSTANT_RETRIES).publish(triage)
+    request = ViewedFiles(
+        triage.pull_request.node_identifier, tuple(MECHANICAL_KINDS)
+    ).request()
+    assert writer.sent == [request] * 3
+
+
+def test_a_request_answered_with_server_errors_throughout_is_raised_after_the_retries(
+    sample_changes: PullRequestChanges,
+):
+    """
+    A request still answered with a server error after the retry policy's last retry is
+    raised as a refused marking.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    writer = FlakyWriter({"data": {}}, failures=100)
+    with pytest.raises(GraphQLErrorsReturned):
+        ViewedMarking(writer, retry_policy=INSTANT_RETRIES).publish(triage)
+    assert len(writer.sent) == 1 + INSTANT_RETRIES.retries
 
 
 def test_each_viewed_file_is_its_own_mutation_of_the_request():

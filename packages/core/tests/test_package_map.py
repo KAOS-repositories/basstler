@@ -93,9 +93,9 @@ class DevelopmentRequirements(ValidatedJSONModel):
     The part of a distribution's ``pyproject.toml`` that says what its tests need.
     """
 
-    dependency_groups: Annotated[
-        DependencyGroups, Field(alias="dependency-groups")
-    ] = DependencyGroups()
+    dependency_groups: Annotated[DependencyGroups, Field(alias="dependency-groups")] = (
+        DependencyGroups()
+    )
     """
     Its dependency groups.
     """
@@ -124,8 +124,9 @@ This checkout's workspace.
 )
 def test_a_distributions_tests_need_no_distribution_it_does_not_require(directory):
     """
-    The basstler distributions a distribution's ``dev`` group lists are ones it requires,
-    directly or through another, so its tests run in an environment of its own.
+    The basstler distributions a distribution's ``dev`` group lists are ones it
+    requires, directly or through another, so its tests run in an environment of its
+    own.
     """
     package_map = WORKSPACE.package_map
     distribution = Distribution(

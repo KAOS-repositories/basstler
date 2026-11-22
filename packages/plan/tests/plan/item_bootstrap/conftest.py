@@ -50,7 +50,7 @@ def repository_publishing(
     )
     scratch_repository.resolve_notes_remote_to()
     scratch_repository.serve_origin_as(
-        PlanManifest(yaml.safe_load(manifest)).default_repository
+        PlanManifest(yaml.safe_load(manifest)).default_repository.clone_url
     )
     return scratch_repository
 

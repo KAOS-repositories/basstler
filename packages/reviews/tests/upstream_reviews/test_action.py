@@ -73,6 +73,8 @@ from basstler.upstream_reviews.request import (
 
 from basstler_testing.constants.paths import RepositoryLocation
 from basstler_testing.upstream_reviews.replay import RecordedJobLog, RecordedResponse
+from basstler_testing.plugin_manifest import PluginSource
+from basstler_testing.release_workflow import plugin_release_branch, release_branch
 from .test_command_line import (
     RECORDED_PULL_REQUEST_NUMBER,
     UPSTREAM,
@@ -808,3 +810,24 @@ def test_the_shell_configuration_names_the_same_branch():
     ).read_text(encoding="utf-8")
 
     assert f'UPSTREAM_REVIEWS_ACTION_BRANCH="{ActionBranch.NAME}"' in configuration
+
+
+# %% where the plugin is released from
+
+
+def test_the_marketplace_serves_the_plugin_from_the_plugin_release_branch():
+    """
+    The marketplace serves the plugin from the branch the release moves the plugin to.
+    """
+    source = PluginSource.of_this_marketplace()
+
+    assert source == PluginSource(
+        repository=BasstlerSource.REPOSITORY, ref=plugin_release_branch()
+    )
+
+
+def test_the_latest_release_is_read_from_the_release_branch():
+    """
+    The latest release is read from the branch the release moves to its tag.
+    """
+    assert BasstlerSource.LATEST_RELEASE == release_branch()

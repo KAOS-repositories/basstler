@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from basstler.git.branch import Branch
 from basstler.git.remote_branch import RemoteBranch
-from basstler.stack.model import StackBranch
 
 # %% the reference a branch is kept under
 
@@ -20,7 +19,3 @@ def test_reference_is_the_branch_under_the_heads_namespace() -> None:
 
 def test_a_remote_branch_is_a_branch() -> None:
     assert issubclass(RemoteBranch, Branch)
-
-
-def test_a_stack_branch_is_a_branch() -> None:
-    assert issubclass(StackBranch, Branch)

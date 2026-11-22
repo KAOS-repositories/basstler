@@ -117,7 +117,10 @@ def test_a_notes_remote_naming_no_repository_falls_back_to_the_owner_s_file():
 def test_the_session_s_login_and_notes_repository_are_read(
     scratch_repository: ScratchRepository,
 ):
-    scratch_repository.serve_notes_remote_as(SHARED_NOTES)
+    """
+    A session's record holds its GitHub login and the repository its notes are on.
+    """
+    scratch_repository.serve_notes_remote_as(SHARED_NOTES.clone_url)
     client = AccountReadingClient(login=COLLEAGUE)
 
     record = GitIdentityRecord.of_session(
@@ -131,7 +134,10 @@ def test_the_session_s_login_and_notes_repository_are_read(
 def test_a_refused_account_read_leaves_the_login_unknown(
     scratch_repository: ScratchRepository,
 ):
-    scratch_repository.serve_notes_remote_as(SHARED_NOTES)
+    """
+    A refused account read leaves the login unknown.
+    """
+    scratch_repository.serve_notes_remote_as(SHARED_NOTES.clone_url)
 
     record = GitIdentityRecord.of_session(
         project_root=scratch_repository.project_root,

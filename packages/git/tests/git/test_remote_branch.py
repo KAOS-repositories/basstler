@@ -13,7 +13,8 @@ from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.json_model import JSONSerializable, ValidatedJSONModel
 
-from basstler_testing.maintenance.fork import ForkCheckout, RemoteName
+from basstler_testing.fork_checkout import ForkCheckout
+from basstler_testing.constants.stack import RemoteName
 
 # %% helpers
 

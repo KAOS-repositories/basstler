@@ -19,10 +19,12 @@ from basstler.maintenance.upstream_pull_request_synchronization import (
 from basstler.stack.model import PullRequest
 
 from basstler_testing.constants.stack import StackBranch, StackLabel
-from basstler_testing.maintenance.fork import (
-    ForkCheckout,
+from basstler_testing.fork_checkout import ForkCheckout
+from basstler_testing.github.pull_request_samples import (
     PromotionSampleText,
     StackPullRequestNumber,
+)
+from basstler_testing.maintenance.fork import (
     a_parent_and_child,
     a_stack,
     make_configuration,

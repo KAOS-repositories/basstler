@@ -72,7 +72,7 @@ def session(scratch_repository: ScratchRepository) -> SessionPullRequest:
     :return: The session working on :data:`SESSION_BRANCH`, whose pull request is open
         at one commit.
     """
-    scratch_repository.serve_origin_as(SAMPLE_REPOSITORY)
+    scratch_repository.serve_origin_as(SAMPLE_REPOSITORY.clone_url)
     scratch_repository.write("work.txt", "work")
     scratch_repository.commit_everything("work")
     scratch_repository.run_git("switch", "--create", SESSION_BRANCH)

@@ -40,18 +40,19 @@ from basstler.git.commands import IntegrationStrategy
 from basstler.stack.settings import Configuration
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
-from basstler_testing.maintenance.fork import (
-    UPSTREAM_BASE,
-    ForkCheckout,
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.github.pull_request_samples import (
     PullRequestHeadRepository,
     StackPullRequestNumber,
+)
+from basstler_testing.maintenance.fork import (
     a_parent_and_child,
     a_stack,
-    an_api_record,
     an_export,
     make_configuration,
     the_board,
 )
+from basstler_testing.github.listed_repository import an_api_record
 from .recorded_fork import (
     AlreadyResolvedPass,
     RecordingPullRequests,

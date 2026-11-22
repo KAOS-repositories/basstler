@@ -33,7 +33,7 @@ from basstler.plan.model import ManifestKey, PlanDocument, PlanItem, PlanManifes
 from basstler.plan.repository_rules import RepositoryRules
 
 from basstler_testing.scratch_repository import ScratchRepository
-from .conftest import (
+from basstler_testing.plan.handover import (
     RECEIVERS_FORK,
     HandedOverPlan,
     plans_repository as sender_repository,

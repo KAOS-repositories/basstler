@@ -14,11 +14,8 @@ from basstler.git.commands import GitCommandFailed
 from basstler.stack.checkout import CurrentCheckout, ForkRefresh, LandedBranches
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
-from basstler_testing.maintenance.fork import (
-    UPSTREAM_BASE,
-    ForkCheckout,
-    make_configuration,
-)
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.maintenance.fork import make_configuration
 
 # %% a parent branch on the fork, and whether the upstream has it
 

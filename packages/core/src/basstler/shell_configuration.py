@@ -256,7 +256,6 @@ class PersonalNotesSetting(PersonalNotesSettingSpecification, Enum):
     """
     The remote, or raw URL, the notes branch lives on.
     """
-
     BRANCH = PersonalNotesSettingSpecification(
         git_config_key="claude.personalNotesBranch",
         environment_variable="CLAUDE_PERSONAL_NOTES_BRANCH",
@@ -265,7 +264,6 @@ class PersonalNotesSetting(PersonalNotesSettingSpecification, Enum):
     """
     The branch the notes are stored on.
     """
-
     PATH = PersonalNotesSettingSpecification(
         git_config_key="claude.personalNotesPath",
         environment_variable="CLAUDE_PERSONAL_NOTES_PATH",

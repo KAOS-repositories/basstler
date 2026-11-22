@@ -11,11 +11,11 @@ from basstler.github.pull_request_description import (
 )
 
 from basstler_testing.constants.paths import DatasetLocation
-from basstler_testing.maintenance.fork import (
+from basstler_testing.github.pull_request_samples import (
     A_SESSION_LINK,
+    UPSTREAM_REPOSITORY,
     PromotionSampleText,
     StackPullRequestNumber,
-    make_configuration,
 )
 
 # %% the session link
@@ -59,9 +59,7 @@ def an_upstream_link() -> UpstreamPullRequestLink:
     """
     :return: A link to the upstream pull request opened from the parent.
     """
-    return UpstreamPullRequestLink(
-        make_configuration().upstream_repository, StackPullRequestNumber.UPSTREAM
-    )
+    return UpstreamPullRequestLink(UPSTREAM_REPOSITORY, StackPullRequestNumber.UPSTREAM)
 
 
 def test_the_upstream_pull_request_read_back_is_the_one_written():

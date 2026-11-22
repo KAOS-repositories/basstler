@@ -8,7 +8,8 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.repository import Repository
 
-from basstler_testing.maintenance.fork import ForkCheckout, RemoteName
+from basstler_testing.fork_checkout import ForkCheckout
+from basstler_testing.constants.stack import RemoteName
 
 # %% helpers
 

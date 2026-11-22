@@ -102,7 +102,7 @@ def save_plan_repository(scratch_repository: ScratchRepository) -> ScratchReposi
         {ProjectLocation.PERSONAL_NOTES / "placeholder.md": "notes\n"}
     )
     scratch_repository.resolve_notes_remote_to()
-    scratch_repository.serve_origin_as(dataset_plan_repository())
+    scratch_repository.serve_origin_as(dataset_plan_repository().clone_url)
     return scratch_repository
 
 
@@ -233,7 +233,7 @@ def test_saves_a_plan_to_notes_in_a_separate_repository(
     Notes kept in a repository of their own take the plan of the project they are for.
     """
     save_plan_repository.serve_notes_remote_as(
-        Repository("notes-owner", "project-notes")
+        Repository("notes-owner", "project-notes").clone_url
     )
 
     result = save_dataset_plan(save_plan_repository)
@@ -273,7 +273,7 @@ def test_refuses_a_plan_for_another_repository(
     from any other checkout is refused before anything is pushed.
     """
     checkout_repository = Repository("another-owner", "another-repository")
-    save_plan_repository.serve_origin_as(checkout_repository)
+    save_plan_repository.serve_origin_as(checkout_repository.clone_url)
 
     result = save_dataset_plan(save_plan_repository)
 
@@ -584,7 +584,10 @@ def test_a_save_whose_pull_requests_could_not_be_read_saves_the_plan_unchanged(
 def test_a_save_prints_the_plan_s_page_on_the_plan_site(
     save_plan_repository: ScratchRepository,
 ):
-    save_plan_repository.serve_notes_remote_as(SiteRepository.NOTES.value)
+    """
+    A save names the page the plan site publishes the plan on.
+    """
+    save_plan_repository.serve_notes_remote_as(SiteRepository.NOTES.value.clone_url)
     save_plan_repository.update_notes_branch_file(
         ProjectLocation.PLAN_HUB,
         PlanHub(
@@ -742,7 +745,7 @@ def save_arguments(
     :param options: Further options to pass.
     :return: The arguments that save it.
     """
-    repository.serve_origin_as(PLAN_REPOSITORY)
+    repository.serve_origin_as(PLAN_REPOSITORY.clone_url)
     directory = repository.project_root / "session-plan"
     version.write(directory)
     return (

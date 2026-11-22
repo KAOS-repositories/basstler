@@ -47,3 +47,15 @@ items:
     #235 and deletes the branch), or keep iterating (say what to change). On accept or drop
     the session sets stack-board''s plan-site.yml back to main and posts the experiment-mode
     feedback on #192, then marks this step done.'
+
+- id: cross-repository-goal-targets
+  title: A goal names target items in plans of other repositories
+  track: sandbox
+  depends_on:
+  - verdict
+  status: not started
+  recommended_model: opus
+  notes: 'Found 2026-11-22: goal kpi-pilot-team-plans (basstler notes) needs kpi-collection items, which
+    live on KAOS-repositories/business_consulting-notes; a target is <plan-id>/<item-id> within one plans
+    directory. Allow <owner>/<repo>:<plan-id>/<item-id>, read with the hub''s repositories, and refuse
+    an unreadable one by name.'

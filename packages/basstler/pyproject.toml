@@ -25,12 +25,15 @@ raw-options = {root = "../.."}
 
 # Built with every basstler requirement pinned to this release.
 [tool.hatch.metadata.hooks.basstler-sibling-pins]
+family = "basstler"
 dependencies = [
     "cyclopts>=5.3",
+    "basstler-build",
     "basstler-core",
     "basstler-git",
     "basstler-rules",
     "basstler-github",
+    "basstler-packaging",
     "basstler-reviews",
     "basstler-review-triage",
     "basstler-stack",
@@ -59,6 +62,7 @@ dev = [
     "basstler-github",
     "basstler-hub",
     "basstler-notes",
+    "basstler-packaging",
     "basstler-plan",
     "basstler-reviews",
     "basstler-review-triage",

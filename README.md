@@ -48,14 +48,14 @@ shipped paths would go stale.
   pull request merged since is labelled `release:minor` or `release:major`. It then
   publishes a GitHub release with generated notes.
 - **`publish.yml` publishes every distribution to PyPI** once the release run finishes: it
-  builds them all from the tagged commit with `uv build --all-packages`, then publishes to
-  TestPyPI and, only if that took them, to PyPI, each through trusted publishing, so no token
-  is stored. It needs a pending trusted publisher for each distribution's name on both
-  indexes, naming this repository, `publish.yml` and the environments `testpypi` and `pypi`.
-  A release whose publishing stopped is finished by re-running the failed run in the
-  Actions tab (or starting `publish.yml` there with the tag, when no run exists); files an
-  index already holds are skipped, so nothing is uploaded twice. Each wheel and source distribution carries
-  `LICENSE` and `NOTICE`. Anyone can `pip install basstler` without `uv`.
+  builds them all from the tagged commit with `uv build --all-packages` and publishes them
+  through trusted publishing, so no token is stored. It needs a pending trusted publisher
+  on PyPI for each distribution's name, naming this repository, `publish.yml` and the
+  environment `pypi`. A release whose publishing stopped is finished by re-running the
+  failed run in the Actions tab (or starting `publish.yml` there with the tag, when no run
+  exists); files PyPI already holds are skipped, so nothing is uploaded twice. Each wheel
+  and source distribution carries `LICENSE` and `NOTICE`. Anyone can `pip install
+  basstler` without `uv`.
 - **A session start installs the tag its plugin's `plugin.json` names,** and a hook
   installs again once the plugin syncs to another release. Where the two still differ, as
   after an install that failed, the session start's `release:` line and check-setup's

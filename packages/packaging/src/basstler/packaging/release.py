@@ -51,30 +51,13 @@ class RequirementField(StrEnum):
     REQUIRES_DIST = "Requires-Dist: "
 
 
-class BasstlerFamily(StrEnum):
-    """
-    The name every basstler distribution shares, alone or followed by a hyphen and a part.
-    """
-
-    NAME = "basstler"
-
-    @classmethod
-    def includes(cls, distribution: str) -> bool:
-        """
-        :param distribution: The name of a distribution.
-        :return: Whether it is basstler or one of its parts.
-        """
-        name = canonicalize_name(distribution)
-        return name == cls.NAME or name.startswith(f"{cls.NAME}-")
-
-
 # %% the built files
 
 
 @dataclass(frozen=True)
-class Wheel:
+class PythonWheel:
     """
-    A built wheel.
+    A built Python wheel: the file a distribution is installed from.
     """
 
     path: Path
@@ -83,7 +66,7 @@ class Wheel:
     """
 
     @property
-    def distribution(self) -> str:
+    def distribution_name(self) -> str:
         """
         The canonical name of the distribution it is of.
         """
@@ -114,10 +97,24 @@ class Wheel:
             if line.startswith(RequirementField.REQUIRES_DIST)
         ]
 
-    def licence_file(self, release_file: ReleaseFile) -> bytes:
+    @property
+    def licence(self) -> bytes:
+        """
+        What the wheel carries of the :attr:`ReleaseFile.LICENSE` file.
+        """
+        return self.carried_file(ReleaseFile.LICENSE)
+
+    @property
+    def notice(self) -> bytes:
+        """
+        What the wheel carries of the :attr:`ReleaseFile.NOTICE` file.
+        """
+        return self.carried_file(ReleaseFile.NOTICE)
+
+    def carried_file(self, release_file: ReleaseFile) -> bytes:
         """
         :param release_file: One of the files every distribution carries.
-        :return: What the wheel carries of it.
+        :return: What the wheel carries of it, under its ``dist-info`` licences.
         """
         with zipfile.ZipFile(self.path) as archive:
             (entry,) = (
@@ -141,13 +138,13 @@ class SourceDistribution:
     """
 
     @property
-    def distribution(self) -> str:
+    def distribution_name(self) -> str:
         """
         The canonical name of the distribution it is of.
         """
         return canonicalize_name(self.path.name.rsplit("-", 1)[0])
 
-    def carries_at_root(self, release_file: ReleaseFile) -> bool:
+    def carries_file_at_root(self, release_file: ReleaseFile) -> bool:
         """
         :param release_file: One of the files every distribution carries.
         :return: Whether it sits at the root of the archive.
@@ -169,17 +166,20 @@ class BuiltRelease:
     """
 
     @property
-    def wheels(self) -> dict[str, Wheel]:
+    def wheels_by_distribution_name(self) -> dict[str, PythonWheel]:
         """
         The wheels, by the canonical name of the distribution each is of.
         """
         found = (
-            Wheel(path) for path in self.directory.glob(f"*{DistributionSuffix.WHEEL}")
+            PythonWheel(path)
+            for path in self.directory.glob(f"*{DistributionSuffix.WHEEL}")
         )
-        return {wheel.distribution: wheel for wheel in found}
+        return {wheel.distribution_name: wheel for wheel in found}
 
     @property
-    def source_distributions(self) -> dict[str, SourceDistribution]:
+    def source_distributions_by_distribution_name(
+        self,
+    ) -> dict[str, SourceDistribution]:
         """
         The source distributions, by the canonical name of the distribution each is of.
         """
@@ -187,4 +187,4 @@ class BuiltRelease:
             SourceDistribution(path)
             for path in self.directory.glob(f"*{DistributionSuffix.SOURCE}")
         )
-        return {source.distribution: source for source in found}
+        return {source.distribution_name: source for source in found}

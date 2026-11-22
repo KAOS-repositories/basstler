@@ -1,66 +1,26 @@
 """
-The workflow that publishes a release's distributions, parsed into the parts its suite
-checks.
+A workflow file that publishes a release's distributions to a package index through
+trusted publishing, parsed into the parts that decide how it publishes.
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated, Any
 
 import yaml
+from basstler.github.workflows import TriggerEvent
 from basstler.json_model import RawValueReader, ValidatedJSONModel
+from basstler.text_file import TextFile
 from pydantic import Field
-
-from basstler_testing.constants.paths import RepositoryLocation
 
 # %% vocabulary
 
 
-class PublishJobName(StrEnum):
-    """
-    The jobs of the publish workflow.
-    """
-
-    BUILD = "build"
-    PUBLISH_TESTPYPI = "publish-testpypi"
-    PUBLISH_PYPI = "publish-pypi"
-
-
-class PackageIndex(StrEnum):
-    """
-    The package indexes a release is published to, in the order they are reached; each
-    value is the GitHub environment that index's trusted publisher names.
-    """
-
-    TESTPYPI = "testpypi"
-    PYPI = "pypi"
-
-    @property
-    def upload_url(self) -> str | None:
-        """
-        Where the index takes uploads, unset where the publish action's default, PyPI
-        itself, is the address.
-        """
-        return {
-            PackageIndex.TESTPYPI: "https://test.pypi.org/legacy/",
-            PackageIndex.PYPI: None,
-        }[self]
-
-    @property
-    def job(self) -> PublishJobName:
-        """
-        The job that publishes to this index.
-        """
-        return {
-            PackageIndex.TESTPYPI: PublishJobName.PUBLISH_TESTPYPI,
-            PackageIndex.PYPI: PublishJobName.PUBLISH_PYPI,
-        }[self]
-
-
 class PublishAction(StrEnum):
     """
-    The actions the workflow uses to hand files over and publish them.
+    The actions a publishing workflow uses to hand files over and publish them.
     """
 
     PUBLISH = "pypa/gh-action-pypi-publish"
@@ -75,6 +35,16 @@ class IdentityTokenPermission(StrEnum):
 
     SCOPE = "id-token"
     LEVEL = "write"
+
+
+class PublishActionInput(StrEnum):
+    """
+    The inputs of the publish action a release depends on.
+    """
+
+    REPOSITORY_URL = "repository-url"
+    SKIP_EXISTING = "skip-existing"
+    PASSWORD = "password"
 
 
 # %% the parts of the file
@@ -108,7 +78,7 @@ class PublishStep(ValidatedJSONModel):
     The shell it runs; unset for an action step.
     """
 
-    inputs: dict[str, Any] = Field(default_factory=dict, alias="with")
+    action_inputs_by_name: dict[str, Any] = Field(default_factory=dict, alias="with")
     """
     The inputs it passes to its action.
     """
@@ -170,17 +140,17 @@ class PublishJob(ValidatedJSONModel):
         return step
 
 
-class ReleaseRunTrigger(ValidatedJSONModel):
+class FollowedRunTrigger(ValidatedJSONModel):
     """
-    The trigger that starts the workflow when another one finishes.
-    """
-
-    workflows: list[str]
-    """
-    The workflows it follows, by name.
+    The trigger that starts the workflow when other workflows' runs reach a stage.
     """
 
-    types: list[str]
+    workflow_names: list[str] = Field(alias="workflows")
+    """
+    The workflows it follows.
+    """
+
+    trigger_types: list[str] = Field(alias="types")
     """
     The stages of their runs it starts on.
     """
@@ -191,9 +161,9 @@ class ManualTrigger(ValidatedJSONModel):
     The trigger that starts the workflow by hand.
     """
 
-    inputs: dict[str, Any] = Field(default_factory=dict)
+    inputs_by_name: dict[str, Any] = Field(default_factory=dict, alias="inputs")
     """
-    What the person starting it may give, by input name.
+    What the person starting it may give.
     """
 
 
@@ -202,28 +172,36 @@ class PublishTriggers(ValidatedJSONModel):
     The events the workflow runs on.
     """
 
-    release_run: ReleaseRunTrigger = Field(alias="workflow_run")
+    followed_run: FollowedRunTrigger = Field(alias=TriggerEvent.WORKFLOW_RUN)
     """
-    The finish of a release run.
+    The stage of another workflow's run that starts it.
     """
 
-    manual: ManualTrigger = Field(alias="workflow_dispatch")
+    manual: ManualTrigger = Field(alias=TriggerEvent.WORKFLOW_DISPATCH)
     """
     A run started by hand.
     """
 
 
-class PublishWorkflow(ValidatedJSONModel):
+class TriggersKey(StrEnum):
     """
-    The publish workflow file.
+    The key that holds a workflow's events, which YAML reads as ``True``.
     """
 
-    jobs: dict[PublishJobName, PublishJob]
+    ON = "on"
+
+
+class PublishWorkflow(ValidatedJSONModel):
+    """
+    A workflow file that publishes a release.
+    """
+
+    jobs: dict[str, PublishJob]
     """
     Its jobs, by name.
     """
 
-    triggers: PublishTriggers = Field(alias="on")
+    triggers: PublishTriggers = Field(alias=TriggersKey.ON)
     """
     The events it runs on.
     """
@@ -234,28 +212,15 @@ class PublishWorkflow(ValidatedJSONModel):
     """
 
     @classmethod
-    def read(cls) -> PublishWorkflow:
+    def read(cls, path: Path) -> PublishWorkflow:
         """
-        :return: The workflow file of the repository, parsed.
+        :param path: A workflow file.
+        :return: The parsed workflow.
         """
-        data = yaml.safe_load(
-            RepositoryLocation.PUBLISH_WORKFLOW.read_text(encoding="utf-8")
-        )
-        # YAML reads the key ``on`` as ``True``.
+        data = yaml.safe_load(TextFile(path).read())
         return cls.from_json(
-            {"on" if key is True else key: v for key, v in data.items()}
+            {
+                TriggersKey.ON if key is True else key: value
+                for key, value in data.items()
+            }
         )
-
-    def publishing_to(self, index: PackageIndex) -> PublishJob:
-        """
-        :param index: A package index.
-        :return: The job that publishes to it.
-        """
-        return self.jobs[index.job]
-
-    @property
-    def source(self) -> str:
-        """
-        The file's text.
-        """
-        return RepositoryLocation.PUBLISH_WORKFLOW.read_text(encoding="utf-8")

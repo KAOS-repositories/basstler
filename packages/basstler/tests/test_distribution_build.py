@@ -11,8 +11,9 @@ import tomllib
 from enum import StrEnum
 
 import pytest
-from basstler.build.release import BasstlerFamily, BuiltRelease, ReleaseFile
+from basstler.basstler_family import BasstlerFamily
 from basstler.git.commands import GitCommandRunner
+from basstler.packaging.release import BuiltRelease, ReleaseFile
 from packaging.utils import canonicalize_name
 
 from basstler_testing.constants.paths import RepositoryLocation
@@ -106,15 +107,20 @@ def test_every_distribution_of_the_workspace_is_built(built_release: BuiltReleas
     """
     Each distribution comes as a wheel and a source distribution.
     """
-    assert set(built_release.wheels) == distribution_names()
-    assert set(built_release.source_distributions) == distribution_names()
+    assert set(built_release.wheels_by_distribution_name) == distribution_names()
+    assert (
+        set(built_release.source_distributions_by_distribution_name)
+        == distribution_names()
+    )
 
 
 def test_every_wheel_carries_the_version_of_the_tag(built_release: BuiltRelease):
     """
     All distributions of a release share one version, the tag's.
     """
-    versions = {wheel.version for wheel in built_release.wheels.values()}
+    versions = {
+        wheel.version for wheel in built_release.wheels_by_distribution_name.values()
+    }
 
     assert versions == {RELEASE_VERSION}
 
@@ -127,9 +133,9 @@ def test_every_requirement_on_a_sibling_is_pinned_to_the_release(
     """
     siblings = [
         requirement
-        for wheel in built_release.wheels.values()
+        for wheel in built_release.wheels_by_distribution_name.values()
         for requirement in wheel.requirements
-        if BasstlerFamily.includes(requirement.name)
+        if BasstlerFamily().includes_distribution(requirement.name)
     ]
 
     assert siblings
@@ -138,17 +144,24 @@ def test_every_requirement_on_a_sibling_is_pinned_to_the_release(
     }
 
 
-@pytest.mark.parametrize("release_file", list(ReleaseFile), ids=str)
-def test_every_wheel_carries_the_release_files(
-    built_release: BuiltRelease, release_file: ReleaseFile
-):
+def test_every_wheel_carries_the_licence(built_release: BuiltRelease):
     """
-    A wheel installed on its own still states its licence and its notices.
+    A wheel installed on its own still states its licence.
     """
-    expected = (RepositoryLocation.ROOT.value / release_file).read_bytes()
+    expected = (RepositoryLocation.ROOT.value / ReleaseFile.LICENSE).read_bytes()
 
-    for name, wheel in built_release.wheels.items():
-        assert wheel.licence_file(release_file) == expected, name
+    for name, wheel in built_release.wheels_by_distribution_name.items():
+        assert wheel.licence == expected, name
+
+
+def test_every_wheel_carries_the_notice(built_release: BuiltRelease):
+    """
+    A wheel installed on its own still states its notices.
+    """
+    expected = (RepositoryLocation.ROOT.value / ReleaseFile.NOTICE).read_bytes()
+
+    for name, wheel in built_release.wheels_by_distribution_name.items():
+        assert wheel.notice == expected, name
 
 
 @pytest.mark.parametrize("release_file", list(ReleaseFile), ids=str)
@@ -158,5 +171,5 @@ def test_every_source_distribution_carries_the_release_files(
     """
     The files sit at the root of the source distribution, not outside it.
     """
-    for name, source in built_release.source_distributions.items():
-        assert source.carries_at_root(release_file), name
+    for name, source in built_release.source_distributions_by_distribution_name.items():
+        assert source.carries_file_at_root(release_file), name

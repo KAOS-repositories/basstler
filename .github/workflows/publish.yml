@@ -1,10 +1,9 @@
 name: Publish
 
 # Every release is published to PyPI, every distribution at the release's version: the
-# files are built once from the tagged commit, taken by TestPyPI first, and only then
-# published to PyPI itself. Both take them through trusted publishing, so no token is
-# stored anywhere; each index's pending publisher names this workflow and the
-# environment of its job.
+# files are built once from the tagged commit and published to PyPI through trusted
+# publishing, so no token is stored anywhere; PyPI's pending publisher names this
+# workflow and the environment of its job.
 #
 # The release workflow moves the release branch to the tag it makes, so the branch is
 # what a finished release run publishes. A release whose publishing stopped is finished
@@ -71,28 +70,9 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  publish-testpypi:
-    name: Publish to TestPyPI
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: testpypi
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: distributions
-          path: dist/
-
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-
   publish-pypi:
     name: Publish to PyPI
-    needs: publish-testpypi
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi

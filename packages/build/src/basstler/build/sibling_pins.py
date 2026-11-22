@@ -13,7 +13,7 @@ from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-from basstler.build.release import BasstlerFamily
+from basstler.build.distribution_family import DistributionFamily
 
 # %% the hook
 
@@ -21,7 +21,8 @@ from basstler.build.release import BasstlerFamily
 class SiblingPinsHook(MetadataHookInterface):
     """
     Sets the distribution's dependencies to the hook's ``dependencies`` setting, each
-    requirement of a basstler distribution pinned to the version being built.
+    requirement of a distribution of the hook's ``family`` pinned to the version being
+    built.
 
     A distribution lists the hook as ``[tool.hatch.metadata.hooks.basstler-sibling-pins]``
     and names ``dependencies`` in ``project.dynamic``.
@@ -38,19 +39,23 @@ class SiblingPinsHook(MetadataHookInterface):
             ``dependencies`` are replaced.
         """
         version = Version(metadata["version"])
+        family = DistributionFamily(self.config["family"])
         metadata["dependencies"] = [
-            str(self.pinned(Requirement(specifier), version))
+            str(self.pinned(Requirement(specifier), family, version))
             for specifier in self.config.get("dependencies", [])
         ]
 
-    def pinned(self, requirement: Requirement, version: Version) -> Requirement:
+    def pinned(
+        self, requirement: Requirement, family: DistributionFamily, version: Version
+    ) -> Requirement:
         """
         :param requirement: One requirement of the distribution.
+        :param family: The family whose distributions are pinned.
         :param version: The version being built.
         :return: *requirement*, its markers and extras kept, pinned to *version* when it
             names a sibling; else *requirement* itself.
         """
-        if not BasstlerFamily.includes(requirement.name):
+        if not family.includes_distribution(requirement.name):
             return requirement
         pinned = Requirement(str(requirement))
         pinned.specifier = SpecifierSet(f"=={version}")

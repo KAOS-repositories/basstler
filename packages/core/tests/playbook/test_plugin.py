@@ -26,7 +26,7 @@ from basstler.playbook.skill import SkillInstructions
 from basstler.plugin_root import PluginRoot
 from basstler.text_file import TextFile
 
-from .components import BodilessSkill, DeclaredSkill
+from .components import UnshippedSkill, DeclaredSkill
 
 DATASET_PLUGIN = PluginRoot(PlaybookSnippet.PLUGIN)
 """
@@ -130,22 +130,22 @@ def test_a_shipped_skill_no_class_declares_is_reported():
     assert plugin.undeclared_skill_names == ("undeclared",)
 
 
-def test_a_declared_skill_without_a_body_is_reported():
+def test_a_declared_skill_without_instructions_is_reported():
     """
-    A declared skill whose directory holds no body is missing.
+    A declared skill whose directory holds no instructions is missing.
     """
-    plugin = PluginFiles(DATASET_PLUGIN, (DeclaredSkill(), BodilessSkill()), ())
+    plugin = PluginFiles(DATASET_PLUGIN, (DeclaredSkill(), UnshippedSkill()), ())
 
-    assert plugin.missing_skills == (BodilessSkill(),)
+    assert plugin.missing_skills == (UnshippedSkill(),)
 
 
 def test_the_generated_files_are_the_registrations_and_each_shipped_skill():
     """
     The plugin generates its hook registrations and the instructions of every skill
-    it ships a body for.
+    it ships instructions for.
     """
     plugin = PluginFiles(
-        DATASET_PLUGIN, (DeclaredSkill(), BodilessSkill()), (SESSION_START_HOOK,)
+        DATASET_PLUGIN, (DeclaredSkill(), UnshippedSkill()), (SESSION_START_HOOK,)
     )
 
     assert plugin.generated_files == (

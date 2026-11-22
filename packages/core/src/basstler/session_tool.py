@@ -7,12 +7,22 @@ from __future__ import annotations
 from enum import StrEnum
 
 
+# %% the common base
+
+
 class SessionTool(StrEnum):
     """
-    The Claude Code tools a session calls.
+    A Claude Code tool a session calls, by the name Claude Code gives it.
     """
 
-    # %% built-in tools
+
+# %% the tools of each kind
+
+
+class BuiltInTool(SessionTool):
+    """
+    A tool Claude Code itself provides.
+    """
 
     RUN_SHELL_COMMAND = "Bash"
     """
@@ -64,7 +74,11 @@ class SessionTool(StrEnum):
     Presents the plan for the user's approval.
     """
 
-    # %% GitHub tools
+
+class GitHubTool(SessionTool):
+    """
+    A tool of the GitHub MCP server.
+    """
 
     READ_GITHUB_USER = "mcp__github__get_me"
     """
@@ -121,7 +135,11 @@ class SessionTool(StrEnum):
     Reads the logs of a workflow job.
     """
 
-    # %% cloud session tools
+
+class CloudSessionTool(SessionTool):
+    """
+    A tool a claude.ai cloud session provides for its repositories and sessions.
+    """
 
     ATTACH_REPOSITORY = "mcp__claude-code-remote__add_repo"
     """

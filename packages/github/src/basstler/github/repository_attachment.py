@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from basstler.github.repository import HasRepository
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, CloudSessionTool
 
 # %% the session's proxy
 
@@ -59,11 +59,11 @@ class RepositoryAttachment(HasRepository):
         """
         return (
             f"Attach {self.repository.full_name} to this session: call "
-            f"{SessionTool.ATTACH_REPOSITORY} with owner {self.repository.owner}, repo "
+            f"{CloudSessionTool.ATTACH_REPOSITORY} with owner {self.repository.owner}, repo "
             f"{self.repository.name} and access push, then run {self.retry_command}. "
             f"Only the attachment's credential is needed: skip the clone and the "
-            f"{SessionTool.REGISTER_REPOSITORY_ROOT} call the attach answer asks for. If "
-            f"the attach is refused, ask the user with {SessionTool.ASK_USER} to allow "
+            f"{CloudSessionTool.REGISTER_REPOSITORY_ROOT} call the attach answer asks for. If "
+            f"the attach is refused, ask the user with {BuiltInTool.ASK_USER} to allow "
             f'it, with "{self.recommended_option}" as the first option: '
             f"{self.benefit}."
         )

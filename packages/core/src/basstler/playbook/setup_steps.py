@@ -82,13 +82,15 @@ class RepositoryCheckout:
 @dataclass(frozen=True)
 class SetupSteps(PlaybookComponent, ABC):
     """
-    The setup steps one distribution leaves to the user of a checkout.
+    The setup steps one distribution leaves to the user of a repository checkout.
     """
 
     @abstractmethod
-    def steps_for_checkout(self, checkout: RepositoryCheckout) -> tuple[SetupStep, ...]:
+    def steps_for_repository_checkout(
+        self, repository_checkout: RepositoryCheckout
+    ) -> tuple[SetupStep, ...]:
         """
-        :param checkout: The checkout the steps are about.
+        :param repository_checkout: The repository checkout the steps are about.
         :return: The steps that apply to it, in the order they should be done.
         """
 
@@ -99,12 +101,13 @@ class SetupSteps(PlaybookComponent, ABC):
 @dataclass(frozen=True)
 class SetupChecklist:
     """
-    The steps one checkout leaves to its user, in the order they should be done.
+    The steps one repository checkout leaves to its user, in the order they should be
+    done.
     """
 
     steps: tuple[SetupStep, ...]
     """
-    The steps that apply to this checkout.
+    The steps that apply to this repository checkout.
     """
 
     @classproperty
@@ -115,19 +118,19 @@ class SetupChecklist:
         return "These steps are yours - no script can do them:"
 
     @classmethod
-    def from_checkout(
-        cls, playbook: Playbook, checkout: RepositoryCheckout
+    def from_repository_checkout(
+        cls, playbook: Playbook, repository_checkout: RepositoryCheckout
     ) -> SetupChecklist:
         """
         :param playbook: The playbook whose :class:`SetupSteps` apply.
-        :param checkout: The checkout the steps are about.
+        :param repository_checkout: The repository checkout the steps are about.
         :return: The steps of every :class:`SetupSteps` in the playbook, in its order.
         """
         return cls(
             tuple(
                 step
                 for setup_steps in playbook.components_of(SetupSteps)
-                for step in setup_steps.steps_for_checkout(checkout)
+                for step in setup_steps.steps_for_repository_checkout(repository_checkout)
             )
         )
 

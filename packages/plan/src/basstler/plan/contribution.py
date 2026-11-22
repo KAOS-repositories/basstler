@@ -13,7 +13,7 @@ from basstler.playbook.command_group import CommandGroup
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.skill import Skill
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, CloudSessionTool, GitHubTool, SessionTool
 
 # %% skills
 
@@ -37,19 +37,19 @@ class AddPlanItemSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.SEARCH_FILE_CONTENTS,
-            SessionTool.FIND_FILES,
-            SessionTool.ASK_USER,
-            SessionTool.RUN_SKILL,
-            SessionTool.ENTER_PLAN_MODE,
-            SessionTool.EXIT_PLAN_MODE,
-            SessionTool.LIST_PULL_REQUESTS,
-            SessionTool.READ_PULL_REQUEST,
-            SessionTool.READ_REPOSITORY_FILE,
-            SessionTool.READ_ISSUE,
-            SessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.SEARCH_FILE_CONTENTS,
+            BuiltInTool.FIND_FILES,
+            BuiltInTool.ASK_USER,
+            BuiltInTool.RUN_SKILL,
+            BuiltInTool.ENTER_PLAN_MODE,
+            BuiltInTool.EXIT_PLAN_MODE,
+            GitHubTool.LIST_PULL_REQUESTS,
+            GitHubTool.READ_PULL_REQUEST,
+            GitHubTool.READ_REPOSITORY_FILE,
+            GitHubTool.READ_ISSUE,
+            CloudSessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
         )
 
 
@@ -71,18 +71,18 @@ class PlanCreateSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.WRITE_FILE,
-            SessionTool.SEARCH_FILE_CONTENTS,
-            SessionTool.FIND_FILES,
-            SessionTool.ASK_USER,
-            SessionTool.RUN_SKILL,
-            SessionTool.LIST_PULL_REQUESTS,
-            SessionTool.READ_PULL_REQUEST,
-            SessionTool.WRITE_ISSUE,
-            SessionTool.CREATE_PULL_REQUEST,
-            SessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.WRITE_FILE,
+            BuiltInTool.SEARCH_FILE_CONTENTS,
+            BuiltInTool.FIND_FILES,
+            BuiltInTool.ASK_USER,
+            BuiltInTool.RUN_SKILL,
+            GitHubTool.LIST_PULL_REQUESTS,
+            GitHubTool.READ_PULL_REQUEST,
+            GitHubTool.WRITE_ISSUE,
+            GitHubTool.CREATE_PULL_REQUEST,
+            CloudSessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
         )
 
 
@@ -104,23 +104,23 @@ class PlanItemKickoffSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.SEARCH_FILE_CONTENTS,
-            SessionTool.FIND_FILES,
-            SessionTool.EDIT_FILE,
-            SessionTool.WRITE_FILE,
-            SessionTool.ASK_USER,
-            SessionTool.RUN_SKILL,
-            SessionTool.ENTER_PLAN_MODE,
-            SessionTool.EXIT_PLAN_MODE,
-            SessionTool.LIST_PULL_REQUESTS,
-            SessionTool.READ_PULL_REQUEST,
-            SessionTool.READ_REPOSITORY_FILE,
-            SessionTool.CREATE_PULL_REQUEST,
-            SessionTool.UPDATE_PULL_REQUEST,
-            SessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
-            SessionTool.READ_ISSUE,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.SEARCH_FILE_CONTENTS,
+            BuiltInTool.FIND_FILES,
+            BuiltInTool.EDIT_FILE,
+            BuiltInTool.WRITE_FILE,
+            BuiltInTool.ASK_USER,
+            BuiltInTool.RUN_SKILL,
+            BuiltInTool.ENTER_PLAN_MODE,
+            BuiltInTool.EXIT_PLAN_MODE,
+            GitHubTool.LIST_PULL_REQUESTS,
+            GitHubTool.READ_PULL_REQUEST,
+            GitHubTool.READ_REPOSITORY_FILE,
+            GitHubTool.CREATE_PULL_REQUEST,
+            GitHubTool.UPDATE_PULL_REQUEST,
+            CloudSessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
+            GitHubTool.READ_ISSUE,
         )
 
 
@@ -142,8 +142,8 @@ class PlanItemModeSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
         )
 
 
@@ -167,22 +167,22 @@ class PlanItemResolveSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.SEARCH_FILE_CONTENTS,
-            SessionTool.FIND_FILES,
-            SessionTool.EDIT_FILE,
-            SessionTool.WRITE_FILE,
-            SessionTool.ASK_USER,
-            SessionTool.RUN_SKILL,
-            SessionTool.ENTER_PLAN_MODE,
-            SessionTool.EXIT_PLAN_MODE,
-            SessionTool.LIST_PULL_REQUESTS,
-            SessionTool.READ_PULL_REQUEST,
-            SessionTool.READ_ISSUE,
-            SessionTool.READ_REPOSITORY_FILE,
-            SessionTool.UPDATE_PULL_REQUEST,
-            SessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.SEARCH_FILE_CONTENTS,
+            BuiltInTool.FIND_FILES,
+            BuiltInTool.EDIT_FILE,
+            BuiltInTool.WRITE_FILE,
+            BuiltInTool.ASK_USER,
+            BuiltInTool.RUN_SKILL,
+            BuiltInTool.ENTER_PLAN_MODE,
+            BuiltInTool.EXIT_PLAN_MODE,
+            GitHubTool.LIST_PULL_REQUESTS,
+            GitHubTool.READ_PULL_REQUEST,
+            GitHubTool.READ_ISSUE,
+            GitHubTool.READ_REPOSITORY_FILE,
+            GitHubTool.UPDATE_PULL_REQUEST,
+            CloudSessionTool.SUBSCRIBE_PULL_REQUEST_ACTIVITY,
         )
 
 
@@ -205,8 +205,8 @@ class PlanRecommendModelsSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
         )
 
 

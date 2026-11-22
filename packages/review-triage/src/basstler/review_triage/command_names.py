@@ -4,51 +4,39 @@ The names of the ``basstler review-triage`` commands.
 
 from __future__ import annotations
 
-from enum import StrEnum
 
-from basstler.locations import PackageLocation
+from basstler.basstler_command import BasstlerCommand
+from basstler.class_property import classproperty
 
 # %% the commands
 
 
-class ReviewTriageCommand(StrEnum):
+class ReviewTriageCommand(BasstlerCommand):
     """
     The ``basstler review-triage`` command group and its commands, by name.
     """
 
-    GROUP = "review-triage"
-    """
-    The command group itself.
-    """
+    @classproperty
+    def group(cls) -> str:
+        return "review-triage"
 
     REPORT = "report"
     """
     Print which files of a pull request need review, as Markdown.
     """
-
     MARK_VIEWED = "mark-viewed"
     """
     Mark a pull request's mechanical files viewed for the logged-in account.
     """
-
     DECLARE = "declare"
     """
     Print the description comment declaring renames.
     """
-
     REQUEST_MARK_VIEWED = "request-mark-viewed"
     """
     Ask a repository's Actions to mark a pull request's mechanical files viewed.
     """
-
     SET_UP_MARK_VIEWED = "set-up-mark-viewed"
     """
     Set a repository's Actions up to mark files viewed, listing the steps left.
     """
-
-    @property
-    def invocation(self) -> str:
-        """
-        The command line running this command.
-        """
-        return f"{PackageLocation.DIRECTORY.name} {ReviewTriageCommand.GROUP} {self}"

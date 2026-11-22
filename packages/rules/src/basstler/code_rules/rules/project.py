@@ -62,10 +62,11 @@ class PackageAndPluginRules(Section):
         f"`{ContributionEntryPointGroup.CONTRIBUTIONS}` entry point group of its "
         "`pyproject.toml`. "
         f"`{(BasstlerRepositoryLocation.PLUGIN / PluginLocation.HOOK_REGISTRATIONS).as_posix()}` and "
-        f"every skill's `{SkillLocation.INSTRUCTIONS.as_posix()}` are generated from the "
-        f"playbook: change a hook or a {CodeReference(Skill).path} class in its "
-        f"contribution, or a skill's `{SkillLocation.BODY.as_posix()}`, and run "
-        f"`{SkillsCommand.BUILD.invocation}`, never edit the generated files"
+        f"the frontmatter and title of every skill's `{SkillLocation.INSTRUCTIONS.as_posix()}` "
+        f"are generated from the playbook: change a hook or a {CodeReference(Skill).path} "
+        f"class in its contribution and run `{SkillsCommand.BUILD.invocation}`, never "
+        "edit the generated parts; a skill's instructions below its title are written by "
+        "hand"
     )
 
     NAME_FILES_AND_VARIABLES_ONCE = (

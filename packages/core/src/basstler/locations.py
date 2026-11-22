@@ -662,11 +662,6 @@ class SkillLocation(PathEnumeration):
     The instructions Claude Code loads the skill from.
     """
 
-    BODY = Path("skill-body.md")
-    """
-    The hand-written instructions below the title of :attr:`INSTRUCTIONS`.
-    """
-
 
 class ProjectLocation(PathEnumeration):
     """

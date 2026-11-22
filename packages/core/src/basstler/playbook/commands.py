@@ -4,29 +4,21 @@ The names of the ``basstler skills`` commands.
 
 from __future__ import annotations
 
-from enum import StrEnum
 
-from basstler.locations import PackageLocation
+from basstler.basstler_command import BasstlerCommand
+from basstler.class_property import classproperty
 
 
-class SkillsCommand(StrEnum):
+class SkillsCommand(BasstlerCommand):
     """
     The ``basstler skills`` command group and its commands, by name.
     """
 
-    GROUP = "skills"
-    """
-    The command group itself.
-    """
+    @classproperty
+    def group(cls) -> str:
+        return "skills"
 
     BUILD = "build"
     """
     Write the plugin's generated files and check its skills against the playbook.
     """
-
-    @property
-    def invocation(self) -> str:
-        """
-        The command line running this command.
-        """
-        return f"{PackageLocation.DIRECTORY.name} {SkillsCommand.GROUP} {self}"

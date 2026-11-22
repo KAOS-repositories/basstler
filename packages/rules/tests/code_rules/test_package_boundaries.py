@@ -19,7 +19,7 @@ from basstler.code_rules.package_boundaries import (
     PackageCrossings,
 )
 from basstler.locations import PackageLocation
-from basstler.module import Module
+from basstler.python_module import PythonModule
 from basstler.package_map import Workspace
 
 from basstler_testing.constants.paths import (
@@ -27,7 +27,7 @@ from basstler_testing.constants.paths import (
     ThirdPartyImportSnippet,
 )
 
-NAMESPACE_ROOT = Module.from_dotted_name(PackageLocation.DIRECTORY.name)
+NAMESPACE_ROOT = PythonModule.from_dotted_name(PackageLocation.DIRECTORY.name)
 """
 The package the dataset's modules are named relative to.
 """
@@ -77,7 +77,7 @@ def test_a_from_import_of_a_module_names_that_module(checker):
     """
     (crossing,) = checker.crossings(PackageBoundarySnippet.UNLISTED_IMPORT)
 
-    assert crossing.imported_module == Module.from_dotted_name(
+    assert crossing.imported_module == PythonModule.from_dotted_name(
         "high.caller", NAMESPACE_ROOT
     )
 
@@ -101,8 +101,12 @@ def test_the_package_s_crossings_are_listed_by_module(checker):
     """
     assert checker.package_crossings().crossings == (
         BoundaryCrossing(
-            importing_module=Module.from_dotted_name("low.upward", NAMESPACE_ROOT),
-            imported_module=Module.from_dotted_name("high.caller", NAMESPACE_ROOT),
+            importing_module=PythonModule.from_dotted_name(
+                "low.upward", NAMESPACE_ROOT
+            ),
+            imported_module=PythonModule.from_dotted_name(
+                "high.caller", NAMESPACE_ROOT
+            ),
         ),
     )
 
@@ -138,7 +142,7 @@ def test_a_crossing_the_base_holds_under_a_module_s_old_name_is_not_new(checker)
     (crossing,) = crossings.crossings
     renames = ModuleRenames(
         {
-            Module.from_dotted_name(
+            PythonModule.from_dotted_name(
                 "low.before_the_move", NAMESPACE_ROOT
             ): crossing.importing_module
         }
@@ -146,7 +150,7 @@ def test_a_crossing_the_base_holds_under_a_module_s_old_name_is_not_new(checker)
     base = PackageCrossings(
         crossings=(
             BoundaryCrossing(
-                importing_module=Module.from_dotted_name(
+                importing_module=PythonModule.from_dotted_name(
                     "low.before_the_move", NAMESPACE_ROOT
                 ),
                 imported_module=crossing.imported_module,
@@ -184,9 +188,9 @@ def test_a_module_git_detects_as_moved_is_renamed(moved_package, scratch_reposit
     assert checker.module_renames(scratch_repository.git, base_commit) == (
         ModuleRenames(
             {
-                Module.from_dotted_name(
+                PythonModule.from_dotted_name(
                     "low.upward", NAMESPACE_ROOT
-                ): Module.from_dotted_name("low.moved", NAMESPACE_ROOT)
+                ): PythonModule.from_dotted_name("low.moved", NAMESPACE_ROOT)
             }
         )
     )
@@ -288,7 +292,7 @@ def test_an_import_of_an_uninstalled_library_is_reported(library_checker):
     """
     (crossing,) = library_checker.library_crossings(ThirdPartyImportSnippet.UNINSTALLED)
 
-    assert crossing.module.top_level_package == Module.from_dotted_name(
+    assert crossing.module.top_level_package == PythonModule.from_dotted_name(
         "no_such_library_installed"
     )
 
@@ -299,7 +303,7 @@ def test_a_library_crossing_names_the_imported_library(library_checker):
     """
     (crossing,) = library_checker.library_crossings(ThirdPartyImportSnippet.UNREQUIRED)
 
-    assert crossing.module.top_level_package == Module.from_dotted_name("libcst")
+    assert crossing.module.top_level_package == PythonModule.from_dotted_name("libcst")
 
 
 def test_the_package_s_library_crossings_are_listed_by_module(library_checker):
@@ -308,16 +312,16 @@ def test_the_package_s_library_crossings_are_listed_by_module(library_checker):
     """
     assert library_checker.package_crossings().library_crossings == (
         LibraryCrossing(
-            importing_module=Module.from_dotted_name(
+            importing_module=PythonModule.from_dotted_name(
                 "low.uninstalled_library", NAMESPACE_ROOT
             ),
-            imported_library=Module.from_dotted_name("no_such_library_installed"),
+            imported_library=PythonModule.from_dotted_name("no_such_library_installed"),
         ),
         LibraryCrossing(
-            importing_module=Module.from_dotted_name(
+            importing_module=PythonModule.from_dotted_name(
                 "low.unrequired_library", NAMESPACE_ROOT
             ),
-            imported_library=Module.from_dotted_name("libcst"),
+            imported_library=PythonModule.from_dotted_name("libcst"),
         ),
     )
 
@@ -350,25 +354,27 @@ def test_a_library_crossing_follows_its_module_s_rename(library_checker):
     crossings = library_checker.package_crossings()
     renames = ModuleRenames(
         {
-            Module.from_dotted_name(
+            PythonModule.from_dotted_name(
                 "low.before_the_move", NAMESPACE_ROOT
-            ): Module.from_dotted_name("low.unrequired_library", NAMESPACE_ROOT)
+            ): PythonModule.from_dotted_name("low.unrequired_library", NAMESPACE_ROOT)
         }
     )
     base = PackageCrossings(
         crossings=(),
         library_crossings=(
             LibraryCrossing(
-                importing_module=Module.from_dotted_name(
+                importing_module=PythonModule.from_dotted_name(
                     "low.before_the_move", NAMESPACE_ROOT
                 ),
-                imported_library=Module.from_dotted_name("libcst"),
+                imported_library=PythonModule.from_dotted_name("libcst"),
             ),
             LibraryCrossing(
-                importing_module=Module.from_dotted_name(
+                importing_module=PythonModule.from_dotted_name(
                     "low.uninstalled_library", NAMESPACE_ROOT
                 ),
-                imported_library=Module.from_dotted_name("no_such_library_installed"),
+                imported_library=PythonModule.from_dotted_name(
+                    "no_such_library_installed"
+                ),
             ),
         ),
     )

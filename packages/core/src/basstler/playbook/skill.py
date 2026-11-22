@@ -19,6 +19,16 @@ from basstler.render_common import create_template_environment
 from basstler.session_tool import SessionTool
 from basstler.text_file import TextFile
 
+FRONTMATTER_DELIMITER = "---\n"
+"""
+The line above and below a Markdown file's YAML frontmatter.
+"""
+
+HEADING_MARKER = "# "
+"""
+What starts a Markdown document's title line.
+"""
+
 # %% skills
 
 
@@ -81,12 +91,12 @@ class Skill(PlaybookComponent, ABC):
         """
         return plugin_root.path_of(PluginSkillLocation.SKILLS) / self.skill_name
 
-    def body_path(self, plugin_root: PluginRoot) -> Path:
+    def instructions_path(self, plugin_root: PluginRoot) -> Path:
         """
         :param plugin_root: The plugin.
-        :return: The hand-written body of the skill's instructions in it.
+        :return: The skill's ``SKILL.md`` in it.
         """
-        return self.directory(plugin_root) / SkillLocation.BODY
+        return self.directory(plugin_root) / SkillLocation.INSTRUCTIONS
 
 
 # %% the instructions built from a skill
@@ -110,14 +120,25 @@ class SkillInstructions(GeneratedFile):
 
     @property
     def path(self) -> Path:
-        return self.skill.directory(self.plugin_root) / SkillLocation.INSTRUCTIONS
+        return self.skill.instructions_path(self.plugin_root)
 
     @property
     def text(self) -> str:
         template = create_template_environment().get_template(
             InstructionsTemplate.SKILL.name
         )
-        return template.render(
-            skill=self.skill,
-            body=TextFile(self.skill.body_path(self.plugin_root)).read(),
-        )
+        return template.render(skill=self.skill, body=self.body)
+
+    @property
+    def body(self) -> str:
+        """
+        The hand-written instructions the file holds below its frontmatter and its
+        title, either of which it may lack.
+        """
+        text = TextFile(self.path).read()
+        if text.startswith(FRONTMATTER_DELIMITER):
+            text = text.split(FRONTMATTER_DELIMITER, 2)[2]
+        text = text.lstrip("\n")
+        if text.startswith(HEADING_MARKER):
+            text = text.partition("\n")[2]
+        return text.lstrip("\n")

@@ -1,5 +1,5 @@
 """
-A Python source file outside any installed package, run as a module of its own.
+Files holding a Python module's source.
 """
 
 from __future__ import annotations
@@ -9,17 +9,33 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
+from basstler.python_module import PythonModule
+from basstler.text_file import TextFile
+
+INITIALIZER_STEM = "__init__"
+"""
+The stem of the file that holds a package's own source.
+"""
+
 
 @dataclass(frozen=True)
-class PythonSourceFile:
+class PythonSourceFile(TextFile):
     """
-    A ``.py`` file that is loaded by its path rather than imported by its name.
+    A file holding a Python module's source.
     """
 
-    path: Path
-    """
-    Where the file is.
-    """
+    def module_below(self, directory: Path, package: PythonModule) -> PythonModule:
+        """
+        :param directory: The directory of *package*, which holds this file.
+        :param package: The package whose directory is *directory*.
+        :return: The module this file holds, relative to *package*.
+        """
+        parts = (
+            self.path.resolve().relative_to(directory.resolve()).with_suffix("").parts
+        )
+        if parts[-1] == INITIALIZER_STEM:
+            parts = parts[:-1]
+        return PythonModule(parts, package)
 
     def load_module(self) -> ModuleType:
         """

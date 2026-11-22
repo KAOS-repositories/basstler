@@ -11,7 +11,7 @@ from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.setup_steps import RepositoryCheckout, SetupStep, SetupSteps
 from basstler.playbook.skill import Skill
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, SessionTool
 
 # %% components of two kinds
 
@@ -92,7 +92,7 @@ class TitledStep(SetupStep):
 @dataclass(frozen=True)
 class StepsNamingTheCheckout(SetupSteps):
     """
-    Setup steps titled after the checkout they are worked out for.
+    Setup steps titled after the repository checkout they are worked out for.
     """
 
     prefix: str
@@ -100,8 +100,10 @@ class StepsNamingTheCheckout(SetupSteps):
     What every step's title starts with.
     """
 
-    def steps_for_checkout(self, checkout: RepositoryCheckout) -> tuple[SetupStep, ...]:
-        return (TitledStep(f"{self.prefix} {checkout.working_tree.name}"),)
+    def steps_for_repository_checkout(
+        self, repository_checkout: RepositoryCheckout
+    ) -> tuple[SetupStep, ...]:
+        return (TitledStep(f"{self.prefix} {repository_checkout.working_tree.name}"),)
 
 
 # %% skills
@@ -119,13 +121,13 @@ class DeclaredSkill(Skill):
 
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
-        return (SessionTool.RUN_SHELL_COMMAND, SessionTool.READ_FILE)
+        return (BuiltInTool.RUN_SHELL_COMMAND, BuiltInTool.READ_FILE)
 
 
 @dataclass(frozen=True)
-class BodilessSkill(Skill):
+class UnshippedSkill(Skill):
     """
-    A skill the dataset plugin ships no body for.
+    A skill the dataset plugin ships no instructions for.
     """
 
     @classproperty

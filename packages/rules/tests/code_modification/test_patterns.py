@@ -12,7 +12,7 @@ from libcst import matchers
 from basstler.class_property import classproperty
 from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 
 from basstler_testing.constants.paths import CodeModificationSnippet
 
@@ -42,7 +42,7 @@ def module() -> PositionedModule:
     :return: The module of calls without arguments, with one, and with a trailing comma.
     """
     return PositionedModule(
-        PythonSourceFile(CodeModificationSnippet.CALL_ARGUMENTS).parse()
+        EditablePythonSourceFile(CodeModificationSnippet.CALL_ARGUMENTS).parse()
     )
 
 

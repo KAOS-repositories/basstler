@@ -21,7 +21,7 @@ from pydantic import Field
 
 from basstler.exit_codes import StackExitCode
 from basstler.github.repository import Repository
-from basstler.session_tool import SessionTool
+from basstler.session_tool import CloudSessionTool
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ClaudeCodeVariable
 from basstler.personal_notes.access import NotesRepositoryAccess
@@ -44,7 +44,7 @@ class PermissionDecision(StrEnum):
 
 class AttachArguments(ValidatedJSONModel):
     """
-    The repository a call of :attr:`SessionTool.ATTACH_REPOSITORY` asks for.
+    The repository a call of :attr:`CloudSessionTool.ATTACH_REPOSITORY` asks for.
     """
 
     owner: str
@@ -77,7 +77,7 @@ class ToolCall(ValidatedJSONModel):
 
     tool_input: AttachArguments
     """
-    The tool's arguments, read as those of :attr:`SessionTool.ATTACH_REPOSITORY`.
+    The tool's arguments, read as those of :attr:`CloudSessionTool.ATTACH_REPOSITORY`.
     """
 
 
@@ -154,7 +154,7 @@ class PlanRepositories:
         :return: The answer allowing it when it attaches one of these repositories,
             ``None`` to leave the decision to the normal permission flow.
         """
-        if call.tool_name != SessionTool.ATTACH_REPOSITORY:
+        if call.tool_name != CloudSessionTool.ATTACH_REPOSITORY:
             return None
         asked = call.tool_input.repository
         if not any(

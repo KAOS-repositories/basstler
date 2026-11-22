@@ -13,7 +13,7 @@ from .components import LabelledComponent, StepsNamingTheCheckout, TitledStep
 
 CHECKOUT = RepositoryCheckout(Path("/projects/clone"), {})
 """
-The checkout every checklist below is worked out for.
+The repository checkout every checklist below is worked out for.
 """
 
 
@@ -29,9 +29,9 @@ def test_the_checklist_lists_every_contributed_step_in_playbook_order():
         )
     )
 
-    assert SetupChecklist.from_checkout(playbook, CHECKOUT) == SetupChecklist(
-        (TitledStep("first for clone"), TitledStep("then for clone"))
-    )
+    assert SetupChecklist.from_repository_checkout(
+        playbook, CHECKOUT
+    ) == SetupChecklist((TitledStep("first for clone"), TitledStep("then for clone")))
 
 
 def test_the_checklist_numbers_each_step_under_its_heading():

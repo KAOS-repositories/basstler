@@ -4,6 +4,9 @@ Tests for :mod:`basstler.playbook.skill`.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from basstler_testing.constants.paths import PlaybookSnippet
 
 from basstler.locations import PluginSkillLocation, SkillLocation
@@ -15,7 +18,7 @@ from .components import CheckCIStatusSkill, DeclaredSkill
 
 DATASET_PLUGIN = PluginRoot(PlaybookSnippet.PLUGIN)
 """
-The dataset plugin, which ships the body of :class:`DeclaredSkill`.
+The dataset plugin, which ships the instructions of :class:`DeclaredSkill`.
 """
 
 # %% naming
@@ -55,3 +58,18 @@ def test_the_instructions_put_the_frontmatter_and_title_above_the_body():
             DeclaredSkill().directory(DATASET_PLUGIN) / SkillLocation.INSTRUCTIONS
         ).read()
     )
+
+
+@pytest.mark.parametrize(
+    "plugin_directory", [PlaybookSnippet.STALE_PLUGIN, PlaybookSnippet.BODY_ONLY_PLUGIN]
+)
+def test_the_instructions_keep_the_body_and_replace_what_is_generated(
+    plugin_directory: Path,
+):
+    """
+    Built from instructions whose frontmatter and title are outdated or absent, the text
+    is the dataset plugin's: the class's frontmatter and title above the same body.
+    """
+    instructions = SkillInstructions(PluginRoot(plugin_directory), DeclaredSkill())
+
+    assert instructions.text == SkillInstructions(DATASET_PLUGIN, DeclaredSkill()).text

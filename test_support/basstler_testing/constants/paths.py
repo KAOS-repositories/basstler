@@ -1085,9 +1085,21 @@ class PlaybookSnippet(PathEnumeration):
 
     PLUGIN = DIRECTORY / "plugin"
     """
-    A plugin shipping a declared skill's body and instructions, a skill nothing
+    A plugin shipping a declared skill's instructions, a skill nothing
     declares, a directory that is no skill, and the hook registrations of a
     session-start hook and a shell-tool hook.
+    """
+
+    STALE_PLUGIN = DIRECTORY / "stale-plugin"
+    """
+    A plugin whose declared skill's instructions carry an outdated frontmatter and
+    title above the body of :attr:`PLUGIN`'s.
+    """
+
+    BODY_ONLY_PLUGIN = DIRECTORY / "body-only-plugin"
+    """
+    A plugin whose declared skill's instructions hold only the body of :attr:`PLUGIN`'s,
+    as a new skill's do before its first build.
     """
 
 

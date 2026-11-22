@@ -11,7 +11,7 @@ from basstler.locations import PluginLocation
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.plugin import PackageModuleCommand, PreToolUseHook
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, CloudSessionTool
 
 
 class HubContribution(PackageContribution):
@@ -24,13 +24,13 @@ class HubContribution(PackageContribution):
         return (
             PreToolUseHook(
                 PackageModuleCommand(basstler.plan_site.attach_approval),
-                matcher=SessionTool.ATTACH_REPOSITORY,
+                matcher=CloudSessionTool.ATTACH_REPOSITORY,
             ),
             PreToolUseHook(
                 PackageModuleCommand(basstler.plan_site.entry_point_approval),
-                matcher=SessionTool.RUN_SHELL_COMMAND,
+                matcher=BuiltInTool.RUN_SHELL_COMMAND,
                 condition=(
-                    f"{SessionTool.RUN_SHELL_COMMAND}"
+                    f"{BuiltInTool.RUN_SHELL_COMMAND}"
                     f"(*{PluginLocation.ENTRY_POINT_SCRIPT.name}*)"
                 ),
             ),

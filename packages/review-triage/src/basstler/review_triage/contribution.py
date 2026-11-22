@@ -17,7 +17,7 @@ from basstler.playbook.plugin import (
 )
 from basstler.playbook.skill import Skill
 from basstler.review_triage.command_line import review_triage_app
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, SessionTool
 
 # %% skills
 
@@ -48,9 +48,9 @@ class SetupReviewTriageSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.ASK_USER,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.ASK_USER,
         )
 
 

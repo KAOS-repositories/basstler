@@ -10,7 +10,7 @@ from basstler.class_property import classproperty
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.skill import Skill
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, CloudSessionTool, SessionTool
 
 # %% skills
 
@@ -33,14 +33,14 @@ class UpstreamReviewsSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.RUN_SKILL,
-            SessionTool.ATTACH_REPOSITORY,
-            SessionTool.CREATE_SESSION,
-            SessionTool.READ_SESSION,
-            SessionTool.LIST_SESSION_EVENTS,
-            SessionTool.ARCHIVE_SESSION,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.RUN_SKILL,
+            CloudSessionTool.ATTACH_REPOSITORY,
+            CloudSessionTool.CREATE_SESSION,
+            CloudSessionTool.READ_SESSION,
+            CloudSessionTool.LIST_SESSION_EVENTS,
+            CloudSessionTool.ARCHIVE_SESSION,
         )
 
 

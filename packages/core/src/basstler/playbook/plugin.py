@@ -337,8 +337,7 @@ class PluginFiles:
     @property
     def generated_files(self) -> tuple[GeneratedFile, ...]:
         """
-        The hook registrations, and the instructions of every skill whose body the
-        plugin ships.
+        The hook registrations, and the instructions of every skill the plugin ships.
         """
         missing = self.missing_skills
         return (
@@ -380,10 +379,10 @@ class PluginFiles:
     @property
     def missing_skills(self) -> tuple[Skill, ...]:
         """
-        The declared skills whose directory carries no body.
+        The declared skills whose directory carries no instructions.
         """
         return tuple(
             skill
             for skill in self.skills
-            if not skill.body_path(self.plugin_root).is_file()
+            if not skill.instructions_path(self.plugin_root).is_file()
         )

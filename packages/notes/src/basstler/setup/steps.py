@@ -481,16 +481,18 @@ class PersistentVariables(SetupStep):
 @dataclass(frozen=True)
 class ForkSetupSteps(SetupSteps):
     """
-    The steps the fork a checkout points at, and the checkout's own settings, leave to
+    The steps the fork a repository checkout points at, and its own settings, leave to
     its user; the fork's steps are omitted when no GitHub repository resolves from the
-    checkout's remotes.
+    repository checkout's remotes.
     """
 
-    def steps_for_checkout(self, checkout: RepositoryCheckout) -> tuple[SetupStep, ...]:
+    def steps_for_repository_checkout(
+        self, repository_checkout: RepositoryCheckout
+    ) -> tuple[SetupStep, ...]:
         notes_remote = PersonalNotesSetting.REMOTE.resolve(
-            checkout.working_tree, checkout.environment
+            repository_checkout.working_tree, repository_checkout.environment
         )
-        repository = resolve_repository(checkout.working_tree, notes_remote)
+        repository = resolve_repository(repository_checkout.working_tree, notes_remote)
         steps: list[SetupStep] = []
         if repository is not None:
             steps.extend(
@@ -501,7 +503,9 @@ class ForkSetupSteps(SetupSteps):
                 ]
             )
         steps.append(
-            PersistentVariables.resolve(checkout.working_tree, checkout.environment)
+            PersistentVariables.resolve(
+                repository_checkout.working_tree, repository_checkout.environment
+            )
         )
         return tuple(steps)
 
@@ -717,7 +721,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{'now runs' if changed else 'already runs'} basstler {arguments.branch_or_tag}"
         )
         return 0
-    checklist = SetupChecklist.from_checkout(
+    checklist = SetupChecklist.from_repository_checkout(
         PlaybookFile(project_root).read(), RepositoryCheckout(project_root, os.environ)
     )
     logger.info(checklist.render())

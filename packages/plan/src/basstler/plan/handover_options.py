@@ -7,20 +7,20 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from basstler.locations import PackageLocation
+from basstler.basstler_command import BasstlerCommand
+from basstler.class_property import classproperty
 
 # %% the commands
 
 
-class PlanHandoverCommand(StrEnum):
+class PlanHandoverCommand(BasstlerCommand):
     """
     The ``basstler plan-handover`` command group and its commands, by name.
     """
 
-    GROUP = "plan-handover"
-    """
-    The command group itself.
-    """
+    @classproperty
+    def group(cls) -> str:
+        return "plan-handover"
 
     EXPORT = "export"
     """
@@ -46,13 +46,6 @@ class PlanHandoverCommand(StrEnum):
     """
     Take a handover on.
     """
-
-    @property
-    def invocation(self) -> str:
-        """
-        The command line running this command.
-        """
-        return f"{PackageLocation.DIRECTORY.name} {PlanHandoverCommand.GROUP} {self}"
 
 
 # %% the options

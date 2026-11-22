@@ -10,7 +10,7 @@ from basstler.class_property import classproperty
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.skill import Skill
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, GitHubTool, SessionTool
 
 # %% skills
 
@@ -35,11 +35,11 @@ class StackedPRMaintenanceSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.WRITE_FILE,
-            SessionTool.ASK_USER,
-            SessionTool.UPDATE_PULL_REQUEST,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.WRITE_FILE,
+            BuiltInTool.ASK_USER,
+            GitHubTool.UPDATE_PULL_REQUEST,
         )
 
 

@@ -22,7 +22,7 @@ from basstler.code_modification.actions import (
     NodeReplacement,
 )
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_modification.specification import Specification
 from basstler.code_modification.syntax import CallSyntax
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
@@ -179,7 +179,7 @@ class FixableChecker[SpecificationType: Specification](CodeRuleChecker, ABC):
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         if not self.checks(path):
             return
-        module = PositionedModule(PythonSourceFile(path).parse())
+        module = PositionedModule(EditablePythonSourceFile(path).parse())
         for specification in self.specifications_of_module(module):
             yield CodeRuleViolation(
                 path,
@@ -233,7 +233,9 @@ class SourceFixer:
     The checkers whose fixes are applied.
     """
 
-    def fix_module(self, source_file: PythonSourceFile) -> AppliedAction[libcst.Module]:
+    def fix_module(
+        self, source_file: EditablePythonSourceFile
+    ) -> AppliedAction[libcst.Module]:
         """
         :param source_file: The module to fix, which is left as it is.
         :return: The module with every place the checkers report fixed, and the action

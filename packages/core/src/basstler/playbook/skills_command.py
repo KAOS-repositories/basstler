@@ -40,7 +40,7 @@ class SkillsExitCode(ExitCode):
 
 
 skills_app = App(
-    name=SkillsCommand.GROUP,
+    name=SkillsCommand.group,
     help="Build the Claude Code plugin's files from the playbook.",
 )
 """
@@ -73,7 +73,7 @@ def build(*, check: bool = False) -> SkillsExitCode:
         logger.error(
             "The playbook declares the skill %s, but %s does not exist.",
             skill.skill_name,
-            skill.body_path(plugin.plugin_root),
+            skill.instructions_path(plugin.plugin_root),
         )
         exit_code = SkillsExitCode.CHANGES_NEEDED
     for stale in plugin.stale_files:

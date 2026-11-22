@@ -39,6 +39,6 @@ def test_every_shipped_skill_is_declared_by_a_contribution(plugin):
 
 def test_every_declared_skill_is_shipped(plugin):
     """
-    Every skill a contribution declares has its body in the plugin.
+    Every skill a contribution declares has its instructions in the plugin.
     """
     assert plugin.missing_skills == ()

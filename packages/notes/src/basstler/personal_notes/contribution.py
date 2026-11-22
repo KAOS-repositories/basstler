@@ -15,7 +15,7 @@ from basstler.playbook.plugin import (
     SessionStartHook,
 )
 from basstler.playbook.skill import Skill
-from basstler.session_tool import SessionTool
+from basstler.session_tool import BuiltInTool, GitHubTool, SessionTool
 from basstler.setup.steps import ForkSetupSteps
 
 # %% skills
@@ -46,14 +46,14 @@ class SetupPersonalNotesSkill(Skill):
     @classproperty
     def allowed_tools(cls) -> tuple[SessionTool, ...]:
         return (
-            SessionTool.RUN_SHELL_COMMAND,
-            SessionTool.READ_FILE,
-            SessionTool.WRITE_FILE,
-            SessionTool.ASK_USER,
-            SessionTool.READ_GITHUB_USER,
-            SessionTool.READ_LABEL,
-            SessionTool.LIST_ACTIONS,
-            SessionTool.READ_JOB_LOGS,
+            BuiltInTool.RUN_SHELL_COMMAND,
+            BuiltInTool.READ_FILE,
+            BuiltInTool.WRITE_FILE,
+            BuiltInTool.ASK_USER,
+            GitHubTool.READ_GITHUB_USER,
+            GitHubTool.READ_LABEL,
+            GitHubTool.LIST_ACTIONS,
+            GitHubTool.READ_JOB_LOGS,
         )
 
 

@@ -165,14 +165,14 @@ line on standard error that says why and what to run, and prints no
 `check-setup.sh` report. That exit is not the setup's own status 1. Report the
 line, do once what it says, then run step 5 again.
 
-It refuses a remote GitHub says someone else owns (exit 3) before writing
-anything. It records the remote in git config, creates the notes branch if
-it's missing, seeds a notes file only if it didn't exist yet, records the
-identity, and runs `session-start.sh`, which installs the package's
-dependencies and writes `CLAUDE.local.md`. Then it reports which labels this
-tooling uses are missing from the repository, and ends by printing
-`check-setup.sh`'s report. It exits with that report's status: 0 when
-nothing is left, 1 when something is or could not be verified.
+Before writing anything it refuses (exit 3) a remote someone else owns unless
+it holds a notes branch the user may push to, which they join. It records the
+remote in git config, creates a missing notes branch, seeds notes only if
+none existed, records the identity, and runs `session-start.sh`, which
+installs the package with what it requires and writes `CLAUDE.local.md`. Then it
+reports the labels this tooling uses that the repository lacks, and ends with
+`check-setup.sh`'s report, whose status it exits with: 0 when nothing is left,
+1 when something is or could not be verified.
 Exit 4 means a hook script failed; its own output above says why. Exit 5
 means `check-setup.sh` itself failed, or printed a report missing a check or
 holding a row the package cannot read; the error names its status, the rows
@@ -318,7 +318,14 @@ the lines and the browser steps on exactly as printed, never shortened to one of
 the two; once the user has done them, run the command again: it counts a step
 done when a run that needs it succeeded.
 
-## 9. Confirm, by re-running the check
+## 9. Optional: marking mechanical files viewed
+
+Ask once, with `AskUserQuestion` ("Not now (Recommended)", "Set it up"), whether
+`basstler review-triage` should mark the mechanical files of pull requests they review
+*Viewed*. On "Set it up", follow
+[`setup-review-triage`](../setup-review-triage/SKILL.md) from its step 1.
+
+## 10. Confirm, by re-running the check
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/hooks/check-setup.sh" $ARGUMENTS || true

@@ -27,10 +27,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Every distribution of that branch or tag, at the versions its uv.lock names,
+      # into the interpreter setup-python put on PATH.
       - name: Install basstler
         run: |
           set -euo pipefail
-          pip install "basstler @ git+https://github.com/KAOS-repositories/basstler@${{ inputs.basstler_branch_or_tag }}"
+          python -m pip install uv
+          git clone --quiet --depth 1 --branch "${{ inputs.basstler_branch_or_tag }}" \
+            https://github.com/KAOS-repositories/basstler "${RUNNER_TEMP}/basstler"
+          UV_PROJECT_ENVIRONMENT="$(python -c 'import sys; print(sys.prefix)')" \
+            uv sync --frozen --package basstler --no-dev --no-editable \
+            --project "${RUNNER_TEMP}/basstler"
 
       - name: Answer the request onto its branch
         env:

@@ -1,0 +1,10 @@
+"""
+Imports a module.
+"""
+
+from __future__ import annotations
+
+import os
+from basstler.text_file import TextFile
+
+print(os.name)

@@ -1,0 +1,9 @@
+"""
+Imports a module.
+"""
+
+from __future__ import annotations
+
+import os
+
+print(os.name)

@@ -32,6 +32,9 @@ if [ "$(git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree 2>/dev/null)" !
   exit 78
 fi
 CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
+# Whether Claude Code runs this in a cloud session (basstler.locations.ClaudeCodeVariable.REMOTE),
+# which setup-review-triage's skill reads; unset elsewhere, so it is "false" there.
+CLAUDE_CODE_REMOTE="${CLAUDE_CODE_REMOTE:-false}"
 
 # Every caller also does `git` operations (config, fetch, worktree, branch)
 # that assume they're running inside the project. Move there explicitly instead
@@ -231,6 +234,12 @@ pr_progress_path() {
 # with the same tool that reads it means the two can never disagree.
 PERSONAL_GIT_IDENTITY_PATH=".claude/personal/git-identity"
 
+# CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY: where everyone but the notes repository's
+# owner records their identity, one file per GitHub login, so colleagues sharing a
+# notes branch each author as themselves. Mirrors ProjectLocation in
+# basstler.locations; git_identity_path picks the file that applies.
+CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY=".claude/personal/git-identities"
+
 # format_git_identity: prints a name and email in the one form every message
 # about an identity uses, so the same pair can't be rendered two ways in two
 # different reports.
@@ -278,20 +287,36 @@ repository_local_git_identity() {
 # above: "nothing is recorded yet" and "what is recorded cannot be used" are
 # different answers needing different advice, and a single failing lookup
 # collapses them into one.
+#
+# Both read the file at $1, default git_identity_path's answer.
 recorded_git_identity_exists() {
-  git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${PERSONAL_GIT_IDENTITY_PATH}" 2>/dev/null
+  local identity_path="${1:-$(git_identity_path)}"
+  git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${identity_path}" 2>/dev/null
 }
 
 recorded_git_identity() {
-  recorded_git_identity_exists || return 1
+  local identity_path="${1:-$(git_identity_path)}"
+  recorded_git_identity_exists "${identity_path}" || return 1
   local identity_file name email
   identity_file="$(mktemp)"
-  git show "${PERSONAL_NOTES_REFERENCE}:${PERSONAL_GIT_IDENTITY_PATH}" > "${identity_file}"
+  git show "${PERSONAL_NOTES_REFERENCE}:${identity_path}" > "${identity_file}"
   name="$(git config --file "${identity_file}" --get user.name || true)"
   email="$(git config --file "${identity_file}" --get user.email || true)"
   rm -f "${identity_file}"
   [ -n "${name}" ] && [ -n "${email}" ] || return 1
   printf '%s\t%s\n' "${name}" "${email}"
+}
+
+# git_identity_path: prints where the notes branch records the identity of the
+# account this session works as - PERSONAL_GIT_IDENTITY_PATH for the notes
+# repository's owner, a file below CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY for anyone
+# else (see basstler.personal_notes.git_identity). The owner's path when the
+# package cannot run or GitHub does not say who the session is.
+git_identity_path() {
+  local identity_path
+  identity_path="$("${BASSTLER_PYTHON}" -m "${GIT_IDENTITY_MODULE}" 2>/dev/null)" \
+    || identity_path=""
+  printf '%s\n' "${identity_path:-${PERSONAL_GIT_IDENTITY_PATH}}"
 }
 
 # PLANS_DIR / PLAN_MANIFEST_FILENAME / PLAN_ROADMAP_FILENAME: the one,
@@ -349,12 +374,15 @@ PLAN_SITE_DISPATCH_WORKFLOW_PATH=".github/workflows/plan-site-dispatch.yml"
 # from its repository at the plugin's own release instead (see
 # basstler_package_source below).
 BASSTLER_CHECKOUT=""
-if [ -f "${PLUGIN_ROOT}/../pyproject.toml" ] && [ -d "${PLUGIN_ROOT}/../src/basstler" ]; then
+if [ -f "${PLUGIN_ROOT}/../uv.lock" ] && [ -d "${PLUGIN_ROOT}/../packages" ]; then
   BASSTLER_CHECKOUT="$(cd "${PLUGIN_ROOT}/.." && pwd)"
-  # Exported so every module a caller runs is that checkout's own source,
-  # whichever interpreter runs it, and whatever an install elsewhere would
-  # resolve to.
-  export PYTHONPATH="${BASSTLER_CHECKOUT}/src${PYTHONPATH:+:${PYTHONPATH}}"
+  # Every distribution's source, exported so every module a caller runs is that
+  # checkout's own, whichever interpreter runs it, and whatever an install
+  # elsewhere would resolve to.
+  for BASSTLER_DISTRIBUTION_SOURCE in "${BASSTLER_CHECKOUT}"/packages/*/src; do
+    PYTHONPATH="${BASSTLER_DISTRIBUTION_SOURCE}${PYTHONPATH:+:${PYTHONPATH}}"
+  done
+  export PYTHONPATH
 fi
 # basstler: the package's command tree, which prints the installed version.
 BASSTLER_COMMAND_MODULE="basstler"
@@ -373,9 +401,15 @@ PLAN_SITE_DISPATCH_CHECK_MODULE="basstler.plan_site.dispatch_check"
 # basstler.plan_site.build_start: starts the plan site's build with this session's own
 # GitHub credential, after a push to the notes branch.
 PLAN_SITE_BUILD_START_MODULE="basstler.plan_site.build_start"
+# basstler.plan_site.merge_workflow_refresh: proposes the current merge workflow when the
+# default branch holds an older one, and prints the step left to the user.
+PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE="basstler.plan_site.merge_workflow_refresh"
 # basstler.personal_notes.access: in a cloud session, prints how to attach a notes
 # repository other than the checkout's own when the session cannot reach it.
 NOTES_ACCESS_MODULE="basstler.personal_notes.access"
+# basstler.personal_notes.git_identity: prints where the notes branch records the
+# git identity of the account this session works as.
+GIT_IDENTITY_MODULE="basstler.personal_notes.git_identity"
 # basstler.plan.item_brief: prints one plan item's brief - the plan header, the item,
 # its dependencies' live readiness and the plan's standing rules.
 ITEM_BRIEF_MODULE="basstler.plan.item_brief"
@@ -724,17 +758,22 @@ BASSTLER_INSTALLED_PLUGIN_DIGEST_FILE="${BASSTLER_ENVIRONMENT_DIRECTORY}/basstle
 # requires-python of the package's pyproject.toml, which a test holds this
 # equal to.
 BASSTLER_PYTHON_REQUIREMENT=">=3.12"
-# BASSTLER_INTERPRETER_CANDIDATES: interpreters satisfying that requirement,
-# newest first, tried by name when uv is not there to find or fetch one.
-BASSTLER_INTERPRETER_CANDIDATES="python3.14 python3.13 python3.12"
-# BASSTLER_UV_DIRECTORY: where uv is installed on a machine with neither uv nor
-# any of the candidates - so one whose only interpreter is too old for the
-# package still gets an environment, from an interpreter uv fetches.
+# BASSTLER_PYTHON_VERSIONS: the versions satisfying that requirement, newest
+# first, tried as python3.X on PATH and then through the Windows launcher, py
+# -3.X, when uv is not there to install the package with.
+BASSTLER_PYTHON_VERSIONS="3.14 3.13 3.12"
+# BASSTLER_UV_DIRECTORY: where uv is installed on a machine without one, since
+# only uv installs the workspace from its lock - with a supported interpreter's
+# pip, else the pip on PATH, so even a machine whose only interpreter is too
+# old for the package gets an environment, from an interpreter uv fetches.
 BASSTLER_UV_DIRECTORY="${BASSTLER_HOME}/uv"
 BASSTLER_INSTALLED_UV="${BASSTLER_UV_DIRECTORY}/bin/uv"
 # BASSTLER_REPOSITORY_URL: where an installed plugin's package comes from, at
 # the plugin's own release.
 BASSTLER_REPOSITORY_URL="${BASSTLER_REPOSITORY_URL:-https://github.com/KAOS-repositories/basstler}"
+# BASSTLER_RELEASES_DIRECTORY: a shallow clone of each release an installed
+# plugin's package was installed from, under the release's tag.
+BASSTLER_RELEASES_DIRECTORY="${BASSTLER_HOME}/releases"
 # PLUGIN_MANIFEST: the plugin's manifest. The source tree's names no version;
 # the release workflow writes the release's into the plugin it serves, which is
 # how a plugin and its package are kept one release.
@@ -773,6 +812,38 @@ basstler_package_source() {
   local release
   release="$(plugin_release)" || return 1
   printf 'basstler @ git+%s@%s\n' "${BASSTLER_REPOSITORY_URL}" "${release}"
+}
+
+# basstler_install_command: sets BASSTLER_WORKSPACE to the workspace the
+# package is installed from - the checkout this plugin sits in, else where the
+# plugin's release is cloned - and the array BASSTLER_INSTALL_COMMAND to the
+# sync installing it into the package's environment at the versions its lock
+# names, editable from a checkout. Returns 1 for a plugin outside a checkout
+# that names no release.
+basstler_install_command() {
+  if [ -n "${BASSTLER_CHECKOUT}" ]; then
+    BASSTLER_WORKSPACE="${BASSTLER_CHECKOUT}"
+  else
+    local release
+    release="$(plugin_release)" || return 1
+    BASSTLER_WORKSPACE="${BASSTLER_RELEASES_DIRECTORY}/${release}"
+  fi
+  local uv
+  uv="$(available_uv)" || uv=uv
+  BASSTLER_INSTALL_COMMAND=(env "UV_PROJECT_ENVIRONMENT=${BASSTLER_ENVIRONMENT_DIRECTORY}"
+    "${uv}" sync --frozen --package basstler --no-dev --project "${BASSTLER_WORKSPACE}")
+  [ -n "${BASSTLER_CHECKOUT}" ] || BASSTLER_INSTALL_COMMAND+=(--no-editable)
+}
+
+# clone_basstler_release: clones the plugin's release into BASSTLER_WORKSPACE,
+# outside a checkout and where it is missing, leaving what git said in
+# BASSTLER_INSTALL_OUTPUT and returning its exit status.
+clone_basstler_release() {
+  [ -z "${BASSTLER_CHECKOUT}" ] || return 0
+  [ ! -d "${BASSTLER_WORKSPACE}/.git" ] || return 0
+  mkdir -p "${BASSTLER_RELEASES_DIRECTORY}"
+  BASSTLER_INSTALL_OUTPUT="$(git clone --quiet --depth 1 --branch "$(plugin_release)" \
+    "${BASSTLER_REPOSITORY_URL}" "${BASSTLER_WORKSPACE}" 2>&1)"
 }
 
 # basstler_branch_or_tag: prints the basstler branch or tag a workflow runs to
@@ -1034,8 +1105,9 @@ basstler_package_failure_line() {
       printf 'the plugin at %s names no release in its plugin.json, so there is no basstler package of its release to run - reinstall the plugin from the marketplace\n' \
         "${PLUGIN_ROOT}" ;;
     *)
-      printf 'could not read what the basstler package requires for %s - run: pip --python %s install '"'"'%s'"'"'\n' \
-        "${BASSTLER_PYTHON}" "${BASSTLER_PYTHON}" "$(basstler_package_source)" ;;
+      basstler_install_command
+      printf 'could not read what the basstler package requires for %s - run: %s\n' \
+        "${BASSTLER_PYTHON}" "${BASSTLER_INSTALL_COMMAND[*]}" ;;
   esac
 }
 
@@ -1068,7 +1140,8 @@ require_basstler_python() {
   fi
   if [ -n "${missing}" ]; then
     echo "The basstler package's requirements are not installed for ${BASSTLER_PYTHON}: ${missing}" >&2
-    echo "Start a new session, or run: pip --python ${BASSTLER_PYTHON} install '$(basstler_package_source)'" >&2
+    basstler_install_command
+    echo "Start a new session, or run: ${BASSTLER_INSTALL_COMMAND[*]}" >&2
     exit 1
   fi
 }
@@ -1098,35 +1171,21 @@ compare_plugin_and_package_releases() {
   fi
 }
 
-# create_basstler_environment: creates BASSTLER_ENVIRONMENT_DIRECTORY from an
-# interpreter satisfying BASSTLER_PYTHON_REQUIREMENT, leaving what the creating
-# tool said in BASSTLER_ENVIRONMENT_OUTPUT and returning its exit status.
-#
-# uv first, since it can fetch a supported interpreter where none is
-# installed; then the first of BASSTLER_INTERPRETER_CANDIDATES on PATH; and
-# with neither, uv installed into BASSTLER_UV_DIRECTORY for the purpose.
-# None of them installs pip into the environment:
-# install_basstler_into_environment runs the pip on PATH against it instead.
+# create_basstler_environment: creates BASSTLER_ENVIRONMENT_DIRECTORY with uv
+# from an interpreter satisfying BASSTLER_PYTHON_REQUIREMENT, which uv fetches
+# where none is installed, leaving what was said in BASSTLER_ENVIRONMENT_OUTPUT
+# and returning 1 when it fails. A uv is installed first where there is none.
 create_basstler_environment() {
   mkdir -p "${BASSTLER_ENVIRONMENTS_DIRECTORY}"
   local uv
-  if uv="$(available_uv)"; then
-    create_basstler_environment_with "${uv}"
-    return
+  if ! uv="$(available_uv)"; then
+    if ! install_uv; then
+      BASSTLER_ENVIRONMENT_OUTPUT="no uv on PATH, and uv could not be installed: $(printf '%s' "${BASSTLER_ENVIRONMENT_OUTPUT}" | tail -1)"
+      return 1
+    fi
+    uv="${BASSTLER_INSTALLED_UV}"
   fi
-  local candidate found=0
-  for candidate in ${BASSTLER_INTERPRETER_CANDIDATES}; do
-    command -v "${candidate}" > /dev/null 2>&1 || continue
-    found=1
-    BASSTLER_ENVIRONMENT_OUTPUT="$("${candidate}" -m venv --without-pip \
-      "${BASSTLER_ENVIRONMENT_DIRECTORY}" 2>&1)" && return
-  done
-  [ "${found}" = "0" ] || return 1
-  if ! install_uv; then
-    BASSTLER_ENVIRONMENT_OUTPUT="no uv and none of ${BASSTLER_INTERPRETER_CANDIDATES} on PATH, and uv could not be installed: $(printf '%s' "${BASSTLER_ENVIRONMENT_OUTPUT}" | tail -1)"
-    return 1
-  fi
-  create_basstler_environment_with "${BASSTLER_INSTALLED_UV}"
+  create_basstler_environment_with "${uv}"
 }
 
 # available_uv: prints the uv to create the environment with - the one on PATH,
@@ -1148,39 +1207,49 @@ create_basstler_environment_with() {
     "${BASSTLER_ENVIRONMENT_DIRECTORY}" 2>&1)"
 }
 
-# install_uv: installs uv into BASSTLER_UV_DIRECTORY with the pip on PATH,
-# leaving pip's output in BASSTLER_ENVIRONMENT_OUTPUT. A target directory
-# rather than the interpreter's own packages, so an externally managed
-# interpreter does not refuse it.
+# supported_interpreter: prints the full path of the first interpreter found
+# that satisfies BASSTLER_PYTHON_REQUIREMENT - python3.X on PATH for each of
+# BASSTLER_PYTHON_VERSIONS, then the Windows launcher's py -3.X - and returns 1
+# when there is none.
+supported_interpreter() {
+  local version
+  for version in ${BASSTLER_PYTHON_VERSIONS}; do
+    command -v "python${version}" > /dev/null 2>&1 || continue
+    "python${version}" -c 'import sys; print(sys.executable)' && return
+  done
+  command -v py > /dev/null 2>&1 || return 1
+  for version in ${BASSTLER_PYTHON_VERSIONS}; do
+    py "-${version}" -c 'import sys; print(sys.executable)' 2> /dev/null && return
+  done
+  return 1
+}
+
+# install_uv: installs uv into BASSTLER_UV_DIRECTORY with the pip of
+# supported_interpreter, else with the pip on PATH, leaving pip's output in
+# BASSTLER_ENVIRONMENT_OUTPUT. A target directory rather than the
+# interpreter's own packages, so an externally managed interpreter does not
+# refuse it.
 install_uv() {
-  BASSTLER_ENVIRONMENT_OUTPUT="$(pip install --target \
+  local interpreter pip=(pip)
+  interpreter="$(supported_interpreter)" && pip=("${interpreter}" -m pip)
+  BASSTLER_ENVIRONMENT_OUTPUT="$("${pip[@]}" install --target \
     "${BASSTLER_UV_DIRECTORY}" uv 2>&1)"
 }
 
-# install_basstler_into_environment: installs the package from
-# basstler_package_source into its environment, which brings every declared
-# dependency with it, leaving the installer's own output (both streams) in
-# BASSTLER_INSTALL_OUTPUT and the command it ran in the array
-# BASSTLER_INSTALL_COMMAND, for a caller to report, and returning the
-# installer's exit status. On success, records the source it installed from.
-#
-# A checkout is installed editable, so `import basstler` there is that
-# checkout's own source rather than a second copy of it in site-packages. With
-# uv where there is one, since pip runs its own code inside the environment's
-# interpreter and an older pip breaks on a newer interpreter; otherwise with
-# the pip on PATH.
+# install_basstler_into_environment: runs basstler_install_command's sync,
+# cloning the plugin's release first outside a checkout, leaving the installer's
+# own output (both streams) in BASSTLER_INSTALL_OUTPUT for a caller to report,
+# and returning its exit status. On success, records the source it installed
+# from.
 install_basstler_into_environment() {
-  local source uv
+  local source
   source="$(basstler_package_source)"
-  local requirement=("${source}")
-  [ -n "${BASSTLER_CHECKOUT}" ] && requirement=(--editable "${source}")
-  if uv="$(available_uv)"; then
-    BASSTLER_INSTALL_COMMAND=("${uv}" pip install --python
-      "${BASSTLER_ENVIRONMENT_INTERPRETER}" "${requirement[@]}")
-  else
-    BASSTLER_INSTALL_COMMAND=(pip --python "${BASSTLER_ENVIRONMENT_INTERPRETER}"
-      install "${requirement[@]}")
+  basstler_install_command || return 1
+  if ! available_uv > /dev/null; then
+    BASSTLER_INSTALL_OUTPUT="no uv to install the package's lock with"
+    return 1
   fi
+  clone_basstler_release || return
   BASSTLER_INSTALL_OUTPUT="$("${BASSTLER_INSTALL_COMMAND[@]}" 2>&1)" || return
   printf '%s\n' "${source}" > "${BASSTLER_INSTALLED_SOURCE_FILE}"
   plugin_content_digest > "${BASSTLER_INSTALLED_PLUGIN_DIGEST_FILE}"

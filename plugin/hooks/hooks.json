@@ -27,6 +27,10 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh __main__ session-close stop-hook"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh review_triage.stop_hook"
           }
         ]
       }

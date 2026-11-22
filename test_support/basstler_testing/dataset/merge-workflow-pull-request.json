@@ -1,0 +1,18 @@
+{
+  "number": 7,
+  "title": "Start the plan site build on every merge",
+  "html_url": "https://github.com/a-fork-owner/a-fork/pull/7",
+  "state": "open",
+  "merged_at": null,
+  "head": {
+    "ref": "basstler/plan-site-merge",
+    "sha": "0123456789abcdef0123456789abcdef01234567",
+    "user": {
+      "login": "a-fork-owner"
+    }
+  },
+  "base": {
+    "ref": "main",
+    "sha": "89abcdef0123456789abcdef0123456789abcdef"
+  }
+}

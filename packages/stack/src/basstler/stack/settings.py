@@ -42,6 +42,17 @@ This module's logger, which is also what its command prints through.
 # %% configuration
 
 
+class GitRemoteName(StrEnum):
+    """
+    A remote name git itself gives.
+    """
+
+    ORIGIN = "origin"
+    """
+    The remote a checkout was cloned from.
+    """
+
+
 @dataclass(frozen=True)
 class Remote(HasRepository):
     """
@@ -148,6 +159,7 @@ class RemoteResolution:
         upstream_repository: Repository,
         preferred_upstream_name: str,
         fork_repository: Repository | None = None,
+        notes_repository: Repository | None = None,
     ) -> RemoteResolution:
         """
         Decide which remote is the fork and which is the upstream.
@@ -160,6 +172,8 @@ class RemoteResolution:
         :param preferred_upstream_name: What to call the upstream remote if one must be
             added.
         :param fork_repository: The fork, when configuration names it outright.
+        :param notes_repository: A separate repository holding only notes branches,
+            which is never the fork.
         :return: The resolved remotes.
         :raises ForkRemoteNotFoundError: If no remote points at a fork.
         :raises AmbiguousForkRemoteError: If several do and configuration does not
@@ -175,7 +189,9 @@ class RemoteResolution:
             None,
         )
         candidates = tuple(
-            remote for remote in remotes if remote.repository != upstream_repository
+            remote
+            for remote in remotes
+            if remote.repository not in (upstream_repository, notes_repository)
         )
         return cls(
             fork=cls._select_fork(candidates, fork_repository, upstream_repository),
@@ -213,7 +229,27 @@ class RemoteResolution:
             values[StackSetting.UPSTREAM_REMOTE],
             fork_repository
             or (Repository.parse(configured_fork) if configured_fork else None),
+            cls._separate_notes_repository(CurrentCheckout.remote_urls()),
         )
+
+    @staticmethod
+    def _separate_notes_repository(remote_urls: Mapping[str, str]) -> Repository | None:
+        """
+        :param remote_urls: Remote name to URL, as git reports them.
+        :return: The repository the personal notes live in when it is not the one the
+            checkout was cloned from, ``None`` when they share it or it names none.
+        """
+        notes_remote = (
+            ShellConfigurationFunction.PERSONAL_NOTES_REMOTE.run().stdout.strip()
+        )
+        notes_url = remote_urls.get(notes_remote, notes_remote)
+        if not Repository.names_a_repository(notes_url):
+            return None
+        notes_repository = Repository.from_remote_url(notes_url)
+        cloned_from = remote_urls.get(GitRemoteName.ORIGIN)
+        if cloned_from and Repository.from_remote_url(cloned_from) == notes_repository:
+            return None
+        return notes_repository
 
     @staticmethod
     def _select_fork(

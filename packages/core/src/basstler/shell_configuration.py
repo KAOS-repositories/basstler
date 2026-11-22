@@ -61,6 +61,11 @@ class ShellConfigurationFunction(StrEnum):
     separated by a tab.
     """
 
+    PERSONAL_NOTES_REMOTE = "personal_notes_remote"
+    """
+    Prints the remote name or URL the personal-notes branch lives on.
+    """
+
     PLAN_ID_FOR_BRANCH = "plan_id_for_branch"
     """
     Prints the plan the fetched branch index says tracks the branch it is given, and

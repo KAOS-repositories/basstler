@@ -42,13 +42,10 @@ items:
   pull_request_number: 294
   session: https://claude.ai/code/session_018wfiv84A1KVH7E7j2mNwsU
   depends_on: []
-  notes: A committed App manifest declares read-only metadata, contents, pull requests, checks
-    and statuses, and the events push, pull_request, pull_request_review, pull_request_review_thread,
-    check_suite, status, issue_comment and installation_repositories. One command runs GitHub's
-    manifest flow for any owner, installable only on that owner's account and named uniquely
-    per owner, and writes the key and secrets to the instance's secret store. The App named
-    BasstlerHub is basstler's own, under KAOS-repositories; the name Basstler is registered
-    beside it, unused.
+  notes: >
+    Implemented in draft pull request 294: the new basstler-hub-server distribution holds the
+    committed manifest and the register-app command. Open: the conversion call sends the caller
+    token; an anonymous client may be better.
 - id: service-deploy
   title: The plan service is one container anyone can run, deployed in one command
   track: service

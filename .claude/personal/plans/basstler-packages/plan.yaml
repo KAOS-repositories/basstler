@@ -42,10 +42,10 @@ items:
   recommended_model: opus
   notes: 'Draft PR 290: basstler.playbook in core (PackageContribution per distribution via basstler.contributions,
     Playbook, DefaultPlaybook, root basstler_playbook.py declaring BASSTLER_PLAYBOOK) with kinds CommandGroup,
-    Skill (a class per skill; skills build writes SKILL.md frontmatter above skill-body.md), per-event
+    Skill (a class per skill; skills build rewrites the SKILL.md frontmatter and title above each hand-written body), per-event
     HookDefinition (skills build writes hooks.json), Ruleset and SetupSteps. A kind lands with its first
     instance: McpTool, SitePanel, ItemAttribute, ActionsWorkflow, PostToolUseHook come later. Next: review
-    round 2. release:minor.'
+    round 3. release:minor.'
 - id: krrood-sync
   title: basstler-rules is the rule engine krrood's development tools build on
   track: rules
@@ -60,17 +60,17 @@ items:
     and check/format/agents-md commands another CLI mounts. Its API is semver-stable from
     here. Cite krrood; NOTICE. release:minor.'
 - id: customization-docs
-  title: A README per distribution and a guide to writing your own playbook and ruleset
+  title: A guide to writing your own playbook and ruleset
   track: playbook
   depends_on:
   - playbook-model
+  - feature-docs
   - krrood-sync
   - playbook-setup-wizard
   - item-lifecycle
   status: not started
   recommended_model: haiku
-  notes: 'A README per distribution: what it holds, depends on, and how to install it alone.
-    The guide''s worked example is the owner''s own playbook adding basstler-recommender (work-recommender)
+  notes: 'A page of the feature-docs site. The guide''s worked example is the owner''s own playbook adding basstler-recommender (work-recommender)
     to DefaultPlaybook, with its SitePanel and ItemAttribute components, then dropping a contribution
     and adding a ruleset of code or plan rules. The guide and NOTICE credit the use case LucaKro/basstler_domain_model
     and LucaKro/GitHubWorkflow, which had to copy parts of basstler to add features of its
@@ -217,4 +217,17 @@ items:
     basstler_playbook.py has no effect. skills build in a user's project writes that project's skills
     and hooks from its playbook, so leaving one out takes effect and a project or another package can
     add its own. Agreed in review of PR 290. release:minor.
+
+- id: feature-docs
+  title: A README and a docs page for every basstler feature, easy to read and navigate
+  track: playbook
+  depends_on:
+  - playbook-model
+  status: not started
+  recommended_model: sonnet
+  notes: A README per distribution (what it holds, what it depends on, how to install it alone)
+    and a docs page per feature (what it does, how to use it, how to configure it), all reached
+    from one index with a table of contents on every page. The existing docs/ pages (SETUP, plan-handover,
+    review-triage, stack) become pages of it. Asked in review of PR 290. Docs only, so a patch
+    release.
 landed_item_count: 6

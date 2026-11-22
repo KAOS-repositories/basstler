@@ -1,0 +1,113 @@
+"""
+Reading fetched pull requests into the board the stack is derived from.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from basstler.github.pull_request_description import PullRequestDescription
+from basstler.github.pull_request_record import (
+    CommitChecks,
+    PullRequestField,
+    PullRequestHead,
+    PullRequestRecord,
+)
+from basstler.stack.model import BoardKey, PullRequest
+from basstler.text_file import TextFile
+from basstler.upstream_reviews.action.open_pull_requests import UpstreamPullRequests
+
+# %% the export itself
+
+
+@dataclass(frozen=True)
+class BoardExport:
+    """
+    The fork's open pull requests, in the shape the derived stack is read from.
+    """
+
+    pull_requests: tuple[PullRequest, ...]
+    """
+    The exported pull requests.
+    """
+
+    @classmethod
+    def from_api_records(
+        cls,
+        records: Iterable[PullRequestRecord],
+        upstream_pull_requests: UpstreamPullRequests,
+        checks: CommitChecks,
+    ) -> BoardExport:
+        """
+        Build the export from what the REST API returned.
+
+        :param records: The fork's open pull requests.
+        :param upstream_pull_requests: The upstream pull requests open for the fork's
+            branches.
+        :param checks: Where the verdict over each head's checks is read from.
+        :return: The export.
+        :raises MissingPullRequestFieldError: If any record omits a required field.
+        """
+        return cls(
+            tuple(
+                cls._pull_request(record, upstream_pull_requests, checks)
+                for record in records
+            )
+        )
+
+    @staticmethod
+    def _pull_request(
+        record: PullRequestRecord,
+        upstream_pull_requests: UpstreamPullRequests,
+        checks: CommitChecks,
+    ) -> PullRequest:
+        """
+        Read one fetched pull request into a board entry.
+
+        :param record: The fetched pull request.
+        :param upstream_pull_requests: The upstream pull requests open for the fork's
+            branches.
+        :param checks: Where the verdict over its head's checks is read from.
+        :return: The board entry.
+        :raises MissingPullRequestFieldError: If a required field is absent.
+        """
+        number = int(PullRequestField.NUMBER.read(record))
+        head = PullRequestHead.from_record(record, number)
+        description = PullRequestDescription(
+            str(PullRequestField.BODY.read(record, number) or "")
+        )
+        return PullRequest(
+            number=number,
+            head=head.branch,
+            base=PullRequestField.BASE.read(record, number),
+            draft=bool(PullRequestField.DRAFT.read(record, number)),
+            head_repository=head.repository,
+            labels=PullRequestField.LABELS.read(record, number),
+            check_state=checks.check_state(head.commit),
+            upstream_pull_request=upstream_pull_requests.pull_request_for(head),
+            session=description.session_link,
+            title=PullRequestField.TITLE.read(record, number),
+            description=description.prose,
+            upstream_link=description.upstream_link,
+        )
+
+    def as_json(self) -> str:
+        """:return: The export, in the document :meth:`basstler.stack.model.PullRequest.read_board` parses."""
+        return json.dumps(
+            {BoardKey.PULL_REQUESTS: [asdict(entry) for entry in self.pull_requests]},
+            indent=2,
+        )
+
+    def write(self, path: Path) -> Path:
+        """
+        Write the export where the derived stack is read from.
+
+        :param path: Where to write it.
+        :return: The path written to.
+        """
+        path.parent.mkdir(parents=True, exist_ok=True)
+        TextFile(path).write(self.as_json() + "\n")
+        return path

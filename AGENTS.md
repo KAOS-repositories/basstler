@@ -35,6 +35,7 @@
 - Assert equality to the expected value whenever it can be determined, never only a weaker check such as not-None or not-empty
 - Assert against the definition, not a retyped copy of it: the enum member, the `classproperty`, or the value from the fixture the code under test consumed. Where a type distinguishes the case - a distinct exception class, an enum member - assert the type instead of matching message text. A retyped literal keeps passing when the original changes
 - Each test checks the one behaviour it names and fails only for its own reason: assert exactly the values that behaviour determines, not incidental output such as the wording of an error message the test is not about. Where another test already asserts a value exactly, derive the expected value from the production code that computes it instead of hardcoding a second copy. Tests are independent of each other
+- A test that asserts where something was found, or which inputs match, shows the code itself next to the expectation: assert the source text found, never bare line numbers or positions in a file the reader has to open, and list each input beside whether it should match
 
 ### External services and CI
 <!-- from ExternalServicesAndCIRules in basstler/code_rules/rules/code_quality.py -->
@@ -168,15 +169,23 @@
 
 ## Package and plugin
 <!-- from PackageAndPluginRules in basstler/code_rules/rules/project.py -->
-- Every Python module lives in the `basstler` package under `src/`; the plugin under `plugin/` carries only its `SKILL.md` files, manifest and bash entry points, which call the installed package with `python -m basstler.<module>`
+- Every Python module lives in the `basstler` namespace package, under `packages/<part>/src/` of the distribution that owns its subject, and its tests under that distribution's `packages/<part>/tests/`; helpers the tests of several distributions share live in `test_support/`. The plugin under `plugin/` carries only its `SKILL.md` files, manifest and bash entry points, which call the installed package with `python -m basstler.<module>`
 - Name every file and directory once, in `basstler.locations`; every environment variable once, in `basstler.environment`
-- The package depends only on the libraries `pyproject.toml` lists. Code that comes from `krrood` is copied, never imported; until krrood's light core is released, a copied module says so and cites krrood with `` :cite:`krrood` ``, whose entry is in `docs/references.bib`
-- A package imports only the basstler packages its pyproject lists: every module belongs to a distribution declared in `basstler.package_map`, and imports only from that distribution and the ones it lists (checked by `basstler code-rules check`)
+- Each distribution depends only on the libraries its `pyproject.toml` lists, and `uv.lock` pins what the workspace installs; change a requirement there and run `uv lock`. Code that comes from `krrood` is copied, never imported; until krrood's light core is released, a copied module says so and cites krrood with `` :cite:`krrood` ``, whose entry is in `docs/references.bib`
+- A package imports only the basstler packages its pyproject lists: every module belongs to the distribution whose `packages/<part>` folder holds it, and imports only from that distribution and the ones its `pyproject.toml` lists, which `basstler.package_map` reads into layers (checked by `basstler code-rules check`)
+
+## Portability
+<!-- from PortabilityRules in basstler/code_rules/rules/project.py -->
+- Start bash through `basstler.bash.Bash`, never by its name: Windows resolves a bare `bash` to WSL's launcher instead of Git Bash (checked by `basstler code-rules check`)
+- Read and write text through `basstler.text_file.TextFile`, never with a path's `read_text` and `write_text`: it is always UTF-8, so no caller spells the encoding (checked by `basstler code-rules check`)
+- Read and write text as UTF-8: pass `encoding="utf-8"` to every `read_text`, `write_text`, text-mode `open` and `subprocess` call that decodes its output, never `text=True`. Windows falls back to a code page that cannot encode most of Unicode (checked by `basstler code-rules check`)
+- Remove a directory through `basstler.directory_tree.DirectoryTree`, never with `shutil.rmtree`: Windows refuses to delete the read-only object files git leaves in a clone (checked by `basstler code-rules check`)
 
 ## Agent instructions
 <!-- from AgentInstructionsRules in basstler/code_rules/rules/project.py -->
 - `AGENTS.md` is generated from the sections in `basstler.code_rules.rules`; change a rule there and run `basstler code-rules agents-md`, never edit the file
 - A script that finds code breaking a rule is a `basstler.code_rules.checker.CodeRuleChecker`, set as that rule's `checker`, so the rule and its check are declared together
+- Where every violation of a rule has one correct fix, its checker is a `basstler.code_rules.fixes.FixableChecker`: its `basstler.code_rules.fixes.CodeFix` builds the replacement and declares whether behaviour changes. Give the fix examples as `before.py` and `after.py` in `test_support/basstler_testing/dataset/rule-fixes/<checker class>/<example>/`, which the suite tests, and apply it with `basstler code-rules fix`, never by hand
 
 ## Releases
 <!-- from ReleasesRules in basstler/code_rules/rules/project.py -->

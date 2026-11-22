@@ -56,12 +56,12 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
-  notes: 'basstler.playbook in core: component kinds CommandGroup, SkillDefinition, HookDefinition,
-    McpTool, ActionsWorkflow, Ruleset[RuleKind], SitePanel (hub tab or sidebar), ItemAttribute
-    (typed item fields basstler-plan validates without depending on their owner), and the
-    existing SetupStep, whose SetupChecklist moves to core so each distribution contributes
-    its own steps. PackageContribution via basstler.contributions entry points; Playbook.without/with_components;
-    DefaultPlaybook; a root basstler_playbook. skills build --check. release:minor.'
+  notes: 'Draft PR 290: basstler.playbook in core (PackageContribution per distribution via basstler.contributions,
+    Playbook, DefaultPlaybook, root basstler_playbook.py) with kinds CommandGroup, SkillDefinition, HookDefinition
+    (basstler skills build [--check] writes hooks.json), Ruleset (feeds code-rules) and SetupSteps. Owner''s
+    kickoff call: a kind lands with its first instance and consumer, so McpTool (mcp-server), SitePanel
+    (plan-graph), ItemAttribute (item-lifecycle) and ActionsWorkflow (playbook-setup-wizard) are added
+    there. Next: review. release:minor.'
 - id: krrood-sync
   title: basstler-rules is the rule engine krrood's development tools build on
   track: rules

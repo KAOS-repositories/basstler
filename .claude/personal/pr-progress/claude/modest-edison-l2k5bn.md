@@ -7,6 +7,6 @@
   basstler-packaging; hook warns its settings stay backward-compatible; plan roadmap rule.
 
 ## Next
-- Owner: decide whether basstler-packaging is published; register 13 PyPI trusted
-  publishers and the pypi environment; README thread left open.
+- Owner: register 13 PyPI pending trusted publishers (all free 2026-11-22) and the pypi
+  environment; README thread left open. basstler-packaging is published (decided).
 - CI at 603d29aa not read.

@@ -56,22 +56,6 @@ This module's logger, which is also what its command prints through.
 """
 
 
-NOTES_REMOTE = "origin"
-"""
-The name a scratch repository gives the repository whose notes branch it fetches.
-"""
-
-NOTES_TIP = "FETCH_HEAD"
-"""
-The ref the fetched notes branch is read from.
-"""
-
-PREFETCH_BATCH_SIZE = 200
-"""
-How many file contents one request downloads, few enough for any command line.
-"""
-
-
 class HubCommand(StrEnum):
     """
     The subcommands the hub command runs.
@@ -340,6 +324,28 @@ class NotesBranch(HasRepository):
     Runs git in the scratch repository the branch was fetched into.
     """
 
+    @classproperty
+    def remote(cls) -> str:
+        """
+        The name a scratch repository gives the repository whose notes branch it
+        fetches.
+        """
+        return "origin"
+
+    @classproperty
+    def tip(cls) -> str:
+        """
+        The ref the fetched notes branch is read from.
+        """
+        return "FETCH_HEAD"
+
+    @classproperty
+    def prefetch_batch_size(cls) -> int:
+        """
+        How many file contents one request downloads, few enough for any command line.
+        """
+        return 200
+
     @classmethod
     def fetch(
         cls,
@@ -347,7 +353,6 @@ class NotesBranch(HasRepository):
         branch: str,
         remote_root: str,
         scratch: Path,
-        remote: str = NOTES_REMOTE,
     ) -> NotesBranch | None:
         """
         :param repository: The repository to fetch from.
@@ -355,16 +360,17 @@ class NotesBranch(HasRepository):
         :param remote_root: Where repositories are fetched from, as
             :meth:`Repository.clone_url_under` takes it.
         :param scratch: An empty directory of its own to fetch into.
-        :param remote: The name the scratch repository gives the repository.
         :return: The fetched branch, or ``None`` when it cannot be fetched.
         """
         scratch.mkdir(parents=True, exist_ok=True)
         git = GitCommandRunner(scratch)
         git.run("init", "--quiet")
-        git.run("remote", "add", remote, repository.clone_url_under(remote_root))
+        git.run("remote", "add", cls.remote, repository.clone_url_under(remote_root))
         # The whole history without old file contents dates each plan; checking a file
         # out downloads its content from the remote when it is needed.
-        fetched = git.attempt("fetch", "--quiet", "--filter=blob:none", remote, branch)
+        fetched = git.attempt(
+            "fetch", "--quiet", "--filter=blob:none", cls.remote, branch
+        )
         if not fetched.succeeded:
             logger.warning(
                 f"{repository}: cannot fetch {branch}: {fetched.error_output}; "
@@ -378,7 +384,7 @@ class NotesBranch(HasRepository):
         :param path: A file's path relative to the branch's root.
         :return: The file's content, or ``None`` when the branch has no such file.
         """
-        return self.git.file_at(NOTES_TIP, path)
+        return self.git.file_at(self.tip, path)
 
     def history_of(self, plan_directory_name: str) -> PlanHistory | None:
         """
@@ -388,7 +394,7 @@ class NotesBranch(HasRepository):
         dates = self.git.run(
             "log",
             "--format=%cI",
-            NOTES_TIP,
+            self.tip,
             "--",
             (ProjectLocation.PLANS / plan_directory_name).as_posix(),
         ).splitlines()
@@ -408,11 +414,11 @@ class NotesBranch(HasRepository):
         """
         plans = ProjectLocation.PLANS.as_posix()
         contents = self.git.run(
-            "ls-tree", "-r", "--format=%(objectname)", NOTES_TIP, "--", plans
+            "ls-tree", "-r", "--format=%(objectname)", self.tip, "--", plans
         ).split()
         if contents:
             self.prefetch(contents)
-            checked_out = self.git.attempt("checkout", NOTES_TIP, "--", plans)
+            checked_out = self.git.attempt("checkout", self.tip, "--", plans)
             if not checked_out.succeeded:
                 raise PlansCheckoutFailedError(
                     self.repository, checked_out.error_output
@@ -429,7 +435,7 @@ class NotesBranch(HasRepository):
 
         :param contents: The object ids of the contents.
         """
-        for start in range(0, len(contents), PREFETCH_BATCH_SIZE):
+        for start in range(0, len(contents), self.prefetch_batch_size):
             self.git.attempt(
                 "-c",
                 "fetch.negotiationAlgorithm=noop",
@@ -439,8 +445,8 @@ class NotesBranch(HasRepository):
                 "--no-write-fetch-head",
                 "--recurse-submodules=no",
                 "--filter=blob:none",
-                NOTES_REMOTE,
-                *contents[start : start + PREFETCH_BATCH_SIZE],
+                self.remote,
+                *contents[start : start + self.prefetch_batch_size],
             )
 
 

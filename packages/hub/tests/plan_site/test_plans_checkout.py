@@ -14,8 +14,6 @@ from basstler.plan.model import PlanDocument
 from basstler.plan_site.__main__ import HubSite
 from basstler.plan_site.exceptions import PlansCheckoutFailedError
 from basstler.plan_site.hub import (
-    NOTES_REMOTE,
-    NOTES_TIP,
     NotesBranch,
     PlanHub,
     SiteAddress,
@@ -58,7 +56,7 @@ def cut_off(notes: NotesBranch) -> None:
 
     :param notes: The fetched branch.
     """
-    notes.git.run("remote", "set-url", NOTES_REMOTE, "file:///nowhere/at/all.git")
+    notes.git.run("remote", "set-url", NotesBranch.remote, "file:///nowhere/at/all.git")
 
 
 def test_one_prefetch_downloads_every_plan_file(tmp_path: Path):
@@ -66,7 +64,7 @@ def test_one_prefetch_downloads_every_plan_file(tmp_path: Path):
         tmp_path, {MANIFEST_PATH: PLAN_MANIFEST.read_text(encoding="utf-8")}
     )
     contents = notes.git.run(
-        "ls-tree", "-r", "--format=%(objectname)", NOTES_TIP
+        "ls-tree", "-r", "--format=%(objectname)", NotesBranch.tip
     ).split()
 
     notes.prefetch(contents)

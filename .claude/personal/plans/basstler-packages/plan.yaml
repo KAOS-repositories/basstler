@@ -33,8 +33,11 @@ items:
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split
+  branch: claude/modest-edison-l2k5bn
+  pull_request_number: 289
+  session: https://claude.ai/code/session_018wfiv5YmNkTyyStUL2qdXV
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: sonnet
   notes: After release.yml tags, uv build --all-packages and pypa/gh-action-pypi-publish via
     OIDC (no token); every package every release, TestPyPI first. The owner registers a pending

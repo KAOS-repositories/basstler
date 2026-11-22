@@ -53,11 +53,11 @@ class BasstlerProject:
         return cls._source_repository(Distribution.GITHUB)
 
     @classproperty
-    def default_branch(cls) -> Branch:
+    def default_branch(cls) -> Branch[Repository]:
         """
         The branch of :attr:`repository` that holds what is developed next.
         """
-        return Branch("main")
+        return Branch(cls.repository, "main")
 
     @staticmethod
     @functools.cache

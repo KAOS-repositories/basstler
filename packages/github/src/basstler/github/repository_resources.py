@@ -87,7 +87,7 @@ class RepositoryRead[ResourceType: ValidatedJSONModel](HasRepository, TypeBindin
         :param body: GitHub's answer, served.
         :return: The resource it describes.
         """
-        return self.resource_type.from_json(body)
+        return self.resource_type.from_json(body, self)
 
     def attempt(self, client: GitHubAttemptReader) -> ResourceReading[ResourceType]:
         """

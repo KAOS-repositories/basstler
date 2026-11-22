@@ -135,7 +135,7 @@ class PullRequest:
 
 
 @dataclass(frozen=True)
-class StackBranch(Branch):
+class StackBranch(Branch[Repository]):
     """A stack node derived from a fork pull request plus git state, named after the pull
     request's head."""
 
@@ -202,6 +202,7 @@ class StackBranch(Branch):
         :return: The stack node the pull request describes."""
         skip_reason = pull_request.skip_reason(configuration.fork_repository)
         return cls(
+            repository=configuration.fork_repository,
             name=pull_request.head,
             parent=pull_request.base,
             pull_request_number=pull_request.number,

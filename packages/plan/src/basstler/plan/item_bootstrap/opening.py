@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
+from basstler.git.branch import Branch
 from basstler.environment import GitHubCredentialVariable
 from basstler.github.pull_request import NewPullRequest
 from basstler.github.pull_request_record import (
@@ -19,7 +20,6 @@ from basstler.github.pull_request_record import (
 from basstler.github.repository import (
     GitHubAddress,
     PullRequestReference,
-    RepositoryBranch,
 )
 from basstler.plan.item_bootstrap.documents import PlanDocuments, ProjectCheckout
 from basstler.plan.item_bootstrap.exceptions import (
@@ -242,8 +242,8 @@ class WorkOpener:
             if request.pull_request_number is not None
             else opener.open_pull_request(
                 NewPullRequest(
-                    base=RepositoryBranch(request.base_branch, repository),
-                    head=RepositoryBranch(request.branch, repository),
+                    base=Branch(repository, request.base_branch),
+                    head=Branch(repository, request.branch),
                     title=request.pull_request_title,
                     body=request.pull_request_body,
                 )

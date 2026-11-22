@@ -16,7 +16,8 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubClient, GitHubResponse, GitHubWrite
 from basstler.github.issue import IssueClosing, IssueComment
 from basstler.github.pull_request import NewPullRequest, PullRequestDescription
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.git.branch import Branch
+from basstler.github.repository import Repository
 from basstler.github.repository_access import ListingParameter
 from basstler.locations import PlanHandoverLocation
 from basstler.plan.exceptions import HandoverPullRequestNotChosenError
@@ -140,11 +141,16 @@ class PullRequestHostingClient(GitHubClient):
             "html_url": opening.base.repository.pull_request_url(number),
             "state": "open",
             "body": opening.body,
-            "base": {"sha": commit, "ref": opening.base.name},
+            "base": {
+                "sha": commit,
+                "ref": opening.base.name,
+                "repo": {"full_name": opening.base.repository.full_name},
+            },
             "head": {
                 "sha": commit,
                 "ref": opening.head.name,
                 "user": {"login": opening.head.repository.owner},
+                "repo": {"full_name": opening.head.repository.full_name},
             },
         }
         self.pull_requests.append(pull_request)
@@ -190,7 +196,7 @@ def offer_to_receiver(
             project_root=sender.project_root,
             plan_identifiers=list(plan_identifiers),
         ),
-        base=RepositoryBranch(repository=RECEIVERS_FORK, name="main"),
+        base=Branch(RECEIVERS_FORK, "main"),
         receiver_login=RECEIVERS_FORK.owner,
         git=sender.git,
     )
@@ -258,8 +264,13 @@ def underway_pull_request(
             "sha": commit,
             "ref": item.branch,
             "user": {"login": repository.owner},
+            "repo": {"full_name": repository.full_name},
         },
-        "base": {"sha": commit, "ref": base},
+        "base": {
+            "sha": commit,
+            "ref": base,
+            "repo": {"full_name": repository.full_name},
+        },
     }
 
 
@@ -483,7 +494,7 @@ def test_underway_items_continue_in_pull_requests_on_the_receivers_fork(
         )
         for continuation in continued.continuations
     } == {
-        continuation.original.summary.head.name: continuation.original.summary.head.object_hash
+        continuation.original.summary.head.name: continuation.original.summary.head.commit
         for continuation in continued.continuations
     }
     reopened = {

@@ -7,14 +7,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from basstler.class_property import classproperty
+from basstler.git.repository import GitRepository
 
 # %% the branch
 
 
 @dataclass(frozen=True)
-class Branch:
+class Branch[RepositoryType: GitRepository]:
     """
-    A named branch of a git repository.
+    A named branch of one git repository.
+    """
+
+    repository: RepositoryType
+    """
+    The repository the branch belongs to.
     """
 
     name: str

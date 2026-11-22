@@ -15,6 +15,7 @@ from pydantic import Field
 
 from basstler.git.branch import Branch
 from basstler.git.commands import GitCommandRunner
+from basstler.git.repository import GitRepository
 
 
 class GitHubAddress(StrEnum):
@@ -99,7 +100,7 @@ class MalformedRepositoryError(ValueError):
 
 
 @dataclass(frozen=True)
-class Repository:
+class Repository(GitRepository):
     """
     A GitHub repository, identified the way GitHub itself writes it.
     """
@@ -288,13 +289,31 @@ class Repository:
         """
         return f"{self.url}/blob/{branch.name}/{file_path}"
 
-    def compare_url(self, base: Branch, head: RepositoryBranch) -> str:
+    def compare_url(self, base: Branch[Repository], head: Branch[Repository]) -> str:
         """
-        :param base: The branch of this repository the comparison merges into.
-        :param head: The branch compared against it.
-        :return: The page comparing the two, from which a pull request is opened.
+        :param base: A branch of this repository.
+        :param head: A branch of this repository or of a fork of it.
+        :return: The page comparing *head* with *base*.
         """
-        return f"{self.url}/compare/{base.name}...{head.name_from(self)}"
+        return f"{self.url}/compare/{base.name}...{self.head_name(head)}"
+
+    def head_name(self, head: Branch[Repository]) -> str:
+        """
+        :param head: A branch of this repository or of a fork of it.
+        :return: The branch as a pull request opened on this repository names its
+            head: its name on this repository, else its :meth:`branch_label`.
+        """
+        if head.repository == self:
+            return head.name
+        return head.repository.branch_label(head)
+
+    def branch_label(self, branch: Branch[Repository]) -> str:
+        """
+        :param branch: A branch of this repository.
+        :return: The ``owner:branch`` label naming it among the repository and its
+            forks.
+        """
+        return f"{self.owner}:{branch.name}"
 
     @property
     def new_actions_secret_url(self) -> str:
@@ -474,30 +493,6 @@ class HasRepository:
     """
     The repository it belongs to, which a payload written for it leaves out.
     """
-
-
-@dataclass(frozen=True)
-class RepositoryBranch(HasRepository, Branch):
-    """
-    A branch of one GitHub repository.
-    """
-
-    @property
-    def qualified_name(self) -> str:
-        """
-        The ``owner:branch`` form naming the branch among a repository and its forks.
-        """
-        return f"{self.repository.owner}:{self.name}"
-
-    def name_from(self, repository: Repository) -> str:
-        """
-        :param repository: The repository a pull request from this branch is opened on.
-        :return: The branch as that pull request names its head: :attr:`name` on the
-            same repository, else :attr:`qualified_name`.
-        """
-        if repository == self.repository:
-            return self.name
-        return self.qualified_name
 
 
 @dataclass(frozen=True)

@@ -14,17 +14,15 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
+from basstler.git.branch import Branch
 from basstler.git.commands import GitCommandRunner
+from basstler.git.remote import Remote
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import GitHubClient, GitHubReader
 from basstler.github.issue import Issue, IssueClosing, IssueComment
 from basstler.github.pull_request import NewPullRequest, PullRequestDescription
 from basstler.github.pull_request_changes import RestPullRequest
-from basstler.github.repository import (
-    PullRequestReference,
-    Repository,
-    RepositoryBranch,
-)
+from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.repository_access import PullRequestListState
 from basstler.locations import PlanHandoverLocation
 from basstler.personal_notes.branch import PersonalNotesLocation
@@ -52,7 +50,7 @@ class HandoverPullRequestDescription(TemplatePage):
     The handover the pull request carries.
     """
 
-    handover_branch: RepositoryBranch
+    handover_branch: Branch[Repository]
     """
     The branch carrying it.
     """
@@ -119,7 +117,7 @@ class HandoverOffer:
     The handover offered.
     """
 
-    base: RepositoryBranch
+    base: Branch[Repository]
     """
     The receiver's branch the pull request is opened against.
     """
@@ -147,7 +145,7 @@ class HandoverOffer:
         return "basstler/plan-handover"
 
     @property
-    def handover_branch(self) -> RepositoryBranch:
+    def handover_branch(self) -> Branch[Repository]:
         """
         The sender's branch carrying the handover: one per set of plans, so offering the
         same plans again updates it.
@@ -155,9 +153,9 @@ class HandoverOffer:
         identifiers = sorted(plan.identifier for plan in self.handover.plans)
         digest = hashlib.sha256(" ".join(identifiers).encode()).hexdigest()[:8]
         first = self.handover.plans_in_saving_order[0].identifier
-        return RepositoryBranch(
-            repository=Repository.from_configured_remote(self.git, self.remote),
-            name=f"{self.branch_namespace}/{first}-{digest}",
+        return Branch(
+            Repository.from_configured_remote(self.git, self.remote),
+            f"{self.branch_namespace}/{first}-{digest}",
         )
 
     def commit_handover_onto_base(self) -> str:
@@ -168,7 +166,7 @@ class HandoverOffer:
         :return: The commit.
         """
         base = RemoteBranch(
-            git=self.git, name=self.base.name, remote=self.base.repository.clone_url
+            Remote(self.git, self.base.repository.clone_url), self.base.name
         )
         base.fetch()
         directory = PurePosixPath(PlanHandoverLocation.PULL_REQUEST_DIRECTORY)

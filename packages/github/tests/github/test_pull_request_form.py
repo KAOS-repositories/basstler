@@ -6,8 +6,9 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
+from basstler.git.branch import Branch
 from basstler.github.pull_request_form import PullRequestForm, PullRequestFormParameter
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import Repository
 
 # %% the filled-in form
 
@@ -17,8 +18,8 @@ The repository the form opens a pull request on.
 """
 
 FORM = PullRequestForm(
-    RepositoryBranch("main", REPOSITORY),
-    RepositoryBranch("a-branch", REPOSITORY),
+    Branch(REPOSITORY, "main"),
+    Branch(REPOSITORY, "a-branch"),
     "Add a workflow",
     "It marks files viewed.",
 )
@@ -42,7 +43,7 @@ def test_the_form_compares_the_branch_with_its_base():
 def test_a_branch_on_a_fork_is_compared_under_its_owner():
     fork = Repository("a-forker", REPOSITORY.name)
     form = PullRequestForm(
-        FORM.base, RepositoryBranch(FORM.head.name, fork), FORM.title, FORM.body
+        FORM.base, Branch(fork, FORM.head.name), FORM.title, FORM.body
     )
     assert form.link.url.startswith(f"{REPOSITORY.compare_url(FORM.base, form.head)}?")
 

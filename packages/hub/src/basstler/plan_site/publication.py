@@ -19,18 +19,20 @@ from typing import Annotated
 
 from cyclopts import App, Parameter
 
+from basstler.git.remote_branch import RemoteBranch
+from basstler.git.branch import Branch
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure
 from basstler.git.commands import GitCommandResult, GitCommandRunner
+from basstler.github.login_lending import GitHubLoginLendingRunner
+from basstler.github.remote import GitHubRemote
 from basstler.github.client import (
     GitHubFullClient,
     GitHubRestClient,
     RetryPolicy,
 )
-from basstler.github.login_lending import GitHubLoginLendingRunner
-from basstler.github.remote_branch import GitHubRemoteBranch
-from basstler.github.repository import GitHubAddress, Repository, RepositoryBranch
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository_details import RepositoryDetails, RepositoryDetailsRead
 from basstler.github.run_listing import RunListing
 from basstler.locations import (
     BasstlerVariable,
@@ -229,7 +231,7 @@ class PlanSitePublication:
             "push to the notes branch"
         )
 
-    def notes_branch_of(self, repository: Repository) -> GitHubRemoteBranch:
+    def notes_branch_of(self, repository: Repository) -> RemoteBranch[GitHubRemote]:
         """
         :param repository: A repository the site publishes.
         :return: Its notes branch.
@@ -239,9 +241,11 @@ class PlanSitePublication:
             if repository == self.dispatch_workflow.notes_repository
             else repository.clone_url_under(self.remote_root)
         )
-        return GitHubRemoteBranch(self.dispatch_workflow.notes_branch, self.git, remote)
+        return RemoteBranch(
+            GitHubRemote(self.git, remote), self.dispatch_workflow.notes_branch
+        )
 
-    def default_branch_of(self, remote: str) -> GitHubRemoteBranch:
+    def default_branch_of(self, remote: str) -> RemoteBranch[GitHubRemote]:
         """
         :param remote: A remote, as a remote name or a URL.
         :return: Its default branch, :attr:`initial_branch` when it has none yet.
@@ -251,11 +255,12 @@ class PlanSitePublication:
         match = re.search(
             r"^ref: refs/heads/(?P<branch>\S+)\s+HEAD$", listed, re.MULTILINE
         )
-        return GitHubRemoteBranch(
-            match["branch"] if match else self.initial_branch, self.git, remote
+        return RemoteBranch(
+            GitHubRemote(self.git, remote),
+            match["branch"] if match else self.initial_branch,
         )
 
-    def site_branch(self) -> GitHubRemoteBranch | None:
+    def site_branch(self) -> RemoteBranch[GitHubRemote] | None:
         """
         :return: The site repository's default branch, ``None`` when GitHub has no such
             repository.
@@ -284,7 +289,7 @@ class PlanSitePublication:
         notes_repository = self.dispatch_workflow.notes_repository
         site = self.dispatch_workflow.site
         report = PublicationReport(site.site_url)
-        notes_details = RepositoryDetails.from_json(
+        notes_details = RepositoryDetailsRead(notes_repository).parse(
             self.github.get(notes_repository.api_path)
         )
         site_branch = self.site_branch()
@@ -425,7 +430,7 @@ class PlanSitePublication:
 
     def write(
         self,
-        branch: GitHubRemoteBranch,
+        branch: RemoteBranch[GitHubRemote],
         workflow: PlanSiteWorkflow,
         message: str,
         report: PublicationReport,
@@ -442,10 +447,10 @@ class PlanSitePublication:
         if branch.read_latest(workflow.location) == workflow.text:
             return
         self.write_file(branch, workflow.location.as_posix(), workflow.text, message)
-        report.written.append(f"{workflow.location} on {branch.description}")
+        report.written.append(f"{workflow.location} on {branch.repository.description}")
 
     def write_file(
-        self, branch: GitHubRemoteBranch, path: str, text: str, message: str
+        self, branch: RemoteBranch[GitHubRemote], path: str, text: str, message: str
     ) -> None:
         """
         Commit one file onto a branch and push it.
@@ -460,7 +465,7 @@ class PlanSitePublication:
 
     def rebuild(
         self,
-        branch: GitHubRemoteBranch,
+        branch: RemoteBranch[GitHubRemote],
         parent: str,
         workflow: PlanSiteWorkflow,
         message: str,
@@ -483,7 +488,7 @@ class PlanSitePublication:
                 parent, {workflow.location.as_posix(): workflow.text}, message
             ).push
         )
-        report.written.append(f"{workflow.location} on {branch.description}")
+        report.written.append(f"{workflow.location} on {branch.repository.description}")
 
     def raise_if_refused(self, push: GitCommandResult) -> None:
         """
@@ -568,7 +573,7 @@ class PlanSitePublication:
             answer = self.github.attempt_get(repository.api_path)
             if answer.failure is not None:
                 unreadable[repository] = answer.failure
-            elif RepositoryDetails.from_json(answer.body).is_private:
+            elif RepositoryDetailsRead(repository).parse(answer.body).is_private:
                 private.append(repository)
         if not private and not unreadable:
             return None
@@ -613,8 +618,8 @@ class PlanSitePublication:
             workflow.text
         ):
             return None
-        head = GitHubRemoteBranch(
-            self.merge_workflow_branch, self.git, self.notes_remote
+        head = RemoteBranch(
+            GitHubRemote(self.git, self.notes_remote), self.merge_workflow_branch
         )
         head_tip = head.fetch()
         if default_tip and not (
@@ -624,8 +629,8 @@ class PlanSitePublication:
         else:
             self.write(head, workflow, message, report)
         return MergeWorkflowProposal(
-            RepositoryBranch(default_branch.name, notes_repository),
-            RepositoryBranch(head.name, notes_repository),
+            Branch(notes_repository, default_branch.name),
+            Branch(notes_repository, head.name),
         )
 
     def refresh_merge_workflow(self) -> PendingStep | None:
@@ -643,7 +648,7 @@ class PlanSitePublication:
         installed = default_tip and self.git.file_at(default_tip, workflow.location)
         if not installed:
             return None
-        notes_details = RepositoryDetails.from_json(
+        notes_details = RepositoryDetailsRead(notes_repository).parse(
             self.github.get(notes_repository.api_path)
         )
         proposal = self.write_merge_workflow(
@@ -678,7 +683,7 @@ class PlanSitePublication:
                 text,
                 f"List {notes_repository.full_name} on the plan site",
             )
-            report.written.append(f"{path} on {branch.description}")
+            report.written.append(f"{path} on {branch.repository.description}")
         return hub
 
 
@@ -738,8 +743,9 @@ def clone_publication(
     if notes_repository is None:
         raise NotesRepositoryUnresolvedError(notes_remote)
     git = GitHubLoginLendingRunner(project_root)
-    notes_branch = GitHubRemoteBranch(
-        PersonalNotesSetting.BRANCH.resolve(project_root, os.environ), git, notes_remote
+    notes_branch = RemoteBranch(
+        GitHubRemote(git, notes_remote),
+        PersonalNotesSetting.BRANCH.resolve(project_root, os.environ),
     )
     site = (
         SiteRepository.recorded_on(notes_branch)
@@ -752,7 +758,7 @@ def clone_publication(
         DispatchWorkflow(notes_repository, notes_branch.name, site),
         SiteWorkflow(branch_or_tag, notes_repository),
         GitHubRestClient(retry_policy=PlanSitePublication.github_retry_policy),
-        remote_root=GitHubAddress.clone_root_for(notes_branch.url),
+        remote_root=GitHubAddress.clone_root_for(notes_branch.repository.url),
         in_cloud_session=ClaudeCodeVariable.REMOTE.is_true(),
         mark_viewed_on=Repository.parse(mark_viewed_on) if mark_viewed_on else None,
     )

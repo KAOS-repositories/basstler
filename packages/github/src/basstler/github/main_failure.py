@@ -28,7 +28,7 @@ from basstler.github.issue import (
     IssueState,
     NewIssue,
 )
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.states import CheckOutcome
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.github.workflow_run import RunJobPage, WorkflowRun
@@ -80,14 +80,9 @@ class TestsRunVerdict(StrEnum):
 
 
 @dataclass(frozen=True)
-class FinishedRun:
+class FinishedRun(HasRepository):
     """
     One finished run of the tests on the default branch, with the jobs that failed.
-    """
-
-    repository: Repository
-    """
-    The repository the run tested.
     """
 
     workflow_run: WorkflowRun
@@ -154,15 +149,10 @@ class FinishedRun:
 
 
 @dataclass(frozen=True)
-class MainFailureTracker:
+class MainFailureTracker(HasRepository):
     """
     Keeps exactly one issue open, labelled :attr:`GitHubLabel.MAIN_RED`, while the
     default branch's tests fail.
-    """
-
-    repository: Repository
-    """
-    The repository whose default branch is tested.
     """
 
     title: str = "The tests on main are failing"

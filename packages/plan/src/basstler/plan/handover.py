@@ -313,8 +313,8 @@ class PlanHandover:
 
         :param project_root: The repository whose notes branch holds the plans.
         :param plan_identifiers: The ids of the plans to hand over.
-        :param leaves_out_dependencies: Whether to hand the plans over without the
-            plans they depend on, recording those dependencies as external ones.
+        :param leaves_out_dependencies: Whether to hand the plans over without the plans
+            they depend on, recording those dependencies as external ones.
         :raises UnknownPlanError: If the notes branch has no such plan.
         :return: The handover.
         """

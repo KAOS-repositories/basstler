@@ -25,9 +25,8 @@ from types import ModuleType
 from basstler.directory_tree import DirectoryTree
 from basstler.bash import Bash
 from basstler.git.commands import GitCommandRunner
-from basstler.github.repository import Repository
 from basstler.locations import PackageLocation, PluginLocation
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from .constants.environment import (
@@ -715,41 +714,39 @@ class ScratchRepository:
         )
         DirectoryTree(checkout).remove()
 
-    def serve_origin_as(self, repository: Repository) -> None:
+    def serve_origin_as(self, clone_url: str) -> None:
         """
-        Name ``origin`` by *repository*'s clone URL, which git serves from a bare
-        repository standing in for the project's own remote.
+        Name ``origin`` by *clone_url*, which git serves from a bare repository standing
+        in for the project's own remote.
 
-        :param repository: The repository ``origin`` is to name.
+        :param clone_url: The URL ``origin`` is to name.
         """
         if self.work_remote_path is None:
             self.work_remote_path = initialize_bare_repository(
                 self.project_root.parent / "work-remote.git"
             )
-            self.run_git("remote", "add", "origin", repository.clone_url)
+            self.run_git("remote", "add", "origin", clone_url)
         else:
-            self.run_git("remote", "set-url", "origin", repository.clone_url)
+            self.run_git("remote", "set-url", "origin", clone_url)
         self.run_git(
             "config",
             self.url_rewriting_key(str(self.work_remote_path)),
-            repository.clone_url,
+            clone_url,
         )
 
-    def serve_notes_remote_as(self, repository: Repository) -> None:
+    def serve_notes_remote_as(self, clone_url: str) -> None:
         """
-        Name the notes remote by *repository*'s clone URL, which git serves from this
-        repository's own notes remote.
+        Name the notes remote by *clone_url*, which git serves from this repository's
+        own notes remote.
 
-        :param repository: The repository the notes remote is to name.
+        :param clone_url: The URL the notes remote is to name.
         """
         self.run_git(
             "config",
             self.url_rewriting_key(str(self.notes_remote_path)),
-            repository.clone_url,
+            clone_url,
         )
-        self.run_git(
-            "config", PersonalNotesSetting.REMOTE.git_config_key, repository.clone_url
-        )
+        self.run_git("config", PersonalNotesSetting.REMOTE.git_config_key, clone_url)
 
     @staticmethod
     def url_rewriting_key(replacement: str) -> str:

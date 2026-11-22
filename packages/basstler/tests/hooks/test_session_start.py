@@ -2273,8 +2273,8 @@ def test_links_the_plan_under_the_notes_repository_the_site_lists(
     """
     The site files plans under the notes repository, which need not be the checkout's.
     """
-    session_start_repository.serve_origin_as(SiteRepository.PROJECT.value)
-    session_start_repository.serve_notes_remote_as(SiteRepository.NOTES.value)
+    session_start_repository.serve_origin_as(SiteRepository.PROJECT.value.clone_url)
+    session_start_repository.serve_notes_remote_as(SiteRepository.NOTES.value.clone_url)
 
     result = publish_and_run(
         session_start_repository,

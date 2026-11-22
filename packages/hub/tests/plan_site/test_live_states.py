@@ -32,7 +32,7 @@ from basstler.plan.structure import Item
 
 from basstler_testing.constants.site import SitePlan, SiteSampleText
 from basstler_testing.github.pull_request_api import api_pull_request
-from basstler_testing.plan_site.first_plan import (
+from basstler_testing.plan.first_plan import (
     ELSEWHERE_PULL_REQUEST,
     FIRST_PLAN,
     MERGED_PULL_REQUEST,

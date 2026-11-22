@@ -32,8 +32,8 @@ from basstler.maintenance.upstream_read_route import UpstreamReadRoute
 from basstler.stack.model import PullRequest
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
+from basstler_testing.fork_checkout import ForkCheckout
 from basstler_testing.maintenance.fork import (
-    ForkCheckout,
     a_parent_and_child,
     make_configuration,
     make_own_remote_configuration,

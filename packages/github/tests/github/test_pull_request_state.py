@@ -35,7 +35,10 @@ from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.site import SiteSampleText
 from basstler_testing.constants.stack import StackLabel
 from basstler_testing.github.pull_request_api import api_pull_request, refusal
-from basstler_testing.plan_site.first_plan import MERGED_PULL_REQUEST, OPEN_PULL_REQUEST
+from basstler_testing.github.pull_request_samples import (
+    MERGED_PULL_REQUEST,
+    OPEN_PULL_REQUEST,
+)
 
 # %% item-status and live-state labels
 

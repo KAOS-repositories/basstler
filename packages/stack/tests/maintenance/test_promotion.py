@@ -26,10 +26,12 @@ from basstler.github.pull_request_form import PullRequestFormParameter
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.stack import StackBranch, StackLabel
 from ..stack.dataset import prefilled
-from basstler_testing.maintenance.fork import (
-    ForkCheckout,
+from basstler_testing.fork_checkout import ForkCheckout
+from basstler_testing.github.pull_request_samples import (
     PromotionSampleText,
     StackPullRequestNumber,
+)
+from basstler_testing.maintenance.fork import (
     a_parent_and_child,
     a_stack,
     make_configuration,

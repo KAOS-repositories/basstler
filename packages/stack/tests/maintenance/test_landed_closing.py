@@ -19,14 +19,9 @@ from basstler.maintenance.landed_closing import (
 from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
-from basstler_testing.maintenance.fork import (
-    UPSTREAM_BASE,
-    ForkCheckout,
-    StackPullRequestNumber,
-    a_parent_and_child,
-    a_stack,
-    the_board,
-)
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.github.pull_request_samples import StackPullRequestNumber
+from basstler_testing.maintenance.fork import a_parent_and_child, a_stack, the_board
 from .test_finish_summary import section_of
 from .recorded_fork import (
     AlreadyResolvedPass,

@@ -22,7 +22,7 @@ from basstler.exceptions import (
     UnsafeNotesPathError,
 )
 from basstler.git.commands import GitCommandRunner
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
 from basstler.text_file import TextFile
 

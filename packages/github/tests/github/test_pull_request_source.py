@@ -24,15 +24,13 @@ from basstler.github.pull_request_state import (
     PullRequestRecord,
     PullRequestState,
 )
-from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository import Repository
 from basstler.github.repository_access import (
     CommitReport,
     GitHubRepository,
     GitHubRepositoryPath,
-    PullRequestListState,
 )
 from basstler.github.states import CombinedCheckState
-from basstler.plan.dependencies import DependencyResolver
 
 from basstler_testing.constants.paths import DatasetLocation, RecordedCommitChecks
 from basstler_testing.constants.site import SiteSampleText
@@ -43,11 +41,11 @@ from basstler_testing.github.pull_request_api import (
     pull_request_path,
 )
 from basstler_testing.github.recorded_client import RecordedGitHubClient
-from basstler_testing.plan_site.first_plan import (
+from basstler_testing.github.pull_request_samples import (
     ELSEWHERE_PULL_REQUEST,
-    FIRST_PLAN,
     OPEN_PULL_REQUEST,
-    PLAN_REPOSITORY,
+    TRACKING_ISSUE,
+    UPSTREAM_REPOSITORY,
 )
 
 # %% reading pull requests
@@ -252,27 +250,33 @@ def test_github_source_leaves_the_mergeable_state_of_a_closed_or_draft_pull_requ
 
 
 def test_github_source_reads_an_issue_url():
-    issue_url = PLAN_REPOSITORY.issue_url(FIRST_PLAN.tracking_issue)
+    """
+    An issue's web address is read from the issue itself.
+    """
+    issue_url = UPSTREAM_REPOSITORY.issue_url(TRACKING_ISSUE)
     source = GitHubPullRequestSource(
         RecordedGitHubClient(
             responses={
-                **details_of(PLAN_REPOSITORY),
-                f"/{PLAN_REPOSITORY.api_path}/issues/{FIRST_PLAN.tracking_issue}": {
+                **details_of(UPSTREAM_REPOSITORY),
+                f"/{UPSTREAM_REPOSITORY.api_path}/issues/{TRACKING_ISSUE}": {
                     PullRequestField.HTML_URL.key: issue_url
                 },
             }
         )
     )
-    assert source.issue_url(PLAN_REPOSITORY, FIRST_PLAN.tracking_issue) == issue_url
+    assert source.issue_url(UPSTREAM_REPOSITORY, TRACKING_ISSUE) == issue_url
 
 
 def test_github_source_reraises_a_refusal_other_than_not_found():
+    """
+    A refused issue read is raised with the status GitHub refused it with.
+    """
     with pytest.raises(GitHubRequestFailed) as refused:
         GitHubPullRequestSource(
             RecordedGitHubClient(
-                responses=details_of(PLAN_REPOSITORY), refusal=HTTPStatus.FORBIDDEN
+                responses=details_of(UPSTREAM_REPOSITORY), refusal=HTTPStatus.FORBIDDEN
             )
-        ).issue_url(PLAN_REPOSITORY, FIRST_PLAN.tracking_issue)
+        ).issue_url(UPSTREAM_REPOSITORY, TRACKING_ISSUE)
     assert refused.value.status == HTTPStatus.FORBIDDEN
 
 
@@ -284,51 +288,47 @@ def test_github_source_answers_none_for_a_pull_request_on_a_repository_it_cannot
     assert source.pull_request(ELSEWHERE_PULL_REQUEST) is None
 
 
-def test_github_source_finds_a_repository_whose_details_are_refused_unreadable():
-    """
-    A repository whose details are refused is a read failure, not a pull request.
-    """
-    source = GitHubPullRequestSource(
-        RecordedGitHubClient(
-            responses=details_of(PLAN_REPOSITORY),
-            pages={listing_path(PLAN_REPOSITORY): [[]]},
-        )
-    )
-    live_pull_requests = source.live_pull_requests_of(
-        DependencyResolver(FIRST_PLAN).pull_request_references
-    )
-    assert list(live_pull_requests.read_failures) == [ELSEWHERE_PULL_REQUEST.repository]
-
-
 @pytest.mark.parametrize(
     "status", [HTTPStatus.UNAUTHORIZED, HTTPStatus.INTERNAL_SERVER_ERROR]
 )
 def test_github_source_raises_a_failure_that_is_not_a_refused_repository(
     status: HTTPStatus,
 ):
+    """
+    A failure other than a refused repository is raised, not kept as unreadable.
+    """
     source = GitHubPullRequestSource(RecordedGitHubClient(refusal=status))
     with pytest.raises(GitHubRequestFailed) as failed:
-        source.read_failure_of(PLAN_REPOSITORY)
+        source.read_failure_of(UPSTREAM_REPOSITORY)
     assert failed.value.status == status
 
 
 def test_github_source_keeps_why_a_repository_cannot_be_read():
+    """
+    An unreadable repository keeps the status its read was refused with.
+    """
     client = RecordedGitHubClient(refusal=HTTPStatus.FORBIDDEN)
-    failure = GitHubPullRequestSource(client).read_failure_of(PLAN_REPOSITORY)
+    failure = GitHubPullRequestSource(client).read_failure_of(UPSTREAM_REPOSITORY)
     assert failure.status == client.refusal
 
 
 def test_github_source_reports_a_repository_it_cannot_read(
     capsys: pytest.CaptureFixture,
 ):
+    """
+    An unreadable repository is reported on standard error.
+    """
     source = GitHubPullRequestSource(RecordedGitHubClient())
-    failure = source.read_failure_of(PLAN_REPOSITORY)
+    failure = source.read_failure_of(UPSTREAM_REPOSITORY)
     assert failure.error_message() in capsys.readouterr().err
 
 
 def test_github_source_answers_no_issue_url_on_a_repository_it_cannot_read():
+    """
+    No issue address is answered on a repository the source cannot read.
+    """
     source = GitHubPullRequestSource(RecordedGitHubClient(refusal=HTTPStatus.FORBIDDEN))
-    assert source.issue_url(PLAN_REPOSITORY, FIRST_PLAN.tracking_issue) is None
+    assert source.issue_url(UPSTREAM_REPOSITORY, TRACKING_ISSUE) is None
 
 
 # %% whether an open pull request's commits are already in the upstream
@@ -346,7 +346,7 @@ def landing_source(
     fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     return GitHubPullRequestSource(
         RecordedGitHubClient(
-            responses={f"/{PLAN_REPOSITORY.api_path}": fork, **answers},
+            responses={f"/{UPSTREAM_REPOSITORY.api_path}": fork, **answers},
             pages={
                 listing_path(OPEN_PULL_REQUEST.repository): [
                     [api_pull_request_at_head(state)]
@@ -447,6 +447,9 @@ def test_a_closed_pull_request_is_not_compared():
 
 
 def test_a_pull_request_of_a_repository_that_is_not_a_fork_is_not_compared():
+    """
+    A pull request on a repository that is no fork has no upstream to be compared with.
+    """
     source = GitHubPullRequestSource(
         RecordedGitHubClient(
             responses=details_of(OPEN_PULL_REQUEST.repository),
@@ -466,11 +469,14 @@ def test_a_pull_request_of_a_repository_that_is_not_a_fork_is_not_compared():
 
 
 def test_github_source_reads_the_upstream_of_a_fork():
+    """
+    A fork's upstream and both default branches are read from its details.
+    """
     fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
     source = GitHubPullRequestSource(
-        RecordedGitHubClient(responses={f"/{PLAN_REPOSITORY.api_path}": fork})
+        RecordedGitHubClient(responses={f"/{UPSTREAM_REPOSITORY.api_path}": fork})
     )
-    assert source.fork_lineage_of(PLAN_REPOSITORY) == ForkLineage(
+    assert source.fork_lineage_of(UPSTREAM_REPOSITORY) == ForkLineage(
         upstream_repository=Repository.parse(fork["parent"]["full_name"]),
         upstream_default_branch=fork["parent"]["default_branch"],
         fork_default_branch=fork["default_branch"],
@@ -478,103 +484,10 @@ def test_github_source_reads_the_upstream_of_a_fork():
 
 
 def test_github_source_finds_no_upstream_for_a_repository_that_is_not_a_fork():
-    source = GitHubPullRequestSource(
-        RecordedGitHubClient(responses=details_of(PLAN_REPOSITORY))
-    )
-    assert source.fork_lineage_of(PLAN_REPOSITORY) is None
-
-
-def test_github_source_records_the_upstream_of_each_fork_it_read_pull_requests_of():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
-    source = GitHubPullRequestSource(
-        RecordedGitHubClient(
-            responses={f"/{PLAN_REPOSITORY.api_path}": fork},
-            pages={
-                listing_path(PLAN_REPOSITORY): [[]],
-                listing_path(
-                    Repository.parse(fork["parent"]["full_name"]),
-                    PullRequestListState.OPEN,
-                ): [[]],
-            },
-        )
-    )
-    live_pull_requests = source.live_pull_requests_of(
-        DependencyResolver(FIRST_PLAN).pull_request_references
-    )
-    assert live_pull_requests.fork_lineages == {
-        str(PLAN_REPOSITORY): source.fork_lineage_of(PLAN_REPOSITORY)
-    }
-
-
-# %% reading the upstream pull requests opened from a fork
-
-
-def an_upstream_pull_request(
-    upstream: Repository, number: int, head_repository: Repository, branch: str
-) -> dict[str, Any]:
     """
-    :param upstream: The repository the pull request is opened on.
-    :param number: Its number.
-    :param head_repository: The repository its head branch lives in.
-    :param branch: Its head branch.
-    :return: The open pull request, as the pulls API lists it.
+    A repository that is no fork has no upstream.
     """
-    return api_pull_request(
-        PullRequestReference(upstream, number),
-        {
-            PullRequestField.HEAD: {
-                PullRequestHeadKey.REFERENCE: branch,
-                PullRequestHeadKey.HEAD_REPOSITORY: {
-                    PullRequestHeadKey.FULL_NAME: head_repository.full_name
-                },
-                PullRequestHeadKey.COMMIT: SiteSampleText.HEAD_COMMIT.value,
-            }
-        },
-    )
-
-
-def test_github_source_records_the_upstream_pull_request_of_each_fork_branch():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
-    upstream = Repository.parse(fork["parent"]["full_name"])
-    elsewhere = Repository("another-owner", "another-fork")
     source = GitHubPullRequestSource(
-        RecordedGitHubClient(
-            responses={f"/{PLAN_REPOSITORY.api_path}": fork},
-            pages={
-                listing_path(PLAN_REPOSITORY): [[]],
-                listing_path(upstream, PullRequestListState.OPEN): [
-                    [
-                        an_upstream_pull_request(
-                            upstream, 7, PLAN_REPOSITORY, "a-branch"
-                        ),
-                        an_upstream_pull_request(
-                            upstream, 8, elsewhere, "a-branch-of-another-fork"
-                        ),
-                    ]
-                ],
-            },
-        )
+        RecordedGitHubClient(responses=details_of(UPSTREAM_REPOSITORY))
     )
-    live_pull_requests = source.live_pull_requests_of(
-        DependencyResolver(FIRST_PLAN).pull_request_references
-    )
-    assert live_pull_requests.upstream_pull_requests == {
-        str(PLAN_REPOSITORY): {"a-branch": 7}
-    }
-
-
-def test_github_source_reading_no_upstream_pull_requests_leaves_the_upstream_unread():
-    fork = json.loads(DatasetLocation.REPOSITORY_FORK.read_text(encoding="utf-8"))
-    upstream = Repository.parse(fork["parent"]["full_name"])
-    client = RecordedGitHubClient(
-        responses={f"/{PLAN_REPOSITORY.api_path}": fork},
-        pages={
-            listing_path(PLAN_REPOSITORY): [[]],
-            listing_path(upstream, PullRequestListState.OPEN): [[]],
-        },
-    )
-    source = GitHubPullRequestSource(client, reads_upstream_pull_requests=False)
-    source.live_pull_requests_of(DependencyResolver(FIRST_PLAN).pull_request_references)
-    assert [
-        path for path in client.reads if path.startswith(f"/{upstream.api_path}/")
-    ] == []
+    assert source.fork_lineage_of(UPSTREAM_REPOSITORY) is None

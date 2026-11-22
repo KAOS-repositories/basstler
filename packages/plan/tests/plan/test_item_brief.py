@@ -334,8 +334,8 @@ def test_the_command_leaves_the_upstream_of_a_forked_plan_repository_unread(
 
 def test_the_brief_of_an_item_with_external_dependencies_says_what_to_do_with_them():
     """
-    The session continuing the item is told to decide what to do with the external
-    work, and the records it decides from are the item's own.
+    The session continuing the item is told to decide what to do with the external work,
+    and the records it decides from are the item's own.
     """
     record = ExternalDependency(
         reference="other-plan/some-item",

@@ -48,7 +48,7 @@ from basstler_testing.github.pull_request_api import (
 )
 from basstler_testing.github.recorded_client import RecordedGitHubClient
 from basstler_testing.recorded_pull_requests import RecordedPullRequestSource
-from basstler_testing.plan_site.first_plan import (
+from basstler_testing.plan.first_plan import (
     ELSEWHERE_PULL_REQUEST,
     FIRST_PLAN,
     MERGED_PULL_REQUEST,

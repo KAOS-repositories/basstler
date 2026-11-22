@@ -65,7 +65,8 @@ from basstler.plan_site.workflows import (
     SiteWorkflow,
 )
 from basstler.review_triage.viewed_setup import MarkViewedSetup
-from basstler.setup.steps import PersonalNotesSetting, resolve_repository
+from basstler.setup.steps import resolve_repository
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
 from basstler.upstream_reviews.action.branch import BasstlerSource
 

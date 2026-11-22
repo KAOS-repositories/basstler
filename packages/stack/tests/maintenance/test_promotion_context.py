@@ -28,11 +28,12 @@ from basstler.maintenance.promotion_context import (
 from basstler.stack.promotion_link import PromotionLink
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
-from basstler_testing.maintenance.fork import (
-    UPSTREAM_BASE,
-    ForkCheckout,
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.github.pull_request_samples import (
     PromotionSampleText,
     StackPullRequestNumber,
+)
+from basstler_testing.maintenance.fork import (
     a_board_entry,
     a_parent_and_child,
     a_stack,

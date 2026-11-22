@@ -1,14 +1,10 @@
-## Plan
-- Publishing is its own workflow, `publish.yml`, following the Release run, so the tests that pin `release.yml` stay as they are.
-- Session start: PyPI first, the tag's lock as the fallback; the environment is used only once the package runs.
-- Owner: register the 12 pending trusted publishers and the `testpypi` / `pypi` environments.
+Plan
+- Publish to PyPI only from publish.yml; reusable packaging model in basstler-packaging; install from PyPI with a tag-clone fallback.
 
-## Done
-- Tests first, then `publish.yml`: build once, TestPyPI, then PyPI, OIDC only.
-- LICENSE and NOTICE in every wheel and sdist; NOTICE paths follow `packages/`.
-- Session start installs `basstler==<release>` from PyPI, falling back to the tag clone; one existing test changed with the owner's approval.
-- README and hooks README describe both; PR description and `release:minor` label set.
+Done
+- publish.yml (PyPI only), LICENSE/NOTICE in every distribution, PyPI-first session start.
+- Review round 1 and 2: basstler-packaging (PythonWheel, BuiltRelease, PublishWorkflow, PackageIndex), DistributionFamily in basstler-build, BasstlerFamily in the meta package, TriggerEvent reused, NO_AMBIGUOUS_NAMES rule. Pushed at b3d82143.
 
-## Next
-- Read CI at f14412d8 (Windows included); fix what it names.
-- Owner: the trusted-publisher registrations, then run `publish.yml` by hand for a tag to prove it.
+Next
+- Read CI at b3d82143; the README "by hand" thread is open for the owner.
+- Owner: register 13 pending trusted publishers on PyPI and create the pypi environment, then run publish.yml for a tag.

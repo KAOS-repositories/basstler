@@ -39,13 +39,14 @@ items:
   depends_on: []
   status: in progress
   recommended_model: sonnet
-  notes: >
-    The general part of #214 (moves, triage since a commit, opt-in rules), split out by moving
-    files. report and mark-viewed default to the viewer's last submitted review, else the merge
-    base; --from-merge-base asks for the whole change. Main merged at 74ab12a5 (workspace layout),
-    pushed at 23c6ba00. Next: read CI at 23c6ba00, then restack the pull requests above it
-    (maintenance restack fails on a git checkout error). Exempt from the basstler-packages freeze on
-    github.
+  notes: 'The general part of #214 (moves, triage since a commit, opt-in rules), split out
+    by moving files. report and mark-viewed default to the viewer''s last submitted review,
+    else the merge base; --from-merge-base asks for the whole change. Main merged at 74ab12a5
+    (workspace layout), pushed at 23c6ba00. Next: read CI at 23c6ba00, then restack the pull
+    requests above it (maintenance restack fails on a git checkout error). Exempt from the
+    basstler-packages freeze on github.
+
+    '
 - id: generated-file-triage
   title: Prove a generated file mechanical by regenerating it
   track: triage
@@ -111,9 +112,8 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
-  notes: 'Draft #262 on #226. mark-viewed-in-reviews starts from LastReviewStart, which
-    viewed-state-start removes; when restacked onto that item, it moves onto the viewed-state
-    start.'
+  notes: 'Draft #262 on #226. mark-viewed-in-reviews starts from LastReviewStart, which viewed-state-start
+    removes; when restacked onto that item, it moves onto the viewed-state start.'
 - id: repository-field-once
   title: Declare the repository field once in every GitHub model
   branch: null
@@ -126,24 +126,6 @@ items:
     onto HasRepository.
 
     '
-- id: branch-owns-its-repository
-  title: Make every branch hold the repository it belongs to
-  branch: claude/ecstatic-carson-fs34i3
-  track: triage
-  pull_request_number: 257
-  session: https://claude.ai/code/session_01JxHGiNcmkURK6bxmkkdhe5
-  notes: 'Implemented on draft #257, based on main (#215 landed; main''s merge in at 7da2b1cf),
-    with repository-field-once folded in: models on HasRepository, Branch[RepositoryType]
-    with GitRepository and Remote, RepositoryBranch merged, one WireForm per payload form,
-    GraphQL PullRequest holding PullRequestReference. Open for the user: merging the stack
-    settings'' Remote with GitHubRemote, and REST pull request models still carrying a bare
-    number.
-
-    '
-  depends_on: []
-  status: in progress
-  recommended_model: opus
-
 - id: pyrefly-receiver-fallback
   title: Answer receivers the triage's inference leaves open with Pyrefly
   track: triage
@@ -153,10 +135,9 @@ items:
   - experiments/receiver-inference-experiment
   status: in progress
   recommended_model: opus
-  notes: 'Draft #240 at 1b6fb9f6, stacked on #238 (experiments/receiver-inference-experiment) on
-    #214. Pins pyrefly==1.4.1; reveals receivers once per pull request; --no-type-checker. Conflicts
-    with its base (needs-resolution), CI not read. Next: restack onto #238.'
-
+  notes: 'Draft #240 at 1b6fb9f6, stacked on #238 (experiments/receiver-inference-experiment)
+    on #214. Pins pyrefly==1.4.1; reveals receivers once per pull request; --no-type-checker.
+    Conflicts with its base (needs-resolution), CI not read. Next: restack onto #238.'
 - id: viewed-state-start
   title: Start each file's triage from where its reviewer last viewed it
   branch: null
@@ -166,9 +147,10 @@ items:
   status: not started
   recommended_model: opus
   notes: 'Stacked on #266 (untracked). Replaces LastReviewStart, which a Claude thread reply
-    under the user reset to head on #223. One paged GraphQL snapshot reads headRefOid and each
-    file''s viewerViewedState: VIEWED skipped, UNVIEWED from the merge base, DISMISSED from the
-    latest checkpoint head where it was VIEWED, else the merge base. Each run stores a checkpoint
-    (head, VIEWED files) on personal notes when reachable, else the local cache. Marking stops
-    if headRefOid moved. --since and --from-merge-base stay. #223 moves these paths.'
-landed_item_count: 5
+    under the user reset to head on #223. One paged GraphQL snapshot reads headRefOid and
+    each file''s viewerViewedState: VIEWED skipped, UNVIEWED from the merge base, DISMISSED
+    from the latest checkpoint head where it was VIEWED, else the merge base. Each run stores
+    a checkpoint (head, VIEWED files) on personal notes when reachable, else the local cache.
+    Marking stops if headRefOid moved. --since and --from-merge-base stay. #223 moves these
+    paths.'
+landed_item_count: 6

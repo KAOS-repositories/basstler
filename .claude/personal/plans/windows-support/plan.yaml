@@ -29,33 +29,17 @@ items:
     here.
 
     '
-
 - id: direct-setup-command-on-windows
-  title: python -m basstler.setup.personal_notes runs on Windows outside a session, as the README documents
+  title: python -m basstler.setup.personal_notes runs on Windows outside a session, as the
+    README documents
   status: not started
   recommended_model: sonnet
   track: fixes
   depends_on: []
   notes: 'Found 2026-11-22 from PowerShell with the environment''s python.exe: it raised PluginRootUnsetError
     (the README''s command names no plugin root), and once BASSTLER_PLUGIN_ROOT was set, check-setup.sh
-    exited 78 with ''is not inside a git work tree'' because it handed the Windows interpreter the POSIX
-    path /c/Users/... under MSYS_NO_PATHCONV=1. Locate the plugin root without a session, and pass Windows
-    paths to the Windows interpreter. A Windows CI case runs the command.'
-
-- id: plan-site-lazy-checkout
-  title: The plan site checks out every plan of a notes branch, or names the repository whose plans it
-    could not read
-  status: in progress
-  recommended_model: sonnet
-  track: fixes
-  branch: fix/plan-site-lazy-checkout
-  pull_request_number: 293
-  session: local Claude Code desktop session eed21a6d-f295-4bc6-bb9a-30b118885ca9
-  depends_on: []
-  notes: 'Found 2026-11-22 building the site locally on Windows (git 2.55): NotesBranch.fetch fetches
-    with --filter=blob:none, and check_out_plans'' git checkout then downloads each blob in its own lazy
-    fetch; some of them failed (''unable to read sha1 file''), and the checkout''s failure is discarded
-    (git.attempt), so every repository published 0 plans with no warning. Fetching the plans'' blob ids
-    in one ''git fetch origin --filter=blob:none --stdin'' before the checkout fixed it. Prefetch in one
-    request, and report a failed checkout on the repository''s card instead of dropping its plans silently.'
-landed_item_count: 1
+    exited 78 with ''is not inside a git work tree'' because it handed the Windows interpreter
+    the POSIX path /c/Users/... under MSYS_NO_PATHCONV=1. Locate the plugin root without a
+    session, and pass Windows paths to the Windows interpreter. A Windows CI case runs the
+    command.'
+landed_item_count: 2

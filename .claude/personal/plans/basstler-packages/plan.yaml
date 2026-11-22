@@ -30,21 +30,6 @@ tracks:
   name: Code rules from krrood
   wave: extensibility
 items:
-- id: pypi-release
-  title: Publish every distribution to PyPI on each release with trusted publishing
-  track: package-split
-  branch: claude/modest-edison-l2k5bn
-  pull_request_number: 289
-  session: https://claude.ai/code/session_018wfiv5YmNkTyyStUL2qdXV
-  depends_on: []
-  status: in progress
-  recommended_model: sonnet
-  notes: >
-    publish.yml builds every distribution once and publishes each in its own job and GitHub
-    environment pypi-<distribution> via OIDC, since PyPI allows one pending publisher per
-    environment; the owner registers one per name. Session start installs basstler from PyPI,
-    falling back to the tag's clone. release:minor. basstler-build is the hook and its
-    DistributionFamily; basstler-packaging models the release, published but used by tests only.
 - id: playbook-model
   title: A Playbook dataclass model that every distribution contributes commands, skills,
     hooks and rules to
@@ -55,12 +40,13 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
-  notes: 'Draft PR 290: basstler.playbook in core (PackageContribution per distribution via basstler.contributions,
-    Playbook, DefaultPlaybook, root basstler_playbook.py) with kinds CommandGroup, SkillDefinition, HookDefinition
-    (basstler skills build [--check] writes hooks.json), Ruleset (feeds code-rules) and SetupSteps. Owner''s
-    kickoff call: a kind lands with its first instance and consumer, so McpTool (mcp-server), SitePanel
-    (plan-graph), ItemAttribute (item-lifecycle) and ActionsWorkflow (playbook-setup-wizard) are added
-    there. Next: review. release:minor.'
+  notes: 'Draft PR 290: basstler.playbook in core (PackageContribution per distribution via
+    basstler.contributions, Playbook, DefaultPlaybook, root basstler_playbook.py) with kinds
+    CommandGroup, SkillDefinition, HookDefinition (basstler skills build [--check] writes
+    hooks.json), Ruleset (feeds code-rules) and SetupSteps. Owner''s kickoff call: a kind
+    lands with its first instance and consumer, so McpTool (mcp-server), SitePanel (plan-graph),
+    ItemAttribute (item-lifecycle) and ActionsWorkflow (playbook-setup-wizard) are added there.
+    Next: review. release:minor.'
 - id: krrood-sync
   title: basstler-rules is the rule engine krrood's development tools build on
   track: rules
@@ -80,7 +66,6 @@ items:
   depends_on:
   - playbook-model
   - krrood-sync
-  - pypi-release
   - playbook-setup-wizard
   - item-lifecycle
   status: not started
@@ -162,23 +147,6 @@ items:
     writes the repository''s basstler_playbook and verifies every step. Never changes repository
     settings: detects issues, Discussions, Actions or branch auto-delete being off and gives
     the link to turn them on. Builds on basstler-setup-ux''s checklist. release:minor.'
-- id: third-party-imports
-  title: A distribution imports only the third-party libraries its own pyproject requires
-  track: package-split
-  branch: claude/dreamy-feynman-aoud9x
-  pull_request_number: 288
-  session: https://claude.ai/code/session_018wfiv8YLuqCdED6dhazFdi
-  depends_on: []
-  status: in progress
-  recommended_model: sonnet
-  notes: 'Extends PackageBoundaryChecker from basstler imports to third-party ones, as krrood''s
-    CoreBoundary does (#546): map each imported top-level package to its distributions with
-    importlib.metadata.packages_distributions(), and allow the distribution''s own requirements
-    plus the closure of what they require, without extras. Needs each distribution''s own
-    pyproject.toml, so it follows uv-workspace. A crossing is reported by the same code-rules
-    check and CI comparison with the base. release:minor.
-
-    '
 - id: pull-request-record-model
   title: Parse a pull request's REST record into a ValidatedJSONModel
   track: package-split
@@ -220,19 +188,19 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
-
 - id: workflow-model
-  title: "One validated model of a GitHub Actions workflow"
+  title: One validated model of a GitHub Actions workflow
   branch: null
   track: package-split
-  notes: >
-    Three parsers of a GitHub Actions workflow exist: basstler.github.workflows (Workflow, Job,
-    Trigger; used by the actions budget), basstler_testing.workflow_definition.Workflow (tests) and
-    basstler.packaging.publish_workflow.PublishWorkflow. Replace them with one ValidatedJSONModel
-    model in basstler-github, reusing TriggerEvent and ActivityType; the budget code moves onto it
-    with its tests unchanged, and PublishWorkflow keeps only the publishing checks.
-  depends_on:
-    - pypi-release
+  notes: 'Three parsers of a GitHub Actions workflow exist: basstler.github.workflows (Workflow,
+    Job, Trigger; used by the actions budget), basstler_testing.workflow_definition.Workflow
+    (tests) and basstler.packaging.publish_workflow.PublishWorkflow. Replace them with one
+    ValidatedJSONModel model in basstler-github, reusing TriggerEvent and ActivityType; the
+    budget code moves onto it with its tests unchanged, and PublishWorkflow keeps only the
+    publishing checks.
+
+    '
+  depends_on: []
   status: not started
   recommended_model: opus
-landed_item_count: 4
+landed_item_count: 6

@@ -40,12 +40,11 @@ items:
   status: in progress
   recommended_model: sonnet
   notes: >
-    publish.yml builds with uv build --all-packages and publishes to PyPI only via OIDC from the
-    pypi environment; the owner registers a pending trusted publisher per name. Session start
-    installs basstler==<plugin release> from PyPI, falling back to the tag's clone; pip works
-    without uv. release:minor. basstler-build is the hook and its DistributionFamily;
-    basstler-packaging models the release and publish workflow, for tests only, and the meta
-    package depends on neither.
+    publish.yml builds every distribution once and publishes each in its own job and GitHub
+    environment pypi-<distribution> via OIDC, since PyPI allows one pending publisher per
+    environment; the owner registers one per name. Session start installs basstler from PyPI,
+    falling back to the tag's clone. release:minor. basstler-build is the hook and its
+    DistributionFamily; basstler-packaging models the release, published but used by tests only.
 - id: playbook-model
   title: A Playbook dataclass model that every distribution contributes commands, skills,
     hooks and rules to

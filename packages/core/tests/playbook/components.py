@@ -47,7 +47,7 @@ class EarlierContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return (LabelledComponent("earlier"), OtherKindComponent("earlier"))
 
 
@@ -57,7 +57,7 @@ class LaterContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return (LabelledComponent("later"),)
 
 

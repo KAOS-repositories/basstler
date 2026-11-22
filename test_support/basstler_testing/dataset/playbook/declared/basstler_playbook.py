@@ -7,7 +7,7 @@ from __future__ import annotations
 from basstler.playbook.core_contribution import CoreContribution
 from basstler.playbook.playbook import Playbook
 
-playbook = Playbook(CoreContribution.components)
+BASSTLER_PLAYBOOK = Playbook(CoreContribution.playbook_components)
 """
 The playbook the project runs basstler with.
 """

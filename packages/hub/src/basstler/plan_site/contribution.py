@@ -11,7 +11,7 @@ from basstler.github.repository_attachment import SessionTool
 from basstler.locations import PluginLocation
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
-from basstler.playbook.plugin import HookDefinition, HookEvent, PackageModuleCommand
+from basstler.playbook.plugin import PackageModuleCommand, PreToolUseHook
 
 
 class HubContribution(PackageContribution):
@@ -20,15 +20,13 @@ class HubContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return (
-            HookDefinition(
-                HookEvent.PRE_TOOL_USE,
+            PreToolUseHook(
                 PackageModuleCommand(basstler.plan_site.attach_approval),
                 matcher=SessionTool.ATTACH_REPOSITORY,
             ),
-            HookDefinition(
-                HookEvent.PRE_TOOL_USE,
+            PreToolUseHook(
                 PackageModuleCommand(basstler.plan_site.entry_point_approval),
                 matcher=SessionTool.RUN_SHELL_COMMAND,
                 condition=(

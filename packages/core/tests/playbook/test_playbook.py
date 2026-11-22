@@ -53,7 +53,7 @@ def test_without_leaves_out_only_the_components_given():
     """
     Leaving one component out keeps every other one.
     """
-    assert Playbook((FIRST, SECOND)).without(FIRST) == Playbook((SECOND,))
+    assert Playbook((FIRST, SECOND)).without_components(FIRST) == Playbook((SECOND,))
 
 
 def test_without_refuses_a_component_the_playbook_does_not_hold():
@@ -61,7 +61,7 @@ def test_without_refuses_a_component_the_playbook_does_not_hold():
     Leaving out a component the playbook lacks is a mistake, not a no-op.
     """
     with pytest.raises(ComponentNotInPlaybook):
-        Playbook((FIRST,)).without(SECOND)
+        Playbook((FIRST,)).without_components(SECOND)
 
 
 def test_components_of_lists_only_that_kind_in_order():
@@ -111,7 +111,10 @@ def test_installed_contributions_come_in_entry_point_name_order():
     """
     Contributions are ordered by entry point name, not registration order.
     """
-    assert PackageContribution.installed() == (EarlierContribution, LaterContribution)
+    assert PackageContribution.installed_package_contributions() == (
+        EarlierContribution,
+        LaterContribution,
+    )
 
 
 @pytest.mark.usefixtures("two_registered_contributions")
@@ -120,16 +123,16 @@ def test_the_default_playbook_holds_every_installed_contribution_in_order():
     The default playbook is every installed contribution's components, in order.
     """
     assert DefaultPlaybook().components == (
-        *EarlierContribution.components,
-        *LaterContribution.components,
+        *EarlierContribution.playbook_components,
+        *LaterContribution.playbook_components,
     )
 
 
 def test_the_installed_contributions_include_the_core_one():
     """
-    basstler-core registers its own contribution.
+    Basstler-core registers its own contribution.
     """
-    assert CoreContribution in PackageContribution.installed()
+    assert CoreContribution in PackageContribution.installed_package_contributions()
 
 
 # %% a project's own playbook
@@ -148,7 +151,7 @@ def test_a_project_runs_the_playbook_its_module_declares():
     A project's playbook module decides the playbook.
     """
     assert PlaybookFile(PlaybookSnippet.DECLARED).read() == Playbook(
-        CoreContribution.components
+        CoreContribution.playbook_components
     )
 
 

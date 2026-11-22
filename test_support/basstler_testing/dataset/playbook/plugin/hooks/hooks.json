@@ -4,22 +4,22 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
+            "type": "command"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
         "hooks": [
           {
-            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh playbook.skills_command",
             "if": "Bash(*basstler.sh*)",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh playbook.skills_command"
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": "Bash"
       }
     ]
   }

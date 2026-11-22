@@ -20,5 +20,5 @@ class RulesContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return (CommandGroup(code_rules_app), CodeRuleset(RuleModule(rules)))

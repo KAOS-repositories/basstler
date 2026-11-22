@@ -26,19 +26,9 @@ from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ClaudeCodeVariable
 from basstler.personal_notes.access import NotesRepositoryAccess
 from basstler.plan_site.build_start import recorded_site
+from basstler.playbook.plugin import HookEvent
 
 # %% what Claude Code sends and expects
-
-
-class HookEvent(StrEnum):
-    """
-    The Claude Code events a hook answers.
-    """
-
-    PRE_TOOL_USE = "PreToolUse"
-    """
-    Before a tool runs.
-    """
 
 
 class PermissionDecision(StrEnum):

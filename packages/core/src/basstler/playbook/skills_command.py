@@ -13,6 +13,7 @@ from basstler.exit_codes import ExitCode
 from basstler.locations import BasstlerRepositoryLocation, PackageLocation
 from basstler.playbook.playbook import PlaybookFile
 from basstler.playbook.plugin import PluginFiles
+from basstler.plugin_root import PluginRoot
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -80,8 +81,8 @@ def build(*, check: bool = False) -> SkillsExitCode:
         nothing.
     """
     project_root = Path.cwd()
-    plugin = PluginFiles.for_playbook(
-        project_root / BasstlerRepositoryLocation.PLUGIN,
+    plugin = PluginFiles.from_playbook(
+        PluginRoot(project_root / BasstlerRepositoryLocation.PLUGIN),
         PlaybookFile(project_root).read(),
     )
     exit_code = SkillsExitCode.SUCCESS

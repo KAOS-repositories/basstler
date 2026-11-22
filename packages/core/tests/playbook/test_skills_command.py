@@ -15,6 +15,7 @@ from basstler.locations import (
     ProjectLocation,
 )
 from basstler.playbook.plugin import PluginFiles
+from basstler.plugin_root import PluginRoot
 from basstler.playbook.playbook import Playbook
 from basstler.playbook.skills_command import SkillsExitCode, build
 from basstler.text_file import TextFile
@@ -65,13 +66,15 @@ def test_a_build_writes_the_playbooks_registrations(project_with_empty_playbook)
     """
     A build writes the registrations of the project's own playbook.
     """
-    plugin_root = project_with_empty_playbook / BasstlerRepositoryLocation.PLUGIN
+    plugin_root = PluginRoot(
+        project_with_empty_playbook / BasstlerRepositoryLocation.PLUGIN
+    )
 
     build()
 
     assert (
         registrations_of(project_with_empty_playbook)
-        == PluginFiles.for_playbook(plugin_root, Playbook(())).hook_registrations
+        == PluginFiles.from_playbook(plugin_root, Playbook(())).hook_registrations.text
     )
 
 

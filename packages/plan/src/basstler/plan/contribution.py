@@ -57,7 +57,7 @@ class PlanContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return (
             CommandGroup(plan_handover_app),
             CommandGroup(repository_rules_app),

@@ -29,5 +29,5 @@ class StackContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return tuple(SkillDefinition(skill) for skill in StackSkill)

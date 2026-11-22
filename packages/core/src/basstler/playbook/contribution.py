@@ -35,13 +35,13 @@ class PackageContribution(ABC):
 
     @classproperty
     @abstractmethod
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         """
         The distribution's components, in the order a playbook lists them.
         """
 
     @classmethod
-    def installed(cls) -> tuple[type[PackageContribution], ...]:
+    def installed_package_contributions(cls) -> tuple[type[PackageContribution], ...]:
         """
         :return: Every contribution an installed distribution registers under
             :attr:`ContributionEntryPointGroup.CONTRIBUTIONS`, in the order of their
@@ -53,13 +53,13 @@ class PackageContribution(ABC):
         )
 
     @classmethod
-    def installed_components(cls) -> tuple[PlaybookComponent, ...]:
+    def installed_playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         """
-        :return: The components of every contribution in :meth:`installed`, in that
+        :return: The components of every contribution in :meth:`installed_package_contributions`, in that
             order.
         """
         return tuple(
             component
-            for contribution in cls.installed()
-            for component in contribution.components
+            for contribution in cls.installed_package_contributions()
+            for component in contribution.playbook_components
         )

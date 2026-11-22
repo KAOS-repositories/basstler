@@ -11,9 +11,8 @@ from basstler.locations import PluginLocation
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.plugin import (
-    HookDefinition,
-    HookEvent,
     PluginScriptCommand,
+    SessionStartHook,
     SkillDefinition,
 )
 from basstler.setup.steps import ForkSetupSteps
@@ -37,12 +36,9 @@ class NotesContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return (
             *(SkillDefinition(skill) for skill in NotesSkill),
-            HookDefinition(
-                HookEvent.SESSION_START,
-                PluginScriptCommand(PluginLocation.SESSION_START_SCRIPT),
-            ),
+            SessionStartHook(PluginScriptCommand(PluginLocation.SESSION_START_SCRIPT)),
             ForkSetupSteps(),
         )

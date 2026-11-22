@@ -12,10 +12,9 @@ from basstler.playbook.command_group import CommandGroup
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.plugin import (
-    HookDefinition,
-    HookEvent,
     PackageModuleCommand,
     SkillDefinition,
+    StopHook,
 )
 from basstler.review_triage.command_line import review_triage_app
 
@@ -38,11 +37,9 @@ class ReviewTriageContribution(PackageContribution):
     """
 
     @classproperty
-    def components(cls) -> tuple[PlaybookComponent, ...]:
+    def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
         return (
             CommandGroup(review_triage_app),
             *(SkillDefinition(skill) for skill in ReviewTriageSkill),
-            HookDefinition(
-                HookEvent.STOP, PackageModuleCommand(basstler.review_triage.stop_hook)
-            ),
+            StopHook(PackageModuleCommand(basstler.review_triage.stop_hook)),
         )

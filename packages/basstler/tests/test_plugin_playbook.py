@@ -9,6 +9,7 @@ from basstler_testing.constants.paths import RepositoryLocation
 
 from basstler.playbook.playbook import DefaultPlaybook
 from basstler.playbook.plugin import PluginFiles
+from basstler.plugin_root import PluginRoot
 
 
 @pytest.fixture(scope="module")
@@ -16,7 +17,9 @@ def plugin():
     """
     The repository's plugin, as the default playbook defines it.
     """
-    return PluginFiles.for_playbook(RepositoryLocation.PLUGIN, DefaultPlaybook())
+    return PluginFiles.from_playbook(
+        PluginRoot(RepositoryLocation.PLUGIN), DefaultPlaybook()
+    )
 
 
 def test_the_hook_registrations_are_built_from_the_playbook(plugin):

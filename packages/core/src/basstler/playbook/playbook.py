@@ -4,7 +4,6 @@ The components a project runs basstler with, and where a project declares its ow
 
 from __future__ import annotations
 
-import importlib.util
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -13,6 +12,7 @@ from basstler.locations import ProjectLocation
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.exceptions import ComponentNotInPlaybook, PlaybookNotDeclared
+from basstler.python_source_file import PythonSourceFile
 
 # %% playbooks
 
@@ -35,7 +35,7 @@ class Playbook:
         """
         return Playbook((*self.components, *components))
 
-    def without(self, *components: PlaybookComponent) -> Playbook:
+    def without_components(self, *components: PlaybookComponent) -> Playbook:
         """
         :param components: Components the playbook holds, to leave out.
         :return: A playbook holding every other component.
@@ -71,11 +71,11 @@ class DefaultPlaybook(Playbook):
     """
 
     components: tuple[PlaybookComponent, ...] = field(
-        default_factory=PackageContribution.installed_components
+        default_factory=PackageContribution.installed_playbook_components
     )
     """
     The components of every installed contribution, in the order of
-    :meth:`PackageContribution.installed`.
+    :meth:`PackageContribution.installed_package_contributions`.
     """
 
 
@@ -87,7 +87,7 @@ class PlaybookFileVariable(StrEnum):
     The module-level names a project's playbook module is read through.
     """
 
-    PLAYBOOK = "playbook"
+    PLAYBOOK = "BASSTLER_PLAYBOOK"
     """
     The :class:`Playbook` the project runs basstler with.
     """
@@ -120,11 +120,7 @@ class PlaybookFile:
         """
         if not self.path.is_file():
             return DefaultPlaybook()
-        specification = importlib.util.spec_from_file_location(
-            ProjectLocation.PLAYBOOK.stem, self.path
-        )
-        module = importlib.util.module_from_spec(specification)
-        specification.loader.exec_module(module)
+        module = PythonSourceFile(self.path).load_module()
         playbook = vars(module).get(PlaybookFileVariable.PLAYBOOK)
         if not isinstance(playbook, Playbook):
             raise PlaybookNotDeclared(self.path, PlaybookFileVariable.PLAYBOOK)

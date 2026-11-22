@@ -26,9 +26,6 @@ from basstler.text_file import TextFile
 class Skill(PlaybookComponent, ABC):
     """
     A skill, declared as a class whose name is its topic followed by ``Skill``.
-
-    Its naming is copied from krrood's ``Skill`` :cite:`krrood` until krrood's light
-    core is released.
     """
 
     @classproperty

@@ -1615,21 +1615,9 @@ def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
         session_start_repository, tagged_release_repository, stub_bin, tmp_path
     )
 
-    overrides = release_overrides(tagged_release_repository, stub_bin)
     assert call_log.read_text(encoding="utf-8").splitlines() == [
-        uv_installer_call(session_start_repository, **overrides)
+        pypi_install_call(session_start_repository, SampleReleaseTag.OLDER)
     ]
-    clone = session_start_repository.configuration_output(
-        f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
-        f'printf "%s" "${{{ConfigurationVariable.WORKSPACE}}}"',
-        **overrides,
-    )
-    assert (
-        session_start_repository.run_git("rev-parse", "HEAD", cwd=Path(clone)).stdout
-        == session_start_repository.run_git(
-            "rev-parse", f"{SampleReleaseTag.OLDER}^{{commit}}"
-        ).stdout
-    )
 
 
 # %% the package comes from PyPI at the plugin's release
@@ -1667,25 +1655,6 @@ def ready_package_of_an_older_plugin(
     return call_log.read_text(encoding="utf-8").splitlines()
 
 
-def test_a_released_plugin_installs_its_release_from_pypi(
-    session_start_repository: ScratchRepository,
-    tagged_release_repository: str,
-    stub_bin: ExecutableStubDirectory,
-    tmp_path: Path,
-):
-    """
-    Where the plugin names a release, the package of that release is taken from the
-    package index and nothing is cloned or synced from a lock.
-    """
-    calls = ready_package_of_an_older_plugin(
-        session_start_repository, tagged_release_repository, stub_bin, tmp_path
-    )
-
-    assert calls == [
-        pypi_install_call(session_start_repository, SampleReleaseTag.OLDER)
-    ]
-
-
 def test_a_release_pypi_does_not_have_is_installed_from_a_clone_of_its_tag(
     session_start_repository: ScratchRepository,
     tagged_release_repository: str,
@@ -1709,6 +1678,17 @@ def test_a_release_pypi_does_not_have_is_installed_from_a_clone_of_its_tag(
         pypi_install_call(session_start_repository, SampleReleaseTag.OLDER),
         uv_installer_call(session_start_repository, **overrides),
     ]
+    clone = session_start_repository.configuration_output(
+        f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
+        f'printf "%s" "${{{ConfigurationVariable.WORKSPACE}}}"',
+        **overrides,
+    )
+    assert (
+        session_start_repository.run_git("rev-parse", "HEAD", cwd=Path(clone)).stdout
+        == session_start_repository.run_git(
+            "rev-parse", f"{SampleReleaseTag.OLDER}^{{commit}}"
+        ).stdout
+    )
 
 
 def test_a_release_that_does_not_load_once_installed_from_pypi_is_installed_from_its_tag(

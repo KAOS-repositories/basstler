@@ -42,12 +42,12 @@ items:
   recommended_model: sonnet
   notes: >
     Draft #223 on main (64146fad), merged at d7360166 with a clean merge probe. Next: read CI at
-    72161178, which the push started; at 58a76a3f the pytest jobs failed because eight distributions
-    did not run alone (fixed, reproduced locally in per-distribution environments).
+    b5112caa, which fixes the three Windows failures the sharded run named at 72161178 (Linux CI
+    passed there). The PR is now out of draft; whoever marked it ready is not recorded.
 
     Open: confirm dropping main's interpreter-candidate session start (the py -3.X launcher path has
-    no test); commit the move's script for code-rule-fixes/action-plan-triage. Not checked: Windows,
-    Python 3.12, the hub's browser tests.
+    no test); commit the move's script for code-rule-fixes/action-plan-triage. Not checked: Windows
+    (until that CI), the hub's browser tests.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split

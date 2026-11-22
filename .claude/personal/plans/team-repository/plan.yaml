@@ -97,3 +97,19 @@ items:
     tracking issue KAOS-repositories/business_consulting#162). Copy it to the team plan store, remove
     it there, point the notes at it; tomsch420 and Hesham join with the onboarding command and read it
     signed in.'
+
+- id: adopt-member-notes
+  title: Onboarding finds a member's existing notes for the project and moves their plans into the team
+    store
+  branch: null
+  status: not started
+  recommended_model: opus
+  track: team-store
+  depends_on:
+  - team-repo-setup
+  notes: 'Found 2026-11-22: business_consulting notes live in three places - Hesham''s on the project''s
+    own claude/personal-notes, tomsch420/business_consulting-notes (public: insolvency-law, law-as-rules,
+    26 PR progress files) and KAOS-repositories/business_consulting-notes (kpi-collection). A clone reads
+    only the one claude.personalNotesRemote names; nothing tells a member the others exist. Onboarding
+    lists the member''s other notes for the repository, moves the plans and PR progress they choose, and
+    says what stays behind.'

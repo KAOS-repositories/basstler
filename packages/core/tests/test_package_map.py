@@ -24,7 +24,6 @@ from basstler.package_map import (
     REQUIREMENT_NAME,
     Distribution,
     DistributionDeclaration,
-    DistributionMetadata,
     Layer,
     PackageMap,
     Workspace,
@@ -121,24 +120,33 @@ WORKSPACE = Workspace(PackageLocation.SOURCE_TREE.value)
 This checkout's workspace.
 """
 
+TESTED_ALONE = [
+    (directory, declaration.distribution)
+    for directory, declaration in zip(
+        WORKSPACE.package_directories, WORKSPACE.package_map.declarations, strict=True
+    )
+    if declaration.distribution is not Distribution.META_PACKAGE
+]
+"""
+Each distribution whose tests run in an environment of their own, with its directory;
+the meta-package's tests cover the whole workspace, its build tooling included.
+"""
+
 
 @pytest.mark.parametrize(
-    "directory", WORKSPACE.package_directories, ids=lambda directory: directory.name
+    ("directory", "distribution"),
+    TESTED_ALONE,
+    ids=lambda value: value.name if isinstance(value, Path) else "",
 )
-def test_a_distributions_tests_need_no_distribution_it_does_not_require(directory):
+def test_a_distributions_tests_need_no_distribution_it_does_not_require(
+    directory, distribution
+):
     """
     The basstler distributions a distribution's ``dev`` group lists are ones it
     requires, directly or through another, so its tests run in an environment of its
     own.
     """
     package_map = WORKSPACE.package_map
-    distribution = Distribution(
-        DistributionMetadata.from_json(
-            tomllib.loads(
-                (directory / WorkspaceLocation.METADATA).read_text(encoding="utf-8")
-            )
-        ).project.name
-    )
     node = next(
         index
         for index in package_map.dependency_graph.node_indices()

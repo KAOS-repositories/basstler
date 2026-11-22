@@ -65,8 +65,9 @@ are the hook scripts here, which also work one at a time:
 
 Every session start also gives the `basstler` package an environment of the project's own,
 under `~/.local/share/basstler/environments` (`$BASSTLER_HOME/environments` when set), with every
-distribution synced into it by `uv sync --frozen` from the workspace's `uv.lock` - the checkout's,
-editable, or a shallow clone of the plugin's release under `releases/` - wherever any of that is
+distribution installed into it - from PyPI at the plugin's release, else synced by `uv sync --frozen`
+from the workspace's `uv.lock`, the checkout's, editable, or a shallow clone of the plugin's release
+under `releases/` - wherever any of that is
 missing or the plugin names another release, for a project whose personal-notes branch resolves — reported on its `dependencies:`
 line, never fatal, and described in the repository's `README.md`. Its `release:` line says
 whether the plugin and the package are one release, and its `environments:` line names the

@@ -111,6 +111,8 @@ class StubVariable(StrEnum):
     """
 
     UV_STATUS = "STUB_UV_STATUS"
+    UV_PIP_STATUS = "STUB_UV_PIP_STATUS"
+    UV_PIP_BREAKS_ENVIRONMENT = "STUB_UV_PIP_BREAKS_ENVIRONMENT"
     """
     The exit status the ``uv`` stub reports.
     """
@@ -1554,6 +1556,7 @@ def ready_package(
     release_repository: str,
     stub_bin: ExecutableStubDirectory,
     tmp_path: Path,
+    **stub_environment: str,
 ) -> Path:
     """
     Ready the package as a hook does, with ``uv`` stubbed.
@@ -1562,6 +1565,7 @@ def ready_package(
     :param release_repository: The repository standing in for the package's own.
     :param stub_bin: The directory of stub executables.
     :param tmp_path: The test's scratch directory.
+    :param stub_environment: Variables that steer the stubs.
     :return: The file the ``uv`` stub logs each invocation to.
     """
     stub_bin.install(PackageManager.UV)
@@ -1570,6 +1574,7 @@ def ready_package(
         ShellConfigurationFunction.READY_BASSTLER_PYTHON,
         **release_overrides(release_repository, stub_bin),
         **{StubVariable.UV_CALL_LOG: str(call_log)},
+        **stub_environment,
     )
     return call_log
 
@@ -1610,9 +1615,68 @@ def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
         session_start_repository, tagged_release_repository, stub_bin, tmp_path
     )
 
-    overrides = release_overrides(tagged_release_repository, stub_bin)
     assert call_log.read_text(encoding="utf-8").splitlines() == [
-        uv_installer_call(session_start_repository, **overrides)
+        pypi_install_call(session_start_repository, SampleReleaseTag.OLDER)
+    ]
+
+
+# %% the package comes from PyPI at the plugin's release
+
+
+def pypi_install_call(repository: ScratchRepository, release: SampleReleaseTag) -> str:
+    """
+    :param repository: The fixture-built scratch repository.
+    :param release: The release the plugin names.
+    :return: The arguments ``uv`` is expected to install the release from PyPI with.
+    """
+    interpreter = repository.configuration_value(
+        ConfigurationVariable.ENVIRONMENT_INTERPRETER
+    )
+    return f"pip install --python {interpreter} basstler=={release.version}"
+
+
+def ready_package_of_an_older_plugin(
+    repository: ScratchRepository,
+    release_repository: str,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+    **stub_environment: str,
+) -> list[str]:
+    """
+    Ready the package for an older plugin than the one it was installed for.
+
+    :return: The invocations ``uv`` received, in order.
+    """
+    install_latest_release_for_another_plugin(repository, release_repository)
+    repository.install_hook_scripts(PluginLocation.ENTRY_POINT_SCRIPT.name)
+    call_log = ready_package(
+        repository, release_repository, stub_bin, tmp_path, **stub_environment
+    )
+    return call_log.read_text(encoding="utf-8").splitlines()
+
+
+def test_a_release_pypi_does_not_have_is_installed_from_a_clone_of_its_tag(
+    session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    The plugin branch moves with the tag, before the files reach PyPI, and PyPI may be
+    out of reach; the release is then installed from its tag's lock instead.
+    """
+    calls = ready_package_of_an_older_plugin(
+        session_start_repository,
+        tagged_release_repository,
+        stub_bin,
+        tmp_path,
+        **{StubVariable.UV_PIP_STATUS: "1"},
+    )
+
+    overrides = release_overrides(tagged_release_repository, stub_bin)
+    assert calls == [
+        pypi_install_call(session_start_repository, SampleReleaseTag.OLDER),
+        uv_installer_call(session_start_repository, **overrides),
     ]
     clone = session_start_repository.configuration_output(
         f"{ShellConfigurationFunction.BASSTLER_INSTALL_COMMAND}; "
@@ -1625,6 +1689,31 @@ def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
             "rev-parse", f"{SampleReleaseTag.OLDER}^{{commit}}"
         ).stdout
     )
+
+
+def test_a_release_that_does_not_load_once_installed_from_pypi_is_installed_from_its_tag(
+    session_start_repository: ScratchRepository,
+    tagged_release_repository: str,
+    stub_bin: ExecutableStubDirectory,
+    tmp_path: Path,
+):
+    """
+    The environment is used only once the package runs; one that was installed but
+    cannot run is replaced by the install from the tag's lock.
+    """
+    calls = ready_package_of_an_older_plugin(
+        session_start_repository,
+        tagged_release_repository,
+        stub_bin,
+        tmp_path,
+        **{StubVariable.UV_PIP_BREAKS_ENVIRONMENT: "1"},
+    )
+
+    overrides = release_overrides(tagged_release_repository, stub_bin)
+    assert calls == [
+        pypi_install_call(session_start_repository, SampleReleaseTag.OLDER),
+        uv_installer_call(session_start_repository, **overrides),
+    ]
 
 
 def test_an_unchanged_plugin_keeps_the_package_installed_for_it(

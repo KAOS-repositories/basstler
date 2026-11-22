@@ -127,6 +127,11 @@ class Distribution(StrEnum):
     The GitHub client and the models of GitHub's data.
     """
 
+    PACKAGING = "basstler-packaging", Layer.GITHUB
+    """
+    The model of a Python release and of the workflow that publishes it.
+    """
+
     REVIEWS = "basstler-reviews", Layer.COLLABORATION
     """
     Reading an upstream pull request's checks and review threads.
@@ -337,6 +342,12 @@ The distribution name a requirement specifier starts with.
 class SiblingPinsSettings(ValidatedJSONModel):
     """
     The settings of the hatch hook pinning a distribution's basstler requirements.
+    """
+
+    family: str = ""
+    """
+    The name of the family of distributions whose requirements are pinned, empty for a
+    distribution without the hook.
     """
 
     dependencies: tuple[str, ...] = ()

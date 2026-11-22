@@ -163,8 +163,11 @@ items:
 - id: split-shared-modules
   title: Give each distribution its own locations, environment and exceptions
   track: package-split
+  branch: claude/keen-ritchie-hqevxv
+  pull_request_number: 297
+  session: https://claude.ai/code/session_018wfiv554FAYoaJU67UauCW
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'Split from break-remaining-cycles at its kickoff. Move every name in locations,
     environment and exceptions that one distribution alone uses into that distribution''s

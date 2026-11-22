@@ -31,8 +31,8 @@ tracks:
   wave: extensibility
 items:
 - id: playbook-model
-  title: A Playbook dataclass model that every distribution contributes commands, skills,
-    hooks and rules to
+  title: A Playbook dataclass model that every distribution contributes commands, skills, hooks and rules
+    to
   track: playbook
   branch: claude/sweet-ritchie-5la2qb
   pull_request_number: 290
@@ -40,13 +40,12 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
-  notes: 'Draft PR 290: basstler.playbook in core (PackageContribution per distribution via
-    basstler.contributions, Playbook, DefaultPlaybook, root basstler_playbook.py) with kinds
-    CommandGroup, SkillDefinition, HookDefinition (basstler skills build [--check] writes
-    hooks.json), Ruleset (feeds code-rules) and SetupSteps. Owner''s kickoff call: a kind
-    lands with its first instance and consumer, so McpTool (mcp-server), SitePanel (plan-graph),
-    ItemAttribute (item-lifecycle) and ActionsWorkflow (playbook-setup-wizard) are added there.
-    Next: review. release:minor.'
+  notes: 'Draft PR 290: basstler.playbook in core (PackageContribution per distribution via basstler.contributions,
+    Playbook, DefaultPlaybook, root basstler_playbook.py declaring BASSTLER_PLAYBOOK) with kinds CommandGroup,
+    Skill (a class per skill; skills build writes SKILL.md frontmatter above skill-body.md), per-event
+    HookDefinition (skills build writes hooks.json), Ruleset and SetupSteps. A kind lands with its first
+    instance: McpTool, SitePanel, ItemAttribute, ActionsWorkflow, PostToolUseHook come later. Next: review
+    round 2. release:minor.'
 - id: krrood-sync
   title: basstler-rules is the rule engine krrood's development tools build on
   track: rules
@@ -203,4 +202,16 @@ items:
   depends_on: []
   status: not started
   recommended_model: opus
+
+- id: project-plugin-files
+  title: A project's playbook decides which skills and hooks Claude loads in it
+  track: playbook
+  depends_on:
+  - playbook-model
+  status: not started
+  recommended_model: opus
+  notes: Today skills and hooks come from the plugin's fixed files, so leaving one out of a project's
+    basstler_playbook.py has no effect. skills build in a user's project writes that project's skills
+    and hooks from its playbook, so leaving one out takes effect and a project or another package can
+    add its own. Agreed in review of PR 290. release:minor.
 landed_item_count: 6

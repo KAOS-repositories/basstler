@@ -317,7 +317,9 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
                 graph.add_edge(nodes[declaration.distribution], nodes[dependency], None)
         return graph
 
-    def libraries_required_by(self, distribution: Distribution) -> frozenset[str]:
+    def libraries_required_by_distribution(
+        self, distribution: Distribution
+    ) -> frozenset[str]:
         """
         :param distribution: A declared distribution.
         :return: The third-party libraries it requires itself, and those of every
@@ -326,7 +328,7 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
         declaration = self[distribution]
         return frozenset(declaration.libraries).union(
             *(
-                self.libraries_required_by(dependency)
+                self.libraries_required_by_distribution(dependency)
                 for dependency in declaration.dependencies
             )
         )

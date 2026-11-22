@@ -262,7 +262,7 @@ def test_an_import_of_an_uninstalled_library_is_reported(library_checker):
     """
     (crossing,) = library_checker.library_crossings(ThirdPartyImportSnippet.UNINSTALLED)
 
-    assert crossing.imported_library == "no_such_library_installed"
+    assert crossing.top_level_package == "no_such_library_installed"
 
 
 def test_a_library_crossing_names_the_imported_library(library_checker):
@@ -271,7 +271,7 @@ def test_a_library_crossing_names_the_imported_library(library_checker):
     """
     (crossing,) = library_checker.library_crossings(ThirdPartyImportSnippet.UNREQUIRED)
 
-    assert crossing.imported_library == "libcst"
+    assert crossing.top_level_package == "libcst"
 
 
 def test_the_package_s_library_crossings_are_listed_by_module(library_checker):

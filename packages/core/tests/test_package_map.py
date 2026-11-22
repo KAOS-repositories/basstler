@@ -96,7 +96,9 @@ def test_a_distribution_requires_the_libraries_of_the_distributions_it_lists(
     """
     The higher distribution lists no library, yet needs the lower one's.
     """
-    assert library_package_map.libraries_required_by(Distribution.GIT) == {"pydantic"}
+    assert library_package_map.libraries_required_by_distribution(Distribution.GIT) == {
+        "pydantic"
+    }
 
 
 # %% looking up a declaration

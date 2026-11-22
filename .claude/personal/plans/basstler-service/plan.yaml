@@ -52,8 +52,11 @@ items:
 - id: service-deploy
   title: The plan service is one container anyone can run, deployed in one command
   track: service
-  status: not started
+  status: in progress
   recommended_model: opus
+  branch: claude/brave-planck-85hymc
+  pull_request_number: 295
+  session: https://claude.ai/code/session_018wfiv88vVrkdbjKuCfFcU5
   depends_on: []
   notes: A Starlette app in the basstler-hub-server distribution of this repository, beside
     basstler-hub; githubkit for App tokens. The release workflow publishes its image to GHCR

@@ -1,0 +1,8 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Registering the App</title>
+<form id="manifest" method="post" action="{{ action }}">
+  <input type="hidden" name="manifest" value="{{ manifest }}">
+  <noscript><button type="submit">Register the App on GitHub</button></noscript>
+</form>
+<script>document.getElementById("manifest").submit();</script>

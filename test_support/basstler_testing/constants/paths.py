@@ -108,6 +108,11 @@ class DatasetLocation(PathEnumeration):
     The dataset directory itself.
     """
 
+    APP_MANIFEST_CONVERSION = DIRECTORY / "hub-server" / "app-manifest-conversion.json"
+    """
+    What GitHub answers when a manifest's code is converted into the App it registered.
+    """
+
     NOTES_CITING_RETIRED_NAMES = (
         DIRECTORY / "document-references" / "notes-citing-retired-names.md"
     )

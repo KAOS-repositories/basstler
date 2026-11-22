@@ -162,6 +162,11 @@ class Distribution(StrEnum):
     The plan site.
     """
 
+    HUB_SERVER = "basstler-hub-server", Layer.USER_FACING
+    """
+    The service behind the plan site and the registration of its GitHub App.
+    """
+
     META_PACKAGE = "basstler", Layer.META_PACKAGE
     """
     The command tree every command is mounted on, installing every default

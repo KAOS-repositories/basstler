@@ -504,6 +504,26 @@ class GitHubTemplate(PathEnumeration):
     """
 
 
+class HubServerTemplate(PathEnumeration):
+    """
+    The files the hub server's App registration reads.
+    """
+
+    APP_MANIFEST = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "app_manifest.json"
+    )
+    """
+    The committed App manifest: what the App may read and which events it receives.
+    """
+
+    APP_MANIFEST_PAGE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "app_manifest_page.html"
+    )
+    """
+    The page that submits an App manifest to the registration page of GitHub.
+    """
+
+
 class PluginLocation(PathEnumeration):
     """
     The plugin's files this package runs, relative to the plugin's root.

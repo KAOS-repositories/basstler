@@ -1,0 +1,20 @@
+{
+  "public": false,
+  "default_permissions": {
+    "metadata": "read",
+    "contents": "read",
+    "pull_requests": "read",
+    "checks": "read",
+    "statuses": "read"
+  },
+  "default_events": [
+    "push",
+    "pull_request",
+    "pull_request_review",
+    "pull_request_review_thread",
+    "check_suite",
+    "status",
+    "issue_comment",
+    "installation_repositories"
+  ]
+}

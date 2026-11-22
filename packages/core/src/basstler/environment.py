@@ -151,6 +151,17 @@ class GitHubCredentialVariable(CredentialOrigin, EnvironmentVariable):
         return None if variable is None else variable.read()
 
 
+class HubServerVariable(EnvironmentVariable):
+    """
+    The variables an instance of the hub server is configured with.
+    """
+
+    SECRET_DIRECTORY = "BASSTLER_HUB_SECRET_DIRECTORY"
+    """
+    The directory holding the instance's App key and secrets, one file for each.
+    """
+
+
 class GitHubActionsVariable(EnvironmentVariable):
     """
     The variables a GitHub Actions runner sets for the steps it runs.

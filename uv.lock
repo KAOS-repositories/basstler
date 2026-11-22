@@ -15,6 +15,7 @@ members = [
     "basstler-git",
     "basstler-github",
     "basstler-hub",
+    "basstler-hub-server",
     "basstler-notes",
     "basstler-packaging",
     "basstler-plan",
@@ -310,6 +311,38 @@ dev = [
     { name = "basstler-reviews", editable = "packages/reviews" },
     { name = "basstler-stack", editable = "packages/stack" },
     { name = "playwright" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
+[[package]]
+name = "basstler-hub-server"
+source = { editable = "packages/hub-server" }
+dependencies = [
+    { name = "basstler-core" },
+    { name = "basstler-github" },
+    { name = "cyclopts" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-core" },
+    { name = "basstler-github" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "cyclopts", specifier = ">=5.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-github", editable = "packages/github" },
     { name = "pytest" },
     { name = "pytest-xdist" },
 ]

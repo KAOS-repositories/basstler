@@ -132,11 +132,12 @@ items:
   track: triage
   pull_request_number: 257
   session: https://claude.ai/code/session_01JxHGiNcmkURK6bxmkkdhe5
-  notes: 'Implemented on draft #257, stacked on #215''s branch, with repository-field-once
-    folded in: models on HasRepository, Branch[RepositoryType] with GitRepository and Remote,
-    RepositoryBranch merged, one WireForm per payload form, GraphQL PullRequest holding PullRequestReference.
-    Open for the user: merging the stack settings'' Remote with GitHubRemote, and REST pull
-    request models still carrying a bare number.
+  notes: 'Implemented on draft #257, based on main (#215 landed; main''s merge in at 7da2b1cf),
+    with repository-field-once folded in: models on HasRepository, Branch[RepositoryType]
+    with GitRepository and Remote, RepositoryBranch merged, one WireForm per payload form,
+    GraphQL PullRequest holding PullRequestReference. Open for the user: merging the stack
+    settings'' Remote with GitHubRemote, and REST pull request models still carrying a bare
+    number.
 
     '
   depends_on: []

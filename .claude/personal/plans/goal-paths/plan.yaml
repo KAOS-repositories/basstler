@@ -75,3 +75,17 @@ items:
     .github/workflows/goal-page.yml renders goal path --json into issue #1 (on plan saves, every 6 hours,
     on dispatch; needs GOAL_PAGE_TOKEN for private PR states). Ship it: goal path --markdown, and setup
     installs the workflow for a goal kept in a private notes repository.'
+
+- id: unreadable-state-degrades
+  title: goal path shows what a token cannot read as unreadable instead of failing
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: sandbox
+  depends_on:
+  - cross-repository-goal-targets
+  notes: 'Found 2026-11-23 in business_consulting-notes'' Goal page workflow: with a token that reads
+    pull requests but not checks, GET .../commits/<sha>/check-runs answered 403 and goal path crashed
+    (GitHubRequestFailed). And when a notes repository could not be fetched (403), the target was reported
+    as ''no item of any plan'' rather than as an unreadable repository. Show CI as unreadable and name
+    the repository that could not be fetched.'

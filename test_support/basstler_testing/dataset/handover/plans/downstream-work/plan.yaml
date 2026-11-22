@@ -1,0 +1,25 @@
+schema_version: 1
+id: downstream-work
+title: Downstream work
+description: Work that builds on the upstream layers.
+default_repository: owner/repo
+waves:
+- id: wave-1
+  name: Wave 1
+tracks:
+- id: track-1
+  name: Track 1
+  wave: wave-1
+items:
+- id: uses-base
+  title: Build on the base layer
+  branch: feature/uses-base
+  pull_request_number: 12
+  track: track-1
+  depends_on:
+  - upstream-work/base-layer
+  status: in_progress
+  recommended_model: opus
+  session: https://claude.ai/code/session_handover_fixture
+  blockers:
+  - Waiting on the base layer's review.

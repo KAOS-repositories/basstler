@@ -225,6 +225,14 @@ items:
   title: "One validated workflow model, and a clear split between basstler-build and basstler-packaging"
   branch: null
   track: package-split
+  notes: >
+    Three parsers of a GitHub Actions workflow exist: basstler.github.workflows (Workflow, Job,
+    Trigger; used by the actions budget), basstler_testing.workflow_definition.Workflow (tests) and
+    basstler.packaging.publish_workflow.PublishWorkflow. Replace them with one ValidatedJSONModel
+    model in basstler-github, reusing TriggerEvent and ActivityType; the budget code moves onto it
+    with its tests unchanged. Then settle the build/packaging split: basstler-build as the hook
+    alone taking the family as a string, DistributionFamily and BasstlerFamily in
+    basstler-packaging.
   depends_on: []
   status: not started
   recommended_model: opus

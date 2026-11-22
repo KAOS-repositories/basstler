@@ -207,6 +207,30 @@ class RegistryUnreadableError(DataclassException):
         )
 
 
+@dataclass
+class PlansCheckoutFailedError(DataclassException):
+    """
+    Raised when a fetched notes branch's plans cannot be written out, so publishing the
+    repository would show none of them.
+    """
+
+    repository: Repository
+    """
+    The repository whose notes branch was fetched.
+    """
+
+    error_output: str
+    """
+    What git printed refusing to check the plans out.
+    """
+
+    def error_message(self) -> str:
+        return f"cannot check out the plans of {self.repository}: {self.error_output}"
+
+    def suggest_correction(self) -> str:
+        return "build the site again; if it fails the same way, fetch the notes branch by hand"
+
+
 # %% storing the token
 
 

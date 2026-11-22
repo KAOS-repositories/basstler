@@ -6,17 +6,24 @@ set -uo pipefail
 # Copied into place as an executable named `uv`, earlier on PATH than any real
 # one; see the stub_bin fixture in conftest.py.
 #
-# Recognizes only the two invocations the hooks make:
+# Recognizes only the three invocations the hooks make:
 #   `venv --no-project --python <requirement> <directory>`, from
 #     create_basstler_environment, which it answers by writing
 #     <directory>/<STUB_UV_ENVIRONMENT_INTERPRETER> as a script running
 #     STUB_UV_PYTHON - the interpreter running the suite;
 #   `sync --frozen --package basstler --no-dev --project <workspace>
 #     [--no-editable]`, from install_basstler_into_environment, which installs
-#     nothing.
+#     nothing;
+#   `pip install --python <interpreter> <requirement>`, from
+#     install_basstler_from_pypi, which installs nothing either.
 #   STUB_UV_CALL_LOG - file the invocation is appended to
 #   STUB_UV_STATUS   - exit status to report, default 0; anything else creates
 #                      and installs nothing
+#   STUB_UV_PIP_STATUS - exit status `pip install` reports, STUB_UV_STATUS when
+#                      unset
+#   STUB_UV_PIP_BREAKS_ENVIRONMENT - when set, a `pip install` that succeeds leaves
+#                      an interpreter that cannot run anything, as a package
+#                      that does not load would
 #   STUB_UV_ENVIRONMENT_INTERPRETER - where in the environment the interpreter
 #                      is written, default bin/python; Scripts/python.exe stands
 #                      in for Windows
@@ -44,6 +51,20 @@ if [ "${1:-}" = "sync" ] && [ "${2:-}" = "--frozen" ] && [ "${3:-}" = "--package
     exit "${STATUS}"
   fi
   echo "Installed $7"
+  exit 0
+fi
+
+if [ "${1:-}" = "pip" ] && [ "${2:-}" = "install" ] && [ "${3:-}" = "--python" ] \
+    && [ -n "${4:-}" ] && [ -n "${5:-}" ] && [ -z "${6:-}" ]; then
+  PIP_STATUS="${STUB_UV_PIP_STATUS:-${STATUS}}"
+  if [ "${PIP_STATUS}" != "0" ]; then
+    echo "error: stub uv found no release matching $5" >&2
+    exit "${PIP_STATUS}"
+  fi
+  if [ -n "${STUB_UV_PIP_BREAKS_ENVIRONMENT:-}" ]; then
+    printf '#!/bin/sh\nexit 1\n' > "$4"
+  fi
+  echo "Installed $5"
   exit 0
 fi
 

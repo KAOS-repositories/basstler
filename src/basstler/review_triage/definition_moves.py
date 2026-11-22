@@ -83,17 +83,34 @@ class DefinitionMoveDetection(RenameSource):
             for change in changes.files
             if change.path.suffix == MODULE_SUFFIX and change.head_text is not None
         ]
-        sources = {
-            base.module_path(change.previous_path or change.path): change
-            for change in modules
-            if change.base_text is not None
-        }
-        targets = {head.module_path(change.path): change for change in modules}
+        sources: dict[str, list[FileVersions]] = {}
+        targets: dict[str, list[FileVersions]] = {}
+        for change in modules:
+            if change.base_text is not None:
+                module = base.module_path(change.previous_path or change.path)
+                sources.setdefault(module, []).append(change)
+            targets.setdefault(head.module_path(change.path), []).append(change)
         moved = []
         for rename in renames.renames:
             old_module, _, name = rename.old.rpartition(DOTTED_NAME_SEPARATOR)
-            source = sources.get(old_module)
-            target = targets.get(rename.new.rpartition(DOTTED_NAME_SEPARATOR)[0])
+            source = next(
+                (
+                    candidate
+                    for candidate in sources.get(old_module, [])
+                    if name in PythonSource.from_text(candidate.base_text).defined_names
+                ),
+                None,
+            )
+            target = next(
+                (
+                    candidate
+                    for candidate in targets.get(
+                        rename.new.rpartition(DOTTED_NAME_SEPARATOR)[0], []
+                    )
+                    if name in PythonSource.from_text(candidate.head_text).defined_names
+                ),
+                None,
+            )
             if (
                 not isinstance(rename.found_by, DefinitionMoveDetection)
                 or source is None

@@ -273,6 +273,20 @@ class DefinitionMovePackageRootSample(SampleTrees):
         return "definition-move-package-root"
 
 
+class DefinitionMoveSameModulePathSample(SampleTrees):
+    """
+    A pull request moving a module's function into a module of the same dotted path
+    that it adds in a package kept under ``packages/``.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-same-module-path"
+
+
 class SubclassSubstitutionSourceLayoutSample(SampleTrees):
     """
     A pull request switching a caller to a new subclass in a package kept under

@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from basstler.github.repository import RepositoryBranch
+from basstler.git.branch import Branch
+from basstler.github.repository import Repository
 
 # %% the ends
 
@@ -17,12 +18,12 @@ class PullRequestEnds:
     The branch a pull request merges into and the branch it proposes.
     """
 
-    base: RepositoryBranch
+    base: Branch[Repository]
     """
     The branch it merges into, on the repository the pull request is opened on.
     """
 
-    head: RepositoryBranch
+    head: Branch[Repository]
     """
     The branch it proposes, on that repository or on a fork of it.
     """

@@ -167,7 +167,7 @@ def recorded_thread(
     :return: The recorded thread.
     :raises KeyError: If the fixture carries no such thread.
     """
-    for thread in fixture.recorded().pull_request.review_threads.threads:
+    for thread in fixture.recorded(UPSTREAM).pull_request.review_threads.threads:
         if thread.identifier == identifier:
             return thread
     raise KeyError(identifier)
@@ -216,16 +216,15 @@ def test_every_recorded_thread_survives_the_read_unchanged(paginated_client):
 
 def test_the_snapshot_identifies_the_pull_request_it_read(paginated_client):
     """
-    The snapshot carries the number, title and page of the pull request it read.
+    The snapshot carries the pull request it read and its title.
     """
     snapshot = make_reader(paginated_client).read_current_state(
         RECORDED_PULL_REQUEST_NUMBER
     )
 
-    recorded = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded().pull_request
-    assert snapshot.number == recorded.number
+    recorded = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded(UPSTREAM).pull_request
+    assert snapshot.reference == recorded.reference
     assert snapshot.title == recorded.title
-    assert snapshot.page_url == recorded.page_url
 
 
 def test_a_thread_keeps_every_comment_in_order(paginated_client):
@@ -277,7 +276,9 @@ def test_a_thread_anchored_to_a_line_is_located_by_it(paginated_client):
 
 
 def test_a_pull_request_reads_its_checks_off_its_head_commit():
-    pull_request = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded().pull_request
+    pull_request = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded(
+        UPSTREAM
+    ).pull_request
 
     [head] = pull_request.commits
 
@@ -289,13 +290,15 @@ def test_a_pull_request_listing_no_commits_has_no_checks():
     """
     A pull request whose commit list is empty has no checks.
     """
-    recorded = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded().pull_request
+    recorded = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded(UPSTREAM).pull_request
 
     assert dataclasses.replace(recorded, commits=[]).checks is None
 
 
 def test_a_thread_page_reads_its_cursor_from_its_page_info():
-    page = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded().pull_request.review_threads
+    page = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded(
+        UPSTREAM
+    ).pull_request.review_threads
 
     assert page.page_info == PageInfo(
         has_next_page=True, end_cursor=ThreadCursor.PAGE_ONE
@@ -303,13 +306,15 @@ def test_a_thread_page_reads_its_cursor_from_its_page_info():
 
 
 def test_the_snapshot_is_assembled_from_the_parsed_pull_request():
-    pull_request = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded().pull_request
+    pull_request = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded(
+        UPSTREAM
+    ).pull_request
 
     snapshot = UpstreamPullRequestSnapshot.assemble(
         pull_request, pull_request.review_threads.threads
     )
 
-    assert snapshot.number == pull_request.number
+    assert snapshot.reference == pull_request.reference
     assert snapshot.reviews == pull_request.reviews
     assert snapshot.threads == pull_request.review_threads.threads
     assert snapshot.checks == pull_request.checks
@@ -729,9 +734,8 @@ def test_a_pull_request_without_checks_says_so(current_state):
     A pull request nothing has reported checks for says so.
     """
     unchecked = UpstreamPullRequestSnapshot(
-        number=current_state.number,
+        reference=current_state.reference,
         title=current_state.title,
-        page_url=current_state.page_url,
         reviews=current_state.reviews,
         threads=current_state.threads,
         checks=None,
@@ -768,9 +772,8 @@ def test_a_pull_request_with_nothing_outstanding_says_so(current_state):
     A pull request with no unresolved thread says nothing needs acting on.
     """
     settled = UpstreamPullRequestSnapshot(
-        number=current_state.number,
+        reference=current_state.reference,
         title=current_state.title,
-        page_url=current_state.page_url,
         reviews=current_state.reviews,
         threads=[thread for thread in current_state.threads if thread.is_resolved],
         checks=current_state.checks,
@@ -935,7 +938,9 @@ def recorded_check(name: RecordedCheck) -> CheckResult:
     :param name: The check to find.
     :return: The parsed check.
     """
-    checks = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded().pull_request.checks
+    checks = RecordedResponse.PULL_REQUEST_PAGE_TWO.recorded(
+        UPSTREAM
+    ).pull_request.checks
     [result] = [result for result in checks.results if result.name == name]
     return result
 

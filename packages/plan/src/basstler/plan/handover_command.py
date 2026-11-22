@@ -15,7 +15,7 @@ from cyclopts.validators import MutuallyExclusive
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubRestClient
-from basstler.github.repository import RepositoryBranch
+from basstler.git.branch import Branch
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.repository_option import RepositoryArgument
 from basstler.locations import PlanHandoverLocation
@@ -53,17 +53,29 @@ The ``plan-handover`` command group.
 
 
 @plan_handover_app.command(name=PlanHandoverCommand.EXPORT)
-def export_plans(plans: list[str], *, output: Path) -> PlanHandoverExitCode:
+def export_plans(
+    plans: list[str],
+    *,
+    output: Path,
+    without_dependencies: Annotated[
+        bool, Parameter(name=PlanHandoverOption.WITHOUT_DEPENDENCIES)
+    ] = False,
+) -> PlanHandoverExitCode:
     """
     Write plans of this repository's notes branch, their items' progress notes and the
     repository's rules into a directory, with a guide to working every item.
 
     :param plans: The ids of the plans to hand over, with every plan they depend on.
     :param output: The directory to write, created if missing.
-    :raises PlanOutsideHandoverError: If a plan depends on a plan not named.
+    :param without_dependencies: Hand the plans over without the plans they depend on,
+        recording those dependencies as external ones.
+    :raises PlanOutsideHandoverError: If a plan depends on a plan not named and
+        *without_dependencies* is not given.
     """
     handover = PlanHandover.from_notes_branch(
-        project_root=Path.cwd(), plan_identifiers=plans
+        project_root=Path.cwd(),
+        plan_identifiers=plans,
+        leaves_out_dependencies=without_dependencies,
     )
     handover.write(output)
     logger.info(
@@ -87,6 +99,9 @@ def offer_plans(
         str | None, Parameter(name=PlanHandoverOption.RECEIVER_LOGIN)
     ] = None,
     close_pull_requests: bool = False,
+    without_dependencies: Annotated[
+        bool, Parameter(name=PlanHandoverOption.WITHOUT_DEPENDENCIES)
+    ] = False,
 ) -> PlanHandoverExitCode:
     """
     Offer plans of this repository's notes branch to another person as a draft pull
@@ -100,7 +115,10 @@ def offer_plans(
     :param receiver_login: The receiver's GitHub login, mentioned in the pull request.
     :param close_pull_requests: Close the open pull requests of the plans' underway
         items on this repository, which the receiver continues on theirs.
-    :raises PlanOutsideHandoverError: If a plan depends on a plan not named.
+    :param without_dependencies: Hand the plans over without the plans they depend on,
+        recording those dependencies as external ones.
+    :raises PlanOutsideHandoverError: If a plan depends on a plan not named and
+        *without_dependencies* is not given.
     """
     project_root = Path.cwd()
     client = GitHubRestClient()
@@ -109,11 +127,13 @@ def offer_plans(
         details = RepositoryDetailsRead(receiver_repository)
         base = details.parse(client.get(details.path)).default_branch.name
     handover = PlanHandover.from_notes_branch(
-        project_root=project_root, plan_identifiers=plans
+        project_root=project_root,
+        plan_identifiers=plans,
+        leaves_out_dependencies=without_dependencies,
     )
     offered = HandoverOffer(
         handover=handover,
-        base=RepositoryBranch(repository=receiver_repository, name=base),
+        base=Branch(receiver_repository, base),
         receiver_login=receiver_login,
         git=git,
     ).push_and_open_pull_request(client=client)

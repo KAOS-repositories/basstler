@@ -15,7 +15,11 @@ from basstler.plan.exceptions import (
     PlanOutsideHandoverError,
 )
 from basstler.plan.handover import HandoverGuide, HandoverPlan, PlanHandover
-from basstler.plan.model import ManifestKey, PlanManifest
+from basstler.plan.model import (
+    ExternalDependency,
+    ManifestKey,
+    PlanManifest,
+)
 from basstler.plan.repository_rules import RepositoryRules
 
 from basstler_testing.plan.handover import (
@@ -23,6 +27,17 @@ from basstler_testing.plan.handover import (
     RECEIVERS_FORK,
     HandedOverPlan,
 )
+
+
+def left_out_upstream(handover: PlanHandover) -> dict[str, PlanManifest]:
+    """
+    :param handover: The dataset's handover.
+    :return: The upstream plan, left out of a handover of the downstream one.
+    """
+    return {
+        HandedOverPlan.UPSTREAM: plan_named(handover, HandedOverPlan.UPSTREAM).manifest
+    }
+
 
 # %% which plans go together
 
@@ -40,6 +55,100 @@ def test_a_plan_is_handed_over_only_with_the_plans_it_depends_on(
             progress_notes={},
             repository_rules=RepositoryRules(),
         )
+
+
+def test_a_plan_detached_from_the_plans_it_depends_on_records_them_as_external(
+    dataset_handover: PlanHandover,
+):
+    """
+    Each dependency on a left-out plan moves from ``depends_on`` to
+    ``external_dependencies``, and the others stay where they are.
+    """
+    downstream = plan_named(dataset_handover, HandedOverPlan.DOWNSTREAM)
+
+    left_out = left_out_upstream(dataset_handover)
+
+    detached = downstream.detached_from_plans(left_out)
+
+    assert [
+        (item.dependencies, item.external_dependencies)
+        for item in detached.manifest.items
+    ] == [
+        (
+            [
+                entry
+                for entry in item.dependencies
+                if DependencyReference.from_text(entry).plan_id
+                != HandedOverPlan.UPSTREAM
+            ],
+            [
+                ExternalDependency.from_item(
+                    plan=left_out[reference.plan_id],
+                    item=left_out[reference.plan_id].item_named(
+                        reference.item_identifier
+                    ),
+                )
+                for entry in item.dependencies
+                for reference in [DependencyReference.from_text(entry)]
+                if reference.plan_id == HandedOverPlan.UPSTREAM
+            ],
+        )
+        for item in downstream.manifest.items
+    ]
+    assert any(item.external_dependencies for item in detached.manifest.items)
+
+
+def test_a_detached_plan_is_handed_over_without_the_plans_it_depended_on(
+    dataset_handover: PlanHandover,
+):
+    """
+    With its dependencies recorded as external, nothing in the plan names a left-out
+    plan any more, so it is handed over alone.
+    """
+    detached = plan_named(
+        dataset_handover, HandedOverPlan.DOWNSTREAM
+    ).detached_from_plans(left_out_upstream(dataset_handover))
+
+    handover = PlanHandover(
+        plans=(detached,), progress_notes={}, repository_rules=RepositoryRules()
+    )
+
+    assert handover.plans == (detached,)
+
+
+def test_a_guide_names_the_external_dependencies_of_an_item(
+    dataset_handover: PlanHandover,
+):
+    """
+    The receiver reads which work an item stacked on that was not handed over, what it
+    was, and what to do with it.
+    """
+    detached = plan_named(
+        dataset_handover, HandedOverPlan.DOWNSTREAM
+    ).detached_from_plans(left_out_upstream(dataset_handover))
+    handover = PlanHandover(
+        plans=(detached,), progress_notes={}, repository_rules=RepositoryRules()
+    )
+
+    guide = HandoverGuide(handover=handover).render()
+
+    external = [
+        entry
+        for item in detached.manifest.items
+        for entry in item.external_dependencies
+    ]
+    assert external
+    assert ExternalDependency.guidance in guide
+    assert all(
+        text in guide
+        for entry in external
+        for text in (
+            entry.reference,
+            entry.title,
+            entry.plan_description,
+            entry.notes or entry.title,
+        )
+    )
 
 
 def test_plans_depending_on_each_other_in_a_cycle_are_refused(

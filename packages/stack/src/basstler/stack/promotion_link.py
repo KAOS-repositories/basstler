@@ -6,12 +6,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from basstler.git.branch import Branch
 from basstler.class_property import classproperty
 from basstler.github.pull_request_form import (
     PrefilledPullRequestLink,
     PullRequestForm,
 )
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import Repository
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     MissingUpstreamRepositoryError,
@@ -36,7 +37,7 @@ class PromotionTarget:
     lives in.
     """
 
-    upstream_base: RepositoryBranch
+    upstream_base: Branch[Repository]
     """
     The upstream branch the pull request merges into, on the repository it is opened on.
     """
@@ -60,9 +61,7 @@ class PromotionTarget:
                 ProjectLocation.PERSONAL_STACK_CONFIGURATION.value,
             )
         return cls(
-            upstream_base=RepositoryBranch(
-                configuration.upstream_base, upstream_repository
-            ),
+            upstream_base=Branch(upstream_repository, configuration.upstream_base),
             fork=configuration.fork_repository,
         )
 
@@ -121,7 +120,7 @@ class PromotionLink(PrefilledPullRequestLink):
         :return: The link, flagged if the body was shortened.
         """
         form = PullRequestForm(
-            target.upstream_base, RepositoryBranch(branch, target.fork), title, body
+            target.upstream_base, Branch(target.fork, branch), title, body
         )
         link = form.link
         if link is None:

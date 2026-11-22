@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from basstler.git.remote import Remote
 from basstler.environment import GitHubCredentialVariable
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
@@ -508,9 +509,8 @@ def notes_branch_of(
 ) -> RemoteBranch:
     """:return: The notes branch *notes_location* names, in the fork checkout."""
     return RemoteBranch(
+        Remote(GitCommandRunner(fork_checkout.project_root), notes_location.remote),
         notes_location.branch,
-        GitCommandRunner(fork_checkout.project_root),
-        notes_location.remote,
     )
 
 
@@ -537,7 +537,8 @@ def test_every_repository_the_registry_s_hub_lists_is_published(
         registry=OTHER_REPOSITORY.full_name, repositories=[NOTES_REPOSITORY.full_name]
     )
     RemoteBranch(
-        NOTES_BRANCH, GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN
+        Remote(GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN),
+        NOTES_BRANCH,
     ).write({ProjectLocation.PLAN_HUB.as_posix(): own_copy.to_text()}, "List the hub")
     registry_copy = PlanHub(
         registry=OTHER_REPOSITORY.full_name,

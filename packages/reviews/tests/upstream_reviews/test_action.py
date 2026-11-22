@@ -21,9 +21,10 @@ import pytest
 import basstler.upstream_reviews.action.__main__
 import basstler.upstream_reviews.action.read
 import basstler.upstream_reviews.action.run
+from basstler.git.remote_branch import RemoteBranch
 from basstler.environment import GitVariable
 from basstler.git.commands import GitCommandRunner
-from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.remote import GitHubRemote
 from basstler.github.client import GitHubReader
 from basstler.github.credential import CredentialProvider
 from basstler.github.exceptions import GitHubRequestFailed
@@ -331,10 +332,10 @@ class Fork:
     remote: Path
 
     @property
-    def branch(self) -> GitHubRemoteBranch:
+    def branch(self) -> RemoteBranch[GitHubRemote]:
         """:return: The Action branch on the fork."""
-        return GitHubRemoteBranch(
-            ActionBranch.NAME, GitCommandRunner(self.clone), "origin"
+        return RemoteBranch(
+            GitHubRemote(GitCommandRunner(self.clone), "origin"), ActionBranch.NAME
         )
 
     def files(self) -> dict[str, str]:
@@ -350,10 +351,11 @@ class Fork:
 
     def request_branch(
         self, identifier: str = REQUEST_IDENTIFIER
-    ) -> GitHubRemoteBranch:
+    ) -> RemoteBranch[GitHubRemote]:
         """:return: The branch of the request with *identifier*."""
-        return GitHubRemoteBranch(
-            ActionBranch.for_request(identifier), GitCommandRunner(self.clone), "origin"
+        return RemoteBranch(
+            GitHubRemote(GitCommandRunner(self.clone), "origin"),
+            ActionBranch.for_request(identifier),
         )
 
     def request_files(self, identifier: str = REQUEST_IDENTIFIER) -> dict[str, str]:
@@ -725,7 +727,7 @@ def test_a_result_is_collected_even_if_its_run_failed_afterwards(fork):
 
 
 def test_the_fork_is_named_by_its_remote(fork):
-    assert fork.branch.repository == FORK
+    assert fork.branch.repository.github_repository == FORK
 
 
 def test_read_prints_the_report_from_the_committed_result(fork, monkeypatch, capsys):

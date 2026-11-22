@@ -9,16 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from basstler.git.branch import Branch
 from basstler.git.commands import GitCommandRunner
+from basstler.git.remote import Remote
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import GitHubClient
 from basstler.github.issue import Issue
 from basstler.github.pull_request import NewPullRequest
-from basstler.github.repository import (
-    PullRequestReference,
-    Repository,
-    RepositoryBranch,
-)
+from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.repository_access import PullRequestListState
 from basstler.plan.handover import PlanHandover
 from basstler.plan.handover_originals import OriginalPullRequest
@@ -143,14 +141,14 @@ class UnderwayWork:
         :return: The continuation.
         """
         repository = self.repository
-        head = RepositoryBranch(repository=repository, name=original.summary.head.name)
-        base = RepositoryBranch(repository=repository, name=original.summary.base.name)
+        head = Branch(repository, original.summary.head.name)
+        base = Branch(repository, original.summary.base.name)
         self.copy_branch_to_receiver(
-            RepositoryBranch(repository=original.repository, name=head.name),
+            Branch(original.repository, head.name),
             replace=True,
         )
         self.copy_branch_to_receiver(
-            RepositoryBranch(repository=original.repository, name=base.name),
+            Branch(original.repository, base.name),
             replace=False,
         )
         opening = NewPullRequest(
@@ -174,7 +172,7 @@ class UnderwayWork:
         )
 
     def copy_branch_to_receiver(
-        self, branch: RepositoryBranch, *, replace: bool
+        self, branch: Branch[Repository], *, replace: bool
     ) -> None:
         """
         Push *branch* to the receiver's repository under the same name.
@@ -188,13 +186,11 @@ class UnderwayWork:
         """
         if (
             not replace
-            and RemoteBranch(
-                git=self.git, name=branch.name, remote=self.remote
-            ).exists()
+            and RemoteBranch(Remote(self.git, self.remote), branch.name).exists()
         ):
             return
         fetched = RemoteBranch(
-            git=self.git, name=branch.name, remote=branch.repository.clone_url
+            Remote(self.git, branch.repository.clone_url), branch.name
         )
         fetched.fetch()
         self.git.run(

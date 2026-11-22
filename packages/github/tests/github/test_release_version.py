@@ -631,10 +631,10 @@ def test_the_release_step_tags_the_merge_commit_and_moves_the_release_branch_to_
 
     assert result.returncode == 0, result.stderr
     tag = version(ReleaseSampleVersion.NEXT_MINOR).tag
-    assert published_checkout.remote_commit(Branch("main").reference) == merge_commit
+    assert published_checkout.remote_commit(f"{Branch.namespace}/main") == merge_commit
     assert published_checkout.remote_commit(f"refs/tags/{tag}") == merge_commit
     assert (
-        published_checkout.remote_commit(Branch(release_branch()).reference)
+        published_checkout.remote_commit(f"{Branch.namespace}/{release_branch()}")
         == merge_commit
     )
     assert release_step_files.output.read_text(encoding="utf-8") == f"tag={tag}\n"
@@ -655,7 +655,7 @@ def test_the_release_step_moves_the_plugin_release_branch_to_the_released_plugin
 
     assert result.returncode == 0, result.stderr
     plugin_commit = published_checkout.remote_commit(
-        Branch(plugin_release_branch()).reference
+        f"{Branch.namespace}/{plugin_release_branch()}"
     )
     changed = published_checkout.runner.run(
         "diff",
@@ -692,7 +692,7 @@ def test_the_released_plugin_s_manifest_names_the_release_s_version(
     run_release_step(published_checkout.runner.working_directory, release_step_files)
 
     plugin_commit = published_checkout.remote_commit(
-        Branch(plugin_release_branch()).reference
+        f"{Branch.namespace}/{plugin_release_branch()}"
     )
     merged_manifest = json.loads(
         published_checkout.runner.file_at(
@@ -714,7 +714,7 @@ def test_a_later_release_moves_the_plugin_release_branch_forward(
     """
     published_checkout.merge()
     run_release_step(published_checkout.runner.working_directory, release_step_files)
-    branch = Branch(plugin_release_branch()).reference
+    branch = f"{Branch.namespace}/{plugin_release_branch()}"
     first = published_checkout.remote_commit(branch)
     published_checkout.merge(ReleaseSampleFile.SKILL)
 

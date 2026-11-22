@@ -210,3 +210,21 @@ def test_a_plan_another_plan_still_depends_on_is_not_removed(
             f"*/{PlanDocument.MANIFEST.value}"
         )
     ) == sorted(HandedOverPlan)
+
+
+def test_a_notes_branch_plan_is_read_detached_when_asked(
+    exporting_repository: ScratchRepository,
+):
+    """
+    Reading the downstream plan alone from the notes branch, asked to leave out its
+    dependencies, gives the plan detached from the upstream plan.
+    """
+    handover = PlanHandover.from_notes_branch(
+        project_root=exporting_repository.project_root,
+        plan_identifiers=[HandedOverPlan.DOWNSTREAM],
+        leaves_out_dependencies=True,
+    )
+
+    (plan,) = handover.plans
+    assert plan.depended_on_plans == set()
+    assert any(item.external_dependencies for item in plan.manifest.items)

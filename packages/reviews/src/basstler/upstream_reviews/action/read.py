@@ -9,9 +9,10 @@ import json
 import time
 from dataclasses import dataclass
 
+from basstler.git.remote_branch import RemoteBranch
+from basstler.github.remote import GitHubRemote
 from basstler.github.client import GitHubReader
 from basstler.github.exceptions import GitHubRequestFailed
-from basstler.github.remote_branch import GitHubRemoteBranch
 from basstler.github.run_listing import RunListing
 from basstler.upstream_reviews.action.branch import ActionBranch, ActionFile
 from basstler.upstream_reviews.action.exchange import (
@@ -35,7 +36,7 @@ class ActionRead[AnswerType: ActionAnswer]:
     One read through the fork's Action: request it, then wait for its answer.
     """
 
-    branch: GitHubRemoteBranch
+    branch: RemoteBranch[GitHubRemote]
     """
     The fork's Action branch, which every request's branch starts from.
     """
@@ -67,14 +68,13 @@ class ActionRead[AnswerType: ActionAnswer]:
     """
 
     @property
-    def request_branch(self) -> GitHubRemoteBranch:
+    def request_branch(self) -> RemoteBranch[GitHubRemote]:
         """
         :return: The branch carrying this request and, once its run answers, its result.
         """
-        return GitHubRemoteBranch(
+        return RemoteBranch(
+            self.branch.repository,
             ActionBranch.for_request(self.request.identifier),
-            self.branch.git,
-            self.branch.remote,
         )
 
     def send(self) -> str:
@@ -86,7 +86,7 @@ class ActionRead[AnswerType: ActionAnswer]:
         """
         installed = self.branch.fetch()
         if installed is None:
-            raise ActionNotInstalled(self.branch.remote)
+            raise ActionNotInstalled(self.branch.repository.location)
         return self.request_branch.create(
             installed,
             {ActionFile.REQUEST: self.request.as_sent()},
@@ -115,7 +115,9 @@ class ActionRead[AnswerType: ActionAnswer]:
                 self.check_run(commit, int(elapsed))
             if elapsed >= timeout:
                 raise ActionResultMissing(
-                    self.request.identifier, self.branch.repository, int(timeout)
+                    self.request.identifier,
+                    self.branch.repository.github_repository,
+                    int(timeout),
                 )
             time.sleep(self.poll_interval)
 
@@ -143,7 +145,7 @@ class ActionRead[AnswerType: ActionAnswer]:
         :raises ActionRunFailed: If its run failed - but only once a last look finds
             no result, since a run may fail after committing one.
         """
-        fork = self.branch.repository
+        fork = self.branch.repository.github_repository
         if self.runs is None or fork is None:
             return
         try:

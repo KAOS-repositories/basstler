@@ -39,13 +39,12 @@ items:
   depends_on: []
   status: in progress
   recommended_model: sonnet
-  notes: After release.yml tags, uv build --all-packages and pypa/gh-action-pypi-publish via
-    OIDC (no token); every package every release, TestPyPI first. The owner registers a pending
-    trusted publisher per name on PyPI and TestPyPI. Session start installs basstler==<plugin
-    release> from PyPI, editable from the workspace in a clone; pip install keeps working
-    without uv (windows-support). release:minor. When PyPI is unreachable, session start installs
-    from a pinned git source instead, and switches to a new runtime only once its hooks and
-    commands load.
+  notes: >
+    publish.yml builds with uv build --all-packages and publishes to PyPI only (TestPyPI dropped)
+    via OIDC from the pypi environment. The owner registers a pending trusted publisher on PyPI for
+    each of the 13 names, basstler-packaging included. Session start installs basstler==<plugin
+    release> from PyPI, falling back to the tag's clone synced from the lock; pip install works
+    without uv. release:minor. basstler-packaging holds the release and publish-workflow model.
 - id: playbook-model
   title: A Playbook dataclass model that every distribution contributes commands, skills,
     hooks and rules to

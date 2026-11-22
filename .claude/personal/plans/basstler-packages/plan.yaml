@@ -50,8 +50,11 @@ items:
   title: A Playbook dataclass model that every distribution contributes commands, skills,
     hooks and rules to
   track: playbook
+  branch: claude/sweet-ritchie-5la2qb
+  pull_request_number: 290
+  session: https://claude.ai/code/session_018wfiv8h2JMn5sT4DJs496i
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'basstler.playbook in core: component kinds CommandGroup, SkillDefinition, HookDefinition,
     McpTool, ActionsWorkflow, Ruleset[RuleKind], SitePanel (hub tab or sidebar), ItemAttribute

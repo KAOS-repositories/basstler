@@ -1,7 +1,10 @@
 id: kpi-pilot-team-plans
-title: The business_consulting team reads and edits the kpi-collection plan privately on its BasstlerHub,
-  and no setup step can publish the private code
+title: 'The business_consulting team runs the KPI pilot on its private BasstlerHub: the kpi-collection
+  plan is read and edited there, no setup step can publish the private code, and the KPIs are
+  reported from every machine'
 targets:
 - separate-notes-repository/sync-never-pushes-to-notes-repository
 - basstler-service/github-sign-in
 - team-repository/migrate-kpi-collection
+- KAOS-repositories/business_consulting-notes:kpi-collection/kpi-report
+- KAOS-repositories/business_consulting-notes:kpi-collection/kpi-uploader

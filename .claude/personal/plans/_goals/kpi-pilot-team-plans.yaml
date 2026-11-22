@@ -1,0 +1,7 @@
+id: kpi-pilot-team-plans
+title: The business_consulting team reads and edits the kpi-collection plan privately on its BasstlerHub,
+  and no setup step can publish the private code
+targets:
+- separate-notes-repository/sync-never-pushes-to-notes-repository
+- basstler-service/github-sign-in
+- team-repository/migrate-kpi-collection

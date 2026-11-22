@@ -17,6 +17,7 @@ from pathlib import Path
 
 from cyclopts import App
 
+from basstler.git.remote import Remote
 from basstler.exit_codes import StackExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
@@ -27,7 +28,7 @@ from basstler.github.client import (
 )
 from basstler.github.credential import GitHubCommand
 from basstler.github.repository_attachment import RepositoryAttachment
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, WorkflowLocation
 from basstler.maintenance.landed_closing import ClosedAsLanded
@@ -170,7 +171,9 @@ class BuildStart:
             WorkflowDispatch(
                 site.repository,
                 WorkflowLocation.PLAN_SITE,
-                RepositoryDetails.from_json(read.body).default_branch.name,
+                RepositoryDetailsRead(site.repository)
+                .parse(read.body)
+                .default_branch.name,
             )
         )
         return cls(site, dispatch)
@@ -229,7 +232,9 @@ def recorded_site() -> SiteRepository | None:
     )
     location = PersonalNotesLocation.resolve(project_root, os.environ)
     return SiteRepository.recorded_on(
-        RemoteBranch(location.branch, GitCommandRunner(project_root), location.remote)
+        RemoteBranch(
+            Remote(GitCommandRunner(project_root), location.remote), location.branch
+        )
     )
 
 

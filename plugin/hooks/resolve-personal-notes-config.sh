@@ -1236,21 +1236,38 @@ install_uv() {
     "${BASSTLER_UV_DIRECTORY}" uv 2>&1)"
 }
 
-# install_basstler_into_environment: runs basstler_install_command's sync,
-# cloning the plugin's release first outside a checkout, leaving the installer's
-# own output (both streams) in BASSTLER_INSTALL_OUTPUT for a caller to report,
-# and returning its exit status. On success, records the source it installed
-# from.
+# install_basstler_from_pypi: installs the plugin's release from PyPI into the
+# environment and succeeds only once the package runs there, leaving uv's output
+# in BASSTLER_INSTALL_OUTPUT. Fails at once in a checkout, whose package is the
+# checkout's own, and where the plugin names no release.
+install_basstler_from_pypi() {
+  [ -z "${BASSTLER_CHECKOUT}" ] || return 1
+  local release uv
+  release="$(plugin_release)" || return 1
+  uv="$(available_uv)" || return 1
+  BASSTLER_INSTALL_OUTPUT="$("${uv}" pip install --python \
+    "${BASSTLER_ENVIRONMENT_INTERPRETER}" "basstler==${release#v}" 2>&1)" || return
+  "${BASSTLER_ENVIRONMENT_INTERPRETER}" -m basstler --help > /dev/null 2>&1
+}
+
+# install_basstler_into_environment: installs the package into its environment,
+# from PyPI at the plugin's release where that works, else with
+# basstler_install_command's sync, cloning the plugin's release first outside a
+# checkout. Leaves the installer's own output (both streams) in
+# BASSTLER_INSTALL_OUTPUT for a caller to report, and returns its exit status.
+# On success, records the source it installed from.
 install_basstler_into_environment() {
   local source
   source="$(basstler_package_source)"
   basstler_install_command || return 1
   if ! available_uv > /dev/null; then
-    BASSTLER_INSTALL_OUTPUT="no uv to install the package's lock with"
+    BASSTLER_INSTALL_OUTPUT="no uv to install the package with"
     return 1
   fi
-  clone_basstler_release || return
-  BASSTLER_INSTALL_OUTPUT="$("${BASSTLER_INSTALL_COMMAND[@]}" 2>&1)" || return
+  if ! install_basstler_from_pypi; then
+    clone_basstler_release || return
+    BASSTLER_INSTALL_OUTPUT="$("${BASSTLER_INSTALL_COMMAND[@]}" 2>&1)" || return
+  fi
   printf '%s\n' "${source}" > "${BASSTLER_INSTALLED_SOURCE_FILE}"
   plugin_content_digest > "${BASSTLER_INSTALLED_PLUGIN_DIGEST_FILE}"
 }

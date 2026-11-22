@@ -1,25 +1,25 @@
 """
-A branch of a remote, named by the GitHub repository the remote points at.
+A remote of a clone, named by the GitHub repository it points at.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from basstler.git.remote_branch import RemoteBranch
+from basstler.git.remote import Remote
 from basstler.github.repository import Repository
 
-# %% the branch
+# %% the remote
 
 
 @dataclass(frozen=True)
-class GitHubRemoteBranch(RemoteBranch):
+class GitHubRemote(Remote):
     """
-    A :class:`RemoteBranch` that knows the GitHub repository its remote points at.
+    A :class:`Remote` that knows the GitHub repository it points at.
     """
 
     @property
-    def repository(self) -> Repository | None:
+    def github_repository(self) -> Repository | None:
         """
         :return: The repository the remote points at, ``None`` when it names none - a
             remote given as a local path.
@@ -32,5 +32,5 @@ class GitHubRemoteBranch(RemoteBranch):
     @property
     def description(self) -> str:
         """:return: The repository's name, or the remote's where it names none."""
-        repository = self.repository
-        return repository.full_name if repository else self.remote
+        repository = self.github_repository
+        return repository.full_name if repository else self.location

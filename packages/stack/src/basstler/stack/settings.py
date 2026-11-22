@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
@@ -43,7 +43,7 @@ This module's logger, which is also what its command prints through.
 
 
 @dataclass(frozen=True)
-class Remote:
+class Remote(HasRepository):
     """
     A git remote, identified by the repository its URL names rather than by its name.
     """
@@ -51,11 +51,6 @@ class Remote:
     name: str
     """
     What this checkout calls the remote.
-    """
-
-    repository: Repository
-    """
-    The repository the remote points at.
     """
 
 
@@ -171,7 +166,7 @@ class RemoteResolution:
             disambiguate.
         """
         remotes = [
-            Remote(name, Repository.from_remote_url(url))
+            Remote(repository=Repository.from_remote_url(url), name=name)
             for name, url in remote_urls.items()
             if Repository.names_a_repository(url)
         ]

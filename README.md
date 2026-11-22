@@ -47,6 +47,16 @@ shipped paths would go stale.
 - **The workflow increments the latest release's patch,** or its minor or major part when a
   pull request merged since is labelled `release:minor` or `release:major`. It then
   publishes a GitHub release with generated notes.
+- **`publish.yml` publishes every distribution to PyPI** once the release run finishes: it
+  builds them all from the tagged commit with `uv build --all-packages` and publishes them
+  through trusted publishing, so no token is stored, each distribution from a GitHub
+  environment of its own, `pypi-<distribution>`, which the run creates. It needs a
+  pending trusted publisher on PyPI for each distribution's name, naming this
+  repository, `publish.yml` and that environment. A release whose publishing stopped
+  is finished by re-running the failed run in the Actions tab (or starting `publish.yml` there with the tag, when no run
+  exists); files PyPI already holds are skipped, so nothing is uploaded twice. Each wheel
+  and source distribution carries `LICENSE` and `NOTICE`. Anyone can `pip install
+  basstler` without `uv`.
 - **A session start installs the tag its plugin's `plugin.json` names,** and a hook
   installs again once the plugin syncs to another release. Where the two still differ, as
   after an install that failed, the session start's `release:` line and check-setup's
@@ -68,9 +78,13 @@ every project has updated its plugin.
 
 What it installs from depends on where the plugin is:
 
-- **A plugin installed on its own** shallow-clones this repository at `<tag>` into
-  `$BASSTLER_HOME/releases/<tag>`, the tag being the release its `plugin.json` names, and
-  syncs every distribution from that clone's `uv.lock`, not editable. A plugin naming none - a copy of the
+- **A plugin installed on its own** installs `basstler==<version>` from PyPI, the version
+  being the release its `plugin.json` names, and uses the environment only once
+  `python -m basstler --help` runs in it. When PyPI is out of reach, does not have the release
+  yet (the plugin branch moves with the tag, before the files are uploaded) or the package
+  does not run, it shallow-clones this repository at `<tag>` into
+  `$BASSTLER_HOME/releases/<tag>` and syncs every distribution from that clone's `uv.lock`,
+  not editable. A plugin naming none - a copy of the
   source tree outside a clone - installs nothing: session start says so on its
   `dependencies:` line, every hook stops with the same reason, and setup reports it as
   `mismatched`. Reinstall the plugin from the marketplace.

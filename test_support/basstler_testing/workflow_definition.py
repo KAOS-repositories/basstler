@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from basstler.github.workflows import TriggerEvent
 
 # %% vocabulary
 
@@ -32,14 +33,6 @@ class WorkflowKey(StrEnum):
     SECRETS = "secrets"
     REQUIRED = "required"
     ENVIRONMENT = "env"
-
-
-class WorkflowTrigger(StrEnum):
-    """
-    The events a workflow runs on, as its ``on`` key names them.
-    """
-
-    WORKFLOW_CALL = "workflow_call"
 
 
 class ExpressionDelimiter(StrEnum):
@@ -317,7 +310,7 @@ class Workflow:
         :return: The parsed workflow.
         """
         concurrency = data.get(WorkflowKey.CONCURRENCY)
-        call = data[True].get(WorkflowTrigger.WORKFLOW_CALL) or {}
+        call = data[True].get(TriggerEvent.WORKFLOW_CALL) or {}
         return cls(
             set(data[True]),
             {

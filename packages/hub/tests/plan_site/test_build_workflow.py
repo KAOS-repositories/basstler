@@ -13,8 +13,9 @@ from basstler.environment import GitHubCredentialVariable
 from basstler.plan_site.__main__ import SiteFile
 from basstler.plan_site.workflows import BuildSecret
 
+from basstler.github.workflows import TriggerEvent
 from basstler_testing.constants.paths import RepositoryLocation
-from basstler_testing.workflow_definition import Workflow, WorkflowTrigger
+from basstler_testing.workflow_definition import Workflow
 
 # %% reading the workflow
 
@@ -56,7 +57,7 @@ def build_workflow() -> Workflow:
 
 
 def test_the_build_is_a_reusable_workflow(build_workflow: Workflow):
-    assert WorkflowTrigger.WORKFLOW_CALL in build_workflow.triggers
+    assert TriggerEvent.WORKFLOW_CALL in build_workflow.triggers
 
 
 def test_the_build_compares_the_built_site_s_digest_with_the_published_one(

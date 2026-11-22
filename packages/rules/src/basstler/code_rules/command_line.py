@@ -131,12 +131,7 @@ def report_new_crossings(base_commit: str) -> CodeRulesExitCode:
     renames = checker.module_renames(git, base_commit)
     added = checker.package_crossings().added_since(base_crossings.renamed(renames))
     for crossing in added:
-        logger.error(
-            "basstler.%s newly imports basstler.%s across a distribution boundary; "
-            "move the code or the import",
-            crossing.importing_module,
-            crossing.imported_module,
-        )
+        logger.error(crossing.new_import_message())
     if added:
         return CodeRulesExitCode.CHANGES_NEEDED
     return CodeRulesExitCode.SUCCESS

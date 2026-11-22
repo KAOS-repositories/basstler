@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
 from basstler.github.permission_level import PermissionLevel
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.locations import ProjectLocation, WorkflowLocation
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.workflows import (
@@ -31,14 +31,9 @@ What the host of every address GitHub Pages serves a user's site from ends with.
 
 
 @dataclass(frozen=True)
-class SiteRepository:
+class SiteRepository(HasRepository):
     """
     The repository the user owns that builds and serves the plan site.
-    """
-
-    repository: Repository
-    """
-    The repository on GitHub.
     """
 
     @classmethod

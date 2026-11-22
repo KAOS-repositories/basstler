@@ -13,7 +13,7 @@ import basstler.plan_site.build_start
 from basstler.github.credential import GitHubCommand
 from basstler.github.repository import Repository
 from basstler.github.repository_attachment import SessionTool
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
 from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
@@ -54,7 +54,9 @@ def test_the_build_is_dispatched_on_the_site_s_default_branch():
         WorkflowDispatch(
             SITE.repository,
             WorkflowLocation.PLAN_SITE,
-            RepositoryDetails.from_json(SITE_DETAILS).default_branch.name,
+            RepositoryDetailsRead(SITE.repository)
+            .parse(SITE_DETAILS)
+            .default_branch.name,
         )
     ]
 

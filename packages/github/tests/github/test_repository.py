@@ -15,7 +15,6 @@ from basstler.github.repository import (
     NewTokenPage,
     GitHubAddress,
     MalformedRepositoryError,
-    RepositoryBranch,
     PullRequestReference,
     Repository,
 )
@@ -26,7 +25,7 @@ REPOSITORY = Repository("an-owner", "a-repository")
 The repository every well-formed reference and remote URL in these tests names.
 """
 
-BRANCH = Branch("main")
+BRANCH = Branch(REPOSITORY, "main")
 """
 The branch the page and path tests address.
 """
@@ -173,14 +172,14 @@ def test_a_file_s_page_is_under_its_branch():
 
 
 def test_the_compare_page_of_a_branch_on_the_same_repository_names_it_alone():
-    assert REPOSITORY.compare_url(BRANCH, RepositoryBranch("topic", REPOSITORY)) == (
+    assert REPOSITORY.compare_url(BRANCH, Branch(REPOSITORY, "topic")) == (
         f"{REPOSITORY.url}/compare/{BRANCH.name}...topic"
     )
 
 
 def test_the_compare_page_of_a_branch_on_a_fork_names_its_owner():
     fork = Repository("a-forker", REPOSITORY.name)
-    assert REPOSITORY.compare_url(BRANCH, RepositoryBranch("topic", fork)) == (
+    assert REPOSITORY.compare_url(BRANCH, Branch(fork, "topic")) == (
         f"{REPOSITORY.url}/compare/{BRANCH.name}...a-forker:topic"
     )
 
@@ -195,13 +194,18 @@ def test_a_token_form_is_under_github_s_web_root():
 
 
 def test_a_branch_on_its_pull_request_s_repository_is_named_alone():
-    branch = RepositoryBranch("topic", REPOSITORY)
-    assert branch.name_from(REPOSITORY) == branch.name
+    branch = Branch(REPOSITORY, "topic")
+    assert REPOSITORY.head_name(branch) == branch.name
 
 
 def test_a_branch_on_a_fork_is_named_under_the_fork_s_owner():
-    branch = RepositoryBranch("topic", Repository("a-forker", REPOSITORY.name))
-    assert branch.name_from(REPOSITORY) == branch.qualified_name == "a-forker:topic"
+    branch = Branch(Repository("a-forker", REPOSITORY.name), "topic")
+    assert REPOSITORY.head_name(branch) == "a-forker:topic"
+
+
+def test_a_branch_s_label_names_it_under_its_repository_s_owner():
+    branch = Branch(Repository("a-forker", REPOSITORY.name), "topic")
+    assert branch.repository.branch_label(branch) == "a-forker:topic"
 
 
 # %% REST paths

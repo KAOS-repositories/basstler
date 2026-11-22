@@ -14,6 +14,7 @@ from basstler.plan.exceptions import (
     DuplicateItemId,
     InvalidBlockers,
     InvalidDependsOn,
+    InvalidExternalDependencies,
     InvalidLandedItemCount,
     InvalidManifestRoot,
     InvalidSchemaVersion,
@@ -36,7 +37,12 @@ from basstler.plan.dependencies import (
     DependencyReference,
     PlanDirectory,
 )
-from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument
+from basstler.plan.model import (
+    ExternalDependency,
+    ItemStatus,
+    ManifestKey,
+    PlanDocument,
+)
 from basstler.plan.model_alias import ModelAlias
 from basstler.plan.validation import PlanValidator
 
@@ -137,6 +143,38 @@ def test_validation_rejects_blockers_that_is_not_a_list():
     with pytest.raises(PlanValidationError) as error:
         PlanValidator(minimal_plan(items=items)).validate()
     assert any(isinstance(problem, InvalidBlockers) for problem in error.value.problems)
+
+
+def test_validation_rejects_external_dependencies_that_is_not_a_list():
+    items = [manifest_item("a", external_dependencies="other-plan/some-item")]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(minimal_plan(items=items)).validate()
+    assert any(
+        isinstance(problem, InvalidExternalDependencies)
+        for problem in error.value.problems
+    )
+
+
+def test_validation_rejects_an_external_dependency_that_is_not_a_record():
+    items = [manifest_item("a", external_dependencies=["other-plan/some-item"])]
+    with pytest.raises(PlanValidationError) as error:
+        PlanValidator(minimal_plan(items=items)).validate()
+    assert any(
+        isinstance(problem, InvalidExternalDependencies)
+        for problem in error.value.problems
+    )
+
+
+def test_validation_accepts_external_dependencies_that_resolve_to_nothing():
+    record = ExternalDependency(
+        reference="other-plan/some-item",
+        title="Some item",
+        status=ItemStatus.IN_PROGRESS,
+        plan_description="What the other plan is for.",
+    )
+    items = [manifest_item("a", external_dependencies=[record.content])]
+
+    PlanValidator(minimal_plan(items=items)).validate()
 
 
 def test_validation_rejects_unknown_status():

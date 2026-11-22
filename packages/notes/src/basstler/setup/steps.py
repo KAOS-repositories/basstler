@@ -39,11 +39,12 @@ from dataclasses import dataclass
 from enum import Enum, StrEnum
 from pathlib import Path
 
+from basstler.git.remote_branch import RemoteBranch
 from basstler.bash import Bash
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandFailed, GitCommandRunner
-from basstler.github.remote_branch import GitHubRemoteBranch
-from basstler.github.repository import Repository
+from basstler.github.remote import GitHubRemote
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.stack_configuration import StackSetting
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
@@ -298,14 +299,9 @@ def resolve_repository(project_root: Path, notes_remote: str) -> Repository | No
 
 
 @dataclass(frozen=True)
-class ForkLabels(SetupStep):
+class ForkLabels(HasRepository, SetupStep):
     """
     Creating the labels this tooling reads and applies, in the user's fork.
-    """
-
-    repository: Repository
-    """
-    The fork the labels belong in.
     """
 
     @property
@@ -339,15 +335,10 @@ class ForkLabels(SetupStep):
 
 
 @dataclass(frozen=True)
-class RepositoryAccess(SetupStep):
+class RepositoryAccess(HasRepository, SetupStep):
     """
     Giving Claude access to the repository sessions read and open pull requests
     against.
-    """
-
-    repository: Repository
-    """
-    The repository the access has to cover.
     """
 
     @property
@@ -377,14 +368,9 @@ class RepositoryAccess(SetupStep):
 
 
 @dataclass(frozen=True)
-class ForkActions(SetupStep):
+class ForkActions(HasRepository, SetupStep):
     """
     Switching Actions on in a fork, where ``/upstream-reviews``' Action runs.
-    """
-
-    repository: Repository
-    """
-    The fork.
     """
 
     @property
@@ -538,15 +524,10 @@ class PersonalNotesWriteRefusedError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class PersonalUpstream:
+class PersonalUpstream(HasRepository):
     """
     Naming the project's upstream in the user's personal ``stack.toml``, so a project
     that commits nothing of basstler's still has one.
-    """
-
-    repository: Repository
-    """
-    The repository the project's pull requests are reviewed on.
     """
 
     @classproperty
@@ -721,8 +702,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if arguments.command == SetupCommand.INSTALL_UPSTREAM_REVIEWS_ACTION:
         remote = PersonalNotesSetting.REMOTE.resolve(project_root, os.environ)
-        branch = GitHubRemoteBranch(
-            ActionBranch.NAME, GitCommandRunner(project_root), remote
+        branch = RemoteBranch(
+            GitHubRemote(GitCommandRunner(project_root), remote), ActionBranch.NAME
         )
         try:
             changed = ActionInstallation(arguments.branch_or_tag).install(branch)
@@ -730,7 +711,7 @@ def main(argv: list[str] | None = None) -> int:
             logger.error(failure)
             return 1
         logger.info(
-            f"{ActionBranch.NAME} on {branch.description} "
+            f"{ActionBranch.NAME} on {branch.repository.description} "
             f"{'now runs' if changed else 'already runs'} basstler {arguments.branch_or_tag}"
         )
         return 0

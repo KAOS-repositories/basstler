@@ -1,12 +1,18 @@
 """
-Finds imports that cross from one distribution into another it does not list.
+Finds imports that cross from one distribution into another it does not list, or into a
+third-party library it does not require.
 """
 
 from __future__ import annotations
 
+import importlib.metadata
+import re
+import sys
 import tempfile
-from collections.abc import Iterator, Mapping
+from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from types import TracebackType
 
@@ -20,7 +26,7 @@ from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.directory_tree import DirectoryTree
 from basstler.git.commands import GitCommandRunner
 from basstler.locations import PackageLocation, WorkspaceLocation
-from basstler.package_map import Workspace
+from basstler.package_map import REQUIREMENT_NAME, Workspace
 
 # %% imports
 
@@ -43,9 +49,48 @@ class ModuleImport:
 
 
 @dataclass(frozen=True)
-class BoundaryCrossing:
+class ImportStatement:
     """
-    A module importing a module of a distribution its own distribution does not list.
+    An absolute import statement, for one imported module.
+    """
+
+    module: str
+    """
+    The dotted name of the module imported, or read from.
+    """
+
+    names: tuple[str, ...]
+    """
+    The names a ``from`` import takes from :attr:`module`; none for a plain import.
+    """
+
+    location: CodeRange
+    """
+    Where the import statement lies in the source.
+    """
+
+
+@dataclass(frozen=True)
+class LibraryImport:
+    """
+    One third-party library an import statement imports, with the statement.
+    """
+
+    imported_library: str
+    """
+    The top-level package imported, as the source spells it.
+    """
+
+    location: CodeRange
+    """
+    Where the import statement lies in the source.
+    """
+
+
+@dataclass(frozen=True, order=True)
+class ImportCrossing(ABC):
+    """
+    A module importing something its own distribution may not.
     """
 
     importing_module: str
@@ -53,10 +98,49 @@ class BoundaryCrossing:
     The dotted name, within ``basstler``, of the module holding the import.
     """
 
+    @abstractmethod
+    def new_import_message(self) -> str:
+        """
+        :return: The error reporting that the module newly holds this import.
+        """
+
+
+@dataclass(frozen=True, order=True)
+class BoundaryCrossing(ImportCrossing):
+    """
+    A module importing a module of a distribution its own distribution does not list.
+    """
+
     imported_module: str
     """
     The dotted name, within ``basstler``, of the module it imports.
     """
+
+    def new_import_message(self) -> str:
+        return (
+            f"basstler.{self.importing_module} newly imports "
+            f"basstler.{self.imported_module} across a distribution boundary; "
+            "move the code or the import"
+        )
+
+
+@dataclass(frozen=True, order=True)
+class LibraryCrossing(ImportCrossing):
+    """
+    A module importing a third-party library its own distribution does not require.
+    """
+
+    imported_library: str
+    """
+    The top-level package imported, as the source spells it.
+    """
+
+    def new_import_message(self) -> str:
+        return (
+            f"basstler.{self.importing_module} newly imports the library "
+            f"{self.imported_library}, which its distribution does not require; "
+            "require it in the distribution's pyproject.toml or move the import"
+        )
 
 
 @dataclass(frozen=True)
@@ -87,16 +171,31 @@ class PackageCrossings:
 
     crossings: tuple[BoundaryCrossing, ...]
     """
-    The crossings, each once, ordered by importing and then imported module.
+    The crossings of distributions, each once, ordered by importing and then imported
+    module.
     """
 
-    def added_since(self, base: PackageCrossings) -> tuple[BoundaryCrossing, ...]:
+    library_crossings: tuple[LibraryCrossing, ...] = ()
+    """
+    The crossings of libraries, each once, ordered by importing module and then library.
+    """
+
+    @property
+    def all_crossings(self) -> tuple[ImportCrossing, ...]:
+        """
+        The crossings of distributions, then those of libraries.
+        """
+        return (*self.crossings, *self.library_crossings)
+
+    def added_since(self, base: PackageCrossings) -> tuple[ImportCrossing, ...]:
         """
         :param base: The crossings of the checkout this one is compared with.
         :return: The crossings this checkout has and *base* does not.
         """
         return tuple(
-            crossing for crossing in self.crossings if crossing not in base.crossings
+            crossing
+            for crossing in self.all_crossings
+            if crossing not in base.all_crossings
         )
 
     def renamed(self, renames: ModuleRenames) -> PackageCrossings:
@@ -111,8 +210,87 @@ class PackageCrossings:
                     imported_module=renames.current_name(crossing.imported_module),
                 )
                 for crossing in self.crossings
-            )
+            ),
+            library_crossings=tuple(
+                LibraryCrossing(
+                    importing_module=renames.current_name(crossing.importing_module),
+                    imported_library=crossing.imported_library,
+                )
+                for crossing in self.library_crossings
+            ),
         )
+
+
+# %% installed libraries
+
+EXTRA_MARKER = re.compile(r"\bextra\s*==")
+"""
+The environment marker of a requirement that only an extra brings in.
+"""
+
+
+@dataclass(frozen=True)
+class InstalledLibraries:
+    """
+    The distributions installed in the running environment and what each requires.
+    """
+
+    @staticmethod
+    def canonical_name(name: str) -> str:
+        """
+        :param name: A distribution's name as any requirement or metadata spells it.
+        :return: The name with runs of ``-``, ``_`` and ``.`` read as one ``-``, in lower
+            case.
+        """
+        return re.sub(r"[-_.]+", "-", name).lower()
+
+    @cached_property
+    def distributions_by_package(self) -> Mapping[str, frozenset[str]]:
+        """
+        The names of the distributions providing each top-level importable package.
+        """
+        return {
+            package: frozenset(map(self.canonical_name, names))
+            for package, names in importlib.metadata.packages_distributions().items()
+        }
+
+    @cached_property
+    def requirements_by_distribution(self) -> Mapping[str, frozenset[str]]:
+        """
+        The names of the distributions each installed distribution requires, without
+        those only an extra requires.
+        """
+        return {
+            self.canonical_name(distribution.metadata["Name"]): frozenset(
+                self.canonical_name(REQUIREMENT_NAME.match(requirement).group())
+                for requirement in distribution.requires or ()
+                if not EXTRA_MARKER.search(requirement)
+            )
+            for distribution in importlib.metadata.distributions()
+        }
+
+    def distributions_providing(self, package: str) -> frozenset[str]:
+        """
+        :param package: A top-level importable package.
+        :return: The distributions providing it; none when it is installed nowhere.
+        """
+        return self.distributions_by_package.get(package, frozenset())
+
+    def required_closure(self, names: Iterable[str]) -> frozenset[str]:
+        """
+        :param names: Names of distributions, as a ``pyproject.toml`` spells them.
+        :return: Them and every distribution they require in turn, each canonically
+            named.
+        """
+        closure: set[str] = set()
+        pending = [self.canonical_name(name) for name in names]
+        while pending:
+            name = pending.pop()
+            if name in closure:
+                continue
+            closure.add(name)
+            pending.extend(self.requirements_by_distribution.get(name, ()))
+        return frozenset(closure)
 
 
 # %% the checker
@@ -132,6 +310,11 @@ class PackageBoundaryChecker(CodeRuleChecker):
     The distributions checked; files outside their parts of ``basstler`` are not.
     """
 
+    installed_libraries: InstalledLibraries = field(default_factory=InstalledLibraries)
+    """
+    The libraries installed, which the imported ones are mapped to.
+    """
+
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         module = self.module_name(path)
         if not module:
@@ -147,30 +330,45 @@ class PackageBoundaryChecker(CodeRuleChecker):
                 f"from {imported.distribution}, which its pyproject.toml does not list; "
                 "move the code or the import",
             )
+        for library_crossing in self.library_crossings(path):
+            yield CodeRuleViolation(
+                path,
+                library_crossing.location.start.line,
+                library_crossing.location.end.line,
+                f"{importing.distribution} imports {library_crossing.imported_library}"
+                ", which neither its pyproject.toml nor a distribution it lists "
+                "requires; require it there or move the import",
+            )
 
     def package_crossings(self) -> PackageCrossings:
         """
         :return: The crossings of every module of :attr:`workspace`.
         """
-        crossings = {
-            BoundaryCrossing(
-                importing_module=module, imported_module=crossing.imported_module
-            )
+        paths = {
+            path: module
             for directory in self.workspace.namespace_package.directories
             for path in directory.rglob("*.py")
             if (module := self.module_name(path))
-            for crossing in self.crossings(path)
         }
         return PackageCrossings(
             crossings=tuple(
                 sorted(
-                    crossings,
-                    key=lambda crossing: (
-                        crossing.importing_module,
-                        crossing.imported_module,
-                    ),
+                    {
+                        BoundaryCrossing(module, crossing.imported_module)
+                        for path, module in paths.items()
+                        for crossing in self.crossings(path)
+                    }
                 )
-            )
+            ),
+            library_crossings=tuple(
+                sorted(
+                    {
+                        LibraryCrossing(module, crossing.imported_library)
+                        for path, module in paths.items()
+                        for crossing in self.library_crossings(path)
+                    }
+                )
+            ),
         )
 
     def module_renames(self, git: GitCommandRunner, base_commit: str) -> ModuleRenames:
@@ -236,29 +434,71 @@ class PackageBoundaryChecker(CodeRuleChecker):
                 continue
             yield module_import
 
+    def library_crossings(self, path: Path) -> Iterator[LibraryImport]:
+        """
+        :param path: A source file of a module some distribution claims.
+        :return: Every import in it of a library neither its own distribution nor a
+            distribution it lists requires, directly or through what they require.
+        """
+        importing = self.workspace.package_map.claiming(self.module_name(path))
+        allowed = self.installed_libraries.required_closure(
+            self.workspace.package_map.libraries_required_by(importing.distribution)
+        )
+        for library_import in self.library_imports(path):
+            providers = self.installed_libraries.distributions_providing(
+                library_import.imported_library
+            )
+            if not providers & allowed:
+                yield library_import
+
+    def library_imports(self, path: Path) -> Iterator[LibraryImport]:
+        """
+        :param path: A Python source file.
+        :return: Every import in it of a package that is neither the standard library
+            nor ``basstler``.
+        """
+        for statement in self.import_statements(path):
+            root = statement.module.partition(".")[0]
+            if root != PackageLocation.DIRECTORY.name and (
+                root not in sys.stdlib_module_names
+            ):
+                yield LibraryImport(root, statement.location)
+
     def module_imports(self, path: Path) -> Iterator[ModuleImport]:
         """
         :param path: A Python source file.
         :return: Every import in it of a module of the package.
         """
+        for statement in self.import_statements(path):
+            root, _, package = statement.module.partition(".")
+            if root != PackageLocation.DIRECTORY.name:
+                continue
+            if not statement.names and package:
+                yield ModuleImport(package, statement.location)
+            for name in statement.names:
+                yield ModuleImport(
+                    self.imported_name(package, name), statement.location
+                )
+
+    def import_statements(self, path: Path) -> Iterator[ImportStatement]:
+        """
+        :param path: A Python source file.
+        :return: Each of its absolute imports, one per imported module.
+        """
         module = PositionedModule(PythonSourceFile(path).parse())
         for statement, location in module.positions.items():
             if isinstance(statement, libcst.Import):
                 for alias in statement.names:
-                    root, _, imported = self.dotted_name(alias.name).partition(".")
-                    if root == PackageLocation.DIRECTORY.name and imported:
-                        yield ModuleImport(imported, location)
+                    yield ImportStatement(self.dotted_name(alias.name), (), location)
             if isinstance(statement, libcst.ImportFrom) and not statement.relative:
-                root, _, package = self.dotted_name(statement.module).partition(".")
-                if root != PackageLocation.DIRECTORY.name:
-                    continue
                 names = (
                     ["*"]
                     if isinstance(statement.names, libcst.ImportStar)
                     else [self.dotted_name(alias.name) for alias in statement.names]
                 )
-                for name in names:
-                    yield ModuleImport(self.imported_name(package, name), location)
+                yield ImportStatement(
+                    self.dotted_name(statement.module), tuple(names), location
+                )
 
     @staticmethod
     def dotted_name(name: libcst.Attribute | libcst.Name | None) -> str:

@@ -194,6 +194,12 @@ class DistributionDeclaration:
     The distributions it may import.
     """
 
+    libraries: tuple[str, ...] = ()
+    """
+    The names, as its ``pyproject.toml`` spells them, of the third-party libraries it
+    requires itself.
+    """
+
     @classmethod
     def read(cls, directory: Path) -> DistributionDeclaration:
         """
@@ -225,6 +231,7 @@ class DistributionDeclaration:
                 for name in metadata.requirement_names
                 if name in names
             ),
+            tuple(name for name in metadata.requirement_names if name not in names),
         )
 
     def claim_length(self, module: str) -> int:
@@ -309,6 +316,20 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
             for dependency in declaration.dependencies:
                 graph.add_edge(nodes[declaration.distribution], nodes[dependency], None)
         return graph
+
+    def libraries_required_by(self, distribution: Distribution) -> frozenset[str]:
+        """
+        :param distribution: A declared distribution.
+        :return: The third-party libraries it requires itself, and those of every
+            distribution it lists, as their ``pyproject.toml`` files spell them.
+        """
+        declaration = self[distribution]
+        return frozenset(declaration.libraries).union(
+            *(
+                self.libraries_required_by(dependency)
+                for dependency in declaration.dependencies
+            )
+        )
 
     def claiming(self, module: str) -> DistributionDeclaration | None:
         """

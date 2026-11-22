@@ -1163,3 +1163,53 @@ class PackageBoundarySnippet(PathEnumeration):
     """
     The lower distribution importing the higher one.
     """
+
+
+class ThirdPartyImportSnippet(PathEnumeration):
+    """
+    A workspace of two distributions, the lower one requiring ``pydantic``, whose
+    modules import libraries.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "third-party-imports"
+    """
+    The workspace's root.
+    """
+
+    LOWER_MODULES = DIRECTORY / "packages" / "low" / "src" / "basstler" / "low"
+    """
+    The lower distribution's part of ``basstler``.
+    """
+
+    LISTED = LOWER_MODULES / "listed_library.py"
+    """
+    Imports ``pydantic``, which the distribution lists.
+    """
+
+    REQUIRED = LOWER_MODULES / "required_library.py"
+    """
+    Imports ``annotated_types``, which ``pydantic`` requires.
+    """
+
+    UNREQUIRED = LOWER_MODULES / "unrequired_library.py"
+    """
+    Imports ``libcst``, which nothing the distribution lists leads to.
+    """
+
+    UNINSTALLED = LOWER_MODULES / "uninstalled_library.py"
+    """
+    Imports a library installed nowhere.
+    """
+
+    STANDARD = LOWER_MODULES / "standard_library.py"
+    """
+    Imports only the standard library.
+    """
+
+    INHERITED = (
+        DIRECTORY / "packages" / "high" / "src" / "basstler" / "high"
+    ) / "inherited_library.py"
+    """
+    The higher distribution importing ``pydantic``, which the lower one it lists
+    requires.
+    """

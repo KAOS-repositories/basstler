@@ -12,6 +12,7 @@ import pytest
 
 from basstler.code_rules.package_boundaries import (
     BoundaryCrossing,
+    LibraryCrossing,
     ModuleRenames,
     PackageAtCommit,
     PackageBoundaryChecker,
@@ -19,7 +20,10 @@ from basstler.code_rules.package_boundaries import (
 )
 from basstler.package_map import Workspace
 
-from basstler_testing.constants.paths import PackageBoundarySnippet
+from basstler_testing.constants.paths import (
+    PackageBoundarySnippet,
+    ThirdPartyImportSnippet,
+)
 
 # %% the dataset's workspace
 
@@ -208,3 +212,121 @@ def test_a_commit_holding_no_distributions_has_no_checker(scratch_repository):
         scratch_repository.git, "HEAD", scratch_repository.project_root
     ) as base_checker:
         assert base_checker is None
+
+
+# %% third-party libraries
+
+
+@pytest.fixture
+def library_checker() -> PackageBoundaryChecker:
+    """
+    :return: A checker of the workspace whose lower distribution requires ``pydantic``.
+    """
+    return PackageBoundaryChecker(Workspace(ThirdPartyImportSnippet.DIRECTORY.value))
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        ThirdPartyImportSnippet.LISTED,
+        ThirdPartyImportSnippet.REQUIRED,
+        ThirdPartyImportSnippet.STANDARD,
+        ThirdPartyImportSnippet.INHERITED,
+    ],
+    ids=lambda snippet: snippet.value.read_text(encoding="utf-8").splitlines()[1],
+)
+def test_an_import_of_a_library_the_distribution_may_use_is_not_reported(
+    library_checker, snippet
+):
+    """
+    A library the distribution lists, one a listed library requires, one a distribution
+    it lists requires and the standard library are all allowed.
+    """
+    assert violation_lines(library_checker, snippet) == []
+
+
+def test_an_import_of_a_library_no_requirement_leads_to_is_reported(library_checker):
+    """
+    ``libcst`` is installed, yet nothing the distribution lists requires it.
+    """
+    import_line = 7
+
+    assert violation_lines(library_checker, ThirdPartyImportSnippet.UNREQUIRED) == [
+        import_line
+    ]
+
+
+def test_an_import_of_an_uninstalled_library_is_reported(library_checker):
+    """
+    A library installed nowhere cannot be among the requirements.
+    """
+    (crossing,) = library_checker.library_crossings(ThirdPartyImportSnippet.UNINSTALLED)
+
+    assert crossing.imported_library == "no_such_library_installed"
+
+
+def test_a_library_crossing_names_the_imported_library(library_checker):
+    """
+    The crossing carries the top-level package imported, as the source spells it.
+    """
+    (crossing,) = library_checker.library_crossings(ThirdPartyImportSnippet.UNREQUIRED)
+
+    assert crossing.imported_library == "libcst"
+
+
+def test_the_package_s_library_crossings_are_listed_by_module(library_checker):
+    """
+    The workspace holds one library crossing per unrequired or uninstalled import.
+    """
+    assert library_checker.package_crossings().library_crossings == (
+        LibraryCrossing(
+            importing_module="low.uninstalled_library",
+            imported_library="no_such_library_installed",
+        ),
+        LibraryCrossing(
+            importing_module="low.unrequired_library", imported_library="libcst"
+        ),
+    )
+
+
+def test_a_library_crossing_the_base_holds_is_not_new(library_checker):
+    """
+    A library crossing the base already had is left for the item that fixes it.
+    """
+    crossings = library_checker.package_crossings()
+
+    assert crossings.added_since(crossings) == ()
+
+
+def test_a_library_crossing_the_base_does_not_hold_is_new(library_checker):
+    """
+    Against a base with no crossings, every library crossing is new.
+    """
+    crossings = library_checker.package_crossings()
+
+    assert crossings.added_since(PackageCrossings(crossings=())) == (
+        *crossings.crossings,
+        *crossings.library_crossings,
+    )
+
+
+def test_a_library_crossing_follows_its_module_s_rename(library_checker):
+    """
+    A module that moved keeps the library crossings it had under its old name.
+    """
+    crossings = library_checker.package_crossings()
+    renames = ModuleRenames({"low.before_the_move": "low.unrequired_library"})
+    base = PackageCrossings(
+        crossings=(),
+        library_crossings=(
+            LibraryCrossing(
+                importing_module="low.before_the_move", imported_library="libcst"
+            ),
+            LibraryCrossing(
+                importing_module="low.uninstalled_library",
+                imported_library="no_such_library_installed",
+            ),
+        ),
+    )
+
+    assert crossings.added_since(base.renamed(renames)) == ()

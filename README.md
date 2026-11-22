@@ -52,8 +52,9 @@ shipped paths would go stale.
   TestPyPI and, only if that took them, to PyPI, each through trusted publishing, so no token
   is stored. It needs a pending trusted publisher for each distribution's name on both
   indexes, naming this repository, `publish.yml` and the environments `testpypi` and `pypi`.
-  A release whose publishing stopped is finished by running the workflow by hand with its
-  tag; files an index already holds are skipped. Each wheel and source distribution carries
+  A release whose publishing stopped is finished by re-running the failed run in the
+  Actions tab (or starting `publish.yml` there with the tag, when no run exists); files an
+  index already holds are skipped, so nothing is uploaded twice. Each wheel and source distribution carries
   `LICENSE` and `NOTICE`. Anyone can `pip install basstler` without `uv`.
 - **A session start installs the tag its plugin's `plugin.json` names,** and a hook
   installs again once the plugin syncs to another release. Where the two still differ, as

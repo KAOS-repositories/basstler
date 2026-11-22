@@ -11,8 +11,9 @@ from hatchling.metadata.plugin.interface import MetadataHookInterface
 from hatchling.plugin import hookimpl
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
-from packaging.utils import canonicalize_name
 from packaging.version import Version
+
+from basstler.build.release import BasstlerFamily
 
 # %% the hook
 
@@ -29,12 +30,6 @@ class SiblingPinsHook(MetadataHookInterface):
     PLUGIN_NAME = "basstler-sibling-pins"
     """
     The name a ``pyproject.toml`` configures the hook under.
-    """
-
-    family = "basstler"
-    """
-    The distribution whose name, alone or followed by a hyphen and a part, names a
-    sibling.
     """
 
     def update(self, metadata: dict[str, Any]) -> None:
@@ -55,8 +50,7 @@ class SiblingPinsHook(MetadataHookInterface):
         :return: *requirement*, its markers and extras kept, pinned to *version* when it
             names a sibling; else *requirement* itself.
         """
-        name = canonicalize_name(requirement.name)
-        if name != self.family and not name.startswith(f"{self.family}-"):
+        if not BasstlerFamily.includes(requirement.name):
             return requirement
         pinned = Requirement(str(requirement))
         pinned.specifier = SpecifierSet(f"=={version}")

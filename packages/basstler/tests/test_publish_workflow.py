@@ -6,77 +6,27 @@ after TestPyPI took the same files.
 
 from __future__ import annotations
 
-from enum import StrEnum
-from typing import Any
-
+import pytest
 import yaml
 
 from basstler_testing.constants.paths import RepositoryLocation
-from basstler_testing.workflow_definition import Workflow, WorkflowJob, WorkflowKey
+from basstler_testing.publish_workflow_definition import (
+    IdentityTokenPermission,
+    PackageIndex,
+    PublishAction,
+    PublishJobName,
+    PublishWorkflow,
+)
 
-# %% vocabulary
+# %% the workflow
 
 
-class PublishJob(StrEnum):
+@pytest.fixture(scope="module")
+def workflow() -> PublishWorkflow:
     """
-    The jobs of the publish workflow.
+    The publish workflow file, parsed.
     """
-
-    BUILD = "build"
-    TEST_PYPI = "publish-testpypi"
-    PYPI = "publish-pypi"
-
-
-class PublishTarget(StrEnum):
-    """
-    The package indexes a release is published to, in the order they are reached.
-    """
-
-    TEST_PYPI = "testpypi"
-    PYPI = "pypi"
-
-
-class PublishAction(StrEnum):
-    """
-    The actions the workflow uses to hand files over and publish them.
-    """
-
-    PUBLISH = "pypa/gh-action-pypi-publish"
-    UPLOAD = "actions/upload-artifact"
-    DOWNLOAD = "actions/download-artifact"
-
-
-class PublishKey(StrEnum):
-    """
-    The keys of the workflow file these tests read beyond the shared definition.
-    """
-
-    NEEDS = "needs"
-    PERMISSIONS = "permissions"
-    ENVIRONMENT = "environment"
-    STEPS = "steps"
-    WITH = "with"
-    USES = "uses"
-    RUN = "run"
-    ID_TOKEN = "id-token"
-    WRITE = "write"
-    REPOSITORY_URL = "repository-url"
-    SKIP_EXISTING = "skip-existing"
-    PASSWORD = "password"
-    REF = "ref"
-    FETCH_DEPTH = "fetch-depth"
-    WORKFLOWS = "workflows"
-    TYPES = "types"
-    INPUTS = "inputs"
-    TAG = "tag"
-
-
-class UploadAddress(StrEnum):
-    """
-    Where TestPyPI takes uploads.
-    """
-
-    LEGACY_UPLOAD = "https://test.pypi.org/legacy/"
+    return PublishWorkflow.read()
 
 
 RELEASE_WORKFLOW_NAME = yaml.safe_load(
@@ -86,189 +36,137 @@ RELEASE_WORKFLOW_NAME = yaml.safe_load(
 The name the Release workflow declares, which the publish workflow waits for.
 """
 
-# %% reading the workflow
-
-
-def publish_file() -> dict[Any, Any]:
-    """
-    :return: The workflow as YAML loads it, which reads the ``on`` key as ``True``.
-    """
-    return yaml.safe_load(
-        RepositoryLocation.PUBLISH_WORKFLOW.read_text(encoding="utf-8")
-    )
-
-
-def raw_job(publishing_job: PublishJob) -> dict[str, Any]:
-    """
-    :param publishing_job: One of the workflow's jobs.
-    :return: The job as the file writes it.
-    """
-    return publish_file()[WorkflowKey.JOBS][publishing_job]
-
-
-def parsed_job(publishing_job: PublishJob) -> WorkflowJob:
-    """
-    :param publishing_job: One of the workflow's jobs.
-    :return: The job, parsed.
-    """
-    return Workflow.read(RepositoryLocation.PUBLISH_WORKFLOW).jobs[publishing_job]
-
-
-def publish_step(target: PublishTarget) -> dict[str, Any]:
-    """
-    :param target: The index a job publishes to.
-    :return: The step of that job which publishes, as the file writes it.
-    """
-    publishing_job = {
-        PublishTarget.TEST_PYPI: PublishJob.TEST_PYPI,
-        PublishTarget.PYPI: PublishJob.PYPI,
-    }[target]
-    (step,) = (
-        step
-        for step in raw_job(publishing_job)[PublishKey.STEPS]
-        if step.get(PublishKey.USES, "").startswith(PublishAction.PUBLISH)
-    )
-    return step
-
-
 # %% when it runs
 
 
-def test_the_workflow_follows_a_finished_release():
+def test_the_workflow_follows_a_finished_release(workflow: PublishWorkflow):
     """
     It starts when the Release workflow completes, so a commit that was not released
     publishes nothing.
     """
-    trigger = publish_file()[True]["workflow_run"]
+    trigger = workflow.triggers.release_run
 
-    assert trigger[PublishKey.WORKFLOWS] == [RELEASE_WORKFLOW_NAME]
-    assert trigger[PublishKey.TYPES] == ["completed"]
+    assert trigger.workflows == [RELEASE_WORKFLOW_NAME]
+    assert trigger.types == ["completed"]
 
 
-def test_a_release_that_failed_publishes_nothing():
+def test_a_release_that_failed_publishes_nothing(workflow: PublishWorkflow):
     """
     A Release run that failed tagged nothing, so there is nothing to publish.
     """
     assert "github.event.workflow_run.conclusion == 'success'" in (
-        parsed_job(PublishJob.BUILD).condition
+        workflow.jobs[PublishJobName.BUILD].condition
     )
 
 
-def test_a_tag_can_be_published_by_hand():
+def test_a_tag_can_be_published_by_hand(workflow: PublishWorkflow):
     """
     A release whose publishing stopped is finished by naming its tag, since the next
     release run finds nothing new to tag.
     """
-    inputs = publish_file()[True]["workflow_dispatch"][PublishKey.INPUTS]
-
-    assert PublishKey.TAG in inputs
+    assert "tag" in workflow.triggers.manual.inputs
 
 
 # %% what is built
 
 
-def test_every_distribution_is_built_from_the_tagged_commit_with_its_history():
+def test_every_distribution_is_built_from_the_tagged_commit_with_its_history(
+    workflow: PublishWorkflow,
+):
     """
     The version is read from the tag, which a shallow checkout does not have.
     """
-    checkout = raw_job(PublishJob.BUILD)[PublishKey.STEPS][0]
+    checkout = workflow.jobs[PublishJobName.BUILD].steps[0]
 
-    assert checkout[PublishKey.WITH][PublishKey.FETCH_DEPTH] == 0
+    assert checkout.inputs["fetch-depth"] == 0
 
 
-def test_the_build_covers_every_member_of_the_workspace():
+def test_the_build_covers_every_member_of_the_workspace(workflow: PublishWorkflow):
     """
     One build produces every distribution, so none is left at the previous release.
     """
-    build = parsed_job(PublishJob.BUILD)
+    build = workflow.jobs[PublishJobName.BUILD]
 
-    assert any(
-        "uv build --all-packages" in (step.command or "") for step in build.steps
-    )
+    assert any("uv build --all-packages" in (step.run or "") for step in build.steps)
 
 
 # %% how it publishes
 
 
-def test_the_workflow_holds_no_credential():
+def test_the_workflow_holds_no_credential(workflow: PublishWorkflow):
     """
     Trusted publishing is the only way in: no secret and no token appears in the file.
     """
-    source = RepositoryLocation.PUBLISH_WORKFLOW.read_text(encoding="utf-8")
+    assert "secrets." not in workflow.source
+    for index in PackageIndex:
+        step = workflow.publishing_to(index).step_using(PublishAction.PUBLISH)
+        assert "password" not in step.inputs
 
-    assert "secrets." not in source
-    for target in PublishTarget:
-        assert PublishKey.PASSWORD not in publish_step(target).get(PublishKey.WITH, {})
 
-
-def test_only_the_jobs_that_publish_may_request_an_identity_token():
+def test_only_the_jobs_that_publish_may_request_an_identity_token(
+    workflow: PublishWorkflow,
+):
     """
     The identity token is what proves to the index which workflow publishes, so no other
     job can ask for one.
     """
     granting = {
-        name
-        for name, declared in publish_file()[WorkflowKey.JOBS].items()
-        if declared.get(PublishKey.PERMISSIONS, {}).get(PublishKey.ID_TOKEN)
-        == PublishKey.WRITE
+        name for name, job in workflow.jobs.items() if job.requests_identity_token
     }
 
-    assert granting == {PublishJob.TEST_PYPI, PublishJob.PYPI}
-    assert PublishKey.ID_TOKEN not in publish_file().get(PublishKey.PERMISSIONS, {})
+    assert granting == {index.job for index in PackageIndex}
+    assert IdentityTokenPermission.SCOPE not in workflow.permissions
 
 
-def test_each_index_is_published_from_an_environment_of_its_own():
+def test_each_index_is_published_from_an_environment_of_its_own(
+    workflow: PublishWorkflow,
+):
     """
     The index's trusted publisher names the environment, so one index's publisher cannot
     publish to the other.
     """
-    assert raw_job(PublishJob.TEST_PYPI)[PublishKey.ENVIRONMENT] == (
-        PublishTarget.TEST_PYPI
-    )
-    assert raw_job(PublishJob.PYPI)[PublishKey.ENVIRONMENT] == PublishTarget.PYPI
+    for index in PackageIndex:
+        assert workflow.publishing_to(index).environment == index
 
 
-def test_testpypi_is_published_to_at_its_own_address():
+def test_each_index_is_published_to_at_its_own_address(workflow: PublishWorkflow):
     """
-    The default address of the publish action is PyPI itself.
+    The default address of the publish action is PyPI itself, so only TestPyPI names one.
     """
-    step = publish_step(PublishTarget.TEST_PYPI)
-
-    assert step[PublishKey.WITH][PublishKey.REPOSITORY_URL] == (
-        UploadAddress.LEGACY_UPLOAD
-    )
-    assert PublishKey.REPOSITORY_URL not in publish_step(PublishTarget.PYPI).get(
-        PublishKey.WITH, {}
-    )
+    for index in PackageIndex:
+        step = workflow.publishing_to(index).step_using(PublishAction.PUBLISH)
+        assert step.inputs.get("repository-url") == index.upload_url
 
 
-def test_pypi_is_reached_only_after_testpypi_took_the_files():
+def test_pypi_is_reached_only_after_testpypi_took_the_files(workflow: PublishWorkflow):
     """
     A release the test index refuses never reaches PyPI.
     """
-    assert PublishJob.TEST_PYPI in raw_job(PublishJob.PYPI)[PublishKey.NEEDS]
-    assert PublishJob.BUILD in raw_job(PublishJob.TEST_PYPI)[PublishKey.NEEDS]
+    assert (
+        PublishJobName.PUBLISH_TESTPYPI
+        in workflow.publishing_to(PackageIndex.PYPI).needs
+    )
+    assert PublishJobName.BUILD in workflow.publishing_to(PackageIndex.TESTPYPI).needs
 
 
-def test_both_indexes_publish_the_files_the_build_made():
+def test_both_indexes_publish_the_files_the_build_made(workflow: PublishWorkflow):
     """
     What TestPyPI took is byte for byte what PyPI gets, since both download the
     build's artifact instead of building again.
     """
-    for publishing_job in (PublishJob.TEST_PYPI, PublishJob.PYPI):
-        actions = {
-            step.action for step in parsed_job(publishing_job).steps if step.action
-        }
+    for index in PackageIndex:
+        actions = {step.action for step in workflow.publishing_to(index).steps}
         assert PublishAction.DOWNLOAD in actions
     assert PublishAction.UPLOAD in {
-        step.action for step in parsed_job(PublishJob.BUILD).steps if step.action
+        step.action for step in workflow.jobs[PublishJobName.BUILD].steps
     }
 
 
-def test_a_publish_that_stopped_can_be_run_again():
+def test_a_publish_that_stopped_can_be_run_again(workflow: PublishWorkflow):
     """
     Files an index already holds are skipped, so running a half-published release again
     uploads what is missing instead of failing on what is there.
     """
-    for target in PublishTarget:
-        assert publish_step(target)[PublishKey.WITH][PublishKey.SKIP_EXISTING] is True
+    for index in PackageIndex:
+        step = workflow.publishing_to(index).step_using(PublishAction.PUBLISH)
+        assert step.inputs["skip-existing"] is True

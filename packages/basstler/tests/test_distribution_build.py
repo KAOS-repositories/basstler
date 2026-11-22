@@ -7,30 +7,17 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import tarfile
 import tomllib
-import zipfile
-from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 
 import pytest
+from basstler.build.release import BasstlerFamily, BuiltRelease, ReleaseFile
 from basstler.git.commands import GitCommandRunner
-from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 from basstler_testing.constants.paths import RepositoryLocation
 
 # %% vocabulary
-
-
-class ReleaseFile(StrEnum):
-    """
-    The files every distribution ships beside its code, named as in the repository root.
-    """
-
-    LICENSE = "LICENSE"
-    NOTICE = "NOTICE"
 
 
 class WorkspacePart(StrEnum):
@@ -53,44 +40,7 @@ RELEASE_VERSION = RELEASE_TAG.removeprefix("v")
 The version the build reads from :data:`RELEASE_TAG`.
 """
 
-FAMILY = "basstler"
-"""
-The distribution whose name, alone or followed by a hyphen, names a sibling.
-"""
-
 # %% a release built in a scratch repository
-
-
-@dataclass(frozen=True)
-class BuiltRelease:
-    """
-    The files ``uv build --all-packages`` produced at a tagged commit.
-    """
-
-    directory: Path
-    """
-    Where the wheels and source distributions are.
-    """
-
-    @property
-    def wheels(self) -> dict[str, Path]:
-        """
-        The wheels, by the canonical name of the distribution each is of.
-        """
-        return {
-            canonicalize_name(path.name.split("-")[0]): path
-            for path in self.directory.glob("*.whl")
-        }
-
-    @property
-    def source_distributions(self) -> dict[str, Path]:
-        """
-        The source distributions, by the canonical name of the distribution each is of.
-        """
-        return {
-            canonicalize_name(path.name.rsplit("-", 1)[0]): path
-            for path in self.directory.glob("*.tar.gz")
-        }
 
 
 def distribution_names() -> frozenset[str]:
@@ -164,27 +114,9 @@ def test_every_wheel_carries_the_version_of_the_tag(built_release: BuiltRelease)
     """
     All distributions of a release share one version, the tag's.
     """
-    versions = {path.name.split("-")[1] for path in built_release.wheels.values()}
+    versions = {wheel.version for wheel in built_release.wheels.values()}
 
     assert versions == {RELEASE_VERSION}
-
-
-def requirements_of(wheel: Path) -> list[Requirement]:
-    """
-    :param wheel: A built wheel.
-    :return: The requirements its metadata declares.
-    """
-    with zipfile.ZipFile(wheel) as archive:
-        (metadata,) = (
-            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
-        )
-        lines = archive.read(metadata).decode("utf-8").splitlines()
-    prefix = "Requires-Dist: "
-    return [
-        Requirement(line.removeprefix(prefix))
-        for line in lines
-        if line.startswith(prefix)
-    ]
 
 
 def test_every_requirement_on_a_sibling_is_pinned_to_the_release(
@@ -196,8 +128,8 @@ def test_every_requirement_on_a_sibling_is_pinned_to_the_release(
     siblings = [
         requirement
         for wheel in built_release.wheels.values()
-        for requirement in requirements_of(wheel)
-        if canonicalize_name(requirement.name).startswith(FAMILY)
+        for requirement in wheel.requirements
+        if BasstlerFamily.includes(requirement.name)
     ]
 
     assert siblings
@@ -213,17 +145,10 @@ def test_every_wheel_carries_the_release_files(
     """
     A wheel installed on its own still states its licence and its notices.
     """
+    expected = (RepositoryLocation.ROOT.value / release_file).read_bytes()
+
     for name, wheel in built_release.wheels.items():
-        with zipfile.ZipFile(wheel) as archive:
-            carried = {
-                Path(entry).name: archive.read(entry)
-                for entry in archive.namelist()
-                if ".dist-info/licenses/" in entry
-            }
-        assert (
-            carried[release_file]
-            == (RepositoryLocation.ROOT.value / release_file).read_bytes()
-        ), name
+        assert wheel.licence_file(release_file) == expected, name
 
 
 @pytest.mark.parametrize("release_file", list(ReleaseFile), ids=str)
@@ -234,6 +159,4 @@ def test_every_source_distribution_carries_the_release_files(
     The files sit at the root of the source distribution, not outside it.
     """
     for name, source in built_release.source_distributions.items():
-        with tarfile.open(source) as archive:
-            members = archive.getnames()
-        assert f"{source.name.removesuffix('.tar.gz')}/{release_file}" in members, name
+        assert source.carries_at_root(release_file), name

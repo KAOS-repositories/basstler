@@ -5,6 +5,8 @@ to a root.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from basstler.exceptions import ModuleOutsideRootError
@@ -73,13 +75,60 @@ def test_a_module_is_within_a_root_when_the_root_is_a_prefix_of_its_parts(
     )
 
 
-def test_a_module_relative_to_a_root_drops_the_root():
+def test_a_module_relative_to_a_root_keeps_the_root():
     """
-    ``basstler.low.helpers`` relative to ``basstler`` is ``low.helpers``.
+    ``basstler.low.helpers`` relative to ``basstler`` is ``low.helpers`` below
+    ``basstler``, so it does not lose where it lies.
     """
+    root = Module(("basstler",))
     module = Module.from_dotted_name("basstler.low.helpers")
 
-    assert module.relative_to(Module(("basstler",))) == Module(("low", "helpers"))
+    assert module.relative_to(root) == Module(("low", "helpers"), root)
+
+
+def test_a_relative_module_is_written_with_a_leading_dot():
+    """
+    The leading dot marks the form as relative, as in a relative import.
+    """
+    module = Module(("low", "helpers"), Module(("basstler",)))
+
+    assert str(module) == ".low.helpers"
+
+
+def test_a_relative_module_has_an_absolute_form_with_its_root():
+    """
+    Joining the root's parts back gives ``basstler.low.helpers``.
+    """
+    module = Module(("low", "helpers"), Module(("basstler",)))
+
+    assert module.absolute == Module(("basstler", "low", "helpers"))
+
+
+def test_an_absolute_module_is_its_own_absolute_form():
+    """
+    A module with no root needs no joining.
+    """
+    module = Module(("basstler", "low"))
+
+    assert module.absolute == module
+
+
+def test_a_relative_module_is_within_the_root_it_lies_below():
+    """
+    ``.low`` below ``basstler`` is within ``basstler``, though its own parts are not.
+    """
+    root = Module(("basstler",))
+
+    assert Module(("low",), root).is_within(root)
+
+
+def test_the_path_form_of_a_module_is_its_parts_as_directories():
+    """
+    ``low.helpers`` is the path ``low/helpers`` below its root, without a suffix.
+    """
+    module = Module(("low", "helpers"), Module(("basstler",)))
+
+    assert module.path == Path("low", "helpers")
 
 
 def test_a_module_outside_the_root_is_refused():

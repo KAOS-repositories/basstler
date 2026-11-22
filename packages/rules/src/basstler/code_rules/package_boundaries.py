@@ -99,8 +99,8 @@ class BoundaryCrossing(HasImportedModule, ImportCrossing):
 
     def new_import_message(self) -> str:
         return (
-            f"basstler.{self.importing_module} newly imports "
-            f"basstler.{self.imported_module} across a distribution boundary; "
+            f"{self.importing_module.absolute} newly imports "
+            f"{self.imported_module.absolute} across a distribution boundary; "
             "move the code or the import"
         )
 
@@ -118,7 +118,7 @@ class LibraryCrossing(ImportCrossing):
 
     def new_import_message(self) -> str:
         return (
-            f"basstler.{self.importing_module} newly imports the library "
+            f"{self.importing_module.absolute} newly imports the library "
             f"{self.imported_library}, which its distribution does not require; "
             "require it in the distribution's pyproject.toml or move the import"
         )
@@ -309,16 +309,16 @@ class PackageBoundaryChecker(CodeRuleChecker):
         module = self.module_of_file(path)
         if module is None:
             return
-        importing = self.workspace.package_map.claiming(str(module))
+        importing = self.workspace.package_map.claiming(module.dotted_name)
         for crossing in self.crossings(path):
             imported = self.workspace.package_map.claiming(
-                str(crossing.imported_module)
+                crossing.imported_module.dotted_name
             )
             yield CodeRuleViolation(
                 path,
                 crossing.statement.location.start.line,
                 crossing.statement.location.end.line,
-                f"{importing.distribution} imports basstler.{crossing.imported_module} "
+                f"{importing.distribution} imports {crossing.imported_module.absolute} "
                 f"from {imported.distribution}, which its pyproject.toml does not list; "
                 "move the code or the import",
             )
@@ -408,7 +408,9 @@ class PackageBoundaryChecker(CodeRuleChecker):
         if directory is None:
             return None
         parts = source.relative_to(directory).with_suffix("").parts
-        return Module(parts[:-1] if parts[-1] == "__init__" else parts)
+        return Module(
+            parts[:-1] if parts[-1] == "__init__" else parts, self.namespace_root
+        )
 
     def crossings(self, path: Path) -> Iterator[ModuleImport]:
         """
@@ -416,11 +418,13 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :return: Every import in it of a module of a distribution the module's own
             distribution does not list.
         """
-        importing = self.workspace.package_map.claiming(str(self.module_of_file(path)))
+        importing = self.workspace.package_map.claiming(
+            self.module_of_file(path).dotted_name
+        )
         allowed = {importing.distribution, *importing.dependencies}
         for module_import in self.module_imports(path):
             imported = self.workspace.package_map.claiming(
-                str(module_import.imported_module)
+                module_import.imported_module.dotted_name
             )
             if imported is None or imported.distribution in allowed:
                 continue
@@ -432,7 +436,9 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :return: Every import in it of a library neither its own distribution nor a
             distribution it lists requires, directly or through what they require.
         """
-        importing = self.workspace.package_map.claiming(str(self.module_of_file(path)))
+        importing = self.workspace.package_map.claiming(
+            self.module_of_file(path).dotted_name
+        )
         allowed = self.installed_libraries.resolve_required_distributions(
             self.workspace.package_map.libraries_required_by_distribution(
                 importing.distribution
@@ -518,11 +524,10 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :param name: A name it imports.
         :return: The module *name* is, when it is one, else *package*.
         """
-        candidate = Module((*package.parts, name))
-        location = Path(*candidate.parts)
+        candidate = Module((*package.parts, name), package.root)
         namespace_package = self.workspace.namespace_package
-        if namespace_package.every(location) or namespace_package.every(
-            location.with_suffix(".py")
+        if namespace_package.every(candidate.path) or namespace_package.every(
+            candidate.path.with_suffix(".py")
         ):
             return candidate
         return package

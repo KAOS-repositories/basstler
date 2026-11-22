@@ -242,10 +242,10 @@ class ModuleOutsideRootError(DataclassException, ValueError):
     """
 
     def error_message(self) -> str:
-        return f"{self.module} is not within {self.root}"
+        return f"{self.module.absolute} is not within {self.root.absolute}"
 
     def suggest_correction(self) -> str:
-        return f"name a module that starts with {self.root}"
+        return f"name a module that starts with {self.root.absolute}"
 
 
 @dataclass

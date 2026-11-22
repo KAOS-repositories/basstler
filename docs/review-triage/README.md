@@ -14,35 +14,15 @@ basstler review-triage mark-viewed <number>   # mark the mechanical files viewed
 Run them in a checkout of the project. `--repository <owner>/<name>` names the pull
 request's repository when it is not the checkout's `origin`.
 
-## On every pull request, automatically
+## In a Claude Code session, automatically
 
-Most people want this: every pull request opened or updated on a repository has its
-mechanical files marked viewed for you, with nothing to run. Updates matter, because
-GitHub clears "Viewed" from a file that changes again. In a checkout of the repository
-the pull requests are opened on, run:
-
-```bash
-basstler review-triage set-up-mark-viewed --on-every-pull-request
-```
-
-It installs a workflow there that runs on every pull request, and lists what is left to
-you: the token, stored as that repository's `REVIEW_TRIAGE_VIEWER_TOKEN` secret, as in
-[route 2](#route-2-from-a-repositorys-actions-from-anywhere). Run it again until nothing
-is left.
-
-- **Where it runs:** on the repository the pull requests are opened on, since a fork
-  never sees its parent's pull request events. That needs a repository whose workflows
-  and secrets you may change - one you maintain.
-- **Whose files:** it marks them viewed for the token's owner, one account per
-  repository. Everyone who can push to the repository can read its secrets through a
-  workflow, so give the token the least it needs and an expiry.
-- **Changing it:** the command never commits to a default branch. It opens a pull
-  request adding the workflow from its own branch, `basstler/mark-viewed`, for you to
-  review and merge. Where it may not push, it gives you GitHub's new-file page with the
-  workflow already filled in.
-
-The run uses `pull_request_target`, so pull requests from forks are marked too. It reads
-their commits but runs none of their code.
+A session with the basstler plugin marks the mechanical files of the pull request its
+checked-out branch has open each time a turn ends, once for each head commit, so every
+change Claude pushes is marked without anything to run. It marks directly where the
+session can, and asks a repository's Actions to where it cannot, as in a cloud session:
+set that route up as in [route 2](#route-2-from-a-repositorys-actions-from-anywhere).
+A push made outside a session is not marked until the next one, or until you run
+`mark-viewed`.
 
 ## Marking files viewed: pick a route
 
@@ -145,6 +125,5 @@ it, so it never marks files viewed for someone else.
 
 ## In Claude Code
 
-`/setup-review-triage` asks whether you want every pull request marked automatically,
-or which route to mark them on demand, runs the setup above and walks you through the
+`/setup-review-triage` asks which route to mark them on, runs the setup above and walks you through the
 steps left. `/setup-personal-notes` offers it as an optional step.

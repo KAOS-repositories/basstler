@@ -19,9 +19,25 @@ git -C "${CLAUDE_PROJECT_DIR:-.}" rev-parse --is-inside-work-tree > /dev/null 2>
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 source "${SCRIPT_DIR}/session-start-messages.sh"
 
-# Tell later commands where the plugin is (CLAUDE_ENV_FILE is SessionStart-only).
+# Tell later commands where the plugin is (CLAUDE_ENV_FILE is SessionStart-only). Claude
+# Code can replace the plugin's directory by a renamed sibling (basstler~g2) while the
+# session runs, so every later read of the file looks for the newest sibling if it is gone.
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   printf 'export BASSTLER_PLUGIN_ROOT=%q\n' "${PLUGIN_ROOT}" >> "${CLAUDE_ENV_FILE}"
+  cat >> "${CLAUDE_ENV_FILE}" <<'RECOVER_PLUGIN_ROOT'
+if [ ! -d "${BASSTLER_PLUGIN_ROOT}" ]; then
+  _basstler_parent="$(dirname "${BASSTLER_PLUGIN_ROOT}")"
+  _basstler_stem="$(basename "${BASSTLER_PLUGIN_ROOT}")"
+  _basstler_stem="${_basstler_stem%%~*}"
+  _basstler_current="$(for _basstler_candidate in "${_basstler_parent}/${_basstler_stem}"~* "${_basstler_parent}/${_basstler_stem}"; do
+    [ -f "${_basstler_candidate}/hooks/session-start.sh" ] && printf '%s\n' "${_basstler_candidate}"
+  done | sort -V | tail -n 1)"
+  if [ -n "${_basstler_current}" ]; then
+    export BASSTLER_PLUGIN_ROOT="${_basstler_current}"
+  fi
+  unset _basstler_parent _basstler_stem _basstler_current _basstler_candidate
+fi
+RECOVER_PLUGIN_ROOT
 fi
 
 # In a cloud session, how to attach a notes repository it cannot reach; empty otherwise.
@@ -334,13 +350,15 @@ else
   rm -f "${OUTPUT_FILE}"
 fi
 
-# Git identity from the notes branch, only where the clone has no local one.
-if ! recorded_git_identity_exists; then
+# Git identity from the notes branch, only where the clone has no local one: the
+# identity of the account this session works as (git_identity_path).
+GIT_IDENTITY_PATH="$(git_identity_path)"
+if ! recorded_git_identity_exists "${GIT_IDENTITY_PATH}"; then
   SUMMARY_GIT_IDENTITY="$(git_identity_line_not_recorded \
-    "${NOTES_BRANCH}" "${PERSONAL_GIT_IDENTITY_PATH}")"
-elif ! RECORDED_GIT_IDENTITY="$(recorded_git_identity)"; then
+    "${NOTES_BRANCH}" "${GIT_IDENTITY_PATH}")"
+elif ! RECORDED_GIT_IDENTITY="$(recorded_git_identity "${GIT_IDENTITY_PATH}")"; then
   SUMMARY_GIT_IDENTITY="$(git_identity_line_incomplete \
-    "${PERSONAL_GIT_IDENTITY_PATH}" "${NOTES_BRANCH}")"
+    "${GIT_IDENTITY_PATH}" "${NOTES_BRANCH}")"
 elif LOCAL_GIT_IDENTITY="$(repository_local_git_identity)"; then
   IFS=$'\t' read -r LOCAL_NAME LOCAL_EMAIL <<< "${LOCAL_GIT_IDENTITY}"
   SUMMARY_GIT_IDENTITY="$(git_identity_line_already_set \
@@ -350,7 +368,7 @@ else
   git config --local user.name "${RECORDED_NAME}"
   git config --local user.email "${RECORDED_EMAIL}"
   SUMMARY_GIT_IDENTITY="$(git_identity_line_written "${NOTES_BRANCH}" \
-    "${PERSONAL_GIT_IDENTITY_PATH}" \
+    "${GIT_IDENTITY_PATH}" \
     "$(format_git_identity "${RECORDED_NAME}" "${RECORDED_EMAIL}")")"
 fi
 

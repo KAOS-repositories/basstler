@@ -1,0 +1,18 @@
+{
+  "number": 7,
+  "title": "Work of the session",
+  "html_url": "https://github.com/example/project/pull/7",
+  "state": "open",
+  "merged_at": null,
+  "head": {
+    "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "ref": "claude/session-work",
+    "user": {"login": "example"},
+    "repo": {"full_name": "example/project"}
+  },
+  "base": {
+    "ref": "main",
+    "sha": "89abcdef0123456789abcdef0123456789abcdef",
+    "repo": {"full_name": "example/project"}
+  }
+}

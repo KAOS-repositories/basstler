@@ -29,7 +29,7 @@ You never hand-edit a ledger. The stack is read from **GitHub itself** plus git:
 
 ## Files
 
-Every module named below lives in the `basstler` package, `src/basstler/`, and runs
+Every module named below lives in the `basstler` package, `packages/stack/src/basstler/`, and runs
 from the package's own environment; `stack.toml` sits beside them. This document stays here,
 next to the workflow it describes, because it is read rather than run.
 

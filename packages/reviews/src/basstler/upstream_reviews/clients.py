@@ -1,0 +1,135 @@
+"""
+The interfaces through which GitHub is read, and the client implementing them through
+``gh``.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
+
+from basstler.class_property import classproperty
+from basstler.github.constants import GitHubExecutable
+from basstler.github.graphql import GraphQLRequest, GraphQLResponse
+from basstler.github.repository import Repository
+from basstler.upstream_reviews.exceptions import (
+    GitHubCommandFailed,
+)
+
+# %% client
+
+
+class JobLogReader(ABC):
+    """
+    Reads the log one Actions job recorded.
+    """
+
+    @abstractmethod
+    def read_job_log(self, repository: Repository, job_identifier: int) -> str:
+        """
+        Read one job's whole log.
+
+        :param repository: The repository the job ran in.
+        :param job_identifier: The job to read.
+        :return: The log, exactly as the runner recorded it.
+        """
+
+
+class GraphQLClient(ABC):
+    """
+    Sends a GraphQL document to GitHub and returns its ``data`` data.
+    """
+
+    @abstractmethod
+    def execute(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
+        """
+        Run one GraphQL query.
+
+        :param query: The GraphQL document.
+        :param variables: The document's variables.
+        :return: The response's ``data`` data.
+        """
+
+
+@dataclass
+class GitHubCommandLineClient(GraphQLClient, JobLogReader):
+    """
+    A client that shells out to ``gh api`` for GraphQL and job logs.
+
+    A runner ships ``gh`` and authenticates it from ``GITHUB_TOKEN``, and a Claude Code
+    session's proxy authenticates it for the repositories the session has attached, so
+    this holds no credential handling of its own.
+    """
+
+    executable: str = GitHubExecutable.COMMAND_LINE
+    """
+    The command to invoke, overridable for testing.
+    """
+
+    @classproperty
+    def allow_escape_sequences(cls) -> str:
+        """
+        What ``gh`` wants before it will print a log at all: a test runner colours its
+        own output, and ``gh`` refuses to write terminal escape sequences it was not
+        asked for.
+        """
+        return "--allow-escape-sequences"
+
+    def execute(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
+        """
+        Run one GraphQL query through ``gh``.
+
+        :param query: The GraphQL document.
+        :param variables: The document's variables.
+        :return: The response's ``data`` data.
+        :raises GitHubCommandFailed: If ``gh`` exits non-zero.
+        :raises GraphQLErrorsReturned: If GitHub answers with errors.
+        """
+        request = json.dumps(GraphQLRequest(query, variables).to_json())
+        return GraphQLResponse.from_json(
+            json.loads(self._run(["api", "graphql", "--input", "-"], request))
+        ).result()
+
+    def read_job_log(self, repository: Repository, job_identifier: int) -> str:
+        """
+        Read one job's log through ``gh``.
+
+        The upstream is a different repository from the one the runner is running in,
+        which its token reads as anyone else does.
+
+        :param repository: The repository the job ran in.
+        :param job_identifier: The job to read.
+        :return: The log, exactly as the runner recorded it.
+        :raises GitHubCommandFailed: If ``gh`` exits non-zero.
+        """
+        return self._run(
+            [
+                "api",
+                self.allow_escape_sequences,
+                repository.job_log_path(job_identifier),
+            ]
+        )
+
+    def _run(self, arguments: list[str], standard_input: str | None = None) -> str:
+        """
+        Invoke ``gh`` once and hand back what it wrote.
+
+        :param arguments: The arguments to pass.
+        :param standard_input: What to write to its standard input, if anything.
+        :return: Its standard output.
+        :raises GitHubCommandFailed: If it exits non-zero.
+        """
+        completed = subprocess.run(
+            [self.executable, *arguments],
+            input=standard_input,
+            capture_output=True,
+            encoding="utf-8",
+        )
+        if completed.returncode != 0:
+            raise GitHubCommandFailed(
+                self.executable, completed.returncode, completed.stderr.strip()
+            )
+        return completed.stdout

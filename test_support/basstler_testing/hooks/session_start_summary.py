@@ -1,0 +1,424 @@
+"""
+Reading session-start.sh's summary report back in a test.
+
+The hook's report is its only observable output, so more than one test module asserts
+against it; both halves of doing so live here rather than being written out again in
+each of them - parsing a line out of the report, and rendering the line the report is
+expected to carry from the same definitions the hook prints it from.
+
+.. note::
+   Rendering an expectation rather than restating it means a reword moves both sides at
+   once, so wording is deliberately not what these tests pin.
+"""
+
+from __future__ import annotations
+
+import os
+
+import subprocess
+from enum import StrEnum
+from pathlib import PurePath
+
+from basstler.bash import Bash
+from basstler.locations import PluginLocation
+
+from ..constants.paths import RepositoryLocation
+
+MESSAGES_SCRIPT = (
+    RepositoryLocation.HOOKS / PluginLocation.SESSION_START_MESSAGES_SCRIPT.name
+)
+"""
+The shell file defining the wording of every summary line.
+"""
+
+
+class SummaryLine(StrEnum):
+    """
+    The labels of the summary report's lines, as session-start.sh prints them.
+    """
+
+    PERSONAL_NOTES = "personal notes"
+    """
+    Whether the personal notes were loaded, and from where.
+    """
+
+    CITED_NAMES = "cited names"
+    """
+    Whether every module and skill the personal notes name is still shipped.
+    """
+
+    PLAN = "plan"
+    """
+    Which plan, if any, tracks the current branch.
+    """
+
+    MERGED_ITEMS = "merged items"
+    """
+    Which items of every plan were recorded done because their pull requests merged,
+    and dropped.
+    """
+
+    RECOMMENDED_MODELS = "recommended models"
+    """
+    Which items of the branch's plan carry no recommended model.
+    """
+
+    PLAN_SITE = "plan site"
+    """
+    The plan site, and where this session's work sits on it.
+    """
+
+    GIT_IDENTITY = "git identity"
+    """
+    Which git identity the clone commits with.
+    """
+
+    DEPENDENCIES = "dependencies"
+    """
+    Whether the package's environment exists and holds everything the package requires.
+    """
+
+    RELEASE = "release"
+    """
+    Whether the plugin and the installed package are one release.
+    """
+
+    SETUP = "setup"
+    """
+    check-setup.sh's verdict.
+    """
+
+    DEFAULT_BRANCH = "default branch"
+    """
+    What became of the default branch every session starts from.
+    """
+
+    ENVIRONMENTS = "environments"
+    """
+    Which package environments of projects that are gone were removed.
+    """
+
+    UPSTREAM_REVIEWS_ACTION = "reviews Action"
+    """
+    What became of the fork's upstream-reviews Action branch.
+    """
+
+    ACTIONS_USAGE = "Actions usage"
+    """
+    How near the workflows' runs and jobs are to the budget's daily ceilings.
+    """
+
+    MAIN_TESTS = "main tests"
+    """
+    Whether an issue reports the default branch's tests failing.
+    """
+
+    PLAN_STATE_SHA = "plan state SHA"
+    """
+    The personal-notes commit this clone read plan state at.
+    """
+
+
+class SummaryMessage(StrEnum):
+    """
+    The situations session-start.sh reports, each carrying the session-start-messages.sh
+    function that renders its line.
+
+    Named for the situation rather than for that function: a test reads as the case it
+    exercises, while the shell file keeps grouping its own definitions by which summary
+    line they belong to.
+    """
+
+    PLAN_NOT_APPLICABLE = "plan_line_not_applicable"
+    """
+    The branch is one no plan item could ever track.
+    """
+
+    NO_PLANS_TRACKED = "plan_line_no_plans_tracked"
+    """
+    The notes branch tracks no plans at all.
+    """
+
+    NO_PLAN_ITEM_TRACKS_BRANCH = "plan_line_no_item_tracks_branch"
+    """
+    Plans are tracked, and none holds an item for this branch.
+    """
+
+    PLAN_MANIFEST_MISSING = "plan_line_manifest_missing"
+    """
+    The index names a plan whose manifest is not on the notes branch.
+    """
+
+    BRANCH_TRACKED_IN_PLAN = "plan_line_tracked"
+    """
+    The branch is a tracked item of a plan that resolved.
+    """
+
+    MERGED_ITEMS_NO_PLANS = "merged_items_line_no_plans"
+    """
+    The notes branch holds no plans, so there were no items to look up.
+    """
+
+    MERGED_ITEMS_NOT_CHECKED = "merged_items_line_not_checked"
+    """
+    Recording every plan's merged items failed, and nothing was changed.
+    """
+
+    RECOMMENDED_MODELS_NOT_APPLICABLE = "recommended_models_line_not_applicable"
+    """
+    No plan tracks the branch, so no items were read.
+    """
+
+    RECOMMENDED_MODELS_ALL_SET = "recommended_models_line_all_set"
+    """
+    Every item of the branch's plan carries one.
+    """
+
+    RECOMMENDED_MODELS_UNSET = "recommended_models_line_unset"
+    """
+    Some items of the branch's plan carry none, named for the session to set.
+    """
+
+    CITED_NAMES_CURRENT = "cited_names_line_current"
+    """
+    Every module and skill the notes name is shipped.
+    """
+
+    CITED_NAMES_STALE = "cited_names_line_stale"
+    """
+    The heading above the indented rows naming each name the notes cite that is no
+    longer shipped.
+    """
+
+    CITED_NAMES_NOT_CHECKED = "cited_names_line_not_checked"
+    """
+    The module reading the notes did not run.
+    """
+
+    NO_NOTES_TO_CITE_NAMES = "cited_names_line_no_notes"
+    """
+    There are no personal notes to read names from.
+    """
+
+    NOTES_NOT_REACHED = "notes_line_not_reached"
+    """
+    The notes branch could not be fetched from a repository this session cannot reach.
+    """
+
+    HUB_NOT_REGISTERED = "hub_line_not_registered"
+    """
+    The notes branch has no hub file.
+    """
+
+    HUB_REGISTERED = "hub_line_registered"
+    """
+    The hub file names the plan site, and this session's place on it.
+    """
+
+    NO_GIT_IDENTITY_RECORDED = "git_identity_line_not_recorded"
+    """
+    The notes branch carries no git identity at all.
+    """
+
+    GIT_IDENTITY_INCOMPLETE = "git_identity_line_incomplete"
+    """
+    A git identity is recorded with only one of its two halves.
+    """
+
+    CLONE_HAS_ITS_OWN_GIT_IDENTITY = "git_identity_line_already_set"
+    """
+    The clone already has a repository-local identity, which is left alone.
+    """
+
+    GIT_IDENTITY_WRITTEN = "git_identity_line_written"
+    """
+    The recorded identity was written into this clone's repository-local config.
+    """
+
+    DEFAULT_BRANCH_NOT_SYNCED = "default_branch_line_not_synced"
+    """
+    The module that catches the default branch up could not run at all.
+    """
+
+    SETUP_SCRIPT_MISSING = "setup_line_not_checked"
+    """
+    The check-setup.sh script is not in this checkout, so there is no verdict.
+    """
+
+    SETUP_OK = "setup_line_ok"
+    """
+    Every setup check passed.
+    """
+
+    CHECKS_NEED_SETUP = "setup_line_needs_setup"
+    """
+    The heading above the indented rows naming each check that needs setup.
+    """
+
+    DEPENDENCIES_NOT_CHECKED = "dependencies_line_not_checked"
+    """
+    Nothing could be looked up, because the interpreter or the package metadata is
+    missing.
+    """
+
+    ENVIRONMENTS_NONE_REMOVED = "environments_line_none_removed"
+    """
+    Every other package environment still has its project.
+    """
+
+    ENVIRONMENTS_REMOVED = "environments_line_removed"
+    """
+    Package environments whose project directory is gone were removed.
+    """
+
+    DEPENDENCIES_ALREADY_INSTALLED = "dependencies_line_already_installed"
+    """
+    The package's environment already had every requirement, so nothing was installed.
+    """
+
+    DEPENDENCIES_INSTALLED = "dependencies_line_installed"
+    """
+    What was missing has just been installed into the package's environment.
+    """
+
+    DEPENDENCIES_ENVIRONMENT_CREATED = "dependencies_line_environment_created"
+    """
+    The package's environment did not exist, and has just been created with the package
+    installed into it.
+    """
+
+    DEPENDENCIES_ENVIRONMENT_NOT_CREATED = "dependencies_line_environment_not_created"
+    """
+    The package's environment did not exist and could not be created, and the run
+    carried on regardless.
+    """
+
+    DEPENDENCIES_INSTALL_FAILED = "dependencies_line_install_failed"
+    """
+    The install did not work, and the run carried on regardless.
+    """
+
+    DEPENDENCIES_RELEASE_NOT_NAMED = "dependencies_line_release_not_named"
+    """
+    The plugin names no release, so there is no package of its release to install.
+    """
+
+    RELEASE_MATCHING = "release_line_matching"
+    """
+    The installed package is the plugin's own release.
+    """
+
+    RELEASE_MISMATCHED = "release_line_mismatched"
+    """
+    The installed package is another release than the plugin's.
+    """
+
+    RELEASE_NOT_NAMED = "release_line_not_named"
+    """
+    The plugin names no release, so nothing pins the package to it.
+    """
+
+    RELEASE_FROM_CHECKOUT = "release_line_checkout"
+    """
+    The plugin and the package both run from the checkout the plugin sits in.
+    """
+
+    RELEASE_NOT_READ = "release_line_package_not_read"
+    """
+    The installed package's version could not be read.
+    """
+
+    ACTION_NOT_READ = "upstream_reviews_action_line_not_read"
+    """
+    The fork's branches could not be read, so whether it has the Action is unknown.
+    """
+
+    ACTION_NOT_INSTALLED = "upstream_reviews_action_line_not_installed"
+    """
+    The fork has no upstream-reviews Action branch, which only setup installs.
+    """
+
+    ACTION_CURRENT = "upstream_reviews_action_line_current"
+    """
+    The Action already runs the release this session runs.
+    """
+
+    ACTION_UPDATED = "upstream_reviews_action_line_updated"
+    """
+    The Action ran another release, and was just brought to this session's.
+    """
+
+    ACTION_UPDATE_FAILED = "upstream_reviews_action_line_update_failed"
+    """
+    The Action runs another release, and bringing it to this session's failed.
+    """
+
+    ACTIONS_USAGE_NOT_CHECKED = "actions_usage_line_not_checked"
+    """
+    The workflow runs could not be read.
+    """
+
+    ACTIONS_USAGE_WITHIN_BUDGET = "actions_usage_line_within_budget"
+    """
+    No workflow is near a daily ceiling.
+    """
+
+    MAIN_TESTS_NOT_CHECKED = "main_tests_line_not_checked"
+    """
+    The repository's issues could not be read.
+    """
+
+    MAIN_TESTS_PASSING = "main_tests_line_passing"
+    """
+    No issue reports the default branch's tests failing.
+    """
+
+    MAIN_TESTS_FAILING = "main_tests_line_failing"
+    """
+    An open issue reports the default branch's tests failing.
+    """
+
+
+def summary_value(output: str, label: SummaryLine) -> str:
+    """
+    Extract one line's value from the summary report.
+
+    :param output: session-start.sh's standard output.
+    :param label: The summary line to read.
+    :return: Everything after the label, stripped.
+    :raises AssertionError: If the report has no such line.
+    """
+    prefix = f"  {label}:"
+    for line in output.splitlines():
+        if line.startswith(prefix):
+            return line[len(prefix) :].strip()
+    raise AssertionError(f"no '{label}' line in this summary report:\n{output}")
+
+
+def summary_message(message: SummaryMessage, *arguments: str | PurePath) -> str:
+    """
+    Render one summary line from the same definitions session-start.sh prints it from,
+    so an assertion is never a second copy of the wording.
+
+    :param message: The summary line to render.
+    :param arguments: That message's arguments, in order; a path is passed with forward
+        slashes, as the shell writes it.
+    :return: The rendered line.
+    """
+    result = subprocess.run(
+        Bash.locate(os.environ).command(
+            "-c",
+            'source "$1"; shift; "$@"',
+            "_",
+            str(MESSAGES_SCRIPT),
+            message,
+            *(
+                argument.as_posix() if isinstance(argument, PurePath) else argument
+                for argument in arguments
+            ),
+        ),
+        capture_output=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout

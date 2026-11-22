@@ -79,6 +79,11 @@ items:                         # the actual trackable units of work - flat,
     depends_on: [<item-id>, ...]  # structural/stacking dependency - a bare id for
                                    # an item of this plan, <plan-id>/<item-id> for
                                    # one in another plan (see below)
+    external_dependencies:       # optional, written by `plan-handover --without-dependencies`:
+      - reference: <plan-id>/<item-id>   # one record per item of a plan not kept alongside
+        title: ...                       # this one that the item stacked on, as it stood
+        status: ...                      # when handed over; never resolved. Also: plan_description,
+                                         # branch, pull_request_url, notes
     status: not started | in progress | blocked | deferred | done  # underscores (not_started) still read
     recommended_model: opus | sonnet | haiku  # required: the Claude Code alias suited to the item's
                                                # difficulty; see "Choosing the recommended model"
@@ -214,7 +219,7 @@ builds the plan's page.
 
 Every session that loads a plan pays for every line of it, so the plan holds
 only what a future session needs to act. `save-plan.sh` enforces this with
-the limits `src/basstler/plan/size_limits.py` names (`Measure`):
+the limits `packages/plan/src/basstler/plan/size_limits.py` names (`Measure`):
 
 - **Landed items are dropped on save**, along with every `depends_on` edge to
   them: the work is in the code and its history in git. A plan left with no

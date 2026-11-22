@@ -12,7 +12,7 @@ from typing import Any
 
 from basstler.github.pull_request_state import LiveState, PullRequestRecord
 from basstler.github.repository import GitHubAddress, PullRequestReference
-from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model import ExternalDependency, ItemStatus, ManifestKey
 from basstler.plan.model_alias import ModelAlias
 from basstler.render_common import sanitize_http_url
 
@@ -174,6 +174,12 @@ class Item:
     The identifiers of items that must complete before this one can start.
     """
 
+    external_dependencies: list[ExternalDependency] = field(default_factory=list)
+    """
+    The items of plans not kept alongside this one that the item stacked on, recorded
+    for the reader and never resolved.
+    """
+
     blockers: list[str] = field(default_factory=list)
     """
     Free-text descriptions of what's currently blocking this item.
@@ -318,6 +324,10 @@ class Item:
             ),
             notes=notes.strip() if notes else None,
             depends_on=list(data.get(ManifestKey.DEPENDS_ON.key) or []),
+            external_dependencies=[
+                ExternalDependency.from_content(entry)
+                for entry in data.get(ManifestKey.EXTERNAL_DEPENDENCIES.key) or []
+            ],
             blockers=list(data.get(ManifestKey.BLOCKERS.key) or []),
         )
 

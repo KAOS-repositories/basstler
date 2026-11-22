@@ -22,7 +22,12 @@ from pathlib import Path
 import pytest
 
 from basstler.bash import Bash
-from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
+from basstler.locations import (
+    BasstlerVariable,
+    ClaudeCodeVariable,
+    PluginLocation,
+    SkillLocation,
+)
 
 from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory
 
@@ -95,9 +100,16 @@ def bash_blocks(document: Path) -> list[str]:
 
 def skill_documents() -> list[Path]:
     """
-    :return: Every markdown document under the skills directory, in a stable order.
+    :return: Every markdown document under the skills directory a session reads, in a
+        stable order; a skill's body is read only as part of its instructions.
     """
-    return sorted((RepositoryLocation.PLUGIN / SkillDirectory.DIRECTORY).rglob("*.md"))
+    return sorted(
+        document
+        for document in (RepositoryLocation.PLUGIN / SkillDirectory.DIRECTORY).rglob(
+            "*.md"
+        )
+        if document.name != SkillLocation.BODY.name
+    )
 
 
 def document_identifier(document: Path) -> str:

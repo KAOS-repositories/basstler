@@ -1085,8 +1085,9 @@ class PlaybookSnippet(PathEnumeration):
 
     PLUGIN = DIRECTORY / "plugin"
     """
-    A plugin shipping a declared skill, a skill nothing declares, a directory that is
-    no skill, and the hook registrations of a session-start hook and a shell-tool hook.
+    A plugin shipping a declared skill's body and instructions, a skill nothing
+    declares, a directory that is no skill, and the hook registrations of a
+    session-start hook and a shell-tool hook.
     """
 
 

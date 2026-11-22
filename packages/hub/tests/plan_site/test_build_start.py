@@ -12,7 +12,7 @@ import pytest
 import basstler.plan_site.build_start
 from basstler.github.credential import GitHubCommand
 from basstler.github.repository import Repository
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import SessionTool
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation

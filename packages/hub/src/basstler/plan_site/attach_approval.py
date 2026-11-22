@@ -21,7 +21,7 @@ from pydantic import Field
 
 from basstler.exit_codes import StackExitCode
 from basstler.github.repository import Repository
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import SessionTool
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ClaudeCodeVariable
 from basstler.personal_notes.access import NotesRepositoryAccess

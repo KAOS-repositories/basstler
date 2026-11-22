@@ -7,11 +7,11 @@ from __future__ import annotations
 import basstler.plan_site.attach_approval
 import basstler.plan_site.entry_point_approval
 from basstler.class_property import classproperty
-from basstler.github.repository_attachment import SessionTool
 from basstler.locations import PluginLocation
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.plugin import PackageModuleCommand, PreToolUseHook
+from basstler.session_tool import SessionTool
 
 
 class HubContribution(PackageContribution):

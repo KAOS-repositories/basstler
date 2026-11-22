@@ -4,23 +4,46 @@ What basstler-stack adds to the default playbook.
 
 from __future__ import annotations
 
-from enum import StrEnum
+from dataclasses import dataclass
 
 from basstler.class_property import classproperty
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
-from basstler.playbook.plugin import SkillDefinition
+from basstler.playbook.skill import Skill
+from basstler.session_tool import SessionTool
+
+# %% skills
 
 
-class StackSkill(StrEnum):
+@dataclass(frozen=True)
+class StackedPRMaintenanceSkill(Skill):
     """
-    The plugin skills basstler-stack ships, by name.
+    The ``/stacked-pr-maintenance`` skill.
     """
 
-    STACKED_PULL_REQUEST_MAINTENANCE = "stacked-pr-maintenance"
-    """
-    One maintenance pass over a fork's stacked pull requests.
-    """
+    @classproperty
+    def description(cls) -> str:
+        return (
+            "Run one maintenance pass over a fork's stacked pull requests, or "
+            "over one branch's stack: reparent, restack, and promote approved "
+            'branches upstream. Invoke as "/stacked-pr-maintenance '
+            '[fork={owner/repo}] [upstream={owner/repo}] [stacked-on={branch}]". '
+            "Use when asked to restack or promote the stack, and as the first "
+            "step of plan-item-kickoff and plan-item-resolve."
+        )
+
+    @classproperty
+    def allowed_tools(cls) -> tuple[SessionTool, ...]:
+        return (
+            SessionTool.RUN_SHELL_COMMAND,
+            SessionTool.READ_FILE,
+            SessionTool.WRITE_FILE,
+            SessionTool.ASK_USER,
+            SessionTool.UPDATE_PULL_REQUEST,
+        )
+
+
+# %% contribution
 
 
 class StackContribution(PackageContribution):
@@ -30,4 +53,4 @@ class StackContribution(PackageContribution):
 
     @classproperty
     def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
-        return tuple(SkillDefinition(skill) for skill in StackSkill)
+        return (StackedPRMaintenanceSkill(),)

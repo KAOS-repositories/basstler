@@ -20,7 +20,7 @@ from cyclopts import App
 
 from basstler.class_property import classproperty
 from basstler.exit_codes import StackExitCode
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import SessionTool
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
 from basstler.plan_site.attach_approval import AllowedAttach, AttachAnswer

@@ -14,9 +14,8 @@ from basstler.locations import (
     PluginLocation,
     ProjectLocation,
 )
-from basstler.playbook.plugin import PluginFiles
+from basstler.playbook.plugin import HookRegistrationsFile, PluginFiles
 from basstler.plugin_root import PluginRoot
-from basstler.playbook.playbook import Playbook
 from basstler.playbook.skills_command import SkillsExitCode, build
 from basstler.text_file import TextFile
 
@@ -74,7 +73,9 @@ def test_a_build_writes_the_playbooks_registrations(project_with_empty_playbook)
 
     assert (
         registrations_of(project_with_empty_playbook)
-        == PluginFiles.from_playbook(plugin_root, Playbook(())).hook_registrations.text
+        == HookRegistrationsFile(
+            plugin_root, PluginFiles(plugin_root, (), ()).hook_registrations
+        ).text
     )
 
 

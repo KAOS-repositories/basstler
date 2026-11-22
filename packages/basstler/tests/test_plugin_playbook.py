@@ -22,11 +22,12 @@ def plugin():
     )
 
 
-def test_the_hook_registrations_are_built_from_the_playbook(plugin):
+def test_the_generated_files_are_built_from_the_playbook(plugin):
     """
-    The plugin's ``hooks.json`` is what ``basstler skills build`` writes.
+    The plugin's ``hooks.json`` and every ``SKILL.md`` are what ``basstler skills
+    build`` writes.
     """
-    assert plugin.hook_registrations_are_current()
+    assert plugin.stale_files == ()
 
 
 def test_every_shipped_skill_is_declared_by_a_contribution(plugin):
@@ -38,6 +39,6 @@ def test_every_shipped_skill_is_declared_by_a_contribution(plugin):
 
 def test_every_declared_skill_is_shipped(plugin):
     """
-    Every skill a contribution declares has its instructions in the plugin.
+    Every skill a contribution declares has its body in the plugin.
     """
     assert plugin.missing_skills == ()

@@ -20,12 +20,13 @@ from basstler.code_rules.rule import CodeReference, Section
 from basstler.code_rules.text_file_usage import TextFileChecker
 from basstler.code_rules.tree_removal import TreeRemovalChecker
 from basstler.directory_tree import DirectoryTree
-from basstler.locations import BasstlerRepositoryLocation, PluginLocation
+from basstler.locations import BasstlerRepositoryLocation, PluginLocation, SkillLocation
 from basstler.playbook.contribution import (
     ContributionEntryPointGroup,
     PackageContribution,
 )
-from basstler.playbook.skills_command import SkillsCommand
+from basstler.playbook.commands import SkillsCommand
+from basstler.playbook.skill import Skill
 from basstler.text_file import TextFile
 
 
@@ -50,7 +51,7 @@ class PackageAndPluginRules(Section):
         "`packages/<part>/src/` of the distribution that owns its subject, and its "
         "tests under that distribution's `packages/<part>/tests/`; helpers the tests "
         "of several distributions share live in `test_support/`. The plugin under "
-        "`plugin/` carries only its `SKILL.md` files, manifest and bash entry points, "
+        "`plugin/` carries only its skills' files, manifest and bash entry points, "
         "which call the installed package with `python -m basstler.<module>`"
     )
 
@@ -60,9 +61,11 @@ class PackageAndPluginRules(Section):
         f"{CodeReference(PackageContribution).path}, registered under the "
         f"`{ContributionEntryPointGroup.CONTRIBUTIONS}` entry point group of its "
         "`pyproject.toml`. "
-        f"`{(BasstlerRepositoryLocation.PLUGIN / PluginLocation.HOOK_REGISTRATIONS).as_posix()}` is "
-        "generated from the playbook: change a hook in its contribution and run "
-        f"`{SkillsCommand.BUILD.invocation}`, never edit the file"
+        f"`{(BasstlerRepositoryLocation.PLUGIN / PluginLocation.HOOK_REGISTRATIONS).as_posix()}` and "
+        f"every skill's `{SkillLocation.INSTRUCTIONS.as_posix()}` are generated from the "
+        f"playbook: change a hook or a {CodeReference(Skill).path} class in its "
+        f"contribution, or a skill's `{SkillLocation.BODY.as_posix()}`, and run "
+        f"`{SkillsCommand.BUILD.invocation}`, never edit the generated files"
     )
 
     NAME_FILES_AND_VARIABLES_ONCE = (

@@ -9,35 +9,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from basstler.github.repository import HasRepository
+from basstler.session_tool import SessionTool
 
-# %% the session's tools
-
-
-class SessionTool(StrEnum):
-    """
-    The Claude Code tools a session calls.
-    """
-
-    ATTACH_REPOSITORY = "mcp__claude-code-remote__add_repo"
-    """
-    Attaches a repository to a cloud session, which lets its proxy answer that
-    repository's git and API requests.
-    """
-
-    REGISTER_REPOSITORY_ROOT = "mcp__claude-code-remote__register_repo_root"
-    """
-    Loads the instructions of an attached repository's local clone into the session.
-    """
-
-    ASK_USER = "AskUserQuestion"
-    """
-    Asks the user to choose between options.
-    """
-
-    RUN_SHELL_COMMAND = "Bash"
-    """
-    Runs a command in the session's shell.
-    """
+# %% the session's proxy
 
 
 class SessionProxyAnswer(StrEnum):

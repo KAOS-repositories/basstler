@@ -399,6 +399,11 @@ class InstructionsTemplate(PathEnumeration):
     The content of ``AGENTS.md``: rules under the headings of their sections.
     """
 
+    SKILL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "skill.md.jinja")
+    """
+    The content of a skill's ``SKILL.md``: its frontmatter and title above its body.
+    """
+
 
 class PlanHandoverLocation(PathEnumeration):
     """
@@ -655,6 +660,11 @@ class SkillLocation(PathEnumeration):
     INSTRUCTIONS = Path("SKILL.md")
     """
     The instructions Claude Code loads the skill from.
+    """
+
+    BODY = Path("skill-body.md")
+    """
+    The hand-written instructions below the title of :attr:`INSTRUCTIONS`.
     """
 
 

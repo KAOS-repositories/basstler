@@ -11,24 +11,22 @@ import pytest
 from basstler_testing.constants.paths import PlaybookSnippet
 
 import basstler.playbook.skills_command
-from basstler.locations import PluginLocation, SkillLocation
+from basstler.locations import PluginLocation
 from basstler.playbook.playbook import Playbook
 from basstler.playbook.plugin import (
     HookRegistrations,
+    HookRegistrationsFile,
     PackageModuleCommand,
     PluginFiles,
     PluginScriptCommand,
     PreToolUseHook,
     SessionStartHook,
-    SkillDefinition,
 )
+from basstler.playbook.skill import SkillInstructions
 from basstler.plugin_root import PluginRoot
 from basstler.text_file import TextFile
 
-DECLARED_SKILL = SkillDefinition("declared-skill")
-"""
-The skill the dataset plugin ships and declares.
-"""
+from .components import BodilessSkill, DeclaredSkill
 
 DATASET_PLUGIN = PluginRoot(PlaybookSnippet.PLUGIN)
 """
@@ -58,7 +56,16 @@ def plugin_copy(tmp_path):
     """
     A copy of the dataset plugin that a test may write to.
     """
-    return shutil.copytree(PlaybookSnippet.PLUGIN, tmp_path / "plugin")
+    return PluginRoot(shutil.copytree(PlaybookSnippet.PLUGIN, tmp_path / "plugin"))
+
+
+def registrations_file(plugin_root, *hooks):
+    """
+    :return: The hook registrations file of *plugin_root* holding *hooks*.
+    """
+    return HookRegistrationsFile(
+        plugin_root, PluginFiles(plugin_root, (), hooks).hook_registrations
+    )
 
 
 # %% hook registrations
@@ -68,10 +75,12 @@ def test_hook_registrations_group_hooks_by_event_in_event_order():
     """
     Hooks are listed under their event, events in their enumeration's order.
     """
-    plugin = PluginFiles(DATASET_PLUGIN, (), (SHELL_TOOL_HOOK, SESSION_START_HOOK))
+    registrations = registrations_file(
+        DATASET_PLUGIN, SHELL_TOOL_HOOK, SESSION_START_HOOK
+    )
 
     assert (
-        plugin.hook_registrations.text
+        registrations.text
         == TextFile(DATASET_PLUGIN.path_of(PluginLocation.HOOK_REGISTRATIONS)).read()
     )
 
@@ -80,78 +89,88 @@ def test_hook_registrations_read_back_from_their_file():
     """
     The registrations file parses back into the registrations it was written from.
     """
-    plugin = PluginFiles(DATASET_PLUGIN, (), (SESSION_START_HOOK, SHELL_TOOL_HOOK))
-    written = TextFile(plugin.hook_registrations_path).read()
+    registrations = registrations_file(
+        DATASET_PLUGIN, SESSION_START_HOOK, SHELL_TOOL_HOOK
+    )
+    written = TextFile(registrations.path).read()
 
-    assert HookRegistrations.from_json(json.loads(written)) == plugin.hook_registrations
-
-
-def test_hook_registrations_are_current_when_the_file_holds_them():
-    """
-    A file holding exactly the playbook's hooks is current.
-    """
-    plugin = PluginFiles(DATASET_PLUGIN, (), (SESSION_START_HOOK, SHELL_TOOL_HOOK))
-
-    assert plugin.hook_registrations_are_current()
+    assert HookRegistrations.from_json(json.loads(written)) == (
+        registrations.registrations
+    )
 
 
 def test_hook_registrations_are_stale_once_a_hook_is_left_out():
     """
     A file still holding a hook the playbook left out is stale.
     """
-    plugin = PluginFiles(DATASET_PLUGIN, (), (SESSION_START_HOOK,))
-
-    assert not plugin.hook_registrations_are_current()
+    assert not registrations_file(DATASET_PLUGIN, SESSION_START_HOOK).is_current()
 
 
-def test_writing_hook_registrations_makes_them_current(plugin_copy):
+def test_writing_a_generated_file_makes_it_current(plugin_copy):
     """
     Writing the registrations brings the file up to date.
     """
-    plugin = PluginFiles(PluginRoot(plugin_copy), (), (SESSION_START_HOOK,))
+    registrations = registrations_file(plugin_copy, SESSION_START_HOOK)
 
-    plugin.write_hook_registrations()
+    registrations.write()
 
-    assert plugin.hook_registrations_are_current()
+    assert registrations.is_current()
 
 
 # %% skills
 
 
-def test_a_shipped_skill_no_definition_declares_is_reported():
+def test_a_shipped_skill_no_class_declares_is_reported():
     """
-    A skill directory nothing declares is reported; a directory without instructions is not a skill.
+    A skill directory nothing declares is reported; a directory without instructions
+    is not a skill.
     """
-    plugin = PluginFiles(DATASET_PLUGIN, (DECLARED_SKILL,), ())
+    plugin = PluginFiles(DATASET_PLUGIN, (DeclaredSkill(),), ())
 
-    assert plugin.undeclared_skill_names == ("undeclared-skill",)
+    assert plugin.undeclared_skill_names == ("undeclared",)
 
 
-def test_a_declared_skill_without_instructions_is_reported():
+def test_a_declared_skill_without_a_body_is_reported():
     """
-    The dataset's ``not-a-skill`` directory holds files but no instructions.
+    A declared skill whose directory holds no body is missing.
     """
-    without_instructions = SkillDefinition("not-a-skill")
-    plugin = PluginFiles(DATASET_PLUGIN, (DECLARED_SKILL, without_instructions), ())
+    plugin = PluginFiles(DATASET_PLUGIN, (DeclaredSkill(), BodilessSkill()), ())
 
-    assert plugin.missing_skills == (without_instructions,)
+    assert plugin.missing_skills == (BodilessSkill(),)
 
 
-def test_a_skill_directory_is_named_after_the_skill():
+def test_the_generated_files_are_the_registrations_and_each_shipped_skill():
     """
-    A skill's directory under the plugin's skills carries its name.
+    The plugin generates its hook registrations and the instructions of every skill
+    it ships a body for.
     """
-    directory = DECLARED_SKILL.directory(DATASET_PLUGIN)
+    plugin = PluginFiles(
+        DATASET_PLUGIN, (DeclaredSkill(), BodilessSkill()), (SESSION_START_HOOK,)
+    )
 
-    assert (directory / SkillLocation.INSTRUCTIONS).is_file()
+    assert plugin.generated_files == (
+        HookRegistrationsFile(DATASET_PLUGIN, plugin.hook_registrations),
+        SkillInstructions(DATASET_PLUGIN, DeclaredSkill()),
+    )
+
+
+def test_the_dataset_plugin_is_current_with_its_playbook():
+    """
+    No generated file of the dataset plugin differs from what its playbook builds.
+    """
+    plugin = PluginFiles(
+        DATASET_PLUGIN, (DeclaredSkill(),), (SESSION_START_HOOK, SHELL_TOOL_HOOK)
+    )
+
+    assert plugin.stale_files == ()
 
 
 def test_the_plugin_files_follow_the_playbooks_skills_and_hooks():
     """
     The plugin takes the playbook's skills and hooks and nothing else.
     """
-    playbook = Playbook((DECLARED_SKILL, SESSION_START_HOOK))
+    playbook = Playbook((DeclaredSkill(), SESSION_START_HOOK))
 
     assert PluginFiles.from_playbook(DATASET_PLUGIN, playbook) == PluginFiles(
-        DATASET_PLUGIN, (DECLARED_SKILL,), (SESSION_START_HOOK,)
+        DATASET_PLUGIN, (DeclaredSkill(),), (SESSION_START_HOOK,)
     )

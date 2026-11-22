@@ -4,23 +4,47 @@ What basstler-reviews adds to the default playbook.
 
 from __future__ import annotations
 
-from enum import StrEnum
+from dataclasses import dataclass
 
 from basstler.class_property import classproperty
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
-from basstler.playbook.plugin import SkillDefinition
+from basstler.playbook.skill import Skill
+from basstler.session_tool import SessionTool
+
+# %% skills
 
 
-class ReviewsSkill(StrEnum):
+@dataclass(frozen=True)
+class UpstreamReviewsSkill(Skill):
     """
-    The plugin skills basstler-reviews ships, by name.
+    The ``/upstream-reviews`` skill.
     """
 
-    UPSTREAM_REVIEWS = "upstream-reviews"
-    """
-    Reports a fork branch's upstream pull request.
-    """
+    @classproperty
+    def description(cls) -> str:
+        return (
+            "Report a fork branch's upstream pull request: its CI checks, failure"
+            ' logs and unresolved review threads. Invoke as "/upstream-reviews '
+            '[{pull-request-number}|{branch}]". Use when asked what upstream '
+            "reviewers or CI said about a promoted branch."
+        )
+
+    @classproperty
+    def allowed_tools(cls) -> tuple[SessionTool, ...]:
+        return (
+            SessionTool.RUN_SHELL_COMMAND,
+            SessionTool.READ_FILE,
+            SessionTool.RUN_SKILL,
+            SessionTool.ATTACH_REPOSITORY,
+            SessionTool.CREATE_SESSION,
+            SessionTool.READ_SESSION,
+            SessionTool.LIST_SESSION_EVENTS,
+            SessionTool.ARCHIVE_SESSION,
+        )
+
+
+# %% contribution
 
 
 class ReviewsContribution(PackageContribution):
@@ -30,4 +54,4 @@ class ReviewsContribution(PackageContribution):
 
     @classproperty
     def playbook_components(cls) -> tuple[PlaybookComponent, ...]:
-        return tuple(SkillDefinition(skill) for skill in ReviewsSkill)
+        return (UpstreamReviewsSkill(),)

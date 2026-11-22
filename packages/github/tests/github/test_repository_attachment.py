@@ -6,7 +6,8 @@ attach a repository it cannot reach.
 from __future__ import annotations
 
 from basstler.github.repository import Repository
-from basstler.github.repository_attachment import RepositoryAttachment, SessionTool
+from basstler.github.repository_attachment import RepositoryAttachment
+from basstler.session_tool import SessionTool
 
 ATTACHMENT = RepositoryAttachment(
     Repository.parse("an-owner/a-repository"),

@@ -1,0 +1,247 @@
+Run commands as [`running-commands.md`](../running-commands.md) says, with
+`${CLAUDE_PLUGIN_ROOT}` as the `${BASSTLER_PLUGIN_ROOT}` it and every linked document name.
+
+Generic, plan-agnostic tooling — nothing in this file may hardcode a
+specific plan's id, branches, or PRs. This is the authoring half of the
+plan system; the plan site renders every plan against live GitHub state. Read `skills/plan-create/plan-schema.md`
+for the full `plan.yaml` schema before drafting
+anything — this skill must produce manifests that pass the exact same
+validation the plan site's build and `save-plan.sh` run, not a close approximation.
+
+The output of this skill is the same as if a session had hand-authored the
+manifest via the marker/`save-plan.sh` flow in `save-plan.sh`'s own header
+comment — this skill just does that authoring for you, with the same
+rigor a careful session would: draft, validate, cross-check live state,
+confirm judgment calls with the user, then bootstrap and publish. It never
+takes a shortcut a hand-written manifest wouldn't also have to clear.
+
+## 0. Check the setup is in place, and run it if not
+
+Follow [`prerequisite-check.md`](../setup-personal-notes/prerequisite-check.md) before step 1, with this
+skill's gate:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate --skill plan-create; echo "setup gate exit status: $?"
+```
+
+## 1. Establish the plan id and refuse to silently overwrite
+
+Source the shared config script — it resolves the personal-notes
+remote/branch precedence into `NOTES_REMOTE`/`NOTES_BRANCH`. What it defines
+lasts only for the Bash call that sources it:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/hooks/resolve-personal-notes-config.sh"
+fetch_personal_notes_branch
+```
+
+Then check whether `${PLANS_DIR}/<plan-id>/plan.yaml` already
+exists on `"${PERSONAL_NOTES_REFERENCE}"` (`PLANS_DIR` is defined by the config script sourced
+above).
+If it does, stop and tell the user — point them at editing the existing
+plan (just ask a session to edit it) instead of
+silently clobbering it with a fresh draft. Recreating over an existing plan
+id is exactly the kind of destructive-by-accident action this system is
+meant to prevent, not cause.
+
+If no `<plan-id>` was given, ask for one (kebab-case, short) rather than
+inventing one — it's the directory name and the reverse-index key forever.
+
+## 2. Figure out where the plan's content comes from
+
+Ask, don't assume, which of these applies (they can combine — a real plan
+might draw on all three):
+
+- **Migrating an existing freeform doc** (a roadmap markdown file, a
+  planning doc on some branch, notes pasted into the conversation, **or an
+  already-approved Claude Code plan-mode plan from earlier in this same
+  conversation** — it counts just as much as a file on disk; there's
+  nothing to "find," just use it directly). Read it in full before drafting
+  anything structured from it — see step 3's "preserve, don't
+  summarize-then-lose" rule.
+- **Naming existing branches/PRs to track.** Don't take the user's verbal
+  description of what state they're in at face value if it's checkable —
+  cross-check live per step 4 before it ever goes in the manifest. A plan
+  that's stale on day one defeats the entire point of this system.
+- **Building from scratch via conversation.** Ask for: title, a one-line
+  description, the repo (default to this one unless told otherwise), and
+  whether the work has natural waves/phases and parallel tracks, or is
+  simple enough to be one track with a flat item list. A **wave** is a
+  sequential phase of the initiative (wave 2 generally starts once wave 1
+  has landed); a **track** is a parallel line of work within a wave — its
+  items can proceed independently of other tracks in the same wave. Don't
+  force a wave/track structure onto something that doesn't have one — an
+  over-modelled plan is worse than a flat one; see `plan-schema.md` on
+  why items are flat and tagged rather than nested.
+
+## 3. Draft the structure, surfacing judgment calls rather than guessing
+
+Waves, tracks, item dependency chains, and status assignments are genuine
+judgment calls specific to this plan — do not silently invent an answer to
+a structural question the source material doesn't settle. Use
+`AskUserQuestion` for anything that would be awkward or costly to redo
+later (e.g., "is this one track or does it actually split into two once
+the work starts stacking?", "should track X's items be sequenced or can
+they run in parallel?") — the same way the plan system's own
+design was worked out via up-front questions before anything was written,
+not after.
+
+### Is it a new item, or a change to one already in flight?
+
+Ask this of every item before adding it, and prefer the change: an item that
+only modifies what an unlanded item introduces is that item's work, not a
+separate one. Follow [`scope-decision.md`](../add-plan-item/scope-decision.md) — it holds the check and how
+to read it.
+
+For a single piece of work rather than a whole plan, `/add-plan-item` runs that
+same decision on its own and is the lighter-weight way in.
+
+Give every item its `recommended_model` by invoking the `plan-recommend-models` skill (`Skill` tool, `<plan-id>`) on the
+drafted `plan.yaml` before the first save.
+
+Write only what a future session needs to act, whether drafting fresh or
+migrating a source doc. Structured facts (branch, PR, status, blockers)
+become `plan.yaml` items, with each item's scope and binding decisions in its
+`notes`; the plan's standing rules become `roadmap.md`, a title and a short
+list of one-sentence entries. History, rationale already settled in code, and
+work that has landed are left out: they live in git and on the pull requests.
+`save-plan.sh` refuses a plan over the limits in `${PLAN_SIZE_LIMITS_MODULE}`
+(items per plan, characters per note and blocker, roadmap entries), so a
+source doc that does not fit is condensed now, or split into more than one
+plan, rather than migrated whole.
+
+A rule that holds for every plan of the repository is not a roadmap entry: it is
+a repository rule, shown in every item brief and on every plan page of the
+repository. List them with `basstler repository-rules show`, and add or reword
+one with `basstler repository-rules set <id> <text>`. To set several at once,
+write them to a YAML file in the rules file's own format (`rules:`, each entry an
+`id` and `text`) and run `basstler repository-rules import <file>`: the file is
+validated before anything is pushed, and its rules land in one commit.
+
+## 4. Cross-check every named branch/PR against live GitHub state
+
+Before the item is written down, bulk-fetch `mcp__github__list_pull_requests`
+(`state: "all"`, paginated) for the repo, and use `mcp__github__pull_request_read`
+for anything outside that page window or referenced by number in the source
+doc. Set each item's `status` from what's actually true (open/draft →
+`in progress` or `not started` as appropriate, merged → `done`, closed
+unmerged → `deferred` with a note), not from what a stale doc or a
+half-remembered conversation claims. If the source material and live
+GitHub disagree, that disagreement itself is worth a line in the item's
+`notes` — it's exactly the kind of drift this system exists to catch, and
+noting it once at creation time is cheaper than rediscovering it later.
+
+## 5. Create the tracking issue (coordination mailbox for structural changes)
+
+Ask whether the plan wants one (default yes for anything with more than one
+session/track likely to touch it — skip only for something so small a
+single session will obviously own it end to end). If yes:
+
+1. Create a GitHub **issue** titled `[plan-tracking] <plan-id>`, with a body
+   explaining its purpose (not a work item — here's how proposals/replies
+   work; see `plan-schema.md`'s "Proposing structural changes" section for
+   the convention to describe).
+2. Do not subscribe to it: `mcp__claude-code-remote__subscribe_pr_activity`
+   takes pull requests only. Sessions read its comments instead, as
+   `plan-item-gathering.md` describes.
+3. Record its number as `tracking_issue` in the manifest you're about to
+   write in step 6.
+
+**Fallback if issue creation fails with a `410`** (Issues disabled on this
+repo — check by trying, don't assume): cut a branch off `main` named
+`plan-tracking-<plan-id>`, make a single **empty commit**
+(`git commit --allow-empty` — the branch carries no file changes, ever),
+open it as a **draft** PR (base `main`, same title, a body noting *why* it's
+a PR and not an issue), subscribe to that with
+`mcp__claude-code-remote__subscribe_pr_activity`, and still record its
+number as `tracking_issue` — the field names the mailbox's role, not the
+literal GitHub object type, since which one applies is a per-repo fact
+that can change if Issues get enabled later. Whoever later builds a link
+to it should check which kind it actually is rather than assuming
+`/issues/`.
+
+## 6. Write and validate `plan.yaml` + `roadmap.md`
+
+Follow the schema in `plan-schema.md` exactly: `schema_version: 1`, `id`,
+`title`, `description`, `default_repository`, `tracking_issue` (if step 5 created
+one), `waves[]`, `tracks[]` (each tagged with a `wave`), `items[]` (flat,
+each tagged with a `track`, `status` from the thin enum `not started |
+in progress | blocked | deferred | done`, `depends_on` — a *list* of item
+ids, so an item can depend on more than one prerequisite (e.g. a track that
+only starts once two other tracks have both landed) — and optional
+`pull_request_number`/`session`/`notes`/`blockers`).
+
+Before saving, validate exactly what the plan site's build validates — do not
+diverge from that checklist, since a manifest this skill produces must pass that
+same check the first time the site is built from it:
+
+- Every `items[].id` (defaulting to `branch` if omitted) is unique.
+- Every `items[].track` resolves to a declared `tracks[].id`.
+- Every `tracks[].wave` resolves to a declared `waves[].id`.
+- Every id in `items[].depends_on` (which may list more than one id)
+  resolves to another `items[].id`.
+- `default_repository` is the repository this session's clone is a checkout
+  of, as its `origin` names it. For another repository run this skill from a
+  checkout of that one; `save-plan.sh` refuses the save otherwise, and also
+  when `origin` is not a GitHub URL naming a repository. The notes remote may
+  be any repository.
+
+Parse with Python's `yaml` module to check this mechanically rather than
+eyeballing it — the same tooling `save-plan.sh` and the plan site's build both
+already require.
+
+## 7. Check the draft isn't already full
+
+Count the draft's items against `Measure.ITEM_COUNT` (`plan/size_limits.py`)
+before the first save:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" plan.size_check --manifest <path/to/plan.yaml>
+```
+
+If `is_full` is `false`, continue to step 8.
+
+If `true`, do not call `save-plan.sh`: report `item_count` against
+`item_limit` and ask, via `AskUserQuestion`, whether to re-draft as several
+plans (back to step 3, cutting by track or wave first) or to trim the scope to
+fit one.
+
+## 8. Bootstrap it through the existing write path — don't invent a new one
+
+This skill does not push directly. It uses exactly the flow
+`save-plan.sh`'s own header comment documents for a brand-new plan (there
+is still no separate create-plan.sh; this skill is what makes that flow
+convenient, not a replacement for it): write the drafted `plan.yaml` and
+`roadmap.md` content to two temporary files, then run
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/hooks/save-plan.sh" <plan-id> --manifest <path/to/plan.yaml> --roadmap <path/to/roadmap.md>
+```
+
+The id must be explicit here, since a brand-new plan has no entry in the
+reverse index yet for `save-plan.sh` to auto-derive it from. This reads the
+manifest/roadmap directly from the given files (no need to round-trip them
+through `CLAUDE.local.md`'s markers first), pushes both to the
+personal-notes branch, and regenerates the branch→plan-id index in the same
+commit.
+
+## 9. Publish
+
+The save's push rebuilds the plan site, which lists the new plan on its
+repository's page and publishes its own. Its address is
+`plan_site_page_url <plan-id>`.
+
+If this was a migration from an existing freeform doc, offer — don't do it
+unprompted — to replace that old doc with a short pointer stub at its
+original location, so anyone still reading the old path finds the new one
+immediately.
+
+Every later change to the plan follows [`manifest-staleness.md`](manifest-staleness.md).
+
+## 10. Report back
+
+Plan id, item/wave/track counts, the plan's page on the plan site, the
+tracking issue link if one was created, and — explicitly, not buried — every judgment call you
+made or flagged along the way (structural assumptions, any live-vs-source
+disagreement found in step 4) so the user can sanity-check them before
+relying on the plan.

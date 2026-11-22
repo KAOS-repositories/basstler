@@ -10,6 +10,8 @@ from basstler.class_property import classproperty
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
 from basstler.playbook.setup_steps import RepositoryCheckout, SetupStep, SetupSteps
+from basstler.playbook.skill import Skill
+from basstler.session_tool import SessionTool
 
 # %% components of two kinds
 
@@ -100,3 +102,51 @@ class StepsNamingTheCheckout(SetupSteps):
 
     def steps_for_checkout(self, checkout: RepositoryCheckout) -> tuple[SetupStep, ...]:
         return (TitledStep(f"{self.prefix} {checkout.working_tree.name}"),)
+
+
+# %% skills
+
+
+@dataclass(frozen=True)
+class DeclaredSkill(Skill):
+    """
+    The skill the dataset plugin ships a body for.
+    """
+
+    @classproperty
+    def description(cls) -> str:
+        return "Use when a test needs a skill the plugin ships."
+
+    @classproperty
+    def allowed_tools(cls) -> tuple[SessionTool, ...]:
+        return (SessionTool.RUN_SHELL_COMMAND, SessionTool.READ_FILE)
+
+
+@dataclass(frozen=True)
+class BodilessSkill(Skill):
+    """
+    A skill the dataset plugin ships no body for.
+    """
+
+    @classproperty
+    def description(cls) -> str:
+        return "Use when a test needs a skill the plugin lacks."
+
+    @classproperty
+    def allowed_tools(cls) -> tuple[SessionTool, ...]:
+        return ()
+
+
+@dataclass(frozen=True)
+class CheckCIStatusSkill(Skill):
+    """
+    A skill whose class name holds an acronym.
+    """
+
+    @classproperty
+    def description(cls) -> str:
+        return "Use when a test needs a name with an acronym in it."
+
+    @classproperty
+    def allowed_tools(cls) -> tuple[SessionTool, ...]:
+        return ()

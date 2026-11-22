@@ -1,5 +1,6 @@
 """
-The skills and hooks of the Claude Code plugin, and the plugin files built from them.
+The hooks of the Claude Code plugin, and the plugin files built from its skills and
+hooks.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, TypeAdapter
 
 from basstler.class_property import classproperty
+from basstler.generated_file import GeneratedFile
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import (
     ClaudeCodeVariable,
@@ -26,30 +28,8 @@ from basstler.locations import (
 )
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.playbook import Playbook
+from basstler.playbook.skill import Skill, SkillInstructions
 from basstler.plugin_root import PluginRoot
-from basstler.text_file import TextFile
-
-# %% skills
-
-
-@dataclass(frozen=True)
-class SkillDefinition(PlaybookComponent):
-    """
-    A skill the plugin ships, as a directory of its own under the plugin's skills.
-    """
-
-    skill_name: str
-    """
-    The skill's name, which is also its directory's name and how a user invokes it.
-    """
-
-    def directory(self, plugin_root: PluginRoot) -> Path:
-        """
-        :param plugin_root: The plugin.
-        :return: The skill's directory in it.
-        """
-        return plugin_root.path_of(PluginSkillLocation.SKILLS) / self.skill_name
-
 
 # %% hooks
 
@@ -276,12 +256,30 @@ class HookRegistrations(ValidatedJSONModel):
             self, mode="json", by_alias=True, exclude_none=True
         )
 
+
+@dataclass(frozen=True)
+class HookRegistrationsFile(GeneratedFile):
+    """
+    The file a plugin's hook registrations are written in.
+    """
+
+    plugin_root: PluginRoot
+    """
+    The plugin the file belongs to.
+    """
+
+    registrations: HookRegistrations
+    """
+    What the file must hold.
+    """
+
+    @property
+    def path(self) -> Path:
+        return self.plugin_root.path_of(PluginLocation.HOOK_REGISTRATIONS)
+
     @property
     def text(self) -> str:
-        """
-        The file's text.
-        """
-        return json.dumps(self.to_json(), indent=2) + "\n"
+        return json.dumps(self.registrations.to_json(), indent=2) + "\n"
 
 
 # %% the plugin's files
@@ -298,7 +296,7 @@ class PluginFiles:
     The plugin whose files these are.
     """
 
-    skills: tuple[SkillDefinition, ...]
+    skills: tuple[Skill, ...]
     """
     The skills the plugin has to ship.
     """
@@ -317,22 +315,14 @@ class PluginFiles:
         """
         return cls(
             plugin_root,
-            playbook.components_of(SkillDefinition),
+            playbook.components_of(Skill),
             playbook.components_of(HookDefinition),
         )
 
     @property
-    def hook_registrations_path(self) -> Path:
-        """
-        The plugin's hook registrations file.
-        """
-        return self.plugin_root.path_of(PluginLocation.HOOK_REGISTRATIONS)
-
-    @property
     def hook_registrations(self) -> HookRegistrations:
         """
-        The registrations the file must hold: every hook, grouped by event in
-        :class:`HookEvent` order.
+        The registrations of every hook, grouped by event in :class:`HookEvent` order.
         """
         groups = {
             event: tuple(
@@ -343,6 +333,29 @@ class PluginFiles:
         return HookRegistrations(
             {event: entries for event, entries in groups.items() if entries}
         )
+
+    @property
+    def generated_files(self) -> tuple[GeneratedFile, ...]:
+        """
+        The hook registrations, and the instructions of every skill whose body the
+        plugin ships.
+        """
+        missing = self.missing_skills
+        return (
+            HookRegistrationsFile(self.plugin_root, self.hook_registrations),
+            *(
+                SkillInstructions(self.plugin_root, skill)
+                for skill in self.skills
+                if skill not in missing
+            ),
+        )
+
+    @property
+    def stale_files(self) -> tuple[GeneratedFile, ...]:
+        """
+        The generated files that do not hold their text.
+        """
+        return tuple(file for file in self.generated_files if not file.is_current())
 
     def shipped_skill_names(self) -> Iterator[str]:
         """
@@ -357,7 +370,7 @@ class PluginFiles:
     @property
     def undeclared_skill_names(self) -> tuple[str, ...]:
         """
-        The skills the plugin ships that no :class:`SkillDefinition` declares.
+        The skills the plugin ships that no :class:`Skill` declares.
         """
         declared = {skill.skill_name for skill in self.skills}
         return tuple(
@@ -365,30 +378,12 @@ class PluginFiles:
         )
 
     @property
-    def missing_skills(self) -> tuple[SkillDefinition, ...]:
+    def missing_skills(self) -> tuple[Skill, ...]:
         """
-        The declared skills whose directory carries no instructions.
+        The declared skills whose directory carries no body.
         """
         return tuple(
             skill
             for skill in self.skills
-            if not (
-                skill.directory(self.plugin_root) / SkillLocation.INSTRUCTIONS
-            ).is_file()
+            if not skill.body_path(self.plugin_root).is_file()
         )
-
-    def hook_registrations_are_current(self) -> bool:
-        """
-        :return: Whether the hook registrations exist and equal
-            :attr:`hook_registrations`' text.
-        """
-        if not self.hook_registrations_path.is_file():
-            return False
-        current = TextFile(self.hook_registrations_path).read()
-        return current == self.hook_registrations.text
-
-    def write_hook_registrations(self) -> None:
-        """
-        Write the hook registrations, replacing whatever they held.
-        """
-        TextFile(self.hook_registrations_path).write(self.hook_registrations.text)

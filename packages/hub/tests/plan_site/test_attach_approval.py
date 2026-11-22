@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from basstler.github.repository import Repository
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import SessionTool
 import basstler.plan_site.attach_approval
 from basstler.locations import BasstlerVariable, PluginLocation
 from basstler.plan_site.attach_approval import (

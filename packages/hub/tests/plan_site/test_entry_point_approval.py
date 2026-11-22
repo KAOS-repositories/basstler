@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import basstler.plan_site.entry_point_approval
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import SessionTool
 from basstler.locations import BasstlerVariable, PluginLocation
 from basstler.maintenance.commands import FastForwardCommand, RestackCommand
 from basstler.plan_site.attach_approval import AttachAnswer, PermissionDecision

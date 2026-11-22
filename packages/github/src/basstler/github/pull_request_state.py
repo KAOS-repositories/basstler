@@ -217,6 +217,13 @@ class PullRequestRecord:
     """
 
     @property
+    def has_failed_checks(self) -> bool:
+        """
+        Whether the checks were read and at least one failed or reported an error.
+        """
+        return self.check_state is not None and self.check_state.failed
+
+    @property
     def identified_labels(self) -> frozenset[GitHubLabel]:
         """The subset of :attr:`labels` that match a known
         :class:`GitHubLabel` - any other raw label this pull request
@@ -435,3 +442,17 @@ class LivePullRequests:
     The number of the open upstream pull request opened from each branch, by the
     ``"owner/repo"`` of the fork the branch is in.
     """
+
+    def record_of(
+        self, repository: str, pull_request_number: int | None
+    ) -> PullRequestRecord | None:
+        """
+        :param repository: The ``"owner/repo"`` the pull request is in.
+        :param pull_request_number: The pull request's number, or ``None`` for none.
+        :return: The live pull request, or ``None`` when there is none by that number.
+        """
+        if pull_request_number is None:
+            return None
+        return self.pull_requests_by_repository.get(repository, {}).get(
+            str(pull_request_number)
+        )

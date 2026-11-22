@@ -389,6 +389,30 @@ class DatasetLocation(PathEnumeration):
     per fixture plan.
     """
 
+    GOAL_PLANS = DIRECTORY / "goal-plans"
+    """
+    A plans directory copied from the plans a real goal spans, with that goal under its
+    goals directory.
+    """
+
+    OWNER_STEP_PLANS = DIRECTORY / "owner-step-plans"
+    """
+    A plans directory whose one plan holds a step its owner performs, with a goal behind
+    that step.
+    """
+
+    DECISION_PLANS = DIRECTORY / "decision-plans"
+    """
+    A plans directory whose one plan holds an owner's step that asks for a verdict, with
+    a goal behind that step.
+    """
+
+    SESSION_CLOSE = DIRECTORY / "session-close"
+    """
+    The hook inputs Claude Code sends when a session is about to stop and after the user
+    decided something.
+    """
+
     BASH_PATH_SCRIPT = DIRECTORY / "bash-path.sh"
     """
     Prints a path as the bash running it writes it.

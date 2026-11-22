@@ -6,8 +6,8 @@ or, through a plans directory, in another - and that item's readiness.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from pathlib import Path
 
@@ -16,7 +16,7 @@ import yaml
 from basstler.class_property import classproperty
 from basstler.github.pull_request_state import LivePullRequests, LiveState
 from basstler.github.repository import PullRequestReference, Repository
-from basstler.plan.model import PlanDocument, PlanManifest
+from basstler.plan.model import DependencyRelease, PlanDocument, PlanManifest
 from basstler.plan.structure import Item, Plan
 from basstler.text_file import TextFile
 
@@ -26,8 +26,10 @@ from basstler.text_file import TextFile
 @dataclass(frozen=True)
 class DependencyReference:
     """
-    One parsed ``depends_on`` entry: an item of the plan the entry is written in, or
-    ``<plan-id>/<item-id>`` naming an item of another plan.
+    One parsed ``depends_on`` entry: an item of the plan the entry is written in,
+    ``<plan-id>/<item-id>`` naming an item of another plan, or
+    ``<owner>/<name>:<plan-id>/<item-id>`` naming an item of a plan kept in the notes of
+    another repository.
     """
 
     item_identifier: str
@@ -38,6 +40,12 @@ class DependencyReference:
     plan_id: str | None = None
     """
     The plan holding it, or ``None`` when the entry named no plan.
+    """
+
+    notes_repository: str | None = None
+    """
+    The repository whose notes hold that plan, as ``owner/name``, or ``None`` for the
+    notes the entry is read from.
     """
 
     @classproperty
@@ -51,6 +59,14 @@ class DependencyReference:
         """
         return "/"
 
+    @classproperty
+    def repository_separator(cls) -> str:
+        """
+        Separates the notes repository from the plan in an entry naming an item of
+        another repository's plans; neither a kebab-case id nor ``owner/name`` holds it.
+        """
+        return ":"
+
     @classmethod
     def from_text(cls, text: str) -> DependencyReference:
         """
@@ -60,10 +76,18 @@ class DependencyReference:
         :return: The parsed reference, whose :attr:`is_well_formed` says whether the
             text was a reference at all.
         """
-        plan_id, separator, item_identifier = text.partition(cls.separator)
+        notes_repository, repository_separator, in_repository = text.rpartition(
+            cls.repository_separator
+        )
+        named_repository = notes_repository if repository_separator else None
+        plan_id, separator, item_identifier = in_repository.partition(cls.separator)
         if not separator:
-            return cls(item_identifier=plan_id)
-        return cls(item_identifier=item_identifier, plan_id=plan_id)
+            return cls(item_identifier=plan_id, notes_repository=named_repository)
+        return cls(
+            item_identifier=item_identifier,
+            plan_id=plan_id,
+            notes_repository=named_repository,
+        )
 
     @classmethod
     def read_other_plans(
@@ -88,7 +112,28 @@ class DependencyReference:
         """
         if self.plan_id is None:
             return self.item_identifier
-        return f"{self.plan_id}{self.separator}{self.item_identifier}"
+        in_repository = f"{self.plan_id}{self.separator}{self.item_identifier}"
+        if self.notes_repository is None:
+            return in_repository
+        return f"{self.notes_repository}{self.repository_separator}{in_repository}"
+
+    @property
+    def names_another_repository(self) -> bool:
+        """
+        Whether this reference reaches into the notes of another repository.
+        """
+        return self.notes_repository is not None
+
+    def in_notes_of(self, notes_repository: str | None) -> DependencyReference:
+        """
+        :param notes_repository: The repository whose notes the entry was read from, or
+            ``None`` for the notes everything else is read from.
+        :return: The reference as read there: one that names no repository names that
+            one.
+        """
+        if self.notes_repository is not None:
+            return self
+        return replace(self, notes_repository=notes_repository)
 
     @property
     def names_another_plan(self) -> bool:
@@ -106,6 +151,14 @@ class DependencyReference:
             not self.plan_id or self.separator in self.plan_id
         ):
             return False
+        if self.notes_repository is not None:
+            owner, separator, name = self.notes_repository.partition(self.separator)
+            if (
+                self.plan_id is None
+                or not (owner and separator and name)
+                or self.separator in name
+            ):
+                return False
         return bool(self.item_identifier) and (
             self.separator not in self.item_identifier
         )
@@ -166,6 +219,31 @@ class Dependency(ABC):
         Whether a dependent item's own pull request is worth reviewing behind this
         dependency.
         """
+
+    @abstractmethod
+    def is_finished(self) -> bool:
+        """
+        Whether the item this dependency names is done or merged.
+        """
+
+    @abstractmethod
+    def has_finished_pushing(self) -> bool:
+        """
+        Whether the item this dependency names takes no more pushes.
+        """
+
+    def releases_dependent(self, release: DependencyRelease) -> bool:
+        """
+        :param release: What the dependent waits for of this dependency.
+        :return: Whether the dependent can start as far as this dependency goes.
+        """
+        match release:
+            case DependencyRelease.MERGED:
+                return self.is_finished()
+            case DependencyRelease.PUSHES_DONE:
+                return self.is_finished() or self.has_finished_pushing()
+            case DependencyRelease.READY_FOR_REVIEW:
+                return self.is_ready_to_unblock_dependents()
 
     @abstractmethod
     def classify_live_state(
@@ -243,12 +321,21 @@ class ResolvedDependency(Dependency):
         referenced item's own answer."""
         return self.item.is_ready_for_dependent_review()
 
+    def is_finished(self) -> bool:
+        return self.item.is_effectively_done()
+
+    def has_finished_pushing(self) -> bool:
+        return self.item.has_finished_pushing
+
     def classify_live_state(
         self,
         live_pull_requests: LivePullRequests,
     ) -> None:
         self.item.live_state = LiveState.classify(
             self.item.pull_request_number, self.repository, live_pull_requests
+        )
+        self.item.pull_request_record = live_pull_requests.record_of(
+            self.repository, self.item.pull_request_number
         )
 
 
@@ -284,6 +371,12 @@ class UnresolvedDependency(Dependency):
         ``False``."""
         return False
 
+    def is_finished(self) -> bool:
+        return False
+
+    def has_finished_pushing(self) -> bool:
+        return False
+
     def classify_live_state(
         self,
         live_pull_requests: LivePullRequests,
@@ -315,6 +408,24 @@ class PlanDirectory:
     plans_by_id: dict[str, Plan] = field(default_factory=dict)
     """The manifests read so far, keyed by plan id - filled in on demand by
     :meth:`plan`, so a plan appears here only once something named it."""
+
+    repository: str | None = None
+    """
+    The repository whose notes these plans are, as ``owner/name``, where known: a
+    reference naming it is read as one naming this directory.
+    """
+
+    other_repositories: dict[str, PlanDirectory | None] = field(default_factory=dict)
+    """
+    The plans of other repositories' notes read so far, keyed by ``owner/name``;
+    ``None`` for one that could not be read.
+    """
+
+    read_other_repository: Callable[[str], PlanDirectory | None] | None = None
+    """
+    Reads another repository's plans the first time a reference names it, or ``None``
+    when only :attr:`other_repositories` is known.
+    """
 
     def plan(self, plan_id: str | None) -> Plan | None:
         """
@@ -373,15 +484,50 @@ class PlanDirectory:
             )
         return naming
 
+    def local_form_of(self, reference: DependencyReference) -> DependencyReference:
+        """
+        :param reference: A reference, perhaps naming the repository of these notes.
+        :return: The same reference, naming no repository when it names this one, so
+            one item has one reference.
+        """
+        if (
+            reference.notes_repository is not None
+            and reference.notes_repository == self.repository
+        ):
+            return replace(reference, notes_repository=None)
+        return reference
+
+    def directory_of(self, reference: DependencyReference) -> PlanDirectory | None:
+        """
+        :param reference: A reference, perhaps naming another repository's notes.
+        :return: The plans it resolves against, or ``None`` when its repository's notes
+            cannot be read.
+        """
+        reference = self.local_form_of(reference)
+        if reference.notes_repository is None:
+            return self
+        repository = reference.notes_repository
+        if repository not in self.other_repositories:
+            self.other_repositories[repository] = (
+                self.read_other_repository(repository)
+                if self.read_other_repository is not None
+                else None
+            )
+        return self.other_repositories[repository]
+
     def resolve(self, reference: DependencyReference) -> Dependency:
         """
         Resolve one cross-plan reference to the item it names.
 
-        :param reference: A reference naming another plan's item.
+        :param reference: A reference naming another plan's item, in these notes or in
+            another repository's.
         :return: The resolved dependency, or an :class:`UnresolvedDependency` if either
-            half of the reference doesn't exist.
+            half of the reference, or its repository's notes, don't exist.
         """
-        plan = self.plan(reference.plan_id)
+        directory = self.directory_of(reference)
+        if directory is None:
+            return UnresolvedDependency(reference=reference)
+        plan = directory.plan(reference.plan_id)
         if plan is None:
             return UnresolvedDependency(reference=reference)
         item = plan.items_by_identifier.get(reference.item_identifier)
@@ -521,8 +667,8 @@ class DependencyResolver:
             item with none.
         """
         return all(
-            dependency.is_ready_to_unblock_dependents()
-            for dependency in self.dependencies_of(item)
+            self.resolve(entry).releases_dependent(item.release_needed_from(entry))
+            for entry in item.depends_on
         )
 
     def classify_live_states(

@@ -92,7 +92,12 @@ function planPageShowLiveState(chip, stateName) {
     chip.classList.remove(tone);
   });
   chip.classList.add(shown.tone);
-  chip.textContent = chip.textContent.split(" · ")[0] + " · " + shown.label;
+  var builtText = chip.textContent;
+  chip.textContent = builtText.split(" · ")[0] + " · " + shown.label;
+  var changeNotice = document.querySelector("[{{ vocabulary.live_state_attribute.CHANGED_SINCE_BUILD }}]");
+  if (changeNotice && chip.textContent !== builtText) {
+    changeNotice.hidden = false;
+  }
   if (stateName === "{{ vocabulary.live_state.MERGED.value }}") {
     planPageMarkItemDone(chip.closest(".item"));
   }
@@ -183,7 +188,7 @@ function planPageRecheckPullRequests() {
     if (addresses.length) {
       planPageShowRefresh(refused);
     }
-    document.getElementById("plan-page")
+    document.querySelector(".page")
       .setAttribute("{{ vocabulary.draft_recheck_attribute.FINISHED }}", "");
   });
 }

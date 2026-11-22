@@ -22,7 +22,7 @@ function planPageCopyCommand(button, command, succeededLabel, missingLabel) {
 
   function copyViaTemporaryTextarea() {
     var textarea = document.createElement("textarea");
-    textarea.value = command;
+    textarea.value = text;
     textarea.style.position = "fixed";
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
@@ -61,6 +61,26 @@ function planPageCopyActionCommand(button) {
     button.getAttribute("data-action-command"),
     model ? "Copied - run /model " + model + " first" : "Copied!"
   );
+}
+
+function planPageCopyDecision(button) {
+  var decision = button.closest(".decision");
+  var requestField = decision.querySelector(".decision-request");
+  var request = requestField.value.trim();
+  var originalLabel = button.textContent;
+  var missingRequestMilliseconds = 1800;
+  if (button.hasAttribute("data-asks-for-request") && !request) {
+    requestField.classList.add("decision-request-missing");
+    requestField.focus();
+    button.textContent = "Write your request first";
+    setTimeout(function () {
+      requestField.classList.remove("decision-request-missing");
+      button.textContent = originalLabel;
+    }, missingRequestMilliseconds);
+    return;
+  }
+  var prompt = button.getAttribute("data-decision-prompt");
+  planPageCopyCommand(button, request ? prompt + "\n\n" + request : prompt, "Copied!", "");
 }
 
 function planPageHandoverReceiver(text, repositoryName) {

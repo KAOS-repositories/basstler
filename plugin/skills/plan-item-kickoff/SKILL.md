@@ -13,6 +13,7 @@ Plan-agnostic: never hardcode a plan id, item or branch. Step 1 creates nothing.
 
 ## 1. Gather
 
+Save text given after the ids to the item's `notes` first.
 Follow [`plan-item-gathering.md`](../plan-item-kickoff/plan-item-gathering.md), with this setup gate:
 
 ```bash
@@ -23,7 +24,7 @@ Then learn
 the pattern this item follows from what landed: for the files it will touch, find the
 merged pull requests that last changed them (`git log <base> -- <paths>`) and read their
 diffs and descriptions (`mcp__github__pull_request_read`), including review-driven
-decisions. If the item's branch already exists, build on what is on it.
+decisions. Build on the item's branch if it exists.
 
 ## 2. Resolve the mode
 
@@ -39,10 +40,10 @@ and how each part is verified (tests first). Cite each part's source (the item's
 a merged pull request, a standing rule) and flag any dependency not ready, any conflict
 between the notes and what landed, and anything still open.
 
-Read `plan-create/plan-schema.md` only when the plan changes the plan's structure.
+Read `plan-create/plan-schema.md` only when the plan's structure changes.
 
 In `plan` mode present it with `ExitPlanMode` and stop. In `auto` mode it is settled;
-the flags go into the pull request description. No git or code in this step.
+the flags go into the pull request description. No git or code here.
 
 ## 4. Bootstrap, before the first edit
 

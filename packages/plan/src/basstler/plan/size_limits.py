@@ -8,7 +8,7 @@ import re
 import shutil
 import sys
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -19,6 +19,7 @@ from basstler.class_property import classproperty
 from basstler.directory_tree import DirectoryTree
 from basstler.exit_codes import CommandFailure, ExitCode, SizeLimitExitCode
 from basstler.plan.dependencies import DependencyReference
+from basstler.plan.goal import Goal
 from basstler.plan.model import PlanDocument, PlanItem, PlanManifest
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
@@ -641,9 +642,9 @@ class PlanFiles:
 
     def release_dependents(self, plan: PlanManifest, destination: PlanFiles) -> None:
         """
-        Stop every other plan beside *destination* depending on an item of *plan* that
-        has landed, since a landed item is removed from its plan and the entry would
-        no longer resolve.
+        Stop every other plan and goal beside *destination* naming an item of *plan*
+        that has landed, since a landed item is removed from its plan and the entry
+        would no longer resolve; a goal whose every target landed is reached and removed.
 
         :param plan: The plan being saved, with its landed items still in it.
         :param destination: Where the plan is saved; its directory's siblings hold the
@@ -663,6 +664,15 @@ class PlanFiles:
             released = dependent.without_dependencies(landed_references)
             if released != dependent:
                 released.write(manifest_path)
+        for goal_path in Goal.files_in(plans_directory):
+            goal = Goal.from_yaml(goal_path.read_text())
+            remaining = [
+                target for target in goal.targets if target not in landed_references
+            ]
+            if not remaining:
+                goal_path.unlink()
+            elif remaining != goal.targets:
+                goal_path.write_text(replace(goal, targets=remaining).render())
 
 
 # %% command line

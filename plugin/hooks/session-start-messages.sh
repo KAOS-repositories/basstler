@@ -380,6 +380,23 @@ main_tests_line_failing() {
   printf 'failing - fix them first: %s' "$1"
 }
 
+# %% the goals line
+
+# goals_line_not_checked: the goals or the plans they span could not be read.
+goals_line_not_checked() {
+  printf 'not checked - could not read the goals on the notes branch'
+}
+
+# goals_line_none: the notes branch holds no goal.
+goals_line_none() {
+  printf 'none set - /plan-goal sets one'
+}
+
+# goals_line_listed: $1 is one line per goal, its progress and its next command.
+goals_line_listed() {
+  printf 'what comes next for each goal:\n%s' "$(printf '%s\n' "$1" | sed 's/^/    /')"
+}
+
 # %% the upstream-reviews Action line
 
 # upstream_reviews_action_line_not_read: the fork's branches could not be read,

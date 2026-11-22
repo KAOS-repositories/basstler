@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from basstler.plan.session_record import SessionRecord, SessionRecordStore
 from basstler.plan.exceptions import PlanInAnotherRepository
 from basstler.exit_codes import ManifestToolsExitCode
 from basstler.github.repository import Repository
@@ -323,6 +324,20 @@ def test_saves_a_plan_from_a_checkout_of_its_own_repository(
         saved_plan_directory(save_plan_repository, DatasetPlan.IDENTIFIER)
         / PlanDocument.MANIFEST
     ).exists()
+
+
+def test_a_save_settles_the_session_record_at_the_checked_out_commit(
+    save_plan_repository: ScratchRepository,
+):
+    """
+    The stop hook asks for nothing a plan save already covered.
+    """
+    result = save_dataset_plan(save_plan_repository)
+
+    assert result.returncode == 0, result.stderr
+    assert SessionRecordStore(save_plan_repository.git).read() == SessionRecord(
+        settled_commit=save_plan_repository.git.commit_at("HEAD")
+    )
 
 
 def save_depending_on(

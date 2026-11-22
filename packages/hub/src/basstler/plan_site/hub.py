@@ -128,6 +128,17 @@ class SiteAddress:
         """
         return f"{self.repository_url(repository)}{plan_identifier}/"
 
+    def goal_url(self, repository: Repository | str, goal_identifier: str) -> str:
+        """
+        :param repository: The repository whose notes hold the goal.
+        :param goal_identifier: The goal's id.
+        :return: The address the goal's page is served from.
+        """
+        return (
+            f"{self.repository_url(repository)}"
+            f"{ProjectLocation.PLAN_GOALS.name}/{goal_identifier}/"
+        )
+
     def item_url(
         self,
         repository: Repository | str,

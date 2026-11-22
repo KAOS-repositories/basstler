@@ -1,0 +1,4 @@
+id: site-published
+title: The plan site is published and checked
+targets:
+- site-setup/verify-site

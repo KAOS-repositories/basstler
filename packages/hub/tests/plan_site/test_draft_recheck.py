@@ -18,7 +18,8 @@ from basstler.github.pull_request_record import (
 )
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
 from basstler.plan_site.__main__ import PlanSource, RepositorySite, SiteFile
-from basstler.plan_site.cards import DraftRecheckAttribute, StartNowAction
+from basstler.plan.item_action import StartNowAction
+from basstler.plan_site.cards import DraftRecheckAttribute
 from basstler.plan.structure import Plan
 
 from basstler_testing.constants.site import SitePlan, SiteSampleText

@@ -281,6 +281,12 @@ class RepositoryStateLocation(PathEnumeration):
     the same name.
     """
 
+    SESSION_RECORD = DIRECTORY / "session-record.json"
+    """
+    What the sessions in this clone last settled with the plans, and the decisions made
+    since.
+    """
+
 
 class CommitScratchFile(PathEnumeration):
     """
@@ -335,6 +341,11 @@ class SiteTemplate(PathEnumeration):
     PLAN = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_plan.html")
     """
     One plan's page: a column per wave, a card per item.
+    """
+
+    GOAL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_goal.html")
+    """
+    One goal's page: the ordered steps that reach it, grouped by what they wait for.
     """
 
     PLAN_SCRIPT = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_plan.js")
@@ -713,6 +724,11 @@ class ProjectLocation(PathEnumeration):
     PLAN_RULES = PLANS / "_rules.yaml"
     """
     The rules every plan of the repository follows, one entry per rule.
+    """
+
+    PLAN_GOALS = PLANS / "_goals"
+    """
+    Where goals live on the personal-notes branch, one file per goal.
     """
 
     PULL_REQUEST_PROGRESS = PERSONAL_NOTES / "pr-progress"

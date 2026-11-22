@@ -287,6 +287,20 @@ regenerates from every manifest on each save, so it can't drift.
 
 Any other label is preserved but not interpreted.
 
+## Stopping with the plans up to date
+
+A session's stop is refused once while it did something the plans do not say yet
+(`hooks.json`'s `Stop` hook, `basstler session-close stop-hook`):
+
+- the checked-out branch moved since its plan was last saved,
+- the checked-out branch holds commits and no plan item owns it,
+- the user answered a question or approved a plan since a plan was last saved.
+
+A plan save settles the first and the last; `basstler session-close confirm` settles all
+three on the session's word that the plans already say what is true. The record lives in the
+clone's git directory (`basstler/session-record.json`) and compares commits and recorded
+decisions, never times. `basstler session-close check` prints what is unrecorded.
+
 ## Attaching your plan repositories without a prompt
 
 A `PreToolUse` hook on `mcp__claude-code-remote__add_repo` ([`basstler.plan_site.attach_approval`](../../src/basstler/plan_site/attach_approval.py))

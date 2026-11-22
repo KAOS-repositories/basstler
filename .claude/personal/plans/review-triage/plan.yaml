@@ -39,12 +39,13 @@ items:
   depends_on: []
   status: in progress
   recommended_model: sonnet
-  notes: 'The general part of #214 (moves, triage since a commit, opt-in rules), split out
-    by moving files. report and mark-viewed now default to the viewer''s last submitted review,
-    else the merge base; --from-merge-base asks for the whole change. --rename no longer crashes
-    (c5473e82, Rename.found_by out of equality). main merged at 8f01b9a9, one conflict in
-    github/repository.py kept both methods; #214, #241 and #238 restacked onto it. Next: read
-    CI. Exempt from the basstler-packages freeze on github.'
+  notes: >
+    The general part of #214 (moves, triage since a commit, opt-in rules), split out by moving
+    files. report and mark-viewed default to the viewer's last submitted review, else the merge
+    base; --from-merge-base asks for the whole change. Main merged at 74ab12a5 (workspace layout),
+    pushed at 23c6ba00. Next: read CI at 23c6ba00, then restack the pull requests above it
+    (maintenance restack fails on a git checkout error). Exempt from the basstler-packages freeze on
+    github.
 - id: generated-file-triage
   title: Prove a generated file mechanical by regenerating it
   track: triage

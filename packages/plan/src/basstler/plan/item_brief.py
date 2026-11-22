@@ -29,7 +29,7 @@ from basstler.github.pull_request_source import (
 from basstler.plan.check_dependency_readiness import DependencyReadiness
 from basstler.plan.dependencies import DependencyResolver
 from basstler.plan.item_bootstrap.documents import PlanDocuments, ProjectCheckout
-from basstler.plan.model import PlanItem, PlanManifest
+from basstler.plan.model import ExternalDependency, PlanItem, PlanManifest
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.repository_rules_store import RepositoryRulesStore
 from basstler.plan.size_limits import Roadmap
@@ -100,6 +100,11 @@ class ItemBriefKey(StrEnum):
     DEPENDENCIES = "dependencies"
     """
     Each dependency's live state and whether it is ready to build on.
+    """
+
+    EXTERNAL_DEPENDENCIES_GUIDANCE = "external_dependencies_guidance"
+    """
+    What to do with the work an item stacked on that was not handed over.
     """
 
     STANDING_RULES = "standing_rules"
@@ -203,6 +208,15 @@ class ItemBrief:
                 ItemBriefKey.DEPENDENCIES.value: [
                     dependency.to_json() for dependency in self.dependencies
                 ],
+                **(
+                    {
+                        ItemBriefKey.EXTERNAL_DEPENDENCIES_GUIDANCE.value: (
+                            ExternalDependency.guidance
+                        )
+                    }
+                    if self.item.external_dependencies
+                    else {}
+                ),
                 ItemBriefKey.REPOSITORY_RULES.value: [
                     rule.to_json() for rule in self.repository_rules.rules
                 ],

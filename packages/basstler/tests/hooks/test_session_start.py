@@ -1755,6 +1755,35 @@ def test_tells_the_session_where_the_plugin_is(
     assert exported == BashPath(session_start_repository.plugin_root).text
 
 
+def test_a_later_command_finds_the_plugin_after_its_directory_is_renamed(
+    session_start_repository: ScratchRepository, tmp_path: Path
+):
+    """
+    Claude Code replaces a synced plugin's directory with a renamed sibling while the
+    session runs, so the path the hook exported no longer exists; the commands the
+    session runs afterwards find the renamed directory.
+    """
+    environment_file = tmp_path / "session-environment"
+    publish_and_run(
+        session_start_repository,
+        environment={ScrubbedEnvironmentPrefix.ENVIRONMENT_FILE: str(environment_file)},
+    )
+    plugin_root = session_start_repository.plugin_root
+    renamed = plugin_root.rename(plugin_root.with_name(f"{plugin_root.name}~g2"))
+
+    exported = subprocess.run(
+        Bash.locate(os.environ).command(
+            "-c",
+            f'source "$0" && printf "%s" "${{{BasstlerVariable.PLUGIN_ROOT}}}"',
+            environment_file,
+        ),
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+    ).stdout
+    assert exported == BashPath(renamed).text
+
+
 def test_tells_the_session_which_interpreter_runs_the_package(
     session_start_repository: ScratchRepository, tmp_path: Path
 ):

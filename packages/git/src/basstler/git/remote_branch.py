@@ -12,11 +12,8 @@ from typing import Any
 
 from basstler.class_property import classproperty
 from basstler.git.branch import Branch
-from basstler.git.commands import (
-    GitCommandResult,
-    GitCommandRunner,
-    ProposedPush,
-)
+from basstler.git.commands import GitCommandResult, ProposedPush
+from basstler.git.remote import Remote
 from basstler.json_model import JSONSerializable
 
 # %% the branch
@@ -28,19 +25,9 @@ What a file is written from: its text, or a JSON object or a value written as on
 
 
 @dataclass(frozen=True)
-class RemoteBranch(Branch):
+class RemoteBranch[RemoteType: Remote](Branch[RemoteType]):
     """
     One branch of one remote, read and written without touching the working tree.
-    """
-
-    git: GitCommandRunner
-    """
-    The clone to work in.
-    """
-
-    remote: str
-    """
-    The remote the branch lives on, as a remote name in the clone or a URL.
     """
 
     @classproperty
@@ -58,19 +45,14 @@ class RemoteBranch(Branch):
         """
         return f"{self.local_reference_prefix}/{self.name}"
 
-    @property
-    def url(self) -> str:
-        """
-        :return: The URL the remote points at.
-        """
-        return self.git.attempt("remote", "get-url", self.remote).output or self.remote
-
     def exists(self) -> bool:
         """
         :return: Whether the remote can be reached and has this branch.
         """
         return bool(
-            self.git.attempt("ls-remote", "--heads", self.remote, self.name).output
+            self.repository.git.attempt(
+                "ls-remote", "--heads", self.repository.location, self.name
+            ).output
         )
 
     def fetch(self) -> str | None:
@@ -79,13 +61,13 @@ class RemoteBranch(Branch):
         """
         if not self.exists():
             return None
-        self.git.fetch(
-            self.remote,
+        self.repository.git.fetch(
+            self.repository.location,
             "--no-tags",
             "--no-write-fetch-head",
             f"+{self.reference}:{self.local_reference}",
         )
-        return self.git.commit_at(self.local_reference)
+        return self.repository.git.commit_at(self.local_reference)
 
     def read_latest(self, path: str | Path) -> str | None:
         """
@@ -94,7 +76,7 @@ class RemoteBranch(Branch):
             ``None`` when the remote has no such branch or the branch no such file.
         """
         tip = self.fetch()
-        return self.git.file_at(tip, path) if tip else None
+        return self.repository.git.file_at(tip, path) if tip else None
 
     def read_every_latest(self, directory: str | Path, file_name: str) -> list[str]:
         """
@@ -107,11 +89,11 @@ class RemoteBranch(Branch):
         tip = self.fetch()
         if tip is None:
             return []
-        listed = self.git.run(
+        listed = self.repository.git.run(
             "ls-tree", "-r", "--name-only", tip, "--", Path(directory).as_posix()
         )
         return [
-            self.git.file_at(tip, path)
+            self.repository.git.file_at(tip, path)
             for path in sorted(listed.splitlines())
             if Path(path).name == file_name
         ]
@@ -130,8 +112,8 @@ class RemoteBranch(Branch):
         """
         for _ in range(attempts):
             commit = self.commit_on(self.fetch(), files, message)
-            pushed = self.git.push(
-                ProposedPush(self.remote, f"{commit}:{self.reference}")
+            pushed = self.repository.git.push(
+                ProposedPush(self.repository.location, f"{commit}:{self.reference}")
             )
             if pushed.succeeded:
                 break
@@ -164,7 +146,9 @@ class RemoteBranch(Branch):
         commit = self.commit_on(parent, files, message)
         return FileWrite(
             commit,
-            self.git.push(ProposedPush(self.remote, f"{commit}:{self.reference}")),
+            self.repository.git.push(
+                ProposedPush(self.repository.location, f"{commit}:{self.reference}")
+            ),
         )
 
     def create(
@@ -198,7 +182,7 @@ class RemoteBranch(Branch):
             if isinstance(content, dict):
                 content = json.dumps(content, indent=2)
             texts[path] = content
-        return self.git.commit_files(parent, texts, message)
+        return self.repository.git.commit_files(parent, texts, message)
 
     def delete(self) -> GitCommandResult:
         """
@@ -206,7 +190,9 @@ class RemoteBranch(Branch):
 
         :return: The push deleting it, failed when the remote refused it.
         """
-        return self.git.push(ProposedPush(self.remote, f":{self.reference}"))
+        return self.repository.git.push(
+            ProposedPush(self.repository.location, f":{self.reference}")
+        )
 
 
 @dataclass(frozen=True)

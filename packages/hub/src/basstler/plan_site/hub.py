@@ -38,7 +38,7 @@ import yaml
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, HasRepository, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan.structure import Item
 from basstler.plan_site.exceptions import RegistryUnreadableError
@@ -311,14 +311,9 @@ class PlanHistory:
 
 
 @dataclass(frozen=True)
-class NotesBranch:
+class NotesBranch(HasRepository):
     """
     One listed repository's notes branch, fetched into a scratch repository.
-    """
-
-    repository: Repository
-    """
-    The repository the branch belongs to.
     """
 
     git: GitCommandRunner

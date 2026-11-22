@@ -12,6 +12,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from basstler.git.remote import Remote
 from basstler.class_property import classproperty
 from basstler.git.branch import Branch
 from basstler.git.commands import CommitTrailer, GitCommandRunner
@@ -185,7 +186,9 @@ class ActionInstallation:
             all.
         """
         tip = branch.fetch()
-        workflow = branch.git.file_at(tip, ActionFile.WORKFLOW) if tip else None
+        workflow = (
+            branch.repository.git.file_at(tip, ActionFile.WORKFLOW) if tip else None
+        )
         if workflow is None:
             return InstallationState.MISSING, None
         match = self.branch_or_tag_line.search(workflow)
@@ -274,6 +277,6 @@ class AbandonedRequests:
         identifiers = self.identifiers()
         for identifier in identifiers:
             RemoteBranch(
-                ActionBranch.for_request(identifier), self.git, self.remote
+                Remote(self.git, self.remote), ActionBranch.for_request(identifier)
             ).delete().raise_if_failed()
         return identifiers

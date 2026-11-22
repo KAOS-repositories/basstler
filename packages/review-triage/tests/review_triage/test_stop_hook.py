@@ -123,7 +123,7 @@ def test_a_head_pushed_since_is_marked_again(
 ):
     session.record_marked(session.unmarked())
     pushed = session_reading(scratch_repository, "b" * 40)
-    assert pushed.unmarked().head.object_hash == "b" * 40
+    assert pushed.unmarked().head.commit == "b" * 40
 
 
 def test_the_mark_is_kept_where_the_checkout_keeps_its_scratch_state(

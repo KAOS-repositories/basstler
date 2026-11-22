@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from basstler.git.commands import GitCommandRunner
+from basstler.git.remote import Remote
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.client import GitHubClient, GitHubReader
 from basstler.github.issue import IssueClosing, IssueComment
@@ -187,12 +188,11 @@ class SenderOriginalPullRequests:
         kept = []
         for original in self.read_unmerged():
             continued_commit = RemoteBranch(
-                git=self.git,
-                name=original.summary.head.name,
-                remote=self.receiver_repository.clone_url,
+                Remote(self.git, self.receiver_repository.clone_url),
+                original.summary.head.name,
             ).fetch()
             if continued_commit is None or not self.git.contains(
-                original.summary.head.object_hash, continued_commit
+                original.summary.head.commit, continued_commit
             ):
                 kept.append(original)
                 continue

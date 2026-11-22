@@ -4,15 +4,20 @@ Writing one file of a repository, and proposing it for a default branch.
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from basstler.git.branch import Branch
+from basstler.github.exceptions import RepositoryUnknown
 from basstler.github.file_proposal import (
+    BranchReferenceRead,
     ExistingBranch,
     FileCommit,
     FileWrite,
     RepositoryFile,
 )
 from basstler.github.git_objects import EncodedContent
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import Repository
 
 from basstler_testing.constants.paths import DatasetLocation
 
@@ -24,7 +29,7 @@ The repository every file here is committed to.
 """
 
 COMMIT = FileCommit(
-    RepositoryBranch("trunk", REPOSITORY),
+    Branch(REPOSITORY, "trunk"),
     ".github/workflows/a-workflow.yml",
     DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text(encoding="utf-8"),
     "Add a workflow",
@@ -60,9 +65,17 @@ def test_a_file_write_changes_a_repository_file():
 # %% a branch, as the git references API names it
 
 
-def test_an_existing_branch_is_read_by_its_name_without_the_namespace():
-    branch = Branch("a-feature")
-    existing = ExistingBranch.from_json(
+def test_an_existing_branch_is_read_as_the_branch_of_the_read_s_repository():
+    branch = Branch(REPOSITORY, "a-feature")
+    existing = BranchReferenceRead(REPOSITORY, branch).parse(
         {"ref": branch.reference, "object": {"sha": "a-commit"}}
     )
-    assert existing.name == branch.name
+    assert existing.branch == branch
+
+
+def test_a_branch_read_outside_a_read_has_no_known_repository():
+    with pytest.raises(ValidationError) as raised:
+        ExistingBranch.from_json(
+            {"ref": f"{Branch.namespace}/a-feature", "object": {"sha": "a-commit"}}
+        )
+    assert isinstance(raised.value.errors()[0]["ctx"]["error"], RepositoryUnknown)

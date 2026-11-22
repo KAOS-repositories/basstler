@@ -15,7 +15,7 @@ from cyclopts.validators import MutuallyExclusive
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubRestClient
-from basstler.github.repository import RepositoryBranch
+from basstler.git.branch import Branch
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.repository_option import RepositoryArgument
 from basstler.locations import PlanHandoverLocation
@@ -133,7 +133,7 @@ def offer_plans(
     )
     offered = HandoverOffer(
         handover=handover,
-        base=RepositoryBranch(repository=receiver_repository, name=base),
+        base=Branch(receiver_repository, base),
         receiver_login=receiver_login,
         git=git,
     ).push_and_open_pull_request(client=client)

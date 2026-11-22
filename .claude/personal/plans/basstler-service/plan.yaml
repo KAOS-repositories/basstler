@@ -71,6 +71,8 @@ items:
     repository's plans changed; a pull request, review, check or status event marks every
     item tracking that pull request, across installations. A failed delivery is logged with
     its id; a page open re-reads live state, so a missed delivery never leaves a page stale.
+    The intake is generic over the request model and its handler, so plan-write-api and services
+    built on basstler-service reuse it.
 - id: served-pages
   title: The service renders the hub and plan pages on request from the notes branches
   track: service
@@ -120,11 +122,12 @@ items:
   depends_on:
   - github-sign-in
   notes: >-
-    An HTTP API applies one plan edit, or one edit of a rules or notes file (account, repository,
-    plan or item), per request as the signed-in user, after the same validation and size limits
-    save-plan.sh runs, and commits it to the notes branch in order, so concurrent edits never race.
-    A user may edit only notes repositories they can push to. save-plan.sh calls it when an instance is configured and keeps its own
-    push otherwise. A session reaches it through basstler-v3's MCP tools where they exist.
+    An HTTP API applies one plan, rules or notes edit per request as the signed-in user, after
+    save-plan.sh's validation and size limits, in order through webhook-intake's intake into a
+    Store interface; its one implementation commits to the notes branch, and a service built on
+    basstler-service may supply another. A user edits only notes repositories they can push to.
+    save-plan.sh calls it when an instance is configured, else pushes itself; sessions reach it
+    through basstler-v3's MCP tools.
 - id: site-actions
   title: Site buttons defer, restore, delete and start items and commit rule and note edits as the
     signed-in viewer

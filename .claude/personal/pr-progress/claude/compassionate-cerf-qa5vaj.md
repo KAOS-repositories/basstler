@@ -1,13 +1,12 @@
 **Plan**
-- Tests first for each part below
-- New distribution `basstler-hub-server` (registered like `basstler-packaging`)
-- Committed App manifest (JSON), read into a `ValidatedJSONModel`
-- Registration page and manifest-conversion call on `basstler.github`, credentials parsed at the boundary
-- Secret store: a directory of files, path from an environment variable
-- Command: `python -m basstler.hub_server`
+- Run the rest of the `basstler` suite and read CI on the pushed commit
+- Decide the open point in the description: anonymous client for the conversion call
 
 **Done**
-- Branch, draft PR 294 and plan record opened
+- New distribution `basstler-hub-server` with the committed manifest, the loopback flow, the conversion, the secret store and the `register-app` command
+- 28 tests; ruff, code-rules, core, github, build, packaging and release tests pass
+- PR 294 described, labelled `release:minor`, kept a draft
 
 **Next**
-- Write the failing tests, then the distribution skeleton
+- Full `basstler` suite result, then CI
+- Owner: register the PyPI trusted publisher for `basstler-hub-server`

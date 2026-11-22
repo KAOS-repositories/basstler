@@ -22,6 +22,7 @@ from cyclopts import App
 
 from basstler.locations import PackageLocation
 from basstler.package_layout import package_modules
+from basstler.package_map import Distribution
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -148,7 +149,7 @@ class ShippedModules:
         """:return: The modules and major release of the package this runs from."""
         return cls(
             frozenset(module.name for module in package_modules()),
-            int(version(PACKAGE_NAME).partition(".")[0]),
+            int(version(Distribution.NOTES).partition(".")[0]),
         )
 
     @property

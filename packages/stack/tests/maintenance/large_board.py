@@ -29,13 +29,12 @@ from basstler.stack.model import (
 from basstler.git.commands import IntegrationStrategy
 from basstler.stack.promotion_link import PromotionLink
 
-from basstler_testing.maintenance.fork import (
+from basstler_testing.github.pull_request_samples import (
     A_SESSION_LINK,
-    UPSTREAM_BASE,
     PullRequestHeadRepository,
-    a_board_entry,
-    make_configuration,
 )
+from basstler_testing.fork_checkout import UPSTREAM_BASE
+from basstler_testing.maintenance.fork import a_board_entry, make_configuration
 
 
 class OutputBudget(IntEnum):

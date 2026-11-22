@@ -23,7 +23,7 @@ from basstler_testing.fixture_plans import (
     fixture_repository,
     foreign_reference,
 )
-from basstler_testing.plan_site.first_plan import (
+from basstler_testing.plan.first_plan import (
     ELSEWHERE_PULL_REQUEST,
     FIRST_PLAN,
     MERGED_PULL_REQUEST,

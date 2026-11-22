@@ -37,11 +37,11 @@ from basstler_testing.executable_stubs import path_hiding_executables
 from basstler_testing.script_runner import PythonModuleRunner
 from basstler_testing.maintenance.fork import (
     MAINTENANCE_MODULE,
-    ForkCheckout,
-    PromotionSampleText,
     a_stack,
     make_configuration,
 )
+from basstler_testing.fork_checkout import ForkCheckout
+from basstler_testing.github.pull_request_samples import PromotionSampleText
 
 # %% reporting a branch back to its owner
 

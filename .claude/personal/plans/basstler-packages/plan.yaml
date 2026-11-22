@@ -220,4 +220,12 @@ items:
   depends_on: []
   status: in progress
   recommended_model: opus
+
+- id: workflow-model
+  title: "One validated workflow model, and a clear split between basstler-build and basstler-packaging"
+  branch: null
+  track: package-split
+  depends_on: []
+  status: not started
+  recommended_model: opus
 landed_item_count: 4

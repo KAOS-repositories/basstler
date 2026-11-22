@@ -1,9 +1,8 @@
 Plan
-- Contract test: a distribution's dev group lists no basstler distribution outside its runtime requirements
-- Split test_support helpers by layer (scratch_repository, maintenance/fork, repository_fixtures)
-- Move the 7 tests that import a higher distribution up to its owner
-- Trim dev groups, uv lock, run each distribution alone in a fresh environment
+- Each distribution's tests run with only its own requirements (contract test + CI loop)
 Done
-- Bootstrap, draft PR #287
+- Contract test; dev groups trimmed; helpers split by layer; crossing tests moved
+- PersonalNotesSetting to core; stack.toml and templates ship from their readers; notes reads its own version
+- Every distribution passes alone at 53c1ff54 (hub browser tests not checked: Playwright)
 Next
-- Contract test, then the helper split
+- Read CI at 53c1ff54; owner review of the production moves listed in #287

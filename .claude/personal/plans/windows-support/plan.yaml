@@ -29,4 +29,16 @@ items:
     here.
 
     '
+
+- id: direct-setup-command-on-windows
+  title: python -m basstler.setup.personal_notes runs on Windows outside a session, as the README documents
+  status: not started
+  recommended_model: sonnet
+  track: fixes
+  depends_on: []
+  notes: 'Found 2026-11-22 from PowerShell with the environment''s python.exe: it raised PluginRootUnsetError
+    (the README''s command names no plugin root), and once BASSTLER_PLUGIN_ROOT was set, check-setup.sh
+    exited 78 with ''is not inside a git work tree'' because it handed the Windows interpreter the POSIX
+    path /c/Users/... under MSYS_NO_PATHCONV=1. Locate the plugin root without a session, and pass Windows
+    paths to the Windows interpreter. A Windows CI case runs the command.'
 landed_item_count: 1

@@ -13,13 +13,9 @@ from basstler.maintenance.check_overview import CheckOverview
 from basstler.maintenance.commands import ChecksCommand
 
 from basstler_testing.constants.stack import StackBranch
-from basstler_testing.maintenance.fork import (
-    UPSTREAM_BASE,
-    ForkCheckout,
-    StackPullRequestNumber,
-    a_board_entry,
-    a_parent_and_child,
-)
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.github.pull_request_samples import StackPullRequestNumber
+from basstler_testing.maintenance.fork import a_board_entry, a_parent_and_child
 from .large_board import LargeBoard, OutputBudget
 from .recorded_fork import AlreadyResolvedPass
 

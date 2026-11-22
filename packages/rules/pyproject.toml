@@ -51,8 +51,4 @@ dev = [
     "pytest-xdist",
     "basstler-core",
     "basstler-git",
-    "basstler-github",
-    "basstler-notes",
-    "basstler-reviews",
-    "basstler-stack",
 ]

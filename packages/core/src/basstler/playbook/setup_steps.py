@@ -130,7 +130,9 @@ class SetupChecklist:
             tuple(
                 step
                 for setup_steps in playbook.components_of(SetupSteps)
-                for step in setup_steps.steps_for_repository_checkout(repository_checkout)
+                for step in setup_steps.steps_for_repository_checkout(
+                    repository_checkout
+                )
             )
         )
 

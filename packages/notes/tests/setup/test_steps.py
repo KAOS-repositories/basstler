@@ -25,12 +25,11 @@ from basstler.setup.steps import (
     ForkSetupSteps,
     Host,
     PersistentVariables,
-    PersonalNotesSetting,
     RepositoryAccess,
     SetupLink,
-    git_value,
     resolve_repository,
 )
+from basstler.shell_configuration import PersonalNotesSetting
 
 from basstler_testing.constants.environment import ScrubbedEnvironmentPrefix
 from basstler_testing.constants.paths import RepositoryLocation
@@ -148,31 +147,6 @@ def test_a_clone_with_no_github_remote_resolves_no_repository(
     Nothing is invented when the clone names no GitHub repository.
     """
     assert resolve_repository(scratch_repository.project_root, "origin") is None
-
-
-# %% reading a value out of the clone
-
-
-def test_a_value_git_cannot_answer_is_reported_rather_than_raised(
-    scratch_repository: ScratchRepository,
-) -> None:
-    """
-    Both callers fall through to something else when git has no answer, so an unset key
-    and an unknown remote have to come back as nothing at all.
-    """
-    root = scratch_repository.project_root
-    assert git_value(root, "config", "--get", "claude.notSet") is None
-    assert git_value(root, "remote", "get-url", "no-such-remote") is None
-
-
-def test_a_value_git_does_answer_comes_back_trimmed(
-    clone_with_fork_remote: ScratchRepository,
-) -> None:
-    """
-    The answer is the value itself, without the newline git writes after it.
-    """
-    root = clone_with_fork_remote.project_root
-    assert git_value(root, "remote", "get-url", "origin") == FORK_REMOTE_URL
 
 
 # %% the labels step
@@ -332,41 +306,6 @@ def test_a_value_with_nothing_to_escape_is_left_bare(
     assert step.variable_lines == (
         f"{PersonalNotesSetting.BRANCH.environment_variable}={branch}",
     )
-
-
-def test_git_config_outranks_the_environment(
-    scratch_repository: ScratchRepository,
-) -> None:
-    """
-    The precedence the hooks apply - git config, then environment, then default.
-    """
-    scratch_repository.run_git(
-        "config", PersonalNotesSetting.PATH.git_config_key, "configured/notes.md"
-    )
-    resolved = PersonalNotesSetting.PATH.resolve(
-        scratch_repository.project_root,
-        {PersonalNotesSetting.PATH.environment_variable: "environment/notes.md"},
-    )
-    assert resolved == "configured/notes.md"
-
-
-def test_the_settings_are_the_ones_the_hooks_resolve() -> None:
-    """
-    Every key, variable and default named here is named by resolve-personal-notes-
-    config.sh, which is what the hooks themselves read.
-    """
-    configuration = RESOLVE_CONFIG_SCRIPT.read_text(encoding="utf-8")
-    missing = [
-        value
-        for setting in PersonalNotesSetting
-        for value in (
-            setting.git_config_key,
-            setting.environment_variable,
-            setting.default,
-        )
-        if value not in configuration
-    ]
-    assert missing == []
 
 
 # %% the list as a whole

@@ -5,16 +5,19 @@ look up.
 
 from __future__ import annotations
 
+import yaml
+
 from basstler.github.repository import PullRequestReference, Repository
-from basstler.plan_site.__main__ import PlanSource
+from basstler.plan.model import PlanDocument
 from basstler.plan.structure import Plan
+from basstler.text_file import TextFile
 
 from ..constants.site import SitePlan
 
 # %% the first plan and its pull requests
 
 FIRST_PLAN = Plan.from_mapping(
-    PlanSource.from_directory(SitePlan.FIRST.directory).manifest
+    yaml.safe_load(TextFile(SitePlan.FIRST.directory / PlanDocument.MANIFEST).read())
 )
 """
 The dataset's first plan, whose items' pull requests and tracking issue the tests look

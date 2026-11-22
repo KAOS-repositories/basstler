@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from basstler.git.branch import Branch
 from basstler.git.remote_branch import RemoteBranch
 from basstler.git.repository import GitRepository
-from basstler.stack.model import StackBranch
 
 # %% a repository the branch belongs to
 
@@ -61,7 +60,3 @@ def test_branches_of_the_same_name_in_two_repositories_differ() -> None:
 
 def test_a_remote_branch_is_a_branch() -> None:
     assert issubclass(RemoteBranch, Branch)
-
-
-def test_a_stack_branch_is_a_branch() -> None:
-    assert issubclass(StackBranch, Branch)

@@ -26,7 +26,7 @@ from basstler.plan_site.hub import (
 )
 from basstler.plan.structure import Item
 from basstler.plan_site.workflows import PlanSiteSecret
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 
 from basstler_testing.constants.site import SitePlan, SiteRepository, SiteSampleText
 from basstler_testing.fixture_plans import ForeignItemId

@@ -25,7 +25,7 @@ from basstler.personal_notes.branch import (
     PersonalNotesBranch,
     PersonalNotesLocation,
 )
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 
 from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.constants.paths import DatasetLocation

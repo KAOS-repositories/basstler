@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from basstler.github.actions_secret import ActionsSecret
 from basstler.github.permission_level import PermissionLevel
 from basstler.git.branch import Branch
 from basstler.github.actions_settings import (
@@ -46,7 +47,6 @@ from basstler.review_triage.viewed_setup import (
     ProposalBranch,
     SetupState,
 )
-from basstler.plan_site.workflows import PlanSiteSecret
 
 from basstler_testing.constants.paths import RepositoryLocation
 from basstler_testing.github.path_answering_client import PathAnsweringClient
@@ -542,6 +542,17 @@ def test_the_workflow_runs_only_when_started(tmp_path: Path):
 # %% one token for several jobs
 
 
+class AnotherJobSecret(ActionsSecret):
+    """
+    The secret another job of basstler's reads its token from.
+    """
+
+    TOKEN = "ANOTHER_JOB_TOKEN"
+    """
+    The token the other job starts a workflow with.
+    """
+
+
 def shared_use(owner: str) -> TokenUse:
     """
     :param owner: The owner of the repository the other job reaches.
@@ -551,7 +562,7 @@ def shared_use(owner: str) -> TokenUse:
         "starts a build",
         (Repository(owner, "site"),),
         {RepositoryPermission.ACTIONS: PermissionLevel.WRITE},
-        PlanSiteSecret.TOKEN,
+        AnotherJobSecret.TOKEN,
         (FORK,),
     )
 

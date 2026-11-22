@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from .maintenance.fork import ForkCheckout
+from .fork_checkout import ForkCheckout
 from .scratch_repository import ScratchRepository
 
 # %% scratch repositories

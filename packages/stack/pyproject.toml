@@ -53,6 +53,5 @@ dev = [
     "basstler-core",
     "basstler-git",
     "basstler-github",
-    "basstler-notes",
     "basstler-reviews",
 ]

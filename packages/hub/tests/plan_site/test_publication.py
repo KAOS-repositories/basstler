@@ -100,13 +100,13 @@ from basstler.plan_site.workflows import (
     WorkflowStep,
 )
 from basstler.review_triage.viewed_request import ReviewTriageSecret
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
 from basstler_testing.executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.stack import RemoteName
-from basstler_testing.maintenance.fork import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
 from basstler_testing.upstream_reviews.replay import ReplayingRestClient
 
 BRANCH_OR_TAG = "v9.9.9"

@@ -16,6 +16,7 @@ class PublishJobName(StrEnum):
 
     BUILD = "build"
     PUBLISH = "publish-pypi"
+    PUBLISH_IMAGE = "publish-image"
 
 
 class PublishStepId(StrEnum):
@@ -25,3 +26,4 @@ class PublishStepId(StrEnum):
 
     LIST_DISTRIBUTIONS = "distributions"
     KEEP_OWN_FILES = "files"
+    PUSH_IMAGE = "image"

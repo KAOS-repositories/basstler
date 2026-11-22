@@ -1,8 +1,9 @@
 name: Publish
 
-# Every release is published to PyPI, every distribution at the release's version: the
-# files are built once from the tagged commit and published to PyPI through trusted
-# publishing, so no token is stored anywhere. Each distribution publishes from an
+# Every release is published to PyPI, every distribution at the release's version, and
+# the plan service's image to the GitHub Container Registry. The files are built once
+# from the tagged commit and published to PyPI through trusted publishing, and the image
+# is pushed with the run's own token, so no token is stored anywhere. Each distribution publishes from an
 # environment of its own, pypi-<distribution>, because PyPI takes a pending publisher
 # for one new project only per workflow and environment.
 #
@@ -112,3 +113,35 @@ jobs:
         with:
           packages-dir: dist/
           skip-existing: true
+
+  # The plan service's image, under the repository's own name, pushed with the run's own
+  # token. The registry's names are lower case, however the owner spells its name.
+  publish-image:
+    name: Publish the plan service's image to the GitHub Container Registry
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # The commit the release run tagged, or the tag named by hand.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.event.workflow_run.head_sha || env.RELEASE_BRANCH }}
+          fetch-depth: 0
+
+      - name: Build and push the image
+        id: image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(git describe --tags --exact-match --match 'v*')"
+          version="${tag#v}"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/basstler-hub-server"
+          printf '%s' "${GH_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+          docker build -f packages/hub-server/Dockerfile --build-arg VERSION="${version}" \
+            --label org.opencontainers.image.source="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            -t "${image}:${version}" -t "${image}:latest" .
+          docker push --all-tags "${image}"
+          echo "Published ${image}:${version}." >> "${GITHUB_STEP_SUMMARY}"

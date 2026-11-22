@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.24", "hatch-vcs>=0.4", "basstler-build"]
+build-backend = "hatchling.build"
+
+[project]
+name = "basstler-hub-server"
+description = "The plan service: one container that receives a GitHub App's webhooks, deployable to any container host."
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{name = "Abdelrhman Bassiouny", email = "bido.bassuny@gmail.com"}]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+"Source" = "https://github.com/KAOS-repositories/basstler"
+"Bug Tracker" = "https://github.com/KAOS-repositories/basstler/issues"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.0"
+raw-options = {root = "../.."}
+
+# Built with every basstler requirement pinned to this release.
+[tool.hatch.metadata.hooks.basstler-sibling-pins]
+family = "basstler"
+dependencies = [
+    "cyclopts>=5.3",
+    "githubkit>=0.17",
+    "starlette>=1.10",
+    "uvicorn>=0.54",
+    "basstler-core",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/basstler"]
+
+# The repository's licence and notices, put at the root of the source distribution so
+# the wheel built from it carries them.
+[tool.hatch.build.targets.sdist.force-include]
+"../../LICENSE" = "LICENSE"
+"../../NOTICE" = "NOTICE"
+
+# What this distribution's tests need besides itself.
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-xdist",
+    "httpx",
+    "pyyaml>=6",
+    "basstler-core",
+]

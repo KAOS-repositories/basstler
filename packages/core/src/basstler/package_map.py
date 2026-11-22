@@ -162,6 +162,11 @@ class Distribution(StrEnum):
     The plan site.
     """
 
+    HUB_SERVER = "basstler-hub-server", Layer.USER_FACING
+    """
+    The plan service, run as one container on any container host.
+    """
+
     META_PACKAGE = "basstler", Layer.META_PACKAGE
     """
     The command tree every command is mounted on, installing every default

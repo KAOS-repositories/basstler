@@ -43,7 +43,7 @@ from basstler.locations import ProjectLocation
 from basstler.plan.structure import Item
 from basstler.plan_site.exceptions import RegistryUnreadableError
 from basstler.plan_site.workflows import PlanSiteSecret
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 

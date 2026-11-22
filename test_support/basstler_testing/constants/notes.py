@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from enum import StrEnum
 
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 
 
 class ScratchBranch(StrEnum):

@@ -27,7 +27,7 @@ from basstler.bash import Bash
 from basstler.git.commands import GitCommandRunner
 from basstler.github.repository import Repository
 from basstler.locations import PackageLocation, PluginLocation
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from .constants.environment import (

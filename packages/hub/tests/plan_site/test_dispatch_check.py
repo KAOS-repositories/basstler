@@ -41,7 +41,7 @@ from basstler.plan_site.publication import PublicationOption
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.workflows import DispatchWorkflow, PlanSiteSecret
 from basstler.setup.report import CheckResult, CheckStatus
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.stack import RemoteName

@@ -99,7 +99,7 @@ from basstler.plan_site.workflows import (
     WorkflowStep,
 )
 from basstler.review_triage.viewed_request import ReviewTriageSecret
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
 from basstler_testing.executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE

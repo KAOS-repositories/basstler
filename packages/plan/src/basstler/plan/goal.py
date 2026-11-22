@@ -48,7 +48,8 @@ class Goal(ValidatedJSONModel):
 
     targets: list[str]
     """
-    The items that reach the outcome, each as ``<plan-id>/<item-id>``.
+    The items that reach the outcome, each as ``<plan-id>/<item-id>``, or as
+    ``<owner>/<name>:<plan-id>/<item-id>`` for an item of another repository's notes.
     """
 
     @pydantic.field_validator("targets")
@@ -67,7 +68,8 @@ class Goal(ValidatedJSONModel):
         ]
         if malformed or not targets:
             raise ValueError(
-                "a goal needs at least one target, each <plan-id>/<item-id>; got "
+                "a goal needs at least one target, each <plan-id>/<item-id> or "
+                "<owner>/<name>:<plan-id>/<item-id>; got "
                 + (", ".join(malformed) or "none")
             )
         return targets

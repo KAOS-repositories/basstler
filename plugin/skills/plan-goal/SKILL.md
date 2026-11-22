@@ -39,6 +39,9 @@ and pick the fewest items that, once done, make the outcome true.
   `/add-plan-item` for the missing work first, then return here.
 - When two readings of the outcome give different targets, ask with `AskUserQuestion`,
   naming the items each reading would include.
+- An item kept in another repository's notes is a target too: write it
+  `<owner>/<name>:<plan-id>/<item-id>`. The command fetches that repository's notes
+  branch, and the plan site reads it from the hub's other repositories.
 
 ## 3. Save it
 
@@ -46,7 +49,8 @@ and pick the fewest items that, once done, make the outcome true.
 "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" __main__ goal set <id> "<title>" --target <plan-id>/<item-id> [--target ...]
 ```
 
-It refuses a target that names no item, and replaces a goal that already has the id.
+It refuses a target that names no item, or whose repository's notes it cannot fetch, and
+replaces a goal that already has the id.
 
 ## 4. Read the path and judge it
 

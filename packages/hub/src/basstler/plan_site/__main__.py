@@ -44,6 +44,7 @@ from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
 from basstler.plan.goal import Goal
 from basstler.plan.goal_path import GoalPath, NeededItems
+from basstler.plan.other_repository_plans import OtherRepositoryPlans
 from basstler.plan_site.goal_page import GoalPage, GoalSummary
 from basstler.plan.exceptions import PlanValidationError
 from basstler.plan.model import PlanDocument
@@ -304,7 +305,9 @@ class RepositorySite(SiteSection[RepositorySummary]):
         Check the plans out of the notes branch and load them and the repository's rules.
         """
         self.plans_directory = self.notes.check_out_plans()
-        self.plan_directory = PlanDirectory(self.plans_directory)
+        self.plan_directory = PlanDirectory(
+            self.plans_directory, repository=str(self.notes.repository)
+        )
         self.repository_rules = RepositoryRules.from_file(
             self.plans_directory / ProjectLocation.PLAN_RULES.name
         )
@@ -397,7 +400,13 @@ class RepositorySite(SiteSection[RepositorySummary]):
             hub_url=self.address.hub_url,
             index_url=self.address.repository_url(self.notes.repository),
             locate_item_card=lambda reference: self.address.item_url(
-                self.notes.repository, reference.plan_id, reference.item_identifier
+                (
+                    Repository.parse(reference.notes_repository)
+                    if reference.notes_repository is not None
+                    else self.notes.repository
+                ),
+                reference.plan_id,
+                reference.item_identifier,
             ),
             built_at=self.built_at,
         )
@@ -509,11 +518,19 @@ class HubSite(SiteSection[SiteSummary]):
             order.
         """
         with tempfile.TemporaryDirectory() as scratch:
-            repositories = [
-                self.build_repository(
-                    Repository.parse(repository), Path(scratch) / str(position), output
+            sites = [
+                self.site_of(
+                    Repository.parse(repository), Path(scratch) / str(position)
                 )
                 for position, repository in enumerate(self.hub.repositories)
+            ]
+            self.share_plans(
+                [site for site in sites if isinstance(site, RepositorySite)],
+                Path(scratch) / "other-repositories",
+            )
+            repositories = [
+                site.build(output) if isinstance(site, RepositorySite) else site
+                for site in sites
             ]
         summary = SiteSummary.over_repositories(repositories)
         self.write_page(output, HubPage(summary, self.stylesheet_url).render())
@@ -522,14 +539,34 @@ class HubSite(SiteSection[SiteSummary]):
         SiteDigest(output).write()
         return summary
 
-    def build_repository(
-        self, repository: Repository, scratch: Path, output: Path
-    ) -> RepositorySummary:
+    def share_plans(self, sites: list[RepositorySite], scratch: Path) -> None:
+        """
+        Let each repository's goals name items of every other repository's plans: those
+        the hub lists as fetched for the site, any other read the first time a goal
+        names it.
+
+        :param sites: The repositories whose notes were fetched.
+        :param scratch: An empty directory to fetch the other repositories' notes into.
+        """
+        others = OtherRepositoryPlans(scratch, self.hub.notes_branch, self.remote_root)
+        for site in sites:
+            site.plan_directory.other_repositories.update(
+                {
+                    str(other.notes.repository): other.plan_directory
+                    for other in sites
+                    if other is not site
+                }
+            )
+            others.reading(site.plan_directory)
+
+    def site_of(
+        self, repository: Repository, scratch: Path
+    ) -> RepositorySite | RepositorySummary:
         """
         :param repository: The repository to publish.
         :param scratch: A directory of its own to fetch the notes into.
-        :param output: The site's root directory.
-        :return: The repository's card, with an error when its notes cannot be read.
+        :return: The repository's site, its plans checked out, or its card with an error
+            when its notes cannot be read.
         """
         notes = NotesBranch.fetch(
             repository, self.hub.notes_branch, self.remote_root, scratch
@@ -538,13 +575,12 @@ class HubSite(SiteSection[SiteSummary]):
             return RepositorySummary.unreadable(
                 str(repository), f"cannot fetch {self.hub.notes_branch}"
             )
-        site = RepositorySite(
+        return RepositorySite(
             address=self.address,
             pull_request_source=self.pull_request_source,
             notes=notes,
             built_at=self.built_at,
         )
-        return site.build(output)
 
 
 def main() -> int:

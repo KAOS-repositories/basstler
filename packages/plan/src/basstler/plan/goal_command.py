@@ -26,7 +26,9 @@ from basstler.plan.done_check import (
 )
 from basstler.plan.exceptions import StepReferenceWithoutPlanError
 from basstler.plan.goal_path import GoalCommandName, GoalPath, NeededItems
+from basstler.github.repository import MalformedRepositoryError, Repository
 from basstler.plan.item_bootstrap.documents import ProjectCheckout
+from basstler.plan.other_repository_plans import OtherRepositoryPlans
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -76,12 +78,47 @@ def read_path(
     :raises UnresolvedGoalReferenceError: If the path reaches a reference naming no item.
     :return: The goal's path over the freshly fetched plans.
     """
-    goal = GoalStore.from_project_root(project_root).read(identifier)
+    store = GoalStore.from_project_root(project_root)
+    goal = store.read(identifier)
     with tempfile.TemporaryDirectory() as scratch:
-        plan_directory = ProjectCheckout(project_root).check_out_manifests(
-            Path(scratch)
-        )
+        plan_directory = plans_across_repositories(project_root, store, Path(scratch))
         return GoalPath.compute(goal, plan_directory, pull_request_source)
+
+
+def plans_across_repositories(
+    project_root: Path, store: GoalStore, scratch: Path
+) -> PlanDirectory:
+    """
+    :param project_root: The repository whose notes branch holds the goal.
+    :param store: That notes branch's goals, which name where it is fetched from.
+    :param scratch: An empty directory of the command's own.
+    :return: The notes branch's plans, naming their repository where its remote names
+        one, which read another repository's notes the first time a target names it.
+    """
+    plan_directory = ProjectCheckout(project_root).check_out_manifests(
+        scratch / "plans"
+    )
+    plan_directory.repository = notes_repository_of(store)
+    return OtherRepositoryPlans(
+        scratch / "other-repositories", store.branch.location.branch
+    ).reading(plan_directory)
+
+
+def notes_repository_of(store: GoalStore) -> str | None:
+    """
+    :param store: A notes branch's goals.
+    :return: The repository its notes remote points at, as ``owner/name``, or ``None``
+        when the remote names none.
+    """
+    remote = store.branch.location.remote
+    url = remote
+    resolved = store.branch.git.attempt("remote", "get-url", remote)
+    if resolved.succeeded:
+        url = resolved.output.strip()
+    try:
+        return Repository.from_remote_url(url).full_name
+    except MalformedRepositoryError:
+        return None
 
 
 @goal_app.command(name=GoalCommandName.PATH)
@@ -173,14 +210,15 @@ def set_goal(
 
     :param identifier: The goal's short name.
     :param title: The outcome, as a sentence that is true once the goal is reached.
-    :param target: An item that reaches the outcome, as ``<plan-id>/<item-id>``; repeat
-        for several.
+    :param target: An item that reaches the outcome, as ``<plan-id>/<item-id>``, or
+        ``<owner>/<name>:<plan-id>/<item-id>`` for an item of another repository's
+        notes; repeat for several.
     """
     goal = Goal(identifier=identifier, title=title, targets=target)
     store = GoalStore.from_project_root(Path.cwd())
     store.branch.fetch()
     with tempfile.TemporaryDirectory() as scratch:
-        plan_directory = ProjectCheckout(Path.cwd()).check_out_manifests(Path(scratch))
+        plan_directory = plans_across_repositories(Path.cwd(), store, Path(scratch))
         NeededItems.of_goal(goal, plan_directory).refuse_unresolved_references()
     store.write(goal)
     return GoalExitCode.SUCCESS

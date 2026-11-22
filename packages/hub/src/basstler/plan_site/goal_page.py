@@ -122,7 +122,11 @@ class GoalPage(TemplatePage):
         :param reference: A step's item.
         :return: The ``id`` of that step on the page.
         """
-        return f"step-{reference.plan_id}-{reference.item_identifier}"
+        step = f"step-{reference.plan_id}-{reference.item_identifier}"
+        if reference.notes_repository is None:
+            return step
+        owner, _, name = reference.notes_repository.partition("/")
+        return f"{step}-in-{owner}-{name}"
 
     def render(self) -> str:
         """

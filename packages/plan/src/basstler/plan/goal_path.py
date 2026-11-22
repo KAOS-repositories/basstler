@@ -820,6 +820,12 @@ class NeededItems:
     The references among the targets and their dependencies that name no item.
     """
 
+    plan_directory: PlanDirectory | None = None
+    """
+    The plans the references were resolved against, which know the repository of their
+    own notes; ``None`` where no reference names a repository.
+    """
+
     @classmethod
     def of_goal(cls, goal: Goal, plan_directory: PlanDirectory) -> NeededItems:
         """
@@ -828,9 +834,10 @@ class NeededItems:
         :return: The targets and, transitively, everything they depend on that
             resolves, with the references that do not in :attr:`unresolved`.
         """
-        needed = cls(goal=goal, resolved_by_reference={})
+        needed = cls(goal=goal, resolved_by_reference={}, plan_directory=plan_directory)
         pending = [
-            (reference, "the goal's targets") for reference in goal.target_references
+            (plan_directory.local_form_of(reference), "the goal's targets")
+            for reference in goal.target_references
         ]
         while pending:
             reference, named_by = pending.pop()
@@ -866,12 +873,17 @@ class NeededItems:
         :return: What it depends on, each named with its plan.
         """
         resolved = self.resolved_by_reference[reference]
-        return tuple(
-            entry
-            if entry.names_another_plan
-            else DependencyReference(entry.item_identifier, resolved.plan.id)
+        dependencies = tuple(
+            (
+                entry
+                if entry.names_another_plan
+                else DependencyReference(entry.item_identifier, resolved.plan.id)
+            ).in_notes_of(reference.notes_repository)
             for entry in map(DependencyReference.from_text, resolved.item.depends_on)
         )
+        if self.plan_directory is None:
+            return dependencies
+        return tuple(map(self.plan_directory.local_form_of, dependencies))
 
     def classify_live_states(self, pull_request_source: PullRequestSource) -> None:
         """

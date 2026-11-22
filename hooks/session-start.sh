@@ -19,9 +19,25 @@ git -C "${CLAUDE_PROJECT_DIR:-.}" rev-parse --is-inside-work-tree > /dev/null 2>
 source "${SCRIPT_DIR}/resolve-personal-notes-config.sh"
 source "${SCRIPT_DIR}/session-start-messages.sh"
 
-# Tell later commands where the plugin is (CLAUDE_ENV_FILE is SessionStart-only).
+# Tell later commands where the plugin is (CLAUDE_ENV_FILE is SessionStart-only). Claude
+# Code can replace the plugin's directory by a renamed sibling (basstler~g2) while the
+# session runs, so every later read of the file looks for the newest sibling if it is gone.
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   printf 'export BASSTLER_PLUGIN_ROOT=%q\n' "${PLUGIN_ROOT}" >> "${CLAUDE_ENV_FILE}"
+  cat >> "${CLAUDE_ENV_FILE}" <<'RECOVER_PLUGIN_ROOT'
+if [ ! -d "${BASSTLER_PLUGIN_ROOT}" ]; then
+  _basstler_parent="$(dirname "${BASSTLER_PLUGIN_ROOT}")"
+  _basstler_stem="$(basename "${BASSTLER_PLUGIN_ROOT}")"
+  _basstler_stem="${_basstler_stem%%~*}"
+  _basstler_current="$(for _basstler_candidate in "${_basstler_parent}/${_basstler_stem}"~* "${_basstler_parent}/${_basstler_stem}"; do
+    [ -f "${_basstler_candidate}/hooks/session-start.sh" ] && printf '%s\n' "${_basstler_candidate}"
+  done | sort -V | tail -n 1)"
+  if [ -n "${_basstler_current}" ]; then
+    export BASSTLER_PLUGIN_ROOT="${_basstler_current}"
+  fi
+  unset _basstler_parent _basstler_stem _basstler_current _basstler_candidate
+fi
+RECOVER_PLUGIN_ROOT
 fi
 
 # In a cloud session, how to attach a notes repository it cannot reach; empty otherwise.

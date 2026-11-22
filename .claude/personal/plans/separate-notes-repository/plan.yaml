@@ -28,8 +28,11 @@ items:
 - id: sync-never-pushes-to-notes-repository
   title: Default-branch sync never pushes the base to the notes repository, nor to a wider-visibility repository
   track: sync-safety
+  branch: fix-sync-never-pushes-to-notes-repository
+  pull_request_number: 296
+  session: this local Claude Code session
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: sonnet
   notes: >
     Found 2026-11-22: a git remote added for the notes repository was the clone's only non-upstream

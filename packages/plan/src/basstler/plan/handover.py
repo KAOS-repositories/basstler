@@ -32,7 +32,13 @@ from basstler.plan.item_bootstrap.documents import (
     ProjectCheckout,
 )
 from basstler.plan.merge import PlanVersion
-from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManifest
+from basstler.plan.model import (
+    ExternalDependency,
+    ItemStatus,
+    ManifestKey,
+    PlanDocument,
+    PlanManifest,
+)
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.repository_rules_store import RepositoryRulesStore
 from basstler.plan.size_limits import Roadmap
@@ -94,6 +100,37 @@ class HandoverPlan:
                 for item in self.manifest.items
                 for dependency in item.dependencies
             ),
+        )
+
+    def detached_from_plans(
+        self, left_out_plans: Mapping[str, PlanManifest]
+    ) -> HandoverPlan:
+        """
+        :param left_out_plans: The plans the handover leaves out, by id.
+        :return: This plan with every item's dependency on an item of those plans
+            recorded as an external dependency instead, described as it stands now.
+        """
+        items = [
+            item.with_dependencies_made_external(
+                {
+                    dependency: ExternalDependency.from_item(
+                        plan=left_out_plans[reference.plan_id],
+                        item=left_out_plans[reference.plan_id].item_named(
+                            reference.item_identifier
+                        ),
+                    )
+                    for dependency in item.dependencies
+                    for reference in [DependencyReference.from_text(dependency)]
+                    if reference.plan_id in left_out_plans
+                }
+            ).content
+            for item in self.manifest.items
+        ]
+        return HandoverPlan(
+            manifest=PlanManifest(
+                {**self.manifest.content, ManifestKey.ITEMS.key: items}
+            ),
+            roadmap_text=self.roadmap_text,
         )
 
     def without_sessions(self) -> HandoverPlan:
@@ -264,7 +301,11 @@ class PlanHandover:
 
     @classmethod
     def from_notes_branch(
-        cls, *, project_root: Path, plan_identifiers: list[str]
+        cls,
+        *,
+        project_root: Path,
+        plan_identifiers: list[str],
+        leaves_out_dependencies: bool = False,
     ) -> PlanHandover:
         """
         Read plans off the freshly fetched notes branch, without the sessions their
@@ -272,6 +313,8 @@ class PlanHandover:
 
         :param project_root: The repository whose notes branch holds the plans.
         :param plan_identifiers: The ids of the plans to hand over.
+        :param leaves_out_dependencies: Whether to hand the plans over without the
+            plans they depend on, recording those dependencies as external ones.
         :raises UnknownPlanError: If the notes branch has no such plan.
         :return: The handover.
         """
@@ -285,6 +328,17 @@ class PlanHandover:
                 for identifier in plan_identifiers
             )
         )
+        if leaves_out_dependencies:
+            left_out_identifiers = {
+                identifier for plan in plans for identifier in plan.depended_on_plans
+            } - set(plan_identifiers)
+            left_out_plans = {
+                identifier: PlanManifest.from_yaml(
+                    PlanDocuments.load(identifier, project_root).manifest_text
+                )
+                for identifier in left_out_identifiers
+            }
+            plans = tuple(plan.detached_from_plans(left_out_plans) for plan in plans)
         checkout = ProjectCheckout(project_root)
         held_paths = set(
             checkout.notes_branch_paths(ProjectLocation.PULL_REQUEST_PROGRESS)
@@ -530,5 +584,8 @@ class HandoverGuide(TemplatePage):
         :return: The guide, in Markdown.
         """
         return self.render_template(
-            handover=self.handover, location=PlanHandoverLocation, status=ItemStatus
+            handover=self.handover,
+            location=PlanHandoverLocation,
+            status=ItemStatus,
+            external_guidance=ExternalDependency.guidance,
         )

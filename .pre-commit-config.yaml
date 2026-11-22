@@ -15,16 +15,16 @@ repos:
         name: Check the code the staged change touches against the rules
         description: >
           Fails when code the staged change touches breaks a rule a checker in
-          src/basstler/code_rules enforces, such as a missing or overlong docstring.
-        entry: env PYTHONPATH=src .venv/bin/python -m basstler code-rules check
+          packages/rules/src/basstler/code_rules enforces, such as a missing or overlong docstring.
+        entry: .venv/bin/python -m basstler code-rules check
         language: unsupported
         files: \.py$
-        exclude: ^tests/dataset/
+        exclude: ^test_support/basstler_testing/dataset/
       - id: agents-md
         name: Generate AGENTS.md from the rules
         description: >
-          Rewrites AGENTS.md from the sections in src/basstler/code_rules/rules.
-        entry: env PYTHONPATH=src .venv/bin/python -m basstler code-rules agents-md
+          Rewrites AGENTS.md from the sections in packages/rules/src/basstler/code_rules/rules.
+        entry: .venv/bin/python -m basstler code-rules agents-md
         language: unsupported
         pass_filenames: false
         always_run: true

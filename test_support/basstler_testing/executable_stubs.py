@@ -54,6 +54,16 @@ Skips a test that needs a real interpreter found by a versioned name such as
 ``python3.13``.
 """
 
+# %% where the file system has no executable bit
+
+NEEDS_EXECUTABLE_BIT = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows files carry no executable bit, so none can be set or read back",
+)
+"""
+Skips a test that sets a file's executable bit and reads it back from the disk.
+"""
+
 # %% stub directories
 
 

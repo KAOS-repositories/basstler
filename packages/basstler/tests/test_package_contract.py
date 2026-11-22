@@ -313,6 +313,18 @@ def test_every_workflow_that_installs_the_package_syncs_it_from_the_workspace():
     ] == []
 
 
+def test_the_windows_workflow_accepts_a_shard_holding_none_of_a_distributions_tests():
+    """
+    A distribution with few tests has none in some shard, which pytest reports with the
+    status for no tests collected, not as a failure.
+    """
+    workflow_text = (WORKFLOWS_DIRECTORY / "windows-tests.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert f"-ne {int(pytest.ExitCode.NO_TESTS_COLLECTED)}" in workflow_text
+
+
 BASSTLER_REFERENCE = re.compile(
     r"(?:basstler/\.github/workflows/upstream-reviews\.yml@|basstler_branch_or_tag: )(\S+)"
 )

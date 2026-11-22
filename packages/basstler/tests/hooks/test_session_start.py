@@ -1959,7 +1959,8 @@ def test_installs_uv_with_the_pip_of_an_interpreter_found_by_name(
 
     assert result.returncode == 0, result.stderr
     assert install_log.read_text(encoding="utf-8").splitlines() == [
-        f"install --target {installed_uv_directory(session_start_repository)} "
+        "install --target "
+        f"{session_start_repository.configuration_value(ConfigurationVariable.UV_DIRECTORY)} "
         f"{PackageManager.UV}"
     ]
     assert environment_log.read_text(encoding="utf-8").splitlines() == [

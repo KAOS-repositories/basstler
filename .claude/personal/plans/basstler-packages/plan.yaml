@@ -40,11 +40,12 @@ items:
   status: in progress
   recommended_model: sonnet
   notes: >
-    publish.yml builds with uv build --all-packages and publishes to PyPI only (TestPyPI dropped)
-    via OIDC from the pypi environment. The owner registers a pending trusted publisher on PyPI for
-    each of the 13 names, basstler-packaging included. Session start installs basstler==<plugin
-    release> from PyPI, falling back to the tag's clone synced from the lock; pip install works
-    without uv. release:minor. basstler-packaging holds the release and publish-workflow model.
+    publish.yml builds with uv build --all-packages and publishes to PyPI only via OIDC from the
+    pypi environment; the owner registers a pending trusted publisher per name. Session start
+    installs basstler==<plugin release> from PyPI, falling back to the tag's clone; pip works
+    without uv. release:minor. basstler-build is the hook and its DistributionFamily;
+    basstler-packaging models the release and publish workflow, for tests only, and the meta
+    package depends on neither.
 - id: playbook-model
   title: A Playbook dataclass model that every distribution contributes commands, skills,
     hooks and rules to
@@ -222,7 +223,7 @@ items:
   recommended_model: opus
 
 - id: workflow-model
-  title: "One validated workflow model, and a clear split between basstler-build and basstler-packaging"
+  title: "One validated model of a GitHub Actions workflow"
   branch: null
   track: package-split
   notes: >
@@ -230,9 +231,7 @@ items:
     Trigger; used by the actions budget), basstler_testing.workflow_definition.Workflow (tests) and
     basstler.packaging.publish_workflow.PublishWorkflow. Replace them with one ValidatedJSONModel
     model in basstler-github, reusing TriggerEvent and ActivityType; the budget code moves onto it
-    with its tests unchanged. Then settle the build/packaging split: basstler-build as the hook
-    alone taking the family as a string, DistributionFamily and BasstlerFamily in
-    basstler-packaging.
+    with its tests unchanged, and PublishWorkflow keeps only the publishing checks.
   depends_on:
     - pypi-release
   status: not started

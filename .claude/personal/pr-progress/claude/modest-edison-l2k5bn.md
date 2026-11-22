@@ -1,10 +1,12 @@
-Plan
-- Publish to PyPI only from publish.yml; reusable packaging model in basstler-packaging; install from PyPI with a tag-clone fallback.
+## Plan
+- PyPI publishing for every distribution (#289), build tooling kept out of runtime deps.
 
-Done
-- publish.yml (PyPI only), LICENSE/NOTICE in every distribution, PyPI-first session start.
-- Review round 1 and 2: basstler-packaging (PythonWheel, BuiltRelease, PublishWorkflow, PackageIndex), DistributionFamily in basstler-build, BasstlerFamily in the meta package, TriggerEvent reused, NO_AMBIGUOUS_NAMES rule. Pushed at b3d82143.
+## Done
+- publish.yml (PyPI only, OIDC), PyPI-first session start, basstler-packaging model.
+- 603d29aa: BasstlerFamily removed; meta package no longer depends on basstler-build or
+  basstler-packaging; hook warns its settings stay backward-compatible; plan roadmap rule.
 
-Next
-- Read CI at b3d82143; the README "by hand" thread is open for the owner.
-- Owner: register 13 pending trusted publishers on PyPI and create the pypi environment, then run publish.yml for a tag.
+## Next
+- Owner: decide whether basstler-packaging is published; register 13 PyPI trusted
+  publishers and the pypi environment; README thread left open.
+- CI at 603d29aa not read.

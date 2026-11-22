@@ -41,7 +41,7 @@ items:
   branch: claude/compassionate-cerf-qa5vaj
   pull_request_number: 294
   session: https://claude.ai/code/session_018wfiv84A1KVH7E7j2mNwsU
-  depends_on: []
+  depends_on: [service-deploy]
   notes: >
     A committed App manifest declares read-only metadata, contents, pull requests, checks and
     statuses, and the events push, pull_request, pull_request_review, pull_request_review_thread,

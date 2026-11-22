@@ -141,6 +141,7 @@ dev = [
 name = "basstler-core"
 source = { editable = "packages/core" }
 dependencies = [
+    { name = "cyclopts" },
     { name = "jinja2" },
     { name = "markdown" },
     { name = "nh3" },
@@ -156,6 +157,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cyclopts", specifier = ">=5.3" },
     { name = "jinja2", specifier = ">=3" },
     { name = "markdown", specifier = ">=3" },
     { name = "nh3", specifier = ">=0.2" },
@@ -425,6 +427,7 @@ dev = [
     { name = "basstler-core" },
     { name = "basstler-git" },
     { name = "basstler-github" },
+    { name = "basstler-hub" },
     { name = "basstler-notes" },
     { name = "basstler-plan" },
     { name = "basstler-reviews" },
@@ -447,6 +450,7 @@ dev = [
     { name = "basstler-core", editable = "packages/core" },
     { name = "basstler-git", editable = "packages/git" },
     { name = "basstler-github", editable = "packages/github" },
+    { name = "basstler-hub", editable = "packages/hub" },
     { name = "basstler-notes", editable = "packages/notes" },
     { name = "basstler-plan", editable = "packages/plan" },
     { name = "basstler-reviews", editable = "packages/reviews" },

@@ -198,8 +198,10 @@ items:
     '
 - id: isolated-test-helpers
   title: Move each shared test helper into the distribution that owns its subject
-  branch: null
+  branch: claude/adoring-mccarthy-1srubs
   track: package-split
+  pull_request_number: 287
+  session: https://claude.ai/code/session_018wfiv7MprsobHbZxymgjkx
   notes: 'Each distribution''s dev group lists only what its tests import, so every distribution
     but the meta-package runs its tests in an environment of its own requirements. Start from
     #223''s list: scratch_repository (imports setup.steps from notes) and maintenance/fork.
@@ -208,6 +210,6 @@ items:
 
     '
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: opus
 landed_item_count: 4

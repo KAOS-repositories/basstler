@@ -11,10 +11,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, StackExitCode
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
+
+if TYPE_CHECKING:
+    from basstler.module import Module
 
 
 class DataclassException(Exception, ABC):
@@ -219,6 +223,29 @@ class MalformedEmailAddressError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "give the address your commits should carry, e.g. you@example.com"
+
+
+@dataclass
+class ModuleOutsideRootError(DataclassException, ValueError):
+    """
+    Raised when a module is named relative to a root that does not hold it.
+    """
+
+    module: Module
+    """
+    The module that was named relative to :attr:`root`.
+    """
+
+    root: Module
+    """
+    The package or module that does not hold :attr:`module`.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.module} is not within {self.root}"
+
+    def suggest_correction(self) -> str:
+        return f"name a module that starts with {self.root}"
 
 
 @dataclass

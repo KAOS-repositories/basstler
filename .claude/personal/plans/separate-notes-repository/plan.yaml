@@ -83,3 +83,16 @@ items:
     Running the old copy's basstler.sh against the 4.0.3 environment failed with
     'reported no row for notes_repository_access, plan_site_access'. Name the other copy, its version
     and how to disable it.
+
+- id: notes-visibility-check
+  title: Session start warns when the notes repository is more public than the project
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: sync-safety
+  depends_on: []
+  notes: 'Found 2026-11-22: tomsch420/business_consulting-notes is public and holds PR progress for branches
+    of the private KAOS-repositories/business_consulting. Nothing compares the two visibilities, so every
+    progress note is published. Session start and /setup-personal-notes read both repositories'' visibility,
+    warn with the fix (make the notes private, or move them to a private notes repository), and setup
+    refuses such a pair unless confirmed.'

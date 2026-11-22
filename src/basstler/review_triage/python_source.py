@@ -9,10 +9,12 @@ import ast
 import io
 import keyword
 import tokenize
+import warnings
+from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
-from functools import cached_property
+from functools import cache, cached_property
 
 from basstler.review_triage.name_scopes import STAR_IMPORT
 from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
@@ -53,7 +55,9 @@ class IdentifierField(StrEnum):
 
     MODULE = "module"
     """
-    The module an ``import ... from`` reads.
+    The module an ``import ...
+
+    from`` reads.
     """
 
     NAMES = "names"
@@ -99,10 +103,9 @@ The typing name of a type allowing only the values it lists.
 
 TUPLE_CLASSES = frozenset({"tuple", "Tuple"})
 """
-The names of the tuple class, whose annotation ``tuple[X, ...]`` declares any number
-of ``X``.
+The names of the tuple class, whose annotation ``tuple[X, ...]`` declares any number of
+``X``.
 """
-
 
 # %% type annotations
 
@@ -166,7 +169,6 @@ CONTAINER_KINDS: dict[str, ContainerKind] = {
 """
 The standard containers, by the name of their class or typing alias.
 """
-
 REMOVED_ITEM_METHODS: dict[ContainerKind, frozenset[str]] = {
     ContainerKind.SEQUENCE: frozenset({"pop", "popleft"}),
     ContainerKind.MAPPING: frozenset({"get", "pop", "setdefault"}),
@@ -186,7 +188,6 @@ class MappingView:
     """
     The name of the view's class.
     """
-
     held_argument: int
     """
     The position of the mapping's type argument the view holds.
@@ -200,7 +201,6 @@ MAPPING_VIEWS: dict[str, MappingView] = {
 """
 The methods of a mapping returning a view, by name.
 """
-
 COPY_METHOD = "copy"
 """
 The method of a standard container returning a shallow copy of it.
@@ -210,8 +210,8 @@ The method of a standard container returning a shallow copy of it.
 @dataclass(frozen=True, slots=True)
 class AnnotatedType:
     """
-    What a type annotation declares a value to be: an instance of one class, holding
-    the values its type arguments declare.
+    What a type annotation declares a value to be: an instance of one class, holding the
+    values its type arguments declare.
     """
 
     class_name: str
@@ -221,8 +221,8 @@ class AnnotatedType:
 
     arguments: tuple[AnnotatedType | None, ...] = ()
     """
-    What the type arguments declare, ``None`` for one allowing no single class; a
-    tuple of any length has its one item type only.
+    What the type arguments declare, ``None`` for one allowing no single class; a tuple
+    of any length has its one item type only.
     """
 
     @classmethod
@@ -246,7 +246,7 @@ class AnnotatedType:
                 return None
             return cls.from_annotation(sides[0], type_variables)
         if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
-            reference = PythonSource(annotation.value)
+            reference = PythonSource.from_text(annotation.value)
             if not (
                 reference.parses
                 and len(reference.tree.body) == 1
@@ -363,6 +363,13 @@ class IdentifierRenamer(ast.NodeVisitor):
     The renames to apply.
     """
 
+    @cached_property
+    def identifier_field_names(self) -> frozenset[str]:
+        """
+        The name of every :class:`IdentifierField`.
+        """
+        return frozenset(IdentifierField)
+
     def generic_visit(self, node: ast.AST) -> None:
         """
         Rename the identifiers *node* holds, then visit its children.
@@ -370,7 +377,7 @@ class IdentifierRenamer(ast.NodeVisitor):
         :param node: The node visited.
         """
         for field_name, value in ast.iter_fields(node):
-            if field_name not in IdentifierField:
+            if field_name not in self.identifier_field_names:
                 continue
             if isinstance(value, str):
                 setattr(node, field_name, self.renames.renamed_identifier(value))
@@ -530,6 +537,17 @@ class PythonSource:
     :meth:`code_tree` under each renames asked for so far.
     """
 
+    @classmethod
+    @cache
+    def from_text(cls, text: str, package: tuple[str, ...] = ()) -> PythonSource:
+        """
+        :param text: The file's content.
+        :param package: As :attr:`package`.
+        :return: The one source of that text in that package for the whole process,
+            so each part of it is read once however often it is asked for.
+        """
+        return cls(text, package)
+
     @cached_property
     def tree(self) -> ast.Module:
         """
@@ -537,7 +555,17 @@ class PythonSource:
 
         :raises SyntaxError: If the file is not valid Python.
         """
-        return ast.parse(self.text)
+        return self.parse()
+
+    def parse(self) -> ast.Module:
+        """
+        :return: A new syntax tree of the file, without the warnings Python gives about
+            the code it parses.
+        :raises SyntaxError: If the file is not valid Python.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            return ast.parse(self.text)
 
     @cached_property
     def parses(self) -> bool:
@@ -556,16 +584,17 @@ class PythonSource:
             rename replaced.
         :raises SyntaxError: If the file is not valid Python.
         """
-        tree = ast.parse(self.text)
-        IdentifierRenamer(renames).visit(tree)
+        tree = self.parse()
+        if renames.renames:
+            IdentifierRenamer(renames).visit(tree)
         return tree
 
     def code_tree(self, renames: RenameMap) -> ast.Module:
         """
         :param renames: The renames to apply first.
-        :return: The file's syntax tree without its imports, other than those of
-            ``__future__``, and with every documentation string emptied; not to be
-            modified, as it is kept for the next call.
+        :return: The file's syntax tree without its imports and with every
+            documentation string emptied; not to be modified, as it is kept for the
+            next call.
         """
         if renames in self.code_trees:
             return self.code_trees[renames]
@@ -593,10 +622,7 @@ class PythonSource:
         :return: Its statements other than imports, each documentation string emptied.
         """
         for statement in statements:
-            if isinstance(statement, ast.Import) or (
-                isinstance(statement, ast.ImportFrom)
-                and statement.module != FUTURE_MODULE
-            ):
+            if isinstance(statement, (ast.Import, ast.ImportFrom)):
                 continue
             if PythonSource.is_documentation(statement):
                 yield ast.Expr(ast.Constant(""))
@@ -709,14 +735,13 @@ class PythonSource:
     @cached_property
     def import_statements(self) -> str:
         """
-        The file's import statements, other than those of ``__future__``, dumped as text
+        The file's import statements, those of ``__future__`` included, dumped as text
         in the order they occur.
         """
         return "\n".join(
             ast.dump(node)
             for node in ast.walk(self.tree)
-            if isinstance(node, ast.Import)
-            or (isinstance(node, ast.ImportFrom) and node.module != FUTURE_MODULE)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
         )
 
     @cached_property
@@ -740,8 +765,8 @@ class PythonSource:
     @cached_property
     def without_module_documentation(self) -> PythonSource:
         """
-        The file without the documentation string at the top, itself when it has none
-        or shares its lines with other code.
+        The file without the documentation string at the top, itself when it has none or
+        shares its lines with other code.
         """
         first = next(iter(self.tree.body), None)
         if first is None or not self.is_documentation(first):
@@ -784,9 +809,19 @@ class PythonSource:
         :param end: The number of the line after the last.
         :return: The :attr:`significant_tokens` starting on those lines.
         """
-        return tuple(
-            token for token in self.significant_tokens if first <= token.start[0] < end
-        )
+        return self.significant_tokens[
+            bisect_left(self.significant_token_lines, first) : bisect_left(
+                self.significant_token_lines, end
+            )
+        ]
+
+    @cached_property
+    def significant_token_lines(self) -> tuple[int, ...]:
+        """
+        The line each of :attr:`significant_tokens` starts on, in the same order, which
+        never decreases.
+        """
+        return tuple(token.start[0] for token in self.significant_tokens)
 
     @staticmethod
     def referenced_name(expression: ast.expr) -> str | None:
@@ -911,4 +946,4 @@ class PythonSource:
             for number, text in enumerate(self.text.splitlines(), start=1)
             if number not in removed
         ]
-        return PythonSource("\n".join(kept) + "\n", self.package)
+        return PythonSource.from_text("\n".join(kept) + "\n", self.package)

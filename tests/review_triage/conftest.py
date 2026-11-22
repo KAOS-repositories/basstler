@@ -166,6 +166,24 @@ class RefusingWriter(GitHubWriter):
         return refusal(self.status, write.method, write.path)
 
 
+@dataclass
+class FlakyWriter(RecordingWriter):
+    """
+    Answers the first writes with a server error, then each with the same body.
+    """
+
+    failures: int = 0
+    """
+    How many of the first writes are answered with a server error.
+    """
+
+    def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
+        if len(self.sent) < self.failures:
+            self.sent.append(write)
+            return refusal(HTTPStatus.BAD_GATEWAY, write.method, write.path)
+        return super().attempt_send(write)
+
+
 WORKFLOW_REPOSITORY_DETAILS: dict[str, Any] = json.loads(
     DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH.read_text()
 )

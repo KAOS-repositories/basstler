@@ -27,7 +27,12 @@ from basstler.github.repository import PullRequestReference, Repository
 from basstler.locations import ClaudeCodeVariable
 from basstler.review_triage.command_names import ReviewTriageCommand
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
-from basstler.review_triage.outputs import MarkdownReport, TriageOutput, ViewedMarking
+from basstler.review_triage.outputs import (
+    MarkdownReport,
+    TriageOutput,
+    TriageSummary,
+    ViewedMarking,
+)
 from basstler.review_triage.rules import (
     ReviewTriageSettings,
     RuleSelection,
@@ -221,15 +226,16 @@ def report(
         default.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
-    :param since: The commit to triage from, such as the head commit you last
-        reviewed; a file only merges of the base branch changed since is mechanical.
-    :param last: How many of the pull request's last commits to triage, a merge
-        counting as one, as GitHub's view of its last commits shows them.
+    :param since: The commit to triage from, such as the head commit you last reviewed;
+        a file only merges of the base branch changed since is mechanical.
+    :param last: How many of the pull request's last commits to triage, a merge counting
+        as one, as GitHub's view of its last commits shows them.
     :param from_merge_base: Triage the whole change, not only what changed since your
         last review.
-    :param select_rule: An opt-in rule to turn on, adding to the checkout's
+    :param select_rule: A rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
-    :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param ignore_rule: A rule to turn off, one on by default included, outranking
+        those settings; repeatable.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -252,6 +258,7 @@ def mark_viewed(
     repository: str | None = None,
     workflow_repository: str | None = None,
     directly: bool = False,
+    summary_only: bool = False,
     rename: tuple[str, ...] = (),
     rejected_rename: tuple[str, ...] = (),
     since: Annotated[str | None, Parameter(group=COMPARISON_START_GROUP)] = None,
@@ -277,17 +284,19 @@ def mark_viewed(
         directly fails, as ``owner/name``; the checkout's ``origin`` by default.
     :param directly: Only mark them directly, never through Actions, as the workflow
         that marks them does.
+    :param summary_only: Print only how many files need review, not the whole triage.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
-    :param since: The commit to triage from, such as the head commit you last
-        reviewed; a file only merges of the base branch changed since is mechanical.
-    :param last: How many of the pull request's last commits to triage, a merge
-        counting as one, as GitHub's view of its last commits shows them.
+    :param since: The commit to triage from, such as the head commit you last reviewed;
+        a file only merges of the base branch changed since is mechanical.
+    :param last: How many of the pull request's last commits to triage, a merge counting
+        as one, as GitHub's view of its last commits shows them.
     :param from_merge_base: Triage the whole change, not only what changed since your
         last review.
-    :param select_rule: An opt-in rule to turn on, adding to the checkout's
+    :param select_rule: A rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
-    :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param ignore_rule: A rule to turn off, one on by default included, outranking
+        those settings; repeatable.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     :raises GraphQLErrorsReturned: If marking them directly, alone, fails.
     :raises FilesNotMarkedViewed: If neither way marks them.
@@ -303,7 +312,7 @@ def mark_viewed(
         ignore_rule,
         from_merge_base,
     ).outcome()
-    MarkdownReport().publish(outcome)
+    (TriageSummary() if summary_only else MarkdownReport()).publish(outcome)
     routes = ViewedMarkingRoutes(
         ViewedMarking(GitHubRestClient()),
         MarkViewedRequest(

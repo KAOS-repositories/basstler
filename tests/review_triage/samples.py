@@ -39,6 +39,9 @@ class FileSample(StrEnum):
     IMPORT_SOURCE_CHANGED = "import-source-changed"
     IMPORTS_REORDERED = "imports-reordered"
     KEYWORD_ARGUMENTS_ADDED = "keyword-arguments-added"
+    KEYWORD_ARGUMENTS_ADDED_THROUGH_IMPORT_ALIAS = (
+        "keyword-arguments-added-through-import-alias"
+    )
     KEYWORD_ARGUMENTS_REORDERED = "keyword-arguments-reordered"
     KEYWORD_ARGUMENTS_SWAPPED = "keyword-arguments-swapped"
     KEYWORD_ARGUMENTS_UNKNOWN_CALLEE = "keyword-arguments-unknown-callee"
@@ -46,9 +49,12 @@ class FileSample(StrEnum):
     MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
     MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
     RECEIVER_BINDS_DIFFERENTLY = "receiver-binds-differently"
+    RECEIVER_OVERRIDES_INCOMPATIBLE = "receiver-overrides-incompatible"
+    RECEIVER_REBOUND_OUT_OF_ORDER = "receiver-rebound-out-of-order"
     RECEIVER_TYPE_AMBIGUOUS = "receiver-type-ambiguous"
     RECEIVER_TYPE_FOLLOWED = "receiver-type-followed"
     RECEIVER_TYPE_INFERRED = "receiver-type-inferred"
+    RECEIVER_TYPE_REASSIGNED = "receiver-type-reassigned"
     RECEIVER_TYPE_UNKNOWN = "receiver-type-unknown"
     RELATIVE_IMPORT_MOVED = "relative-import-moved"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
@@ -111,6 +117,24 @@ class DescriptionSample(StrEnum):
         :return: The description.
         """
         return (DatasetLocation.REVIEW_TRIAGE / self).read_text()
+
+
+# %% scopes
+
+
+class ScopeSample(StrEnum):
+    """
+    A module whose scopes bind names in a particular way, by its file name.
+    """
+
+    GLOBAL_IN_NESTED_FUNCTION = "global-in-nested-function.py"
+    INVALID_ESCAPE_SEQUENCE = "invalid-escape-sequence.py"
+
+    def read(self) -> str:
+        """
+        :return: The module's text.
+        """
+        return (DatasetLocation.REVIEW_TRIAGE / "scopes" / self).read_text()
 
 
 # %% the pull request
@@ -184,6 +208,40 @@ class ModuleMoveSample(SampleTrees):
         return "module-move"
 
 
+# %% the package root move
+
+
+class PackageRootMoveSample(SampleTrees):
+    """
+    A pull request moving a package, ``__init__.py`` files and all, under a directory
+    that is not a package, leaving its modules' dotted paths as they were.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "package-root-move"
+
+
+# %% empty package initializers moved apart
+
+
+class AmbiguousPackageInitializersSample(SampleTrees):
+    """
+    A pull request splitting one ``tests`` package into two, whose many identical, empty
+    ``__init__.py`` files git pairs with each other in no meaningful order.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "ambiguous-package-initializers"
+
+
 # %% the definition move
 
 
@@ -199,6 +257,48 @@ class DefinitionMoveSample(SampleTrees):
     @classproperty
     def directory_name(cls) -> str:
         return "definition-move"
+
+
+class DefinitionMovePackageRootSample(SampleTrees):
+    """
+    A pull request moving a class into a new module of a package moved out of ``src/``,
+    a directory that is not a package, and importing it from there relatively.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-package-root"
+
+
+class DefinitionMoveSameModulePathSample(SampleTrees):
+    """
+    A pull request moving a module's function into a module of the same dotted path
+    that it adds in a package kept under ``packages/``.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-same-module-path"
+
+
+class SubclassSubstitutionSourceLayoutSample(SampleTrees):
+    """
+    A pull request switching a caller to a new subclass in a package kept under
+    ``src/``, importing both classes relatively.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "subclass-substitution-source-layout"
 
 
 class DefinitionMoveFromMovedModuleSample(SampleTrees):

@@ -35,6 +35,11 @@ class MovedDefinition:
     The base version of the module it left.
     """
 
+    source_package: tuple[str, ...]
+    """
+    The package the module it left is in, in the base commit.
+    """
+
     target_path: PurePosixPath
     """
     The file of the module it moved into, in the head commit.
@@ -62,7 +67,7 @@ class MovedDefinition:
         """
         The base version of the module it left.
         """
-        return PythonSource(self.source_text, self.source_path.parent.parts)
+        return PythonSource.from_text(self.source_text, self.source_package)
 
 
 # %% every moved definition

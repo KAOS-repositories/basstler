@@ -6,6 +6,7 @@ triage.
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -13,15 +14,14 @@ from typing import Any
 import pytest
 
 from basstler.git.commands import GitCommandRunner
+from basstler.github.client import RetryPolicy
 from basstler.github.exceptions import GraphQLErrorsReturned
-from basstler.github.graphql import GraphQLRequest
 from basstler.github.pull_request_changes import (
     MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
     RestPullRequest,
 )
-from basstler.locations import ReviewTriageLocation
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.detection import RenameDetection
@@ -29,19 +29,31 @@ from basstler.review_triage.keyword_arguments import (
     UnprovenBinding,
     UnprovenKeywordCall,
 )
-from basstler.review_triage.outputs import MarkdownReport, ViewedFile, ViewedMarking
+from basstler.review_triage.outputs import (
+    MarkdownReport,
+    TriageSummary,
+    ViewedFiles,
+    ViewedFilesVariable,
+    ViewedMarking,
+)
 from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from ..scratch_repository import ScratchRepository
 from .conftest import (
     SAMPLE_REPOSITORY,
+    FlakyWriter,
     OnePullRequestReader,
     RecordingWriter,
     RefusingWriter,
     read_sample,
 )
 from .samples import DescriptionSample, PullRequestSample
+
+INSTANT_RETRIES = RetryPolicy(first_delay=timedelta(0))
+"""
+A retry policy that asks again at once, so no test waits.
+"""
 
 # %% renames
 
@@ -89,6 +101,21 @@ def test_the_files_changed_only_mechanically_are_found(
     """
     assert mechanical_kinds(PullRequestTriager().triage(sample_changes)) == (
         MECHANICAL_KINDS
+    )
+
+
+def test_files_judged_in_other_processes_get_the_same_verdicts(
+    sample_changes: PullRequestChanges,
+):
+    """
+    Judging the files in several processes, a few at a time, gives each the verdict it
+    gets judged in this process.
+    """
+    parallel = replace(
+        PullRequestTriager(), workers=2, files_per_worker=1, files_per_batch=2
+    )
+    assert parallel.triage(sample_changes) == PullRequestTriager(workers=1).triage(
+        sample_changes
     )
 
 
@@ -188,7 +215,9 @@ def test_the_report_names_why_a_file_needs_review(sample_changes: PullRequestCha
     Each reason a file needs review is listed under it, with its line.
     """
     triage = PullRequestTriager().triage(sample_changes)
-    reason = UnprovenKeywordCall(3, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN)
+    reason = UnprovenKeywordCall(
+        3, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN, ("GoalPlotter.plot",)
+    )
     explained = replace(triage.files_needing_review[0], reasons=(reason,))
     triage = replace(
         triage,
@@ -201,29 +230,98 @@ def test_the_report_names_why_a_file_needs_review(sample_changes: PullRequestCha
     assert line in MarkdownReport().render(triage).splitlines()
 
 
-def test_each_mechanical_file_is_marked_viewed(sample_changes: PullRequestChanges):
+def test_the_summary_is_the_reports_count_of_files_needing_review(
+    sample_changes: PullRequestChanges,
+):
     """
-    One mutation is sent per mechanical file, naming the pull request and the file.
+    The summary is the line of the report counting the files that need review.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    summary = TriageSummary().render(triage)
+    assert summary in MarkdownReport().render(triage).splitlines()
+    assert summary.startswith(
+        f"**{len(triage.files_needing_review)} of {len(triage.files)} files"
+    )
+
+
+def test_every_mechanical_file_is_marked_viewed_in_one_request(
+    sample_changes: PullRequestChanges,
+):
+    """
+    One request marks every mechanical file, naming the pull request and the files.
     """
     triage = PullRequestTriager().triage(sample_changes)
     writer = RecordingWriter({"data": {}})
     ViewedMarking(writer).publish(triage)
-    document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
     assert writer.sent == [
-        GraphQLRequest(
-            document,
-            ViewedFile(triage.pull_request.node_identifier, path).to_json(),
-        )
-        for path in MECHANICAL_KINDS
+        ViewedFiles(
+            triage.pull_request.node_identifier, tuple(MECHANICAL_KINDS)
+        ).request()
     ]
 
 
-def test_a_viewed_path_is_sent_with_forward_slashes():
+def test_mechanical_files_beyond_one_request_are_marked_in_several(
+    sample_changes: PullRequestChanges,
+):
     """
-    A file's path goes to GitHub as its POSIX form, on every platform.
+    No request marks more files than one request may.
     """
-    path = PurePosixPath("package/constants.py")
-    assert ViewedFile("node", path).to_json()["path"] == path.as_posix()
+    triage = PullRequestTriager().triage(sample_changes)
+    writer = RecordingWriter({"data": {}})
+    ViewedMarking(writer, files_per_request=3).publish(triage)
+    paths = tuple(MECHANICAL_KINDS)
+    node = triage.pull_request.node_identifier
+    assert writer.sent == [
+        ViewedFiles(node, paths[:3]).request(),
+        ViewedFiles(node, paths[3:]).request(),
+    ]
+
+
+def test_a_request_answered_with_a_server_error_is_sent_again(
+    sample_changes: PullRequestChanges,
+):
+    """
+    Marking files viewed is idempotent, so a request GitHub answers with a server error
+    is sent again, and the marking succeeds once GitHub answers.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    writer = FlakyWriter({"data": {}}, failures=2)
+    ViewedMarking(writer, retry_policy=INSTANT_RETRIES).publish(triage)
+    request = ViewedFiles(
+        triage.pull_request.node_identifier, tuple(MECHANICAL_KINDS)
+    ).request()
+    assert writer.sent == [request] * 3
+
+
+def test_a_request_answered_with_server_errors_throughout_is_raised_after_the_retries(
+    sample_changes: PullRequestChanges,
+):
+    """
+    A request still answered with a server error after the retry policy's last retry is
+    raised as a refused marking.
+    """
+    triage = PullRequestTriager().triage(sample_changes)
+    writer = FlakyWriter({"data": {}}, failures=100)
+    with pytest.raises(GraphQLErrorsReturned):
+        ViewedMarking(writer, retry_policy=INSTANT_RETRIES).publish(triage)
+    assert len(writer.sent) == 1 + INSTANT_RETRIES.retries
+
+
+def test_each_viewed_file_is_its_own_mutation_of_the_request():
+    """
+    The request runs the mutation marking a file viewed once per file, each with that
+    file's path, sent in its POSIX form on every platform.
+    """
+    paths = (PurePosixPath("package/constants.py"), PurePosixPath("notes.md"))
+    request = ViewedFiles("node", paths).request()
+    path_variables = {
+        name: value
+        for name, value in request.variables.items()
+        if name != ViewedFilesVariable.PULL_REQUEST
+    }
+    assert sorted(path_variables.values()) == sorted(path.as_posix() for path in paths)
+    assert request.query.count("markFileAsViewed(") == len(paths)
+    assert all(f"path: ${name}" in request.query for name in path_variables)
 
 
 def test_a_refused_marking_is_raised(sample_changes: PullRequestChanges):

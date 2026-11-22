@@ -120,8 +120,8 @@ class MarkdownComparison(ContentComparison):
         """
         if base_block == head_block:
             return ChangeKind.no_change
-        base = PythonSource(base_block)
-        head = PythonSource(head_block)
+        base = PythonSource.from_text(base_block)
+        head = PythonSource.from_text(head_block)
         if not (base.parses and head.parses):
             return None
         return self.code.source_changes(base, head, context)

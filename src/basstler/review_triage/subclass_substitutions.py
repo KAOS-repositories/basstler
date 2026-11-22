@@ -60,7 +60,7 @@ class ClassVersions:
             next(
                 (
                     statement
-                    for statement in PythonSource(text or "").tree.body
+                    for statement in PythonSource.from_text(text or "").tree.body
                     if isinstance(statement, ast.ClassDef) and statement.name == name
                 ),
                 None,
@@ -178,9 +178,12 @@ class SubclassSubstitutionDetection(RenameSource):
         :param changes: The pull request.
         :return: Each class the module adds deriving from one imported class alone.
         """
-        head = PythonSource(change.head_text or "", change.path.parent.parts)
+        head_modules = CommitModules(changes.commits.head_tree)
+        head = PythonSource.from_text(
+            change.head_text or "", head_modules.package(change.path)
+        )
         base_names = (
-            PythonSource(change.base_text).defined_names
+            PythonSource.from_text(change.base_text).defined_names
             if change.base_text is not None
             else frozenset()
         )

@@ -10,6 +10,7 @@ import tokenize
 from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from functools import cache
 
 from basstler.class_property import classproperty
 from basstler.git.commit_range import FileVersions
@@ -49,17 +50,20 @@ class RenameDetection(RenameSource):
         for change in changes.files:
             if PythonComparison().applies_to(change):
                 self.collect(
-                    PythonSource(change.base_text),
-                    PythonSource(change.head_text),
+                    PythonSource.from_text(change.base_text),
+                    PythonSource.from_text(change.head_text),
                     candidates,
                 )
-        base = changes.commits.base_tree
-        head = changes.commits.head_tree
+        consistent = candidates.consistent()
+        kept_in_head = changes.commits.head_tree.mentioned_words(frozenset(consistent))
+        already_in_base = changes.commits.base_tree.mentioned_words(
+            frozenset(consistent.values())
+        )
         return RenameDecisions(
             tuple(
                 Rename(old, new, self)
-                for old, new in sorted(candidates.consistent().items())
-                if not head.mentions(old) and not base.mentions(new)
+                for old, new in sorted(consistent.items())
+                if old not in kept_in_head and new not in already_in_base
             )
         )
 
@@ -74,6 +78,18 @@ class RenameDetection(RenameSource):
         :param head: The file's head version.
         :param candidates: The substitutions found so far.
         """
+        candidates.add_all(RenameDetection.file_candidates(base, head))
+
+    @staticmethod
+    @cache
+    def file_candidates(base: PythonSource, head: PythonSource) -> RenameCandidates:
+        """
+        :param base: The file's base version.
+        :param head: The file's head version.
+        :return: Each identifier the head version puts in place of another; not to be
+            modified, as it is kept for the next call.
+        """
+        candidates = RenameCandidates()
         lines = difflib.SequenceMatcher(
             a=base.text.splitlines(), b=head.text.splitlines(), autojunk=False
         )
@@ -84,6 +100,7 @@ class RenameDetection(RenameSource):
                     head.tokens_on_lines(head_start + 1, head_end + 1),
                     candidates,
                 )
+        return candidates
 
     @staticmethod
     def collect_tokens(
@@ -144,8 +161,8 @@ class MemberRenameDetection(RenameSource):
         ]
         sources = {
             change.path: (
-                PythonSource(change.base_text),
-                PythonSource(change.head_text),
+                PythonSource.from_text(change.base_text),
+                PythonSource.from_text(change.head_text),
             )
             for change in modules
         }

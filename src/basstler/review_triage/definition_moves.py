@@ -83,17 +83,34 @@ class DefinitionMoveDetection(RenameSource):
             for change in changes.files
             if change.path.suffix == MODULE_SUFFIX and change.head_text is not None
         ]
-        sources = {
-            base.module_path(change.previous_path or change.path): change
-            for change in modules
-            if change.base_text is not None
-        }
-        targets = {head.module_path(change.path): change for change in modules}
+        sources: dict[str, list[FileVersions]] = {}
+        targets: dict[str, list[FileVersions]] = {}
+        for change in modules:
+            if change.base_text is not None:
+                module = base.module_path(change.previous_path or change.path)
+                sources.setdefault(module, []).append(change)
+            targets.setdefault(head.module_path(change.path), []).append(change)
         moved = []
         for rename in renames.renames:
             old_module, _, name = rename.old.rpartition(DOTTED_NAME_SEPARATOR)
-            source = sources.get(old_module)
-            target = targets.get(rename.new.rpartition(DOTTED_NAME_SEPARATOR)[0])
+            source = next(
+                (
+                    candidate
+                    for candidate in sources.get(old_module, [])
+                    if name in PythonSource.from_text(candidate.base_text).defined_names
+                ),
+                None,
+            )
+            target = next(
+                (
+                    candidate
+                    for candidate in targets.get(
+                        rename.new.rpartition(DOTTED_NAME_SEPARATOR)[0], []
+                    )
+                    if name in PythonSource.from_text(candidate.head_text).defined_names
+                ),
+                None,
+            )
             if (
                 not isinstance(rename.found_by, DefinitionMoveDetection)
                 or source is None
@@ -105,6 +122,7 @@ class DefinitionMoveDetection(RenameSource):
                     name,
                     source.previous_path or source.path,
                     source.base_text,
+                    base.package(source.previous_path or source.path),
                     target.path,
                     rename.old,
                     rename.new,
@@ -120,10 +138,10 @@ class DefinitionMoveDetection(RenameSource):
         """
         if change.head_text is None:
             return frozenset()
-        head_names = PythonSource(change.head_text).defined_names
+        head_names = PythonSource.from_text(change.head_text).defined_names
         if change.base_text is None:
             return head_names
-        return head_names - PythonSource(change.base_text).defined_names
+        return head_names - PythonSource.from_text(change.base_text).defined_names
 
     @staticmethod
     def removed_names(
@@ -139,8 +157,8 @@ class DefinitionMoveDetection(RenameSource):
             return
         module = base.module_path(change.previous_path or change.path)
         removed = (
-            PythonSource(change.base_text).defined_names
-            - PythonSource(change.head_text).defined_names
+            PythonSource.from_text(change.base_text).defined_names
+            - PythonSource.from_text(change.head_text).defined_names
         )
         for name in sorted(removed):
             yield module, name
@@ -179,8 +197,13 @@ class DefinitionMoveComparison(FileJudgment):
             if change.base_text is None:
                 return None
             return self.comparison.changes(change, context)
-        head = PythonSource(change.head_text, change.path.parent.parts)
-        base = PythonSource(change.base_text or "", base_path.parent.parts)
+        head = PythonSource.from_text(
+            change.head_text, context.package_of(context.head_modules, change.path)
+        )
+        base = PythonSource.from_text(
+            change.base_text or "",
+            context.package_of(context.base_modules, base_path),
+        )
         head_rest = head.without(self.spans(head, arriving, base))
         base_rest = base.without(self.spans(base, leaving, head))
         arrival_kinds = self.arrival_changes(head, arriving, context)

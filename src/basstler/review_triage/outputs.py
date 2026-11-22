@@ -5,19 +5,18 @@ built-in outputs.
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import Annotated
-
-from pydantic import Field
 
 from basstler.class_property import classproperty
-from basstler.github.client import GitHubWriter
+from basstler.github.client import GitHubResponse, GitHubWriter, RetryPolicy
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest, GraphQLResponse
-from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ReviewTriageLocation
+from basstler.progress import ProgressStep, ProgressUnit
 from basstler.render_common import TemplatePage
 from basstler.review_triage.declaration import TriageDeclaration
 from basstler.review_triage.triage import TriageOutcome
@@ -68,24 +67,72 @@ class MarkdownReport(TriageOutput, TemplatePage):
         logger.info(self.render(outcome))
 
 
+class TriageSummary(MarkdownReport):
+    """
+    Prints only the sentence of :class:`MarkdownReport` counting the files that need
+    review.
+    """
+
+    @classproperty
+    def template(cls) -> str:
+        return ReviewTriageLocation.SUMMARY_TEMPLATE.name
+
+
 # %% marking files viewed
 
 
-class ViewedFile(ValidatedJSONModel):
+class ViewedFilesVariable(StrEnum):
     """
-    The variables of the mutation marking one file of a pull request viewed.
+    The variables of the mutation marking files of a pull request viewed.
     """
 
-    pull_request_node_identifier: Annotated[str, Field(alias="pullRequestId")]
+    PULL_REQUEST = "pullRequestId"
     """
     What GitHub's GraphQL API identifies the pull request by.
     """
 
-    path: PurePosixPath
+    PATH_PREFIX = "file"
     """
-    The file's path in the pull request's head commit, which GitHub separates with
-    forward slashes on every platform.
+    What the variable holding each file's path, and the mutation marking it, is named
+    by, followed by the file's position in the request.
     """
+
+
+@dataclass(frozen=True)
+class ViewedFiles:
+    """
+    Files of one pull request to mark viewed with one request.
+    """
+
+    pull_request_node_identifier: str
+    """
+    What GitHub's GraphQL API identifies the pull request by.
+    """
+
+    paths: tuple[PurePosixPath, ...]
+    """
+    The files' paths in the pull request's head commit.
+    """
+
+    def request(self) -> GraphQLRequest:
+        """
+        :return: The mutation marking every file of :attr:`paths` viewed, each path
+            sent with forward slashes, as GitHub separates them on every platform.
+        """
+        paths = {
+            f"{ViewedFilesVariable.PATH_PREFIX}{position}": path.as_posix()
+            for position, path in enumerate(self.paths)
+        }
+        document = TemplatePage.render_named_template(
+            ReviewTriageLocation.MARK_FILES_AS_VIEWED_TEMPLATE.name,
+            pull_request_variable=ViewedFilesVariable.PULL_REQUEST,
+            path_variables=tuple(paths),
+        )
+        return GraphQLRequest(
+            document,
+            {ViewedFilesVariable.PULL_REQUEST: self.pull_request_node_identifier}
+            | paths,
+        )
 
 
 @dataclass(frozen=True)
@@ -100,6 +147,17 @@ class ViewedMarking(TriageOutput):
     The writer the mutations are sent through.
     """
 
+    files_per_request: int = 50
+    """
+    How many files one request marks at most.
+    """
+
+    retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
+    """
+    When a request answered with a server error is sent again; marking a file viewed
+    twice changes nothing, so asking again is safe.
+    """
+
     def publish(self, outcome: TriageOutcome) -> None:
         refusals = self.refusals(outcome)
         if refusals:
@@ -107,22 +165,36 @@ class ViewedMarking(TriageOutput):
 
     def refusals(self, outcome: TriageOutcome) -> tuple[str, ...]:
         """
-        Mark the mechanical files viewed, stopping at the first refusal.
+        Mark the mechanical files viewed, stopping at the first refused request.
 
         :param outcome: The triaged pull request.
         :return: What GitHub refused with, empty once every file is marked.
         """
-        document = ReviewTriageLocation.MARK_FILE_AS_VIEWED.read_text()
-        for file in outcome.mechanical_files:
-            variables = ViewedFile(
-                outcome.pull_request.node_identifier, file.change.path
-            )
-            response = self.github.attempt_send(
-                GraphQLRequest(document, variables.to_json())
-            )
-            if response.failure is not None:
-                return (response.failure.error_message(),)
-            answer = GraphQLResponse.from_json(response.body)
-            if answer.errors:
-                return tuple(error.message for error in answer.errors)
+        paths = tuple(file.change.path for file in outcome.mechanical_files)
+        with ProgressStep.MARKING_VIEWED.bar(len(paths), ProgressUnit.FILE) as progress:
+            for start in range(0, len(paths), self.files_per_request):
+                batch = paths[start : start + self.files_per_request]
+                response = self.send_retrying(
+                    ViewedFiles(outcome.pull_request.node_identifier, batch)
+                )
+                if response.failure is not None:
+                    return (response.failure.error_message(),)
+                answer = GraphQLResponse.from_json(response.body)
+                if answer.errors:
+                    return tuple(error.message for error in answer.errors)
+                progress.update(len(batch))
         return ()
+
+    def send_retrying(self, files: ViewedFiles) -> GitHubResponse:
+        """
+        :param files: The files to mark viewed.
+        :return: GitHub's last answer, the request sent again as :attr:`retry_policy`
+            says while GitHub answers with a server error.
+        """
+        response = self.github.attempt_send(files.request())
+        for delay in self.retry_policy.delays():
+            if not response.is_server_error:
+                break
+            time.sleep(delay.total_seconds())
+            response = self.github.attempt_send(files.request())
+        return response

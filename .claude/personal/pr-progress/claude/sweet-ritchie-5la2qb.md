@@ -3,7 +3,7 @@ Plan
 
 Done
 - 578a9d15, 5dc4919d, 84d895b1: renames, hook classes and models, RepositoryCheckout,
-  Skill classes generating SKILL.md frontmatter. 17 threads resolved; summary answered.
+  Skill classes generating SKILL.md frontmatter. 13 threads resolved; summary answered.
 - Plan item project-plugin-files added (basstler-packages).
 
 Next

@@ -14,7 +14,7 @@ from basstler.stack.__main__ import Command, CommandOption
 from basstler.stack.report import MergeVerdict
 
 from basstler_testing.constants.stack import RemoteName, StackBranch
-from basstler_testing.maintenance.fork import ForkCheckout
+from basstler_testing.fork_checkout import ForkCheckout
 from basstler_testing.script_runner import PythonModuleRunner
 
 # %% running the probe

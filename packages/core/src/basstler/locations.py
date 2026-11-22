@@ -64,7 +64,7 @@ class ShippedPath(PathEnumeration):
     distribution ships the templates it renders.
     """
 
-    STACK_CONFIGURATION = Path("stack") / "stack.toml"
+    STACK_CONFIGURATION = Path("github") / "stack.toml"
     """
     The shipped stack configuration every run starts from, before a project's and a
     user's overrides.
@@ -200,7 +200,7 @@ class PackageLocation(PathEnumeration):
 
     STACK_CONFIGURATION = INSTALLED_PACKAGE.shipped(ShippedPath.STACK_CONFIGURATION)
     """
-    :attr:`ShippedPath.STACK_CONFIGURATION`, where the stack distribution ships it.
+    :attr:`ShippedPath.STACK_CONFIGURATION`, where the github distribution ships it.
     """
 
     META_PACKAGE_METADATA = (

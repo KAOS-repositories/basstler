@@ -16,10 +16,9 @@ from basstler.maintenance.restack_steps import RestackOutcome
 
 from basstler_testing.constants.paths import RepositoryLocation
 from basstler_testing.constants.stack import RemoteName, StackBranch
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
 from basstler_testing.maintenance.fork import (
-    UPSTREAM_BASE,
     FixtureFile,
-    ForkCheckout,
     a_parent_and_child,
     a_stack,
     the_board,

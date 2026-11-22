@@ -47,7 +47,7 @@ from basstler.regular_expression import (
     CharacterSet,
     RegularExpression,
 )
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
 from basstler.upstream_reviews.action.branch import ReviewsWorkflowInput
 from basstler.yaml_syntax import YamlSyntax

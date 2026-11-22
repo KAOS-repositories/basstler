@@ -26,7 +26,7 @@ from basstler.stack.promotability import PromotionBlocker
 from basstler_testing.constants.stack import StackLabel
 from basstler_testing.github.pull_request_api import api_pull_request
 from basstler_testing.recorded_pull_requests import RecordedPullRequestSource
-from basstler_testing.plan_site.first_plan import OPEN_PULL_REQUEST, PLAN_REPOSITORY
+from basstler_testing.plan.first_plan import OPEN_PULL_REQUEST, PLAN_REPOSITORY
 from .test_live_states import answers_with, open_first_plan_page, open_item_card
 
 # %% what a link attribute holds

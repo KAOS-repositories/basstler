@@ -13,7 +13,7 @@ from basstler.regular_expression import (
     RegularExpression,
 )
 from basstler.render_common import HtmlSyntax
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 
 
 class ScratchBranch(StrEnum):

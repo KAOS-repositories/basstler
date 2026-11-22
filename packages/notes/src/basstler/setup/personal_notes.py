@@ -49,7 +49,8 @@ from basstler.setup.report import (
     SetupCheckScript,
     SetupReport,
 )
-from basstler.setup.steps import PersonalNotesSetting, resolve_repository
+from basstler.setup.steps import resolve_repository
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)

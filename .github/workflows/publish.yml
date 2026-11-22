@@ -1,0 +1,109 @@
+name: Publish
+
+# Every release is published to PyPI, every distribution at the release's version: the
+# files are built once from the tagged commit, taken by TestPyPI first, and only then
+# published to PyPI itself. Both take them through trusted publishing, so no token is
+# stored anywhere; each index's pending publisher names this workflow and the
+# environment of its job.
+#
+# The release workflow moves the release branch to the tag it makes, so the branch is
+# what a finished release run publishes. A release whose publishing stopped is finished
+# by running this workflow by hand with its tag: the next release run finds nothing new
+# to tag, and files an index already holds are skipped.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish; the latest release when empty.
+        required: false
+        type: string
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The branch the release workflow keeps at the latest release.
+  RELEASE_BRANCH: release
+
+jobs:
+  build:
+    name: Build every distribution of the release
+    if: >-
+      !github.event.repository.fork &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The version is read from the tag, so the whole history comes with the checkout.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || env.RELEASE_BRANCH }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # A commit that no release tags has nothing to publish; building it would name a
+      # development version.
+      - name: Require a release tag at the commit
+        run: git describe --tags --exact-match --match 'v*'
+
+      - name: Build
+        run: |
+          python -m pip install uv
+          uv build --all-packages --out-dir dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: publish-testpypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

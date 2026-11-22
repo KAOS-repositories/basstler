@@ -164,9 +164,7 @@ def test_every_wheel_carries_the_version_of_the_tag(built_release: BuiltRelease)
     """
     All distributions of a release share one version, the tag's.
     """
-    versions = {
-        path.name.split("-")[1] for path in built_release.wheels.values()
-    }
+    versions = {path.name.split("-")[1] for path in built_release.wheels.values()}
 
     assert versions == {RELEASE_VERSION}
 
@@ -222,9 +220,10 @@ def test_every_wheel_carries_the_release_files(
                 for entry in archive.namelist()
                 if ".dist-info/licenses/" in entry
             }
-        assert carried[release_file] == (
-            RepositoryLocation.ROOT.value / release_file
-        ).read_bytes(), name
+        assert (
+            carried[release_file]
+            == (RepositoryLocation.ROOT.value / release_file).read_bytes()
+        ), name
 
 
 @pytest.mark.parametrize("release_file", list(ReleaseFile), ids=str)

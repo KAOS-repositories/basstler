@@ -98,20 +98,20 @@ def publish_file() -> dict[Any, Any]:
     )
 
 
-def raw_job(job: PublishJob) -> dict[str, Any]:
+def raw_job(publishing_job: PublishJob) -> dict[str, Any]:
     """
-    :param job: One of the workflow's jobs.
+    :param publishing_job: One of the workflow's jobs.
     :return: The job as the file writes it.
     """
-    return publish_file()[WorkflowKey.JOBS][job]
+    return publish_file()[WorkflowKey.JOBS][publishing_job]
 
 
-def job(job: PublishJob) -> WorkflowJob:
+def parsed_job(publishing_job: PublishJob) -> WorkflowJob:
     """
-    :param job: One of the workflow's jobs.
+    :param publishing_job: One of the workflow's jobs.
     :return: The job, parsed.
     """
-    return Workflow.read(RepositoryLocation.PUBLISH_WORKFLOW).jobs[job]
+    return Workflow.read(RepositoryLocation.PUBLISH_WORKFLOW).jobs[publishing_job]
 
 
 def publish_step(target: PublishTarget) -> dict[str, Any]:
@@ -150,7 +150,7 @@ def test_a_release_that_failed_publishes_nothing():
     A Release run that failed tagged nothing, so there is nothing to publish.
     """
     assert "github.event.workflow_run.conclusion == 'success'" in (
-        job(PublishJob.BUILD).condition
+        parsed_job(PublishJob.BUILD).condition
     )
 
 
@@ -180,9 +180,11 @@ def test_the_build_covers_every_member_of_the_workspace():
     """
     One build produces every distribution, so none is left at the previous release.
     """
-    build = job(PublishJob.BUILD)
+    build = parsed_job(PublishJob.BUILD)
 
-    assert any("uv build --all-packages" in (step.command or "") for step in build.steps)
+    assert any(
+        "uv build --all-packages" in (step.command or "") for step in build.steps
+    )
 
 
 # %% how it publishes
@@ -255,11 +257,11 @@ def test_both_indexes_publish_the_files_the_build_made():
     """
     for publishing_job in (PublishJob.TEST_PYPI, PublishJob.PYPI):
         actions = {
-            step.action for step in job(publishing_job).steps if step.action
+            step.action for step in parsed_job(publishing_job).steps if step.action
         }
         assert PublishAction.DOWNLOAD in actions
     assert PublishAction.UPLOAD in {
-        step.action for step in job(PublishJob.BUILD).steps if step.action
+        step.action for step in parsed_job(PublishJob.BUILD).steps if step.action
     }
 
 

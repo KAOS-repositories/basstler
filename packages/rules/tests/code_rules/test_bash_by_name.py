@@ -1,0 +1,58 @@
+"""
+Tests for :mod:`basstler.code_rules.bash_by_name`: reporting commands that start bash
+by its name, which Windows resolves to WSL's launcher instead of Git Bash.
+"""
+
+from __future__ import annotations
+
+from basstler.code_rules.bash_by_name import BashByNameChecker
+from basstler.code_rules.checker import CodeRulesCheck
+from basstler_testing.constants.paths import BashByNameSnippet
+
+from .marked_snippet import MarkedSnippet
+
+# %% commands
+
+
+def test_a_subprocess_call_running_bash_by_its_name_is_reported():
+    """
+    A command line handed to :mod:`subprocess` is reported.
+    """
+    snippet = MarkedSnippet(BashByNameSnippet.SUBPROCESS_CALL)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
+
+
+def test_a_subprocess_imported_under_another_name_is_resolved():
+    """
+    A call is a :mod:`subprocess` call by what it imports, not by how it is spelled.
+    """
+    snippet = MarkedSnippet(BashByNameSnippet.IMPORTED_SUBPROCESS)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
+
+
+def test_a_returned_command_running_bash_by_its_name_is_reported():
+    """
+    A command line returned for a caller to run is reported.
+    """
+    snippet = MarkedSnippet(BashByNameSnippet.RETURNED_COMMAND)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
+
+
+def test_the_located_bash_and_a_tuple_of_names_are_not_reported():
+    """
+    The located bash is not, and neither is a tuple of names that runs nothing.
+    """
+    snippet = MarkedSnippet(BashByNameSnippet.LOCATED_BASH)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
+
+
+# %% this repository
+
+
+def test_no_code_in_the_repository_starts_bash_by_its_name(repository_sources):
+    """
+    Every bash the package, its scripts and its suite start is the one
+    :class:`basstler.bash.Bash` locates, so the suite passes on Windows too.
+    """
+    violations = CodeRulesCheck((BashByNameChecker(),)).violations(repository_sources)
+    assert [violation.render() for violation in violations] == []

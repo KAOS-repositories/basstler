@@ -15,18 +15,18 @@ on:
       - ".gitattributes"
       - "plugin/hooks/**"
       - "pyproject.toml"
-      - "src/basstler/bash.py"
-      - "src/basstler/directory_tree.py"
-      - "src/basstler/environment.py"
-      - "src/basstler/git/**"
-      - "src/basstler/locations.py"
-      - "src/basstler/plugin_root.py"
-      - "src/basstler/setup/**"
-      - "src/basstler/shell_configuration.py"
-      - "tests/bash_path.py"
-      - "tests/conftest.py"
-      - "tests/executable_stubs.py"
-      - "tests/suite_shard.py"
+      - "packages/core/src/basstler/bash.py"
+      - "packages/core/src/basstler/directory_tree.py"
+      - "packages/core/src/basstler/environment.py"
+      - "packages/git/src/basstler/git/**"
+      - "packages/core/src/basstler/locations.py"
+      - "packages/core/src/basstler/plugin_root.py"
+      - "packages/notes/src/basstler/setup/**"
+      - "packages/core/src/basstler/shell_configuration.py"
+      - "packages/basstler/tests/bash_path.py"
+      - "test_support/basstler_testing/fixtures.py"
+      - "test_support/basstler_testing/executable_stubs.py"
+      - "test_support/basstler_testing/suite_shard.py"
 
 concurrency:
   group: windows-tests-${{ github.ref }}
@@ -62,21 +62,44 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install basstler and the test runner
+      # Every distribution and the test runner, at the versions uv.lock names, into the
+      # interpreter setup-python put on PATH.
+      - name: Install the workspace and the test runner
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          pip install --editable . --group dev
+          python -m pip install uv
+          UV_PROJECT_ENVIRONMENT="$(python -c 'import sys; print(sys.prefix)')" \
+            uv sync --frozen --all-packages
 
       # The plan page's script is tested in a headless Chromium.
       - name: Install the browser the page tests run in
         run: python -m playwright install chromium
 
-      # The runner's temporary directory is on its faster drive.
-      - name: Run the tests
+      # The runner's temporary directory is on its faster drive. Each distribution's tests
+      # run the shard's share; the plugin declaring the shard options comes from
+      # test_support, which is not installed.
+      - name: Run each distribution's tests
+        shell: bash
         env:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
-        run: >-
-          pytest tests -n auto --durations=20
-          --shard-index ${{ strategy.job-index }}
-          --shard-count ${{ strategy.job-total }}
+          PYTHONPATH: test_support
+        run: |
+          failed=""
+          for directory in packages/*/; do
+            echo "::group::${directory}"
+            status=0
+            python -m pytest "${directory}tests" -n auto --durations=20 \
+              -p basstler_testing.suite_shard \
+              --shard-index "$((${{ strategy.job-index }}))" \
+              --shard-count "$((${{ strategy.job-total }}))" || status=$?
+            # Status 5: this shard holds none of the distribution's tests.
+            if [ "${status}" -ne 0 ] && [ "${status}" -ne 5 ]; then
+              failed="${failed} ${directory}"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "${failed}" ]; then
+            echo "Tests failed for:${failed}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi

@@ -1,0 +1,166 @@
+"""
+Standing an executable in for the real one, on a test subprocess's ``PATH``.
+
+Two suites need the same two moves - put a stub where a script will find it, and take a
+real executable out of reach - so both live here rather than in whichever suite happened
+to need them first.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+import pytest
+
+from .constants.environment import FileMode, SearchPathVariable
+from .constants.paths import DatasetLocation
+
+# %% where a script cannot stand in for an executable
+
+NEEDS_SCRIPT_AS_EXECUTABLE = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason=(
+        "Windows only launches a .exe found on PATH: a .cmd wrapper splits its "
+        "arguments at '&', and Defender blocks a compiled launcher (WinError 225), "
+        "so a script cannot stand in for gh or bash"
+    ),
+)
+"""
+Skips a test that runs a script as ``gh`` or ``bash``, where the platform cannot launch
+one.
+"""
+
+NEEDS_STUB_AHEAD_OF_GIT_TOOLS = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason=(
+        "Git for Windows' bash puts its own tools, curl among them, ahead of PATH, "
+        "so a stub on PATH cannot stand in for one"
+    ),
+)
+"""
+Skips a test that stubs an executable Git for Windows ships, where its own one wins.
+"""
+
+NEEDS_VERSIONED_INTERPRETER_NAME = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows installs Python as python.exe, never as python3.13 or the like",
+)
+"""
+Skips a test that needs a real interpreter found by a versioned name such as
+``python3.13``.
+"""
+
+# %% where the file system has no executable bit
+
+NEEDS_EXECUTABLE_BIT = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows files carry no executable bit, so none can be set or read back",
+)
+"""
+Skips a test that sets a file's executable bit and reads it back from the disk.
+"""
+
+# %% stub directories
+
+
+@dataclass(frozen=True)
+class ExecutableStubDirectory:
+    """
+    A directory of stubbed executables, meant to be placed first on a subprocess's
+    ``PATH`` so the script under test finds the stub instead of the real thing.
+    """
+
+    path: Path
+    """
+    The directory itself, which is what goes on ``PATH``.
+    """
+
+    @classmethod
+    def create(cls, parent: Path) -> ExecutableStubDirectory:
+        """
+        :param parent: Where to create the directory, typically pytest's ``tmp_path``.
+        :return: An empty stub directory, ready for :meth:`install`.
+        """
+        path = parent / "stub-bin"
+        path.mkdir()
+        return cls(path)
+
+    @staticmethod
+    def stub_for(executable_name: str) -> Path:
+        """
+        :param executable_name: The executable to stand in for.
+        :return: The script standing in for it, ``dataset/stubs/<name>.sh``.
+        """
+        return DatasetLocation.STUBS / f"{executable_name}.sh"
+
+    def install(self, executable_name: str, stub_name: str | None = None) -> None:
+        """
+        Copy a stub into this directory under the name of the executable it replaces.
+
+        :param executable_name: The executable to stand in for.
+        :param stub_name: The stub to copy; the one named like *executable_name* if
+            omitted.
+        """
+        destination = self.path / executable_name
+        shutil.copy(self.stub_for(stub_name or executable_name), destination)
+        destination.chmod(FileMode.EXECUTABLE)
+
+    def ahead_of(self, search_path: str) -> str:
+        """
+        :param search_path: A ``PATH`` string to fall back to.
+        :return: *search_path* with this directory first, so its stubs win.
+        """
+        return os.pathsep.join([str(self.path), search_path])
+
+    def ahead_of_inherited_path(self) -> str:
+        """
+        :return: This process's own ``PATH`` with this directory first.
+        """
+        return self.ahead_of(
+            os.environ.get(SearchPathVariable.EXECUTABLE_SEARCH_PATH, "")
+        )
+
+
+def path_hiding_executables(mirror_parent: Path, *executable_names: str) -> str:
+    """
+    Build a ``PATH`` string equivalent to the current one but with every one of
+    *executable_names* unfindable through it.
+
+    Mirrors (via symlinks, or hard links on Windows, which lets only a privileged user
+    make symlinks) any directory that provides one of them into a copy missing
+    just those files, rather than dropping the whole directory from `PATH` - the
+    directory providing them (typically ``/usr/bin``) also provides ``bash``, ``git`` and
+    ``python3``, which the script under test still needs to run at all.
+
+    :param mirror_parent: Where to create mirror directories.
+    :param executable_names: The executables to hide, by the name a search finds them
+        under, which on Windows leaves out the extension.
+    :return: The adjusted ``PATH`` string.
+    """
+    hidden = frozenset(executable_names)
+    link = os.link if sys.platform == "win32" else os.symlink
+    entries = []
+    for mirror_index, entry in enumerate(
+        os.environ.get(SearchPathVariable.EXECUTABLE_SEARCH_PATH, "").split(os.pathsep)
+    ):
+        directory = Path(entry)
+        if not directory.is_dir() or not any(
+            shutil.which(name, path=entry) for name in hidden
+        ):
+            entries.append(entry)
+            continue
+        mirror = mirror_parent / f"hidden-executables-{mirror_index}"
+        mirror.mkdir()
+        for item in directory.iterdir():
+            if item.name in hidden or item.stem in hidden:
+                continue
+            try:
+                link(item, mirror / item.name)
+            except OSError:
+                continue
+        entries.append(str(mirror))
+    return os.pathsep.join(entries)

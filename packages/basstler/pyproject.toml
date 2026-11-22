@@ -28,12 +28,10 @@ raw-options = {root = "../.."}
 family = "basstler"
 dependencies = [
     "cyclopts>=5.3",
-    "basstler-build",
     "basstler-core",
     "basstler-git",
     "basstler-rules",
     "basstler-github",
-    "basstler-packaging",
     "basstler-reviews",
     "basstler-review-triage",
     "basstler-stack",

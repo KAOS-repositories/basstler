@@ -11,7 +11,6 @@ import tomllib
 from enum import StrEnum
 
 import pytest
-from basstler.basstler_family import BasstlerFamily
 from basstler.git.commands import GitCommandRunner
 from basstler.packaging.release import BuiltRelease, ReleaseFile
 from packaging.utils import canonicalize_name
@@ -135,7 +134,7 @@ def test_every_requirement_on_a_sibling_is_pinned_to_the_release(
         requirement
         for wheel in built_release.wheels_by_distribution_name.values()
         for requirement in wheel.requirements
-        if BasstlerFamily().includes_distribution(requirement.name)
+        if canonicalize_name(requirement.name) in distribution_names()
     ]
 
     assert siblings

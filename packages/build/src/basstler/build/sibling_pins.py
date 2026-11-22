@@ -26,6 +26,10 @@ class SiblingPinsHook(MetadataHookInterface):
 
     A distribution lists the hook as ``[tool.hatch.metadata.hooks.basstler-sibling-pins]``
     and names ``dependencies`` in ``project.dynamic``.
+
+    .. warning::
+        Every published source distribution builds with the newest release of this hook:
+        never remove or rename a setting, and give every new one a default.
     """
 
     PLUGIN_NAME = "basstler-sibling-pins"

@@ -54,13 +54,11 @@ wheels = [
 name = "basstler"
 source = { editable = "packages/basstler" }
 dependencies = [
-    { name = "basstler-build" },
     { name = "basstler-core" },
     { name = "basstler-git" },
     { name = "basstler-github" },
     { name = "basstler-hub" },
     { name = "basstler-notes" },
-    { name = "basstler-packaging" },
     { name = "basstler-plan" },
     { name = "basstler-review-triage" },
     { name = "basstler-reviews" },
@@ -88,13 +86,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "basstler-build", editable = "packages/build" },
     { name = "basstler-core", editable = "packages/core" },
     { name = "basstler-git", editable = "packages/git" },
     { name = "basstler-github", editable = "packages/github" },
     { name = "basstler-hub", editable = "packages/hub" },
     { name = "basstler-notes", editable = "packages/notes" },
-    { name = "basstler-packaging", editable = "packages/packaging" },
     { name = "basstler-plan", editable = "packages/plan" },
     { name = "basstler-review-triage", editable = "packages/review-triage" },
     { name = "basstler-reviews", editable = "packages/reviews" },

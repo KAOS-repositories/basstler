@@ -21,8 +21,7 @@ items:
   status: deferred
   recommended_model: haiku
   track: fixes
-  depends_on:
-  - basstler-packages/uv-workspace
+  depends_on: []
   pull_request_number: null
   notes: 'Folded into basstler-packages/uv-workspace (owner, 2026-11-13): that item creates
     the environment with uv sync --frozen and also covers creating it on Windows without uv

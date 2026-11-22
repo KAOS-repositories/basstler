@@ -90,8 +90,7 @@ items:
   branch: null
   pull_request_number: null
   track: guards
-  depends_on:
-  - basstler-packages/uv-workspace
+  depends_on: []
   status: deferred
   recommended_model: haiku
   notes: 'Folded into basstler-packages/uv-workspace (2026-11-07): that item commits uv.lock

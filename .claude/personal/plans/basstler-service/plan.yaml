@@ -1,11 +1,12 @@
 schema_version: 1
 id: basstler-service
 title: 'BasstlerHub: the plan site served live by a GitHub App, self-hostable by anyone'
-description: 'BasstlerHub, an open-source plan service of one container behind a GitHub App, serves the
-  plan site itself: pages update from GitHub''s webhook events within seconds, viewers sign in with GitHub
-  and see only what they can read, and the site''s buttons edit plans. Anyone runs their own instance
-  with their own App; basstler''s own is the BasstlerHub App of KAOS-repositories on Cloud Run. No personal
-  access token, site repository or dispatch workflow remains. The team half is team-repository.'
+description: 'BasstlerHub, an open-source plan service of one container behind a GitHub App,
+  serves the plan site itself: pages update from GitHub''s webhook events within seconds,
+  viewers sign in with GitHub and see only what they can read, and the site''s buttons edit
+  plans. Anyone runs their own instance with their own App; basstler''s own is the BasstlerHub
+  App of KAOS-repositories on Cloud Run. No personal access token, site repository or dispatch
+  workflow remains. The team half is team-repository.'
 default_repository: KAOS-repositories/basstler
 tracking_issue: 200
 waves:
@@ -37,26 +38,26 @@ items:
   track: github-app
   status: not started
   recommended_model: sonnet
-  depends_on:
-  - basstler-packages/uv-workspace
-  notes: A committed App manifest declares read-only metadata, contents, pull requests, checks and statuses,
-    and the events push, pull_request, pull_request_review, pull_request_review_thread, check_suite, status,
-    issue_comment and installation_repositories. One command runs GitHub's manifest flow for any owner,
-    installable only on that owner's account and named uniquely per owner, and writes the key and secrets
-    to the instance's secret store. The App named BasstlerHub is basstler's own, under KAOS-repositories;
-    the name Basstler is registered beside it, unused.
+  depends_on: []
+  notes: A committed App manifest declares read-only metadata, contents, pull requests, checks
+    and statuses, and the events push, pull_request, pull_request_review, pull_request_review_thread,
+    check_suite, status, issue_comment and installation_repositories. One command runs GitHub's
+    manifest flow for any owner, installable only on that owner's account and named uniquely
+    per owner, and writes the key and secrets to the instance's secret store. The App named
+    BasstlerHub is basstler's own, under KAOS-repositories; the name Basstler is registered
+    beside it, unused.
 - id: service-deploy
   title: The plan service is one container anyone can run, deployed in one command
   track: service
   status: not started
   recommended_model: opus
-  depends_on:
-  - basstler-packages/uv-workspace
-  notes: A Starlette app in the basstler-hub-server distribution of this repository, beside basstler-hub;
-    githubkit for App tokens. The release workflow publishes its image to GHCR from the same tag. It reads
-    its key and secrets from environment variables or mounted files, so docker run or any container host
-    works; one command deploys to Cloud Run, the first target, with Secret Manager. Docs cover self-hosting
-    and local webhooks via gh webhook forward. One instance at first. Served by uvicorn (approved).
+  depends_on: []
+  notes: A Starlette app in the basstler-hub-server distribution of this repository, beside
+    basstler-hub; githubkit for App tokens. The release workflow publishes its image to GHCR
+    from the same tag. It reads its key and secrets from environment variables or mounted
+    files, so docker run or any container host works; one command deploys to Cloud Run, the
+    first target, with Secret Manager. Docs cover self-hosting and local webhooks via gh webhook
+    forward. One instance at first. Served by uvicorn (approved).
 - id: webhook-intake
   title: The service verifies GitHub's webhooks and maps each to the plans it changes
   track: github-app
@@ -65,14 +66,13 @@ items:
   depends_on:
   - app-manifest
   - service-deploy
-  notes: >-
-    Verify the signature, answer within GitHub's 10-second timeout, then process. Each
-    delivery is applied once by its delivery id. A push to a notes branch marks that
-    repository's plans changed; a pull request, review, check or status event marks every
-    item tracking that pull request, across installations. A failed delivery is logged with
-    its id; a page open re-reads live state, so a missed delivery never leaves a page stale.
-    The intake is generic over the request model and its handler, so plan-write-api and services
-    built on basstler-service reuse it.
+  notes: Verify the signature, answer within GitHub's 10-second timeout, then process. Each
+    delivery is applied once by its delivery id. A push to a notes branch marks that repository's
+    plans changed; a pull request, review, check or status event marks every item tracking
+    that pull request, across installations. A failed delivery is logged with its id; a page
+    open re-reads live state, so a missed delivery never leaves a page stale. The intake is
+    generic over the request model and its handler, so plan-write-api and services built on
+    basstler-service reuse it.
 - id: served-pages
   title: The service renders the hub and plan pages on request from the notes branches
   track: service
@@ -81,8 +81,7 @@ items:
   depends_on:
   - service-deploy
   - app-manifest
-  notes: >-
-    Reuse basstler.plan_site's page models and templates; no second renderer. Read each
+  notes: Reuse basstler.plan_site's page models and templates; no second renderer. Read each
     notes branch and pull request with the installation token of its owner, so repositories
     of several owners and teammates' forks are readable once they install the App (replaces
     team-basstler's per-owner-read-tokens). Cache rendered pages until an event marks them
@@ -95,12 +94,12 @@ items:
   depends_on:
   - webhook-intake
   - served-pages
-  notes: 'Server-sent events per page: when webhook-intake marks a page changed, the service re-renders
-    it and pushes the changed cards; the browser reconnects after the host''s request timeout. Replaces
-    plan-site-ui''s rebuild-indicator and the browser''s unauthenticated pull request recheck. A page
-    shows when it last heard from the service and says so when the stream is down. The stream closes while
-    the tab is hidden and the page re-reads live state when shown again, so an instance runs only while
-    someone is looking.'
+  notes: 'Server-sent events per page: when webhook-intake marks a page changed, the service
+    re-renders it and pushes the changed cards; the browser reconnects after the host''s request
+    timeout. Replaces plan-site-ui''s rebuild-indicator and the browser''s unauthenticated
+    pull request recheck. A page shows when it last heard from the service and says so when
+    the stream is down. The stream closes while the tab is hidden and the page re-reads live
+    state when shown again, so an instance runs only while someone is looking.'
 - id: github-sign-in
   title: Viewers sign in with GitHub and see only plans their account can read
   track: access
@@ -108,12 +107,11 @@ items:
   recommended_model: opus
   depends_on:
   - served-pages
-  notes: >-
-    The App's user authorization signs a viewer in; the session cookie is HttpOnly, Secure
-    and SameSite. A plan is shown only when the viewer's own token can read its notes
-    repository and every repository it tracks; access answers are cached briefly per viewer.
-    Sharing a plan is granting repository access on GitHub. Replaces team-basstler's
-    page-viewer-token, private-site and page-github-sign-in.
+  notes: The App's user authorization signs a viewer in; the session cookie is HttpOnly, Secure
+    and SameSite. A plan is shown only when the viewer's own token can read its notes repository
+    and every repository it tracks; access answers are cached briefly per viewer. Sharing
+    a plan is granting repository access on GitHub. Replaces team-basstler's page-viewer-token,
+    private-site and page-github-sign-in.
 - id: plan-write-api
   title: The service is the only writer of plans, and sessions edit through it
   track: writes
@@ -121,26 +119,24 @@ items:
   recommended_model: opus
   depends_on:
   - github-sign-in
-  notes: >-
-    An HTTP API applies one plan, rules or notes edit per request as the signed-in user, after
-    save-plan.sh's validation and size limits, in order through webhook-intake's intake into a
-    Store interface; its one implementation commits to the notes branch, and a service built on
-    basstler-service may supply another. A user edits only notes repositories they can push to.
-    save-plan.sh calls it when an instance is configured, else pushes itself; sessions reach it
-    through basstler-v3's MCP tools.
+  notes: An HTTP API applies one plan, rules or notes edit per request as the signed-in user,
+    after save-plan.sh's validation and size limits, in order through webhook-intake's intake
+    into a Store interface; its one implementation commits to the notes branch, and a service
+    built on basstler-service may supply another. A user edits only notes repositories they
+    can push to. save-plan.sh calls it when an instance is configured, else pushes itself;
+    sessions reach it through basstler-v3's MCP tools.
 - id: site-actions
-  title: Site buttons defer, restore, delete and start items and commit rule and note edits as the
-    signed-in viewer
+  title: Site buttons defer, restore, delete and start items and commit rule and note edits
+    as the signed-in viewer
   track: writes
   status: not started
   recommended_model: sonnet
   depends_on:
   - plan-write-api
-  notes: >-
-    Each button sends one plan-write-api request; the page shows the result through
-    live-pages, and a refused edit is shown with its reason. Commit on plan-site-ui's
-    rules-and-notes-comments becomes one click here, in place of opening GitHub's editor. Request bodies are parsed into
-    models at the boundary. Replaces plan-site-ui's command-issues and command-token-setup;
+  notes: Each button sends one plan-write-api request; the page shows the result through live-pages,
+    and a refused edit is shown with its reason. Commit on plan-site-ui's rules-and-notes-comments
+    becomes one click here, in place of opening GitHub's editor. Request bodies are parsed
+    into models at the boundary. Replaces plan-site-ui's command-issues and command-token-setup;
     plan-site-ui's item-commands and plan-commands build on this.
 - id: retire-pages-publication
   title: Remove the Pages publication, its tokens and the site repository
@@ -150,13 +146,11 @@ items:
   depends_on:
   - live-pages
   - github-sign-in
-  notes: >-
-    Delete the dispatch and merge workflows, PLAN_SITE_TOKEN and PLAN_SITE_READ_TOKEN, the
-    store-token command, build_start, dispatch_check, token_storage, the recheck script and
-    the site repository's attachment; setup and check-setup check the App's installation
-    and the instance's address instead. Moves every plan site address to the service with a
-    redirect page left on Pages. A release:major change.
-
+  notes: Delete the dispatch and merge workflows, PLAN_SITE_TOKEN and PLAN_SITE_READ_TOKEN,
+    the store-token command, build_start, dispatch_check, token_storage, the recheck script
+    and the site repository's attachment; setup and check-setup check the App's installation
+    and the instance's address instead. Moves every plan site address to the service with
+    a redirect page left on Pages. A release:major change.
 - id: server-deploy
   title: The plan service also deploys to any server that runs Docker
   track: service
@@ -164,11 +158,11 @@ items:
   recommended_model: sonnet
   depends_on:
   - service-deploy
-  notes: 'A second deploy target beside Cloud Run, for a university, KAOS or rented server: one command
-    writes a docker compose file with the service and Caddy for automatic HTTPS on a hostname the owner
-    points at the server, and the secrets as mounted files, then prints the steps left to a person. Optional:
-    no item depends on it, and basstler''s own instance stays on Cloud Run. Caddy is approved.'
-
+  notes: 'A second deploy target beside Cloud Run, for a university, KAOS or rented server:
+    one command writes a docker compose file with the service and Caddy for automatic HTTPS
+    on a hostname the owner points at the server, and the secrets as mounted files, then prints
+    the steps left to a person. Optional: no item depends on it, and basstler''s own instance
+    stays on Cloud Run. Caddy is approved.'
 - id: own-instance
   title: basstler's own BasstlerHub instance deploys every release from its own repository
   track: service
@@ -177,8 +171,8 @@ items:
   depends_on:
   - service-deploy
   - app-manifest
-  notes: 'KAOS-repositories/basstlerhub-instance holds only basstler''s own instance''s settings: the
-    Google Cloud project and region, the hub.basstler.com address and the BasstlerHub App''s id, and no
-    secret. Its workflow deploys each release''s image with service-deploy''s command, signing in to Google
-    Cloud through Workload Identity Federation, so no key is stored. The open-source repository names
-    none of these.'
+  notes: 'KAOS-repositories/basstlerhub-instance holds only basstler''s own instance''s settings:
+    the Google Cloud project and region, the hub.basstler.com address and the BasstlerHub
+    App''s id, and no secret. Its workflow deploys each release''s image with service-deploy''s
+    command, signing in to Google Cloud through Workload Identity Federation, so no key is
+    stored. The open-source repository names none of these.'

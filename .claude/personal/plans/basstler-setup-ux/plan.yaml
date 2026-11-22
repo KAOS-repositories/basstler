@@ -135,7 +135,6 @@ items:
   track: status
   depends_on:
   - run-as-proof
-  - basstler-packages/uv-workspace
   status: not started
   recommended_model: sonnet
   session: https://claude.ai/code/session_018wfiv8ntWsdS2nU92PrJbr

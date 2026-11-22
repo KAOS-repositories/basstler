@@ -30,29 +30,10 @@ tracks:
   name: Code rules from krrood
   wave: extensibility
 items:
-- id: uv-workspace
-  title: Move each distribution into packages/<name> as a uv workspace with lockstep versions
-  track: package-split
-  branch: ccr-6ee4aeab-7j9mi2
-  pull_request_number: 223
-  session: https://claude.ai/code/session_01JxHGiNXmsDWbDmd81sWCfP
-  blockers: []
-  depends_on: []
-  status: in progress
-  recommended_model: sonnet
-  notes: >
-    Draft #223 on main (64146fad), merged at d7360166 with a clean merge probe. Next: read CI at
-    b5112caa, which fixes the three Windows failures the sharded run named at 72161178 (Linux CI
-    passed there). The PR is now out of draft; whoever marked it ready is not recorded.
-
-    Open: confirm dropping main's interpreter-candidate session start (the py -3.X launcher path has
-    no test); commit the move's script for code-rule-fixes/action-plan-triage. Not checked: Windows
-    (until that CI), the hub's browser tests.
 - id: pypi-release
   title: Publish every distribution to PyPI on each release with trusted publishing
   track: package-split
-  depends_on:
-  - uv-workspace
+  depends_on: []
   status: not started
   recommended_model: sonnet
   notes: After release.yml tags, uv build --all-packages and pypa/gh-action-pypi-publish via
@@ -66,8 +47,7 @@ items:
   title: A Playbook dataclass model that every distribution contributes commands, skills,
     hooks and rules to
   track: playbook
-  depends_on:
-  - uv-workspace
+  depends_on: []
   status: not started
   recommended_model: opus
   notes: 'basstler.playbook in core: component kinds CommandGroup, SkillDefinition, HookDefinition,
@@ -79,8 +59,7 @@ items:
 - id: krrood-sync
   title: basstler-rules is the rule engine krrood's development tools build on
   track: rules
-  depends_on:
-  - uv-workspace
+  depends_on: []
   status: not started
   recommended_model: sonnet
   notes: 'Parity with krrood@be69c37d: one module per top-level section, project rules in
@@ -110,8 +89,7 @@ items:
 - id: extension-points
   title: Open vocabularies, one interface per GitHub capability, and shipped test doubles
   track: playbook
-  depends_on:
-  - uv-workspace
+  depends_on: []
   status: not started
   recommended_model: opus
   notes: Labels (with description and colour), discussion categories and item stages become
@@ -182,8 +160,7 @@ items:
 - id: third-party-imports
   title: A distribution imports only the third-party libraries its own pyproject requires
   track: package-split
-  depends_on:
-  - uv-workspace
+  depends_on: []
   status: not started
   recommended_model: sonnet
   notes: 'Extends PackageBoundaryChecker from basstler imports to third-party ones, as krrood''s
@@ -219,18 +196,18 @@ items:
     own module; the rule becomes "once, in its own package''s locations". Pure moves.
 
     '
-
 - id: isolated-test-helpers
-  title: "Move each shared test helper into the distribution that owns its subject"
+  title: Move each shared test helper into the distribution that owns its subject
   branch: null
   track: package-split
-  notes: >
-    Each distribution's dev group lists only what its tests import, so every distribution but the
-    meta-package runs its tests in an environment of its own requirements. Start from #223's list:
-    scratch_repository (imports setup.steps from notes) and maintenance/fork. Notes' and plan's dev
-    groups also list the meta-package. Done when uv sync --package <name> plus the dev group runs
-    each distribution's tests alone.
-  depends_on: [uv-workspace]
+  notes: 'Each distribution''s dev group lists only what its tests import, so every distribution
+    but the meta-package runs its tests in an environment of its own requirements. Start from
+    #223''s list: scratch_repository (imports setup.steps from notes) and maintenance/fork.
+    Notes'' and plan''s dev groups also list the meta-package. Done when uv sync --package
+    <name> plus the dev group runs each distribution''s tests alone.
+
+    '
+  depends_on: []
   status: not started
   recommended_model: opus
-landed_item_count: 3
+landed_item_count: 4

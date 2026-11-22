@@ -34,7 +34,6 @@ import re
 import subprocess
 import sys
 import tempfile
-from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum, StrEnum
@@ -48,6 +47,13 @@ from basstler.github.repository import Repository
 from basstler.github.stack_configuration import StackSetting
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
+from basstler.playbook.playbook import PlaybookFile
+from basstler.playbook.setup_steps import (
+    ProjectClone,
+    SetupChecklist,
+    SetupStep,
+    SetupSteps,
+)
 from basstler.plugin_root import PluginRoot
 from basstler.shell_configuration import (
     FetchedBranchReference,
@@ -292,47 +298,6 @@ def resolve_repository(project_root: Path, notes_remote: str) -> Repository | No
 
 
 @dataclass(frozen=True)
-class SetupStep(ABC):
-    """
-    One setup step that no script can perform or verify, because it changes a setting
-    held by GitHub or by Claude rather than a file in this clone.
-    """
-
-    @property
-    @abstractmethod
-    def title(self) -> str:
-        """
-        What the step changes, in a few words.
-        """
-
-    @property
-    @abstractmethod
-    def reason(self) -> str:
-        """
-        What stops working until it is done.
-        """
-
-    @abstractmethod
-    def instructions(self) -> list[str]:
-        """
-        What to do, one line per action.
-
-        :return: The lines, printed under the title.
-        """
-
-    def render(self, number: int) -> str:
-        """
-        Render this step as the numbered block the reader sees.
-
-        :param number: The step's position in the printed list.
-        :return: The block, without a trailing newline.
-        """
-        lines = [f"{number}. {self.title}", f"   {self.reason}", ""]
-        lines.extend(f"   {instruction}" for instruction in self.instructions())
-        return "\n".join(lines)
-
-
-@dataclass(frozen=True)
 class ForkLabels(SetupStep):
     """
     Creating the labels this tooling reads and applies, in the user's fork.
@@ -524,43 +489,22 @@ class PersistentVariables(SetupStep):
         ]
 
 
-# %% the checklist they add up to
+# %% the steps this distribution contributes
 
 
 @dataclass(frozen=True)
-class SetupChecklist:
+class ForkSetupSteps(SetupSteps):
     """
-    The steps one clone leaves to its user, in the order they should be done.
-    """
-
-    steps: tuple[SetupStep, ...]
-    """
-    The steps that apply to this clone.
+    The steps the fork a clone points at, and the clone's own settings, leave to its
+    user; the fork's steps are omitted when no GitHub repository resolves from the
+    clone's remotes.
     """
 
-    @classproperty
-    def heading(cls) -> str:
-        """
-        The line introducing the printed list.
-        """
-        return "These steps are yours - no script can do them:"
-
-    @classmethod
-    def for_clone(
-        cls, project_root: Path, environment: Mapping[str, str]
-    ) -> SetupChecklist:
-        """
-        Work out which steps a clone leaves to its user, and fill them in from it.
-
-        The repository-specific steps are omitted when no GitHub repository can be
-        resolved from the clone's remotes, since neither can be acted on without one.
-
-        :param project_root: The clone the steps are about.
-        :param environment: The environment its settings resolve from.
-        :return: The checklist.
-        """
-        notes_remote = PersonalNotesSetting.REMOTE.resolve(project_root, environment)
-        repository = resolve_repository(project_root, notes_remote)
+    def steps_for(self, clone: ProjectClone) -> tuple[SetupStep, ...]:
+        notes_remote = PersonalNotesSetting.REMOTE.resolve(
+            clone.project_root, clone.environment
+        )
+        repository = resolve_repository(clone.project_root, notes_remote)
         steps: list[SetupStep] = []
         if repository is not None:
             steps.extend(
@@ -570,19 +514,8 @@ class SetupChecklist:
                     ForkActions(repository),
                 ]
             )
-        steps.append(PersistentVariables.resolve(project_root, environment))
-        return cls(steps=tuple(steps))
-
-    def render(self) -> str:
-        """
-        Render the whole checklist as it is printed.
-
-        :return: The full output.
-        """
-        blocks = [
-            step.render(number) for number, step in enumerate(self.steps, start=1)
-        ]
-        return "\n\n".join([self.heading, *blocks])
+        steps.append(PersistentVariables.resolve(clone.project_root, clone.environment))
+        return tuple(steps)
 
 
 # %% the steps a script performs
@@ -801,7 +734,10 @@ def main(argv: list[str] | None = None) -> int:
             f"{'now runs' if changed else 'already runs'} basstler {arguments.branch_or_tag}"
         )
         return 0
-    logger.info(SetupChecklist.for_clone(project_root, os.environ).render())
+    checklist = SetupChecklist.for_clone(
+        PlaybookFile(project_root).read(), ProjectClone(project_root, os.environ)
+    )
+    logger.info(checklist.render())
     return 0
 
 

@@ -20,6 +20,12 @@ from basstler.code_rules.rule import CodeReference, Section
 from basstler.code_rules.text_file_usage import TextFileChecker
 from basstler.code_rules.tree_removal import TreeRemovalChecker
 from basstler.directory_tree import DirectoryTree
+from basstler.locations import BasstlerRepositoryLocation, PluginLocation
+from basstler.playbook.contribution import (
+    ContributionEntryPointGroup,
+    PackageContribution,
+)
+from basstler.playbook.skills_command import SkillsCommand
 from basstler.text_file import TextFile
 
 
@@ -46,6 +52,17 @@ class PackageAndPluginRules(Section):
         "of several distributions share live in `test_support/`. The plugin under "
         "`plugin/` carries only its `SKILL.md` files, manifest and bash entry points, "
         "which call the installed package with `python -m basstler.<module>`"
+    )
+
+    CONTRIBUTE_THROUGH_THE_PLAYBOOK = (
+        "A distribution adds its command groups, skills, hooks, code rulesets and "
+        "setup steps to the default playbook through one "
+        f"{CodeReference(PackageContribution).path}, registered under the "
+        f"`{ContributionEntryPointGroup.CONTRIBUTIONS}` entry point group of its "
+        "`pyproject.toml`. "
+        f"`{(BasstlerRepositoryLocation.PLUGIN / PluginLocation.HOOK_REGISTRATIONS).as_posix()}` is "
+        "generated from the playbook: change a hook in its contribution and run "
+        f"`{SkillsCommand.BUILD.invocation}`, never edit the file"
     )
 
     NAME_FILES_AND_VARIABLES_ONCE = (

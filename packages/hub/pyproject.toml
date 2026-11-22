@@ -20,6 +20,11 @@ dynamic = ["version", "dependencies"]
 [project.entry-points."basstler.landed_closing_follow_ups"]
 plan-site-rebuild = "basstler.plan_site.build_start:PlanSiteRebuild"
 
+# What this distribution adds to the default playbook: `basstler.playbook.contribution`
+# loads this group.
+[project.entry-points."basstler.contributions"]
+basstler-hub = "basstler.plan_site.contribution:HubContribution"
+
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "0.0.0"

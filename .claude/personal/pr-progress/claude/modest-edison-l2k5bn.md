@@ -1,13 +1,14 @@
 ## Plan
-- Tests first: release workflow shape (OIDC, TestPyPI before PyPI); scratch-repository build (lockstep versions, sibling pins, LICENSE and NOTICE); session-start install order (PyPI, then tag clone, old environment kept on failure).
-- `release.yml`: build job at the tag, TestPyPI then PyPI publish jobs, `workflow_dispatch` for an existing tag.
-- LICENSE and NOTICE in every distribution; NOTICE paths follow `packages/`.
-- Session start: PyPI install of the plugin's release into a fresh environment, #223's tag clone as fallback, switch only after hooks and commands load.
-- Docs: README's Releasing section, SETUP.
+- Publishing is its own workflow, `publish.yml`, following the Release run, so the tests that pin `release.yml` stay as they are.
+- Session start: PyPI first, the tag's lock as the fallback; the environment is used only once the package runs.
+- Owner: register the 12 pending trusted publishers and the `testpypi` / `pypi` environments.
 
 ## Done
-- Planned; draft pull request opened.
+- Tests first, then `publish.yml`: build once, TestPyPI, then PyPI, OIDC only.
+- LICENSE and NOTICE in every wheel and sdist; NOTICE paths follow `packages/`.
+- Session start installs `basstler==<release>` from PyPI, falling back to the tag clone; one existing test changed with the owner's approval.
+- README and hooks README describe both; PR description and `release:minor` label set.
 
 ## Next
-- Write the failing tests.
-- Owner: register the 12 pending trusted publishers and the `testpypi` / `pypi` environments.
+- Read CI at f14412d8 (Windows included); fix what it names.
+- Owner: the trusted-publisher registrations, then run `publish.yml` by hand for a tag to prove it.

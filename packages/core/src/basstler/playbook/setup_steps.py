@@ -1,6 +1,6 @@
 """
-The setup steps a project leaves to its user, which each distribution contributes for
-its own subject.
+The setup steps a repository checkout leaves to its user, which each distribution
+contributes for its own subject.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from basstler.playbook.playbook import Playbook
 @dataclass(frozen=True)
 class SetupStep(ABC):
     """
-    One setup step that no script can perform or verify, because it changes a setting
-    held by GitHub or by Claude rather than a file in this clone.
+    One setup step basstler leaves to its user, because it changes a setting held by
+    GitHub or by Claude, which basstler holds no credential or approval to change.
     """
 
     @property
@@ -62,15 +62,15 @@ class SetupStep(ABC):
 
 
 @dataclass(frozen=True)
-class ProjectClone:
+class RepositoryCheckout:
     """
-    One clone of a project, as the setup steps it leaves to its user are worked out
-    from.
+    A local checkout of the repository basstler runs in, together with the environment
+    its settings resolve from.
     """
 
-    project_root: Path
+    working_tree: Path
     """
-    The clone's root.
+    The directory the repository is checked out in.
     """
 
     environment: Mapping[str, str]
@@ -82,13 +82,13 @@ class ProjectClone:
 @dataclass(frozen=True)
 class SetupSteps(PlaybookComponent, ABC):
     """
-    The setup steps one distribution leaves to the user of a clone.
+    The setup steps one distribution leaves to the user of a checkout.
     """
 
     @abstractmethod
-    def steps_for(self, clone: ProjectClone) -> tuple[SetupStep, ...]:
+    def steps_for_checkout(self, checkout: RepositoryCheckout) -> tuple[SetupStep, ...]:
         """
-        :param clone: The clone the steps are about.
+        :param checkout: The checkout the steps are about.
         :return: The steps that apply to it, in the order they should be done.
         """
 
@@ -99,12 +99,12 @@ class SetupSteps(PlaybookComponent, ABC):
 @dataclass(frozen=True)
 class SetupChecklist:
     """
-    The steps one clone leaves to its user, in the order they should be done.
+    The steps one checkout leaves to its user, in the order they should be done.
     """
 
     steps: tuple[SetupStep, ...]
     """
-    The steps that apply to this clone.
+    The steps that apply to this checkout.
     """
 
     @classproperty
@@ -115,17 +115,19 @@ class SetupChecklist:
         return "These steps are yours - no script can do them:"
 
     @classmethod
-    def for_clone(cls, playbook: Playbook, clone: ProjectClone) -> SetupChecklist:
+    def from_checkout(
+        cls, playbook: Playbook, checkout: RepositoryCheckout
+    ) -> SetupChecklist:
         """
         :param playbook: The playbook whose :class:`SetupSteps` apply.
-        :param clone: The clone the steps are about.
+        :param checkout: The checkout the steps are about.
         :return: The steps of every :class:`SetupSteps` in the playbook, in its order.
         """
         return cls(
             tuple(
                 step
                 for setup_steps in playbook.components_of(SetupSteps)
-                for step in setup_steps.steps_for(clone)
+                for step in setup_steps.steps_for_checkout(checkout)
             )
         )
 

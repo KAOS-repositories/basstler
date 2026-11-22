@@ -18,7 +18,7 @@ from basstler.github.repository import Repository
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import PluginLocation
 from basstler.playbook.playbook import DefaultPlaybook
-from basstler.playbook.setup_steps import ProjectClone, SetupChecklist
+from basstler.playbook.setup_steps import RepositoryCheckout, SetupChecklist
 from basstler.setup.steps import (
     ForkActions,
     ForkLabels,
@@ -384,8 +384,8 @@ def test_a_resolvable_fork_gets_every_step(
     """
     All three steps are printed, with the two repository-specific ones first.
     """
-    steps = ForkSetupSteps().steps_for(
-        ProjectClone(clone_with_fork_remote.project_root, {})
+    steps = ForkSetupSteps().steps_for_checkout(
+        RepositoryCheckout(clone_with_fork_remote.project_root, {})
     )
     assert steps == (
         ForkLabels(FORK),
@@ -402,8 +402,8 @@ def test_the_repository_steps_are_dropped_when_no_fork_resolves(
     A clone naming no GitHub repository is given the step that still applies to it,
     rather than steps addressed to a repository nobody could name.
     """
-    steps = ForkSetupSteps().steps_for(
-        ProjectClone(scratch_repository.project_root, {})
+    steps = ForkSetupSteps().steps_for_checkout(
+        RepositoryCheckout(scratch_repository.project_root, {})
     )
     assert steps == (PersistentVariables(variable_lines=()),)
 
@@ -424,7 +424,7 @@ def test_running_the_module_prints_the_steps_for_its_own_clone(
         module_name=SETUP_STEPS_MODULE,
     ).run()
     assert result.returncode == 0, result.stderr
-    expected = SetupChecklist.for_clone(
-        DefaultPlaybook(), ProjectClone(clone_with_fork_remote.project_root, {})
+    expected = SetupChecklist.from_checkout(
+        DefaultPlaybook(), RepositoryCheckout(clone_with_fork_remote.project_root, {})
     )
     assert result.stdout == expected.render() + "\n"

@@ -50,7 +50,7 @@ from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
 from basstler.playbook.playbook import PlaybookFile
 from basstler.playbook.setup_steps import (
-    ProjectClone,
+    RepositoryCheckout,
     SetupChecklist,
     SetupStep,
     SetupSteps,
@@ -481,16 +481,16 @@ class PersistentVariables(SetupStep):
 @dataclass(frozen=True)
 class ForkSetupSteps(SetupSteps):
     """
-    The steps the fork a clone points at, and the clone's own settings, leave to its
-    user; the fork's steps are omitted when no GitHub repository resolves from the
-    clone's remotes.
+    The steps the fork a checkout points at, and the checkout's own settings, leave to
+    its user; the fork's steps are omitted when no GitHub repository resolves from the
+    checkout's remotes.
     """
 
-    def steps_for(self, clone: ProjectClone) -> tuple[SetupStep, ...]:
+    def steps_for_checkout(self, checkout: RepositoryCheckout) -> tuple[SetupStep, ...]:
         notes_remote = PersonalNotesSetting.REMOTE.resolve(
-            clone.project_root, clone.environment
+            checkout.working_tree, checkout.environment
         )
-        repository = resolve_repository(clone.project_root, notes_remote)
+        repository = resolve_repository(checkout.working_tree, notes_remote)
         steps: list[SetupStep] = []
         if repository is not None:
             steps.extend(
@@ -500,7 +500,9 @@ class ForkSetupSteps(SetupSteps):
                     ForkActions(repository),
                 ]
             )
-        steps.append(PersistentVariables.resolve(clone.project_root, clone.environment))
+        steps.append(
+            PersistentVariables.resolve(checkout.working_tree, checkout.environment)
+        )
         return tuple(steps)
 
 
@@ -715,8 +717,8 @@ def main(argv: list[str] | None = None) -> int:
             f"{'now runs' if changed else 'already runs'} basstler {arguments.branch_or_tag}"
         )
         return 0
-    checklist = SetupChecklist.for_clone(
-        PlaybookFile(project_root).read(), ProjectClone(project_root, os.environ)
+    checklist = SetupChecklist.from_checkout(
+        PlaybookFile(project_root).read(), RepositoryCheckout(project_root, os.environ)
     )
     logger.info(checklist.render())
     return 0

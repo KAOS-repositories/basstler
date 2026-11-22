@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from basstler.class_property import classproperty
 from basstler.playbook.component import PlaybookComponent
 from basstler.playbook.contribution import PackageContribution
-from basstler.playbook.setup_steps import ProjectClone, SetupStep, SetupSteps
+from basstler.playbook.setup_steps import RepositoryCheckout, SetupStep, SetupSteps
 
 # %% components of two kinds
 
@@ -88,9 +88,9 @@ class TitledStep(SetupStep):
 
 
 @dataclass(frozen=True)
-class StepsNamingTheClone(SetupSteps):
+class StepsNamingTheCheckout(SetupSteps):
     """
-    Setup steps titled after the clone they are worked out for.
+    Setup steps titled after the checkout they are worked out for.
     """
 
     prefix: str
@@ -98,5 +98,5 @@ class StepsNamingTheClone(SetupSteps):
     What every step's title starts with.
     """
 
-    def steps_for(self, clone: ProjectClone) -> tuple[SetupStep, ...]:
-        return (TitledStep(f"{self.prefix} {clone.project_root.name}"),)
+    def steps_for_checkout(self, checkout: RepositoryCheckout) -> tuple[SetupStep, ...]:
+        return (TitledStep(f"{self.prefix} {checkout.working_tree.name}"),)

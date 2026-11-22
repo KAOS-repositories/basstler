@@ -7,13 +7,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from basstler.playbook.playbook import Playbook
-from basstler.playbook.setup_steps import ProjectClone, SetupChecklist
+from basstler.playbook.setup_steps import RepositoryCheckout, SetupChecklist
 
-from .components import LabelledComponent, StepsNamingTheClone, TitledStep
+from .components import LabelledComponent, StepsNamingTheCheckout, TitledStep
 
-CLONE = ProjectClone(Path("/projects/clone"), {})
+CHECKOUT = RepositoryCheckout(Path("/projects/clone"), {})
 """
-The clone every checklist below is worked out for.
+The checkout every checklist below is worked out for.
 """
 
 
@@ -23,13 +23,13 @@ def test_the_checklist_lists_every_contributed_step_in_playbook_order():
     """
     playbook = Playbook(
         (
-            StepsNamingTheClone("first for"),
+            StepsNamingTheCheckout("first for"),
             LabelledComponent("not a setup step"),
-            StepsNamingTheClone("then for"),
+            StepsNamingTheCheckout("then for"),
         )
     )
 
-    assert SetupChecklist.for_clone(playbook, CLONE) == SetupChecklist(
+    assert SetupChecklist.from_checkout(playbook, CHECKOUT) == SetupChecklist(
         (TitledStep("first for clone"), TitledStep("then for clone"))
     )
 

@@ -160,8 +160,11 @@ items:
 - id: third-party-imports
   title: A distribution imports only the third-party libraries its own pyproject requires
   track: package-split
+  branch: claude/dreamy-feynman-aoud9x
+  pull_request_number: 288
+  session: https://claude.ai/code/session_018wfiv8YLuqCdED6dhazFdi
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: sonnet
   notes: 'Extends PackageBoundaryChecker from basstler imports to third-party ones, as krrood''s
     CoreBoundary does (#546): map each imported top-level package to its distributions with

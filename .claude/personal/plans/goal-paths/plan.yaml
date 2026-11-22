@@ -60,3 +60,18 @@ items:
     plans and links a step to its card there. goal path kpi-pilot-team-plans prints 12 steps across basstler
     and business_consulting-notes. Next: goal summary still reads only the local plans; split this part
     into its own pull request after the verdict.'
+
+- id: private-goal-issue
+  title: A private goal's path is kept in an issue of its notes repository, readable and refreshed from
+    any device
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: sandbox
+  depends_on:
+  - cross-repository-goal-targets
+  notes: 'Found 2026-11-23: the KPI pilot''s goal names items of a private notes repository, so the public
+    site cannot show it, and the owner wants it on their phone. Interim: KAOS-repositories/business_consulting-notes
+    .github/workflows/goal-page.yml renders goal path --json into issue #1 (on plan saves, every 6 hours,
+    on dispatch; needs GOAL_PAGE_TOKEN for private PR states). Ship it: goal path --markdown, and setup
+    installs the workflow for a goal kept in a private notes repository.'

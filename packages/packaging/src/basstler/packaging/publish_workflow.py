@@ -43,8 +43,17 @@ class PublishActionInput(StrEnum):
     """
 
     REPOSITORY_URL = "repository-url"
+    PACKAGES_DIRECTORY = "packages-dir"
     SKIP_EXISTING = "skip-existing"
     PASSWORD = "password"
+
+
+class ArtifactActionInput(StrEnum):
+    """
+    The inputs of the actions that hand files between jobs a release depends on.
+    """
+
+    PATH = "path"
 
 
 # %% the parts of the file
@@ -68,6 +77,11 @@ class PublishStep(ValidatedJSONModel):
     One step of a job.
     """
 
+    step_id: str | None = Field(default=None, alias="id")
+    """
+    The name other steps and jobs refer to it by; unset when none does.
+    """
+
     uses: str | None = None
     """
     The action it uses, with the version it pins; unset for a shell step.
@@ -83,12 +97,33 @@ class PublishStep(ValidatedJSONModel):
     The inputs it passes to its action.
     """
 
+    environment_variables: dict[str, str] = Field(default_factory=dict, alias="env")
+    """
+    The environment variables it sets, by name.
+    """
+
     @property
     def action(self) -> str | None:
         """
         The action it uses, without its version.
         """
         return self.uses.partition("@")[0] if self.uses else None
+
+
+class PublishStrategy(ValidatedJSONModel):
+    """
+    How a job is run once for each combination of its matrix.
+    """
+
+    matrix: dict[str, Any]
+    """
+    The values each run takes, by the variable that holds them.
+    """
+
+    fail_fast: bool = Field(default=True, alias="fail-fast")
+    """
+    Whether one run failing cancels the others.
+    """
 
 
 class PublishJob(ValidatedJSONModel):
@@ -121,6 +156,16 @@ class PublishJob(ValidatedJSONModel):
     The permissions it asks for, by scope.
     """
 
+    strategy: PublishStrategy | None = None
+    """
+    The matrix it runs over; unset when it runs once.
+    """
+
+    outputs: dict[str, str] = Field(default_factory=dict)
+    """
+    The values it hands to the jobs that need it, by name.
+    """
+
     @property
     def requests_identity_token(self) -> bool:
         """
@@ -137,6 +182,14 @@ class PublishJob(ValidatedJSONModel):
         :return: The one step that uses it.
         """
         (step,) = (step for step in self.steps if step.action == action)
+        return step
+
+    def identified_step(self, step_id: str) -> PublishStep:
+        """
+        :param step_id: The name a step is referred to by.
+        :return: The step of that name.
+        """
+        (step,) = (step for step in self.steps if step.step_id == step_id)
         return step
 
 

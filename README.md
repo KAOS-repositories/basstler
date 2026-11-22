@@ -49,9 +49,10 @@ shipped paths would go stale.
   publishes a GitHub release with generated notes.
 - **`publish.yml` publishes every distribution to PyPI** once the release run finishes: it
   builds them all from the tagged commit with `uv build --all-packages` and publishes them
-  through trusted publishing, so no token is stored. It needs a pending trusted publisher
-  on PyPI for each distribution's name, naming this repository, `publish.yml` and the
-  environment `pypi`. A release whose publishing stopped is finished by re-running the
+  through trusted publishing, so no token is stored, each distribution from a GitHub
+  environment of its own, `pypi-<distribution>`, which the run creates. It needs a
+  pending trusted publisher on PyPI for each distribution's name, naming this
+  repository, `publish.yml` and that environment. A release whose publishing stopped is finished by re-running the
   failed run in the Actions tab (or starting `publish.yml` there with the tag, when no run
   exists); files PyPI already holds are skipped, so nothing is uploaded twice. Each wheel
   and source distribution carries `LICENSE` and `NOTICE`. Anyone can `pip install

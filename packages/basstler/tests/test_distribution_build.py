@@ -5,17 +5,31 @@ tagged commit gives one version, siblings pinned to it, and the licence in each.
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
 import tomllib
 from enum import StrEnum
+from pathlib import Path
 
 import pytest
+from basstler.bash import Bash
+from basstler.environment import GitHubActionsVariable
 from basstler.git.commands import GitCommandRunner
+from basstler.packaging.publish_workflow import (
+    ArtifactActionInput,
+    PublishAction,
+    PublishActionInput,
+    PublishWorkflow,
+)
 from basstler.packaging.release import BuiltRelease, ReleaseFile
+from basstler.text_file import TextFile
 from packaging.utils import canonicalize_name
 
 from basstler_testing.constants.paths import RepositoryLocation
+
+from .publish_jobs import PublishJobName, PublishStepId
 
 # %% vocabulary
 
@@ -172,3 +186,86 @@ def test_every_source_distribution_carries_the_release_files(
     """
     for name, source in built_release.source_distributions_by_distribution_name.items():
         assert source.carries_file_at_root(release_file), name
+
+
+# %% how the publish workflow splits it
+
+
+@pytest.fixture(scope="module")
+def publish_workflow() -> PublishWorkflow:
+    """
+    The publish workflow file, parsed.
+    """
+    return PublishWorkflow.read(RepositoryLocation.PUBLISH_WORKFLOW)
+
+
+def run_step(script: str, directory: Path, environment: dict[str, str]) -> None:
+    """
+    :param script: A workflow step's shell.
+    :param directory: The directory it runs in, as a job's workspace.
+    :param environment: The variables it reads besides the process's own.
+    """
+    subprocess.run(
+        Bash.locate(os.environ).command("-c", script),
+        cwd=directory,
+        env=os.environ | environment,
+        check=True,
+        capture_output=True,
+        encoding="utf-8",
+    )
+
+
+def test_the_build_lists_every_distribution_it_built(
+    built_release: BuiltRelease, publish_workflow: PublishWorkflow, tmp_path: Path
+):
+    """
+    The list is what the publish job's matrix runs over, so none is left unpublished.
+    """
+    build = publish_workflow.jobs[PublishJobName.BUILD]
+    step = build.identified_step(PublishStepId.LIST_DISTRIBUTIONS)
+    output = tmp_path / "output"
+    output.touch()
+
+    run_step(
+        step.run,
+        built_release.directory.parent,
+        {GitHubActionsVariable.OUTPUT: str(output)},
+    )
+
+    name, _, value = TextFile(output).read().strip().partition("=")
+    assert list(build.outputs.values()) == [
+        f"${{{{ steps.{PublishStepId.LIST_DISTRIBUTIONS}.outputs.{name} }}}}"
+    ]
+    assert sorted(json.loads(value)) == sorted(distribution_names())
+
+
+def test_each_publish_job_keeps_exactly_its_own_distribution_files(
+    built_release: BuiltRelease, publish_workflow: PublishWorkflow, tmp_path: Path
+):
+    """
+    A job uploads only the files its environment's trusted publisher may publish.
+    """
+    publish = publish_workflow.jobs[PublishJobName.PUBLISH]
+    step = publish.identified_step(PublishStepId.KEEP_OWN_FILES)
+    downloaded = publish.step_using(PublishAction.DOWNLOAD).action_inputs_by_name[
+        ArtifactActionInput.PATH
+    ]
+    published = publish.step_using(PublishAction.PUBLISH).action_inputs_by_name[
+        PublishActionInput.PACKAGES_DIRECTORY
+    ]
+
+    for name, wheel in built_release.wheels_by_distribution_name.items():
+        workspace = tmp_path / name
+        shutil.copytree(built_release.directory, workspace / downloaded)
+
+        run_step(
+            step.run,
+            workspace,
+            {variable: name for variable in step.environment_variables},
+        )
+
+        source = built_release.source_distributions_by_distribution_name[name]
+        assert {path.name for path in (workspace / published).iterdir()} == {
+            wheel.path.name,
+            source.path.name,
+        }

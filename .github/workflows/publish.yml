@@ -2,8 +2,9 @@ name: Publish
 
 # Every release is published to PyPI, every distribution at the release's version: the
 # files are built once from the tagged commit and published to PyPI through trusted
-# publishing, so no token is stored anywhere; PyPI's pending publisher names this
-# workflow and the environment of its job.
+# publishing, so no token is stored anywhere. Each distribution publishes from an
+# environment of its own, pypi-<distribution>, because PyPI takes a pending publisher
+# for one new project only per workflow and environment.
 #
 # The release workflow moves the release branch to the tag it makes, so the branch is
 # what a finished release run publishes. A release whose publishing stopped is finished
@@ -42,6 +43,8 @@ jobs:
       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      distributions: ${{ steps.distributions.outputs.names }}
     steps:
       # The version is read from the tag, so the whole history comes with the checkout.
       - uses: actions/checkout@v4
@@ -64,6 +67,14 @@ jobs:
           python -m pip install uv
           uv build --all-packages --out-dir dist
 
+      # The names of the distributions built, as the JSON list the publish job's matrix
+      # takes.
+      - name: List the distributions
+        id: distributions
+        run: |
+          names=$(for wheel in dist/*.whl; do basename "$wheel" | cut -d- -f1 | tr _ -; done | sed 's/.*/"&"/' | paste -sd, -)
+          echo "names=[$names]" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v4
         with:
           name: distributions
@@ -71,19 +82,33 @@ jobs:
           if-no-files-found: error
 
   publish-pypi:
-    name: Publish to PyPI
+    name: Publish ${{ matrix.distribution }} to PyPI
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: pypi
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: ${{ fromJSON(needs.build.outputs.distributions) }}
+    environment: pypi-${{ matrix.distribution }}
     permissions:
       id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: distributions
-          path: dist/
+          path: built/
+
+      # A file's name spells the distribution with underscores, followed by its version.
+      - name: Keep only this distribution's files
+        id: files
+        env:
+          DISTRIBUTION: ${{ matrix.distribution }}
+        run: |
+          mkdir dist
+          mv "built/${DISTRIBUTION//-/_}"-[0-9]* dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          packages-dir: dist/
           skip-existing: true

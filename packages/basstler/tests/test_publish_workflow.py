@@ -5,8 +5,6 @@ a finished release and publishes through trusted publishing alone.
 
 from __future__ import annotations
 
-from enum import StrEnum
-
 import pytest
 import yaml
 from basstler.github.workflows import ActivityType
@@ -21,16 +19,9 @@ from basstler.text_file import TextFile
 
 from basstler_testing.constants.paths import RepositoryLocation
 
+from .publish_jobs import PublishJobName
+
 # %% the workflow
-
-
-class PublishJobName(StrEnum):
-    """
-    The jobs of this repository's publish workflow.
-    """
-
-    BUILD = "build"
-    PUBLISH = "publish-pypi"
 
 
 @pytest.fixture(scope="module")
@@ -47,6 +38,7 @@ RELEASE_WORKFLOW_NAME = yaml.safe_load(
 """
 The name the Release workflow declares, which the publish workflow waits for.
 """
+
 
 # %% when it runs
 
@@ -130,11 +122,42 @@ def test_only_the_job_that_publishes_may_request_an_identity_token(
     assert IdentityTokenPermission.SCOPE not in workflow.permissions
 
 
-def test_the_job_publishes_from_the_environment_of_pypi(workflow: PublishWorkflow):
+def test_each_distribution_publishes_from_an_environment_of_its_own(
+    workflow: PublishWorkflow,
+):
     """
-    The index's trusted publisher names the environment.
+    PyPI takes a pending trusted publisher for one new project per environment, so each
+    distribution's publisher names its own.
     """
-    assert workflow.jobs[PublishJobName.PUBLISH].environment == PackageIndex.PYPI
+    publish = workflow.jobs[PublishJobName.PUBLISH]
+    (variable,) = publish.strategy.matrix
+
+    assert publish.environment == PackageIndex.PYPI.publishing_environment(
+        f"${{{{ matrix.{variable} }}}}"
+    )
+
+
+def test_the_publish_runs_once_for_each_distribution_the_build_lists(
+    workflow: PublishWorkflow,
+):
+    """
+    The matrix is the build's list, so a new distribution needs no change here.
+    """
+    (output,) = workflow.jobs[PublishJobName.BUILD].outputs
+    (distributions,) = workflow.jobs[PublishJobName.PUBLISH].strategy.matrix.values()
+
+    assert distributions == (
+        f"${{{{ fromJSON(needs.{PublishJobName.BUILD}.outputs.{output}) }}}}"
+    )
+
+
+def test_a_distribution_that_fails_to_publish_leaves_the_others_publishing(
+    workflow: PublishWorkflow,
+):
+    """
+    One refused upload, such as a name whose publisher is missing, cancels no other.
+    """
+    assert workflow.jobs[PublishJobName.PUBLISH].strategy.fail_fast is False
 
 
 def test_pypi_is_published_to_at_its_default_address(workflow: PublishWorkflow):

@@ -11,8 +11,8 @@ from enum import StrEnum
 
 class PackageIndex(StrEnum):
     """
-    A package index; each value is the GitHub environment that index's trusted publisher
-    names.
+    A package index; each value starts the names of the GitHub environments its trusted
+    publishers name.
     """
 
     TESTPYPI = "testpypi"
@@ -28,3 +28,10 @@ class PackageIndex(StrEnum):
             PackageIndex.TESTPYPI: "https://test.pypi.org/legacy/",
             PackageIndex.PYPI: None,
         }[self]
+
+    def publishing_environment(self, distribution_name: str) -> str:
+        """
+        :param distribution_name: The distribution published, or an expression giving it.
+        :return: The GitHub environment the distribution is published to the index from.
+        """
+        return f"{self}-{distribution_name}"

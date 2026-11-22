@@ -55,7 +55,8 @@ items:
   - verdict
   status: not started
   recommended_model: opus
-  notes: 'Found 2026-11-22: goal kpi-pilot-team-plans (basstler notes) needs kpi-collection items, which
-    live on KAOS-repositories/business_consulting-notes; a target is <plan-id>/<item-id> within one plans
-    directory. Allow <owner>/<repo>:<plan-id>/<item-id>, read with the hub''s repositories, and refuse
-    an unreadable one by name.'
+  notes: 'Built in the experiment at 34cd5bd9 (draft #235): a target or depends_on may be <owner>/<name>:<plan-id>/<item-id>;
+    goal set/path/next fetch that repository''s notes branch, and the hub site shares every listed repository''s
+    plans and links a step to its card there. goal path kpi-pilot-team-plans prints 12 steps across basstler
+    and business_consulting-notes. Next: goal summary still reads only the local plans; split this part
+    into its own pull request after the verdict.'

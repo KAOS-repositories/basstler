@@ -233,7 +233,8 @@ items:
     with its tests unchanged. Then settle the build/packaging split: basstler-build as the hook
     alone taking the family as a string, DistributionFamily and BasstlerFamily in
     basstler-packaging.
-  depends_on: []
+  depends_on:
+    - pypi-release
   status: not started
   recommended_model: opus
 landed_item_count: 4

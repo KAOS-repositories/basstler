@@ -50,12 +50,6 @@ from basstler.plan.exceptions import (
     UnknownWave,
     ValidationProblem,
 )
-from basstler.github.repository import Repository
-from basstler.plan.dependencies import (
-    DependencyReference,
-    PlanDirectory,
-    ResolvedDependency,
-)
 from basstler.plan.decision import Decision
 from basstler.plan.goal import Goal
 from basstler.plan.model import ExternalDependency, ItemStatus, ManifestKey, Performer

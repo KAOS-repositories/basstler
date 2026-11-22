@@ -14,7 +14,6 @@ from basstler.class_property import classproperty
 from basstler.plan.item_action import ItemAction, StartNowAction
 from basstler.github.repository import Repository
 from basstler.plan.dependencies import UnresolvedDependency
-from basstler.plan.model_alias import ModelAlias
 from basstler.stack.promotability import PromotionBlocker
 
 if TYPE_CHECKING:

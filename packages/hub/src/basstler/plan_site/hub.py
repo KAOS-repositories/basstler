@@ -41,7 +41,10 @@ from basstler.git.remote_branch import RemoteBranch
 from basstler.github.repository import GitHubAddress, HasRepository, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan.structure import Item
-from basstler.plan_site.exceptions import RegistryUnreadableError
+from basstler.plan_site.exceptions import (
+    PlansCheckoutFailedError,
+    RegistryUnreadableError,
+)
 from basstler.plan_site.workflows import PlanSiteSecret
 from basstler.setup.steps import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
@@ -50,6 +53,22 @@ from basstler.text_file import TextFile
 logger = StandardStreamHandler.logger_for(__name__)
 """
 This module's logger, which is also what its command prints through.
+"""
+
+
+NOTES_REMOTE = "origin"
+"""
+The name a scratch repository gives the repository whose notes branch it fetches.
+"""
+
+NOTES_TIP = "FETCH_HEAD"
+"""
+The ref the fetched notes branch is read from.
+"""
+
+PREFETCH_BATCH_SIZE = 200
+"""
+How many file contents one request downloads, few enough for any command line.
 """
 
 
@@ -328,7 +347,7 @@ class NotesBranch(HasRepository):
         branch: str,
         remote_root: str,
         scratch: Path,
-        remote: str = "origin",
+        remote: str = NOTES_REMOTE,
     ) -> NotesBranch | None:
         """
         :param repository: The repository to fetch from.
@@ -359,7 +378,7 @@ class NotesBranch(HasRepository):
         :param path: A file's path relative to the branch's root.
         :return: The file's content, or ``None`` when the branch has no such file.
         """
-        return self.git.file_at("FETCH_HEAD", path)
+        return self.git.file_at(NOTES_TIP, path)
 
     def history_of(self, plan_directory_name: str) -> PlanHistory | None:
         """
@@ -369,7 +388,7 @@ class NotesBranch(HasRepository):
         dates = self.git.run(
             "log",
             "--format=%cI",
-            "FETCH_HEAD",
+            NOTES_TIP,
             "--",
             (ProjectLocation.PLANS / plan_directory_name).as_posix(),
         ).splitlines()
@@ -381,16 +400,48 @@ class NotesBranch(HasRepository):
 
     def check_out_plans(self) -> Path:
         """
-        Write the branch's plans directory out as plain files.
+        Write the branch's plans directory out as plain files, downloading their
+        contents in a few requests first rather than one request a file.
 
+        :raises PlansCheckoutFailedError: If the plans cannot be written out.
         :return: The plans directory, empty when the branch has none.
         """
-        self.git.attempt(
-            "checkout", "FETCH_HEAD", "--", ProjectLocation.PLANS.as_posix()
-        )
+        plans = ProjectLocation.PLANS.as_posix()
+        contents = self.git.run(
+            "ls-tree", "-r", "--format=%(objectname)", NOTES_TIP, "--", plans
+        ).split()
+        if contents:
+            self.prefetch(contents)
+            checked_out = self.git.attempt("checkout", NOTES_TIP, "--", plans)
+            if not checked_out.succeeded:
+                raise PlansCheckoutFailedError(
+                    self.repository, checked_out.error_output
+                )
         plans_directory = self.git.working_directory / ProjectLocation.PLANS
         plans_directory.mkdir(parents=True, exist_ok=True)
         return plans_directory
+
+    def prefetch(self, contents: list[str]) -> None:
+        """
+        Download file contents the filtered fetch left out, a batch a request, leaving
+        the fetched branch's tip where it is. A batch that fails is left for the
+        checkout to download file by file.
+
+        :param contents: The object ids of the contents.
+        """
+        for start in range(0, len(contents), PREFETCH_BATCH_SIZE):
+            self.git.attempt(
+                "-c",
+                "fetch.negotiationAlgorithm=noop",
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--no-write-fetch-head",
+                "--recurse-submodules=no",
+                "--filter=blob:none",
+                NOTES_REMOTE,
+                *contents[start : start + PREFETCH_BATCH_SIZE],
+            )
 
 
 def main() -> int:

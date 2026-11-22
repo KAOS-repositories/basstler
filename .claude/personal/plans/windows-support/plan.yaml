@@ -45,9 +45,12 @@ items:
 - id: plan-site-lazy-checkout
   title: The plan site checks out every plan of a notes branch, or names the repository whose plans it
     could not read
-  status: not started
+  status: in progress
   recommended_model: sonnet
   track: fixes
+  branch: fix/plan-site-lazy-checkout
+  pull_request_number: 293
+  session: local Claude Code desktop session eed21a6d-f295-4bc6-bb9a-30b118885ca9
   depends_on: []
   notes: 'Found 2026-11-22 building the site locally on Windows (git 2.55): NotesBranch.fetch fetches
     with --filter=blob:none, and check_out_plans'' git checkout then downloads each blob in its own lazy

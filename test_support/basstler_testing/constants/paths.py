@@ -65,6 +65,11 @@ class RepositoryLocation(PathEnumeration):
     The workflow that tags a merge commit as a release.
     """
 
+    PUBLISH_WORKFLOW = WORKFLOWS / "publish.yml"
+    """
+    The workflow that publishes a release's distributions to PyPI.
+    """
+
     TESTS_WORKFLOW = WORKFLOWS / "tests.yml"
     """
     The workflow that lints and tests every pull request and every push to main.

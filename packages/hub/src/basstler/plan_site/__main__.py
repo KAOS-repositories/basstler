@@ -48,6 +48,7 @@ from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.structure import Plan
 from basstler.plan.validation import PlanValidator
 from basstler.plan_site.cards import PlanTimeAttribute
+from basstler.plan_site.exceptions import PlansCheckoutFailedError
 from basstler.plan_site.hub import NotesBranch, PlanHub, SiteAddress
 from basstler.plan_site.hub_page import (
     CountedItem,
@@ -473,12 +474,18 @@ class HubSite(SiteSection[SiteSummary]):
             return RepositorySummary.unreadable(
                 str(repository), f"cannot fetch {self.hub.notes_branch}"
             )
-        site = RepositorySite(
-            address=self.address,
-            pull_request_source=self.pull_request_source,
-            notes=notes,
-            built_at=self.built_at,
-        )
+        try:
+            site = RepositorySite(
+                address=self.address,
+                pull_request_source=self.pull_request_source,
+                notes=notes,
+                built_at=self.built_at,
+            )
+        except PlansCheckoutFailedError as failure:
+            logger.warning(failure.error_message())
+            return RepositorySummary.unreadable(
+                str(repository), f"cannot check out its plans: {failure.error_output}"
+            )
         return site.build(output)
 
 

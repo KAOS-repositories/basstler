@@ -1,12 +1,11 @@
 ## Plan
-- Tests first: notes remote never selected as fork; base push refused to a wider-visibility repository.
-- RemoteResolution excludes the separate notes repository from fork candidates.
-- Base fast-forward refuses a private-upstream to public-target push and reports it.
+- Notes remote never selected as fork (done); base push refused to a repository not known as private when the upstream is not known public (done).
 
 ## Done
-- Branch, draft PR 296 and plan record opened; worktree ../basstler-sync-fix (uv.lock blocked checkout here).
-- Exclusion tests written and failing; fix in RemoteResolution.resolve and of_checkout in place.
+- Branch, draft PR 296, plan record; worktree ../basstler-sync-fix (uv.lock blocked checkout here).
+- Fork exclusion: tests failing first, fix in RemoteResolution, committed.
+- Visibility guard: PushVisibilityGuard, new outcome, tests; stack tests updated for the new github parameter.
 
 ## Next
-- Confirm stack suite green; add of_checkout test with a configured notes remote.
-- Write visibility-refusal tests, then implement.
+- Full stack/core/notes suite green, commit, push, update PR description.
+- Report open questions: fail-closed when visibility is unreadable; session-start test calls the live API.

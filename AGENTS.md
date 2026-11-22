@@ -63,6 +63,7 @@
 <!-- from NamingRules in basstler/code_rules/rules/code_quality.py -->
 - Names are technically correct, simple and descriptive, in that order. An inaccurate name is worse than a vague one, because a reader who trusts it stops reading
 - A name stays correct and understandable when read on its own, without its class or a keyword argument next to it - after `value = instance.attribute`, in a log line, in a traceback, or when passed on positionally. A `Pipe` field `size` says nothing once it leaves the class; `inner_diameter` does. A generic word that would fit anything never passes this test
+- A name is unambiguous: a word that also names something else a reader may know - a wheel, a release, a package - carries the word that says which, as `PythonWheel` does, so the name says what the class represents without its module beside it
 - A method name is never a bare preposition such as `of`, `for` or `with`: it says nothing without its class and its arguments beside it. Name what it builds from or does, as in `RenameMap.from_decisions`
 - Use the plain word every reader already knows. Use a specialist, metaphorical or in-house term only where it is genuinely the precise word, never as shorthand between the people who were in the discussion
 - Where the domain or file format already has a word for something, use that word
@@ -172,7 +173,7 @@
 - Every Python module lives in the `basstler` namespace package, under `packages/<part>/src/` of the distribution that owns its subject, and its tests under that distribution's `packages/<part>/tests/`; helpers the tests of several distributions share live in `test_support/`. The plugin under `plugin/` carries only its `SKILL.md` files, manifest and bash entry points, which call the installed package with `python -m basstler.<module>`
 - Name every file and directory once, in `basstler.locations`; every environment variable once, in `basstler.environment`
 - Each distribution depends only on the libraries its `pyproject.toml` lists, and `uv.lock` pins what the workspace installs; change a requirement there and run `uv lock`. Code that comes from `krrood` is copied, never imported; until krrood's light core is released, a copied module says so and cites krrood with `` :cite:`krrood` ``, whose entry is in `docs/references.bib`
-- A package imports only the basstler packages its pyproject lists: every module belongs to the distribution whose `packages/<part>` folder holds it, and imports only from that distribution and the ones its `pyproject.toml` lists, which `basstler.package_map` reads into layers (checked by `basstler code-rules check`)
+- A package imports only the basstler packages its pyproject lists: every module belongs to the distribution whose `packages/<part>` folder holds it, and imports only from that distribution and the ones its `pyproject.toml` lists, which `basstler.package_map` reads into layers; it imports only the third-party libraries that `pyproject.toml` or a distribution it lists requires, directly or through what those libraries require (checked by `basstler code-rules check`)
 
 ## Portability
 <!-- from PortabilityRules in basstler/code_rules/rules/project.py -->

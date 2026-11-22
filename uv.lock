@@ -16,6 +16,7 @@ members = [
     "basstler-github",
     "basstler-hub",
     "basstler-notes",
+    "basstler-packaging",
     "basstler-plan",
     "basstler-review-triage",
     "basstler-reviews",
@@ -68,11 +69,13 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "basstler-build" },
     { name = "basstler-core" },
     { name = "basstler-git" },
     { name = "basstler-github" },
     { name = "basstler-hub" },
     { name = "basstler-notes" },
+    { name = "basstler-packaging" },
     { name = "basstler-plan" },
     { name = "basstler-review-triage" },
     { name = "basstler-reviews" },
@@ -98,11 +101,13 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "basstler-build", editable = "packages/build" },
     { name = "basstler-core", editable = "packages/core" },
     { name = "basstler-git", editable = "packages/git" },
     { name = "basstler-github", editable = "packages/github" },
     { name = "basstler-hub", editable = "packages/hub" },
     { name = "basstler-notes", editable = "packages/notes" },
+    { name = "basstler-packaging", editable = "packages/packaging" },
     { name = "basstler-plan", editable = "packages/plan" },
     { name = "basstler-review-triage", editable = "packages/review-triage" },
     { name = "basstler-reviews", editable = "packages/reviews" },
@@ -331,6 +336,44 @@ dev = [
     { name = "basstler-github", editable = "packages/github" },
     { name = "basstler-reviews", editable = "packages/reviews" },
     { name = "basstler-stack", editable = "packages/stack" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
+[[package]]
+name = "basstler-packaging"
+source = { editable = "packages/packaging" }
+dependencies = [
+    { name = "basstler-build" },
+    { name = "basstler-core" },
+    { name = "basstler-github" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "basstler-build" },
+    { name = "basstler-core" },
+    { name = "basstler-github" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "basstler-build", editable = "packages/build" },
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-github", editable = "packages/github" },
+    { name = "packaging", specifier = ">=24" },
+    { name = "pyyaml", specifier = ">=6" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basstler-build", editable = "packages/build" },
+    { name = "basstler-core", editable = "packages/core" },
+    { name = "basstler-github", editable = "packages/github" },
     { name = "pytest" },
     { name = "pytest-xdist" },
 ]

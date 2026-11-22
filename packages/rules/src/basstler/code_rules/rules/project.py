@@ -66,7 +66,9 @@ class PackageAndPluginRules(Section):
         "A package imports only the basstler packages its pyproject lists: every "
         "module belongs to the distribution whose `packages/<part>` folder holds it, "
         "and imports only from that distribution and the ones its `pyproject.toml` "
-        f"lists, which {CodeReference(package_map).path} reads into layers",
+        f"lists, which {CodeReference(package_map).path} reads into layers; it imports "
+        "only the third-party libraries that `pyproject.toml` or a distribution it "
+        "lists requires, directly or through what those libraries require",
         (),
         PackageBoundaryChecker(),
     )

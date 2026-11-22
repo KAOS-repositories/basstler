@@ -25,6 +25,7 @@ from basstler.git.remote_branch import RemoteBranch
 from basstler.environment import GitVariable
 from basstler.git.commands import GitCommandRunner
 from basstler.github.remote import GitHubRemote
+from basstler.github.workflows import TriggerEvent
 from basstler.github.client import GitHubReader
 from basstler.github.credential import CredentialProvider
 from basstler.github.exceptions import GitHubRequestFailed
@@ -316,7 +317,7 @@ def test_the_reusable_workflow_runs_this_module():
 
     command_path = basstler.upstream_reviews.action.__main__.__package__
     assert f"python -m {command_path} {ActionCommand.RUN}" in reusable
-    assert "workflow_call" in reusable
+    assert TriggerEvent.WORKFLOW_CALL in reusable
 
 
 # %% the branch

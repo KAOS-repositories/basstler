@@ -18,7 +18,7 @@ from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
 from basstler.github.actions_secret import ActionsSecret
 from basstler.github.repository import Repository
-from basstler.github.workflows import ActivityType
+from basstler.github.workflows import ActivityType, TriggerEvent
 from basstler.json_model import JSONModel
 from basstler.locations import WorkflowLocation
 from basstler.plan_site.exceptions import PlanSiteTokenNotEnteredError
@@ -177,14 +177,9 @@ class WorkflowKey(StrEnum):
     The events that start the workflow, by event.
     """
 
-    PUSH = "push"
-    """
-    The push event, under :attr:`TRIGGERS`.
-    """
-
     BRANCHES = "branches"
     """
-    The branches a push to starts the workflow, under :attr:`PUSH`.
+    The branches a push to starts the workflow, under :attr:`TriggerEvent.PUSH`.
     """
 
     JOBS = "jobs"
@@ -329,7 +324,7 @@ class WorkflowFile(JSONModel):
         :param data: The whole workflow file.
         :return: The parsed workflow.
         """
-        push = data[WorkflowKey.TRIGGERS].get(WorkflowKey.PUSH, {})
+        push = data[WorkflowKey.TRIGGERS].get(TriggerEvent.PUSH, {})
         return cls(
             push.get(WorkflowKey.BRANCHES, []),
             {

@@ -32,7 +32,10 @@ from basstler.package_map import (
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import WorkspaceLocation
 
-from basstler_testing.constants.paths import PackageBoundarySnippet
+from basstler_testing.constants.paths import (
+    PackageBoundarySnippet,
+    ThirdPartyImportSnippet,
+)
 
 # %% the workspace's map
 
@@ -157,6 +160,40 @@ def test_a_distributions_tests_need_no_distribution_it_does_not_require(director
         )
         if name in names
     } - required == set()
+
+
+# %% required libraries
+
+
+@pytest.fixture
+def library_package_map() -> PackageMap:
+    """
+    :return: The map of the dataset's workspace, whose lower distribution requires
+        ``pydantic``.
+    """
+    return Workspace(ThirdPartyImportSnippet.DIRECTORY.value).package_map
+
+
+def test_a_distribution_lists_the_libraries_its_metadata_requires(library_package_map):
+    """
+    The lower distribution lists ``pydantic``, whose version constraint is not part of
+    the name; the higher one lists no library of its own.
+    """
+    assert {
+        declaration.distribution: declaration.libraries
+        for declaration in library_package_map.declarations
+    } == {Distribution.CORE: ("pydantic",), Distribution.GIT: ()}
+
+
+def test_a_distribution_requires_the_libraries_of_the_distributions_it_lists(
+    library_package_map,
+):
+    """
+    The higher distribution lists no library, yet needs the lower one's.
+    """
+    assert library_package_map.libraries_required_by_distribution(Distribution.GIT) == {
+        "pydantic"
+    }
 
 
 # %% looking up a declaration

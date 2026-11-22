@@ -4,7 +4,7 @@ description: Start one tracked plan item: gather its context, open its branch an
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, AskUserQuestion, Skill, EnterPlanMode, ExitPlanMode, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__get_file_contents, mcp__github__create_pull_request, mcp__github__update_pull_request, mcp__claude-code-remote__subscribe_pr_activity, mcp__github__issue_read
 ---
 
-# Plan Item Kickoff
+# Plan item kickoff
 
 Run commands as [`running-commands.md`](../running-commands.md) says, with
 `${CLAUDE_PLUGIN_ROOT}` as the `${BASSTLER_PLUGIN_ROOT}` it and every linked document name.

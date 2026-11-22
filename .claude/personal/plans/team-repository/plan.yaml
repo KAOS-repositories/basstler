@@ -40,12 +40,11 @@ items:
   - team-notes-store
   - basstler-service/service-deploy
   - basstler-service/app-manifest
-  notes: Owner creates the repository in cram2 (name to confirm), enables Issues, installs the Claude
-    GitHub App and the team's BasstlerHub App, and deploys the team's instance (basstler-service/service-deploy).
-    Setup writes the hub (registry, notes_branch = default branch), labels and docs/team.md; a member
-    runs setup with the team repository to get their notes branch. Conflict - basstler.setup.personal_notes
-    refuses a notes remote the token's login does not own; allow the configured plan store, e.g. by push
-    access.
+  notes: Owner creates the repository in the organisation (cram2 for CRAM; KAOS-repositories for business_consulting,
+    see migrate-kpi-collection), enables Issues, installs the Claude GitHub App and the team's BasstlerHub
+    App, and deploys the team's instance (basstler-service/service-deploy). Setup writes the hub (registry,
+    notes_branch = default branch), labels and docs/team.md; a member runs setup with the team repository
+    to get their notes branch. v4.0.3 already accepts a notes remote by push access (2026-11-22).
 - id: migrate-domain-models
   title: Move the domain-models plan from the CRAM fork's notes to the team repository
   branch: null
@@ -85,3 +84,16 @@ items:
     The assignee's kickoff link starts the item on their fork; its pull request into the upstream reaches
     the item through the App's events, and one still on their fork once they install the App there. Only
     the assignee and the plan's writers change its status.
+
+- id: migrate-kpi-collection
+  title: Move the kpi-collection plan to the business_consulting team repository
+  track: team-store
+  depends_on:
+  - team-repo-setup
+  status: not started
+  recommended_model: sonnet
+  notes: 'Second pilot, decided by the owner 2026-11-22: a private project several people work on. kpi-collection
+    lives on KAOS-repositories/business_consulting-notes (private, one shared claude/personal-notes branch,
+    tracking issue KAOS-repositories/business_consulting#162). Copy it to the team plan store, remove
+    it there, point the notes at it; tomsch420 and Hesham join with the onboarding command and read it
+    signed in.'

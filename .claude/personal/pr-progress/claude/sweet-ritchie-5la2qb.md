@@ -1,11 +1,11 @@
 Plan
-- PR #290 (playbook-model): review 6012167964 addressed; waiting on round 2.
+- PR #290 (playbook-model): review rounds 1 and 2 addressed; waiting on round 3.
 
 Done
-- 578a9d15, 5dc4919d, 84d895b1: renames, hook classes and models, RepositoryCheckout,
-  Skill classes generating SKILL.md frontmatter. 13 threads resolved; summary answered.
-- Plan item project-plugin-files added (basstler-packages).
+- 510fd24c: SKILL.md holds its body (skill-body.md gone); SessionTool kinds;
+  BasstlerCommand base; PythonModule + one PythonSourceFile; repository_checkout names.
+- Plan item feature-docs added (basstler-packages); customization-docs depends on it.
 
 Next
-- Open threads: 6, 8, 10, 13 (answered differently), 9 and 17 (wait on
-  project-plugin-files). Confirm the 43 hub browser tests in CI.
+- Open threads: Module "one class?" (2 threads), PluginRoot mixin, 9 and 17
+  (wait on project-plugin-files). Confirm the 43 hub browser tests in CI.

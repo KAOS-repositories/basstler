@@ -1,11 +1,11 @@
 Plan
-- PR #290 (playbook-model): address review 6012167964.
+- PR #290 (playbook-model): review 6012167964 addressed; waiting on round 2.
 
 Done
-- 578a9d15: renames, BASSTLER_PLAYBOOK, PythonSourceFile, per-event hook classes,
-  hooks.json models, PluginRoot; 9 threads resolved, rest replied.
+- 578a9d15, 5dc4919d, 84d895b1: renames, hook classes and models, RepositoryCheckout,
+  Skill classes generating SKILL.md frontmatter. 17 threads resolved; summary answered.
+- Plan item project-plugin-files added (basstler-packages).
 
 Next
-- Owner decides: Skill class (krrood) + skills outside the plugin; common component
-  field; ProjectClone name; automatable setup steps; playbook benefit + docs item.
-- Then reply/resolve threads 1, 6, 8, 9, 10, 13, 15, 16, 17, 19.
+- Open threads: 6, 8, 10, 13 (answered differently), 9 and 17 (wait on
+  project-plugin-files). Confirm the 43 hub browser tests in CI.

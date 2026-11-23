@@ -23,12 +23,7 @@ import yaml
 from basstler.class_property import classproperty
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
-from basstler.regular_expression import (
-    Anchor,
-    CharacterClass,
-    RegularExpression,
-    Wildcard,
-)
+from basstler.regular_expression import Anchor, RegularExpression, Separator, Wildcard
 from basstler.text_file import TextFile
 
 
@@ -202,7 +197,7 @@ class Prose:
         ['one', 'two']
         """
         return RegularExpression.sequence(
-            "\n", CharacterClass.WHITESPACE.zero_or_more(), "\n"
+            "\n", Separator.WHITESPACE.zero_or_more(), "\n"
         ).compiled()
 
     @classproperty
@@ -545,9 +540,9 @@ class ManifestKey(KeySpecification, Enum):
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             f"{self.key}:",
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
             Anchor.LINE_END,
         ).compiled()

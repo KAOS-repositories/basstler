@@ -14,6 +14,7 @@ import pytest
 from basstler.class_property import classproperty
 from basstler.regular_expression import (
     Anchor,
+    BacktickQuoted,
     CharacterRange,
     CharacterSet,
     RegularExpression,
@@ -59,11 +60,12 @@ class RowReference:
         ``` `git_identity` row ```.
         """
         return RegularExpression.sequence(
-            "`",
-            CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_")
-            .one_or_more()
-            .captured_as(RowReferenceGroup.WORD),
-            "` row",
+            BacktickQuoted(
+                CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_")
+                .one_or_more()
+                .captured_as(RowReferenceGroup.WORD)
+            ),
+            " row",
             RegularExpression.literal("s").optional(),
             Anchor.WORD_BOUNDARY,
         ).compiled()

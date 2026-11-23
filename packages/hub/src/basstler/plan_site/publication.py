@@ -65,7 +65,12 @@ from basstler.plan_site.workflows import (
     SiteWorkflow,
 )
 from basstler.review_triage.viewed_setup import MarkViewedSetup
-from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+    Separator,
+)
 from basstler.setup.steps import resolve_repository
 from basstler.shell_configuration import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
@@ -118,7 +123,7 @@ class SymbolicReferenceListing(StrEnum):
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
                 SymbolicReferenceListing.BRANCH_GROUP
             ),
-            CharacterClass.WHITESPACE.one_or_more(),
+            Separator.WHITESPACE.one_or_more(),
             SymbolicReferenceListing.HEAD,
             Anchor.LINE_END,
         ).compiled()

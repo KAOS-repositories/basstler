@@ -15,7 +15,7 @@ from basstler.code_rules.rule import CodeReference, Section
 from basstler.exceptions import DataclassException
 from basstler.locations import PathEnumeration
 from basstler import regular_expression
-from basstler.regular_expression import RegularExpression
+from basstler.regular_expression import EnclosedPattern, RegularExpression, Separator
 
 
 class CodeQualityRules(Section):
@@ -677,11 +677,20 @@ class StructuredDataRules(Section):
 
     PATTERNS_FROM_NAMED_PARTS = (
         "A regular expression reads as a sentence of what each part means, composed "
-        f"with {CodeReference(RegularExpression).path}: text the matched input holds "
-        "as written - a delimiter, a keyword, a `<` or `>` - is written as text, "
-        "adjacent pieces joined into one string or f-string, while pattern syntax - "
-        "a character class, a repeat, a lookaround - is a named part, and a group's "
-        "name is an enum member"
+        f"with {CodeReference(RegularExpression).path}: a delimiter or keyword the "
+        "matched input holds as written is written as text, adjacent pieces joined "
+        "into one string or f-string; pattern syntax - a character class, a repeat, a "
+        "lookaround - is a named part; a separator standing as a piece of its own is "
+        f"a {CodeReference(Separator).path} member; text between two delimiters - "
+        "quotes, a tag, an HTML comment, a code fence - is a "
+        f"{CodeReference(EnclosedPattern).path}; and a group's name is an enum member"
+    )
+
+    PATTERN_ALTERNATIVES_AS_ENUMS = (
+        "Texts a pattern matches that share one meaning - the alternatives it chooses "
+        "from, a set of characters such as the shell's metacharacters - are the "
+        "members of one `StrEnum`, passed all at once as `*InstallCommand`, and so is "
+        "a text of several words that names one thing, such as the command `uv sync`"
     )
 
     NO_PATTERN_TEXT = (

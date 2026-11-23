@@ -6,6 +6,7 @@ each part means instead of a run of symbols.
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -129,11 +130,6 @@ class CharacterClass(PatternPart, StrEnum):
     A kind of character, matching one character of that kind, alone or in a set.
     """
 
-    WHITESPACE = r"\s"
-    """
-    A space, tab or line break.
-    """
-
     NON_WHITESPACE = r"\S"
     """
     Any character but whitespace.
@@ -188,6 +184,44 @@ class CharacterRange(PatternPart, StrEnum):
         return f"[{self.value}]"
 
 
+class Separator(PatternPart, StrEnum):
+    """
+    A character that separates words, fields or lines, matching one character of its
+    kind, alone or in a set.
+    """
+
+    WHITESPACE = r"\s"
+    """
+    A space, tab or line break.
+    """
+
+    SPACE = " "
+    """
+    A space.
+    """
+
+    SPACE_OR_TAB = r" \t"
+    """
+    A space or a tab, the whitespace within a line.
+    """
+
+    LINE_BREAK = r"\n"
+    """
+    The end of a line.
+    """
+
+    COMMA = ","
+    """
+    A comma.
+    """
+
+    def __str__(self) -> str:
+        """
+        :return: The separator as a set of its own.
+        """
+        return f"[{self.value}]"
+
+
 class Wildcard(PatternPart, StrEnum):
     """
     Any one character, of a breadth no character class names.
@@ -204,9 +238,10 @@ class Wildcard(PatternPart, StrEnum):
     """
 
 
-type CharacterSetMember = CharacterClass | CharacterRange | str
+type CharacterSetMember = CharacterClass | CharacterRange | Separator | str
 """
-What a set lists: a kind of character, a run of characters, or the characters of a text.
+What a set lists: a kind of character, a run of characters, a separator, or the
+characters of a text.
 """
 
 
@@ -229,6 +264,9 @@ class CharacterSet(PatternPart):
     @classmethod
     def any_of(cls, *members: CharacterSetMember) -> CharacterSet:
         """
+        >>> CharacterSet.any_of(".~-").compiled().findall("a.b~c-d")
+        ['.', '~', '-']
+
         :param members: The characters to choose from.
         :return: The set matching one of them.
         """
@@ -248,7 +286,7 @@ class CharacterSet(PatternPart):
         """
         listed = "".join(
             member.value
-            if isinstance(member, (CharacterClass, CharacterRange))
+            if isinstance(member, (CharacterClass, CharacterRange, Separator))
             else re.escape(member)
             for member in self.members
         )
@@ -305,8 +343,8 @@ class RegularExpression(PatternPart):
         The position before a part, which the match does not take in.
 
         >>> before_one = RegularExpression.lookahead("1")
-        >>> RegularExpression.sequence("v", before_one).compiled().sub("V", "v1 v2")
-        'V1 v2'
+        >>> RegularExpression.sequence("v", before_one).compiled().search("v2 v1")
+        <re.Match object; span=(3, 4), match='v'>
 
         :param piece: The part that has to come next.
         :return: The position it follows, matching no character.
@@ -319,8 +357,8 @@ class RegularExpression(PatternPart):
         A position not before a part.
 
         >>> not_before_one = RegularExpression.negative_lookahead("1")
-        >>> RegularExpression.sequence("v", not_before_one).compiled().sub("V", "v1 v2")
-        'v1 V2'
+        >>> RegularExpression.sequence("v", not_before_one).compiled().search("v1 v2")
+        <re.Match object; span=(3, 4), match='v'>
 
         :param piece: The part that must not come next.
         :return: A position it does not follow, matching no character.
@@ -349,8 +387,8 @@ class RegularExpression(PatternPart):
 
         >>> not_after_hyphen = RegularExpression.negative_lookbehind("-")
         >>> identifier = RegularExpression.sequence(not_after_hyphen, "id")
-        >>> identifier.compiled().sub("ID", "id x-id")
-        'ID x-id'
+        >>> identifier.compiled().search("x-id id")
+        <re.Match object; span=(5, 7), match='id'>
 
         :param piece: The part that must not come before, of a fixed length.
         :return: A position not right after it, matching no character.
@@ -380,3 +418,177 @@ class RegularExpression(PatternPart):
         :return: The pattern text.
         """
         return self.source
+
+
+# %% patterns between delimiters
+
+
+class EnclosedPattern(PatternPart, ABC):
+    """
+    A pattern between an opening and a closing delimiter, which match as written.
+    """
+
+    content: RegularExpression
+    """
+    The pattern matched between the delimiters.
+    """
+
+    def __init__(self, *pieces: PatternPiece) -> None:
+        """
+        :param pieces: The parts matched between the delimiters, in order.
+        """
+        self.content = RegularExpression.sequence(*pieces)
+
+    @property
+    @abstractmethod
+    def opening(self) -> str:
+        """
+        The text before the content.
+        """
+
+    @property
+    @abstractmethod
+    def closing(self) -> str:
+        """
+        The text after the content.
+        """
+
+    def __str__(self) -> str:
+        """
+        :return: The pattern text of the content between its delimiters.
+        """
+        return str(RegularExpression.sequence(self.opening, self.content, self.closing))
+
+
+class SingleQuoted(EnclosedPattern):
+    """
+    A pattern between single quotes.
+
+    >>> SingleQuoted(CharacterClass.DIGIT).compiled().findall("'1' 2 '3'")
+    ["'1'", "'3'"]
+    """
+
+    @property
+    def opening(self) -> str:
+        return "'"
+
+    @property
+    def closing(self) -> str:
+        return "'"
+
+
+class DoubleQuoted(EnclosedPattern):
+    """
+    A pattern between double quotes.
+
+    >>> DoubleQuoted(CharacterClass.DIGIT).compiled().findall('"1" 2 "3"')
+    ['"1"', '"3"']
+    """
+
+    @property
+    def opening(self) -> str:
+        return '"'
+
+    @property
+    def closing(self) -> str:
+        return '"'
+
+
+class BacktickQuoted(EnclosedPattern):
+    """
+    A pattern between backticks, as Markdown writes inline code.
+
+    >>> BacktickQuoted("cd").compiled().findall("`cd` cd")
+    ['`cd`']
+    """
+
+    @property
+    def opening(self) -> str:
+        return "`"
+
+    @property
+    def closing(self) -> str:
+        return "`"
+
+
+class MarkupTag(EnclosedPattern):
+    """
+    A pattern between angle brackets, as an HTML tag or a placeholder is written.
+
+    >>> MarkupTag("time").compiled().findall("<time>12:00</time>")
+    ['<time>']
+    """
+
+    @property
+    def opening(self) -> str:
+        return "<"
+
+    @property
+    def closing(self) -> str:
+        return ">"
+
+
+class MarkupClosingTag(EnclosedPattern):
+    """
+    A pattern between the delimiters of a closing HTML tag.
+
+    >>> MarkupClosingTag("time").compiled().findall("<time>12:00</time>")
+    ['</time>']
+    """
+
+    @property
+    def opening(self) -> str:
+        return "</"
+
+    @property
+    def closing(self) -> str:
+        return ">"
+
+
+class HtmlComment(EnclosedPattern):
+    """
+    A pattern between the delimiters of an HTML comment.
+
+    >>> HtmlComment(" note ").compiled().findall("<!-- note --> note")
+    ['<!-- note -->']
+    """
+
+    @property
+    def opening(self) -> str:
+        return "<!--"
+
+    @property
+    def closing(self) -> str:
+        return "-->"
+
+
+class CodeFence(EnclosedPattern):
+    r"""
+    A pattern between the fences of a Markdown code block in one language, the content
+    starting on the line after the opening fence.
+
+    >>> block = CodeFence("bash", Wildcard.ANY_CHARACTER.zero_or_more(shortest=True))
+    >>> block.compiled().findall("```bash\nls\n```")
+    ['```bash\nls\n```']
+    """
+
+    language: str
+    """
+    The language the opening fence names.
+    """
+
+    def __init__(self, language: str, *pieces: PatternPiece) -> None:
+        """
+        :param language: The language the opening fence names.
+        :param pieces: The parts matched between the fences, in order.
+        """
+        super().__init__(*pieces)
+        self.language = language
+
+    @property
+    def opening(self) -> str:
+        return f"```{self.language}\n"
+
+    @property
+    def closing(self) -> str:
+        return "```"

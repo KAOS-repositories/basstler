@@ -33,7 +33,9 @@ from basstler.regular_expression import (
     Anchor,
     CharacterClass,
     CharacterSet,
+    CodeFence,
     RegularExpression,
+    Separator,
     Wildcard,
 )
 
@@ -76,8 +78,8 @@ class SkillDocumentName(StrEnum):
 
     SKILL = "SKILL.md"
     """
-    A skill's own instructions, the only document Claude Code substitutes its
-    variables in.
+    A skill's own instructions, the only document Claude Code substitutes its variables
+    in.
     """
 
 
@@ -134,24 +136,23 @@ class SkillDocumentPattern:
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            RegularExpression.literal(" ")
-            .zero_or_more()
-            .captured_as(BashBlockGroup.INDENTATION),
-            "```bash\n",
-            Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
-                BashBlockGroup.COMMANDS
+            Separator.SPACE.zero_or_more().captured_as(BashBlockGroup.INDENTATION),
+            CodeFence(
+                "bash",
+                Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
+                    BashBlockGroup.COMMANDS
+                ),
+                Anchor.LINE_START,
+                RegularExpression.backreference(BashBlockGroup.INDENTATION),
             ),
-            Anchor.LINE_START,
-            RegularExpression.backreference(BashBlockGroup.INDENTATION),
-            "```",
         ).compiled()
 
     @classproperty
     def bare_interpreter_run(cls) -> re.Pattern[str]:
         """
         A module of the package run with whatever ``python``/``python3`` the path finds,
-        which in a session is not the package's own environment, as
-        ``python3 -m basstler``.
+        which in a session is not the package's own environment, as ``python3 -m
+        basstler``.
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(
@@ -465,7 +466,8 @@ def test_the_resolve_skill_links_the_pull_request_rules() -> None:
 @pytest.mark.parametrize("document", skill_documents(), ids=document_identifier)
 def test_no_skill_document_runs_the_package_with_a_bare_interpreter(document: Path):
     """
-    Each skill links the shared rules for running commands and says what plugin root they name.
+    Each skill links the shared rules for running commands and says what plugin root
+    they name.
     """
     assert (
         SkillDocumentPattern.bare_interpreter_run.findall(

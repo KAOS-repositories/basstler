@@ -24,10 +24,11 @@ from basstler.bash import Bash
 from basstler.class_property import classproperty
 from basstler.locations import PluginLocation, ProjectLocation
 from basstler.regular_expression import (
-    CharacterClass,
     CharacterRange,
     CharacterSet,
+    MarkupTag,
     RegularExpression,
+    Separator,
 )
 from basstler.shell_configuration import ShellConfigurationFunction
 
@@ -123,19 +124,17 @@ class DocumentPattern:
         """
         A Markdown link to a file, capturing its target, as ``](../rule.md)``.
         """
-        return MarkdownLinkPattern.target("#", CharacterClass.WHITESPACE).compiled()
+        return MarkdownLinkPattern.target("#", Separator.WHITESPACE).compiled()
 
     @classproperty
     def placeholder(cls) -> re.Pattern[str]:
         """
         A placeholder such as ``<plan-id>``, capturing its name.
         """
-        return RegularExpression.sequence(
-            "<",
+        return MarkupTag(
             CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
             .one_or_more()
             .captured_as(PlaceholderGroup.NAME),
-            ">",
         ).compiled()
 
     @classproperty

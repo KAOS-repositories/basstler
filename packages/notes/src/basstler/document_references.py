@@ -30,6 +30,7 @@ from basstler.regular_expression import (
     CharacterRange,
     CharacterSet,
     RegularExpression,
+    Separator,
 )
 from basstler.slash_command import SlashCommand
 from basstler.standard_streams import StandardStreamHandler
@@ -311,7 +312,7 @@ class CitedNames:
             RegularExpression.lookbehind(CharacterSet.any_of('/"`')),
             PluginLocation.ENTRY_POINT_SCRIPT.name,
             RegularExpression.literal('"').optional(),
-            CharacterClass.WHITESPACE.one_or_more(),
+            Separator.WHITESPACE.one_or_more(),
             RegularExpression.sequence(
                 cls.module_name,
                 RegularExpression.sequence(".", cls.module_name).zero_or_more(),

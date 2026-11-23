@@ -55,12 +55,7 @@ from basstler.playbook.setup_steps import (
     SetupSteps,
 )
 from basstler.plugin_root import PluginRoot
-from basstler.regular_expression import (
-    Anchor,
-    CharacterSet,
-    RegularExpression,
-    Wildcard,
-)
+from basstler.regular_expression import Anchor, RegularExpression, Separator, Wildcard
 from basstler.shell_configuration import (
     FetchedBranchReference,
     PersonalNotesSetting,
@@ -422,12 +417,12 @@ class PersonalUpstream(HasRepository):
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            CharacterSet.any_of(" \t").zero_or_more(),
+            Separator.SPACE_OR_TAB.zero_or_more(),
             StackSetting.UPSTREAM_REPOSITORY,
-            CharacterSet.any_of(" \t").zero_or_more(),
+            Separator.SPACE_OR_TAB.zero_or_more(),
             "=",
             Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
-            RegularExpression.either("\n", Anchor.LINE_END),
+            RegularExpression.either(Separator.LINE_BREAK, Anchor.LINE_END),
         ).compiled()
 
     def written_over(self, existing: str) -> str:

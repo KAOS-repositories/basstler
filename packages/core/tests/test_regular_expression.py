@@ -14,6 +14,7 @@ from basstler.regular_expression import (
     CharacterRange,
     CharacterSet,
     RegularExpression,
+    Separator,
     Wildcard,
 )
 
@@ -265,7 +266,7 @@ def test_a_complement_set_matches_one_character_outside_its_members():
     """
     A character class and text members are both refused.
     """
-    pattern = CharacterSet.any_except(CharacterClass.WHITESPACE, "^\\").compiled()
+    pattern = CharacterSet.any_except(Separator.WHITESPACE, "^\\").compiled()
     assert [pattern.fullmatch(text) is not None for text in ("a", " ", "^", "\\")] == [
         True,
         False,

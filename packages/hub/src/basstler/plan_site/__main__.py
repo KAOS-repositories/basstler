@@ -66,7 +66,12 @@ from basstler.plan_site.hub_page import (
 from basstler.plan_site.item_classifier import ItemClassifier
 from basstler.plan_site.plan_page import PlanPage, RenderedPlanPage
 from basstler.plan_site.plan_page_header import PlanPageHeader
-from basstler.regular_expression import CharacterSet, RegularExpression
+from basstler.regular_expression import (
+    CharacterSet,
+    MarkupClosingTag,
+    MarkupTag,
+    RegularExpression,
+)
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -124,13 +129,14 @@ class SiteDigest:
         b'<time data-refreshed-at="1">12:00</time>'
         """
         return RegularExpression.sequence(
-            "<time ",
-            CharacterSet.any_except(">").zero_or_more(),
-            PlanTimeAttribute.REFRESHED,
-            CharacterSet.any_except(">").zero_or_more(),
-            ">",
+            MarkupTag(
+                "time ",
+                CharacterSet.any_except(">").zero_or_more(),
+                PlanTimeAttribute.REFRESHED,
+                CharacterSet.any_except(">").zero_or_more(),
+            ),
             CharacterSet.any_except("<").zero_or_more(),
-            "</time>",
+            MarkupClosingTag("time"),
         ).compiled_for_bytes()
 
     @property

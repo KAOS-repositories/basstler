@@ -11,9 +11,9 @@ from basstler.exit_codes import ExitCode
 from basstler.plan.model import ManifestKey, Prose
 from basstler.regular_expression import (
     Anchor,
-    CharacterClass,
     CharacterSet,
     RegularExpression,
+    Separator,
 )
 
 # %% shared vocabulary
@@ -52,7 +52,7 @@ class ManifestLinePattern(Enum):
 
     ITEM_START = RegularExpression.sequence(
         Anchor.LINE_START,
-        CharacterClass.WHITESPACE.zero_or_more(),
+        Separator.WHITESPACE.zero_or_more(),
         f"- {ManifestKey.IDENTIFIER.key}:",
     ).compiled()
     """
@@ -64,9 +64,9 @@ class ManifestLinePattern(Enum):
 
     SEQUENCE_ENTRY = RegularExpression.sequence(
         Anchor.LINE_START,
-        CharacterClass.WHITESPACE.zero_or_more(),
+        Separator.WHITESPACE.zero_or_more(),
         "-",
-        CharacterClass.WHITESPACE,
+        Separator.WHITESPACE,
     ).compiled()
     """
     Matches one entry of a block sequence, which YAML lets sit either indented under
@@ -79,7 +79,7 @@ class ManifestLinePattern(Enum):
 
     TOP_LEVEL_KEY = RegularExpression.sequence(
         Anchor.LINE_START,
-        CharacterSet.any_except(CharacterClass.WHITESPACE, "-"),
+        CharacterSet.any_except(Separator.WHITESPACE, "-"),
     ).compiled()
     """
     Matches a top-level ``plan.yaml`` key, which is where the last item block ends. A
@@ -92,7 +92,7 @@ class ManifestLinePattern(Enum):
 
     BLOCK_VALUE = RegularExpression.sequence(
         Anchor.LINE_START,
-        CharacterClass.WHITESPACE.zero_or_more(),
+        Separator.WHITESPACE.zero_or_more(),
         RegularExpression.either(
             *sorted(manifest_key.key for manifest_key in ManifestKey.block_styled())
         ),

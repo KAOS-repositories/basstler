@@ -23,9 +23,9 @@ from basstler.code_modification.syntax import BodySyntax, ExpressionSyntax
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.regular_expression import (
     Anchor,
-    CharacterClass,
     CharacterSet,
     RegularExpression,
+    Separator,
 )
 from basstler.text_file import TextFile
 
@@ -140,7 +140,7 @@ class SourceProse:
         return RegularExpression.sequence(
             Anchor.LINE_START,
             ":",
-            CharacterSet.any_except(":", CharacterClass.WHITESPACE),
+            CharacterSet.any_except(":", Separator.WHITESPACE),
             CharacterSet.any_except(":").zero_or_more(),
             ":",
         ).compiled()
@@ -158,7 +158,7 @@ class SourceProse:
         return RegularExpression.sequence(
             Anchor.LINE_START,
             "#",
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             RegularExpression.either(*ToolDirective),
         ).compiled()
 

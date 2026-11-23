@@ -42,6 +42,7 @@ from basstler.regular_expression import (
     Anchor,
     CharacterSet,
     RegularExpression,
+    SingleQuoted,
     Wildcard,
 )
 from basstler.render_common import create_template_environment
@@ -123,7 +124,6 @@ class WorkflowLimits:
         >>> pattern = WorkflowLimits.repository_pin
         >>> bool(pattern.fullmatch("github.repository == 'owner/repo'"))
         True
-        >>> pattern = WorkflowLimits.repository_pin
         >>> bool(pattern.fullmatch("github.repository != 'owner/repo'"))
         False
         """
@@ -133,9 +133,8 @@ class WorkflowLimits:
         )
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            "github.repository == '",
-            CharacterSet.any_except("'").one_or_more(),
-            "'",
+            "github.repository == ",
+            SingleQuoted(CharacterSet.any_except("'").one_or_more()),
             further_condition.optional(),
             Anchor.LINE_END,
         ).compiled()

@@ -19,6 +19,12 @@ from pathlib import Path
 
 from cyclopts import App
 
+from basstler.bash import (
+    ShellExpansionCharacter,
+    ShellListOperator,
+    ShellMetacharacter,
+    ShellQuote,
+)
 from basstler.class_property import classproperty
 from basstler.exit_codes import StackExitCode
 from basstler.session_tool import BuiltInTool
@@ -27,10 +33,11 @@ from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocat
 from basstler.plan_site.attach_approval import AllowedAttach, AttachAnswer
 from basstler.plugin_root import PluginRoot
 from basstler.regular_expression import (
-    CharacterClass,
     CharacterRange,
     CharacterSet,
+    DoubleQuoted,
     RegularExpression,
+    Separator,
 )
 
 # %% what Claude Code sends
@@ -110,7 +117,10 @@ class EntryPointInvocation:
         '~/repo'
         """
         return CharacterSet.any_except(
-            CharacterClass.WHITESPACE, "|&;()<>", "$`", "'\"\\"
+            Separator.WHITESPACE,
+            *ShellMetacharacter,
+            *ShellExpansionCharacter,
+            *ShellQuote,
         ).one_or_more()
 
     @classproperty
@@ -173,10 +183,13 @@ class EntryPointInvocation:
         ' setup.gate --check'
         """
         argument = CharacterSet.any_except(
-            CharacterClass.WHITESPACE, "|&;()<>", "$`", "\\"
+            Separator.WHITESPACE,
+            *ShellMetacharacter,
+            *ShellExpansionCharacter,
+            ShellQuote.ESCAPE,
         ).one_or_more()
         return RegularExpression.sequence(
-            CharacterClass.WHITESPACE.one_or_more(), argument
+            Separator.WHITESPACE.one_or_more(), argument
         ).zero_or_more()
 
     @classproperty
@@ -191,11 +204,11 @@ class EntryPointInvocation:
         """
         return RegularExpression.sequence(
             "cd",
-            CharacterClass.WHITESPACE.one_or_more(),
+            Separator.WHITESPACE.one_or_more(),
             cls.plain_word,
-            CharacterClass.WHITESPACE.zero_or_more(),
-            RegularExpression.either("&&", ";"),
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
+            RegularExpression.either(*ShellListOperator),
+            Separator.WHITESPACE.zero_or_more(),
         ).optional()
 
     @classproperty
@@ -207,16 +220,16 @@ class EntryPointInvocation:
         >>> bool(pattern.fullmatch('; echo "exit status: $?"'))
         True
         """
-        plain_text = CharacterSet.any_except('"\\$`').zero_or_more()
+        plain_text = CharacterSet.any_except(
+            ShellQuote.DOUBLE_QUOTE, ShellQuote.ESCAPE, *ShellExpansionCharacter
+        ).zero_or_more()
         return RegularExpression.sequence(
-            CharacterClass.WHITESPACE.zero_or_more(),
-            ";",
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
+            ShellListOperator.COMMAND_SEPARATOR,
+            Separator.WHITESPACE.zero_or_more(),
             "echo",
-            CharacterClass.WHITESPACE.one_or_more(),
-            '"',
-            plain_text,
-            '$?"',
+            Separator.WHITESPACE.one_or_more(),
+            DoubleQuoted(plain_text, "$?"),
         ).optional()
 
     @classproperty
@@ -233,12 +246,12 @@ class EntryPointInvocation:
         False
         """
         return RegularExpression.sequence(
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             cls.directory_change,
             cls.script,
             cls.arguments,
             cls.status_report,
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
         ).compiled()
 
     def matches(self, command: str) -> bool:

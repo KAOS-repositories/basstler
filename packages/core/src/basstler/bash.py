@@ -37,6 +37,101 @@ class LocatedProgram(StrEnum):
 # %% bash's syntax
 
 
+class ShellMetacharacter(StrEnum):
+    """
+    The characters that, unquoted, end a word and start an operator.
+    """
+
+    PIPE = "|"
+    """
+    Feeds one command's output to the next.
+    """
+
+    BACKGROUND = "&"
+    """
+    Runs the command before it in the background, and doubled, chains a command.
+    """
+
+    COMMAND_SEPARATOR = ";"
+    """
+    Ends a command, running the next after it.
+    """
+
+    SUBSHELL_START = "("
+    """
+    Opens a subshell.
+    """
+
+    SUBSHELL_END = ")"
+    """
+    Closes a subshell.
+    """
+
+    INPUT_REDIRECTION = "<"
+    """
+    Reads a command's input from a file.
+    """
+
+    OUTPUT_REDIRECTION = ">"
+    """
+    Writes a command's output to a file.
+    """
+
+
+class ShellExpansionCharacter(StrEnum):
+    """
+    The characters that make the shell replace text with a value, also inside double
+    quotes.
+    """
+
+    PARAMETER_EXPANSION = "$"
+    """
+    Starts a variable's or a special parameter's value.
+    """
+
+    COMMAND_SUBSTITUTION = "`"
+    """
+    Encloses a command whose output replaces it.
+    """
+
+
+class ShellQuote(StrEnum):
+    """
+    The characters that quote what follows them.
+    """
+
+    SINGLE_QUOTE = "'"
+    """
+    Encloses text the shell leaves entirely as written.
+    """
+
+    DOUBLE_QUOTE = '"'
+    """
+    Encloses text the shell leaves as written but for expansions.
+    """
+
+    ESCAPE = "\\"
+    """
+    Quotes the one character after it.
+    """
+
+
+class ShellListOperator(StrEnum):
+    """
+    The operators that run one command after another.
+    """
+
+    AND_LIST = "&&"
+    """
+    Runs the next command only when the one before succeeded.
+    """
+
+    COMMAND_SEPARATOR = ShellMetacharacter.COMMAND_SEPARATOR
+    """
+    Runs the next command after the one before, whatever its exit status.
+    """
+
+
 # %% the bash itself
 
 

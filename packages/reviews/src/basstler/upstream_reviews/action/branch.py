@@ -17,7 +17,12 @@ from basstler.class_property import classproperty
 from basstler.git.branch import Branch
 from basstler.git.commands import CommitTrailer, GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
-from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+    Separator,
+)
 from basstler.render_common import create_template_environment
 from basstler.github.basstler_project import BasstlerProject, BasstlerWorkflowInput
 
@@ -160,13 +165,13 @@ class ActionInstallation:
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             f"{BasstlerWorkflowInput.BRANCH_OR_TAG}:",
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
                 BasstlerWorkflowInput.BRANCH_OR_TAG
             ),
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             Anchor.LINE_END,
         ).compiled()
 

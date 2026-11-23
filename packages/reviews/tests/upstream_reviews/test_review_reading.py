@@ -21,7 +21,12 @@ from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
 )
-from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+    Separator,
+)
 
 from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory
 
@@ -71,11 +76,11 @@ def upstream_reviews_invocation() -> str:
         RegularExpression.sequence(
             Anchor.LINE_START,
             "name:",
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
                 FrontMatterGroup.NAME
             ),
-            CharacterClass.WHITESPACE.zero_or_more(),
+            Separator.WHITESPACE.zero_or_more(),
             Anchor.LINE_END,
         )
         .compiled()

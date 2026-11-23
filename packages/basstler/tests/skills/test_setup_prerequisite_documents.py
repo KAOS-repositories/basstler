@@ -22,10 +22,10 @@ from basstler.class_property import classproperty
 from basstler.locations import PackageLocation
 from basstler.regular_expression import (
     Anchor,
-    CharacterClass,
     CharacterRange,
     CharacterSet,
     RegularExpression,
+    Separator,
 )
 from basstler.setup import gate
 from basstler.setup.gate import BasstlerSkill, GateOption
@@ -63,6 +63,22 @@ class OfferingVerb(StrEnum):
     SUGGEST = "suggest"
     """
     A synonym that would reinstate the same question.
+    """
+
+
+class VerbEnding(StrEnum):
+    """
+    The endings an offering verb takes in an instruction.
+    """
+
+    THIRD_PERSON = "s"
+    """
+    As in *offers*.
+    """
+
+    PRESENT_PARTICIPLE = "ing"
+    """
+    As in *offering*.
     """
 
 
@@ -133,16 +149,16 @@ class SkillDocument:
         """
         to_run = RegularExpression.sequence(
             "to",
-            CharacterClass.WHITESPACE.one_or_more(),
+            Separator.WHITESPACE.one_or_more(),
             "run",
-            CharacterClass.WHITESPACE.one_or_more(),
+            Separator.WHITESPACE.one_or_more(),
         )
         return (
             RegularExpression.sequence(
                 Anchor.WORD_BOUNDARY,
                 RegularExpression.either(*OfferingVerb),
-                RegularExpression.either("s", "ing").optional(),
-                CharacterClass.WHITESPACE.one_or_more(),
+                RegularExpression.either(*VerbEnding).optional(),
+                Separator.WHITESPACE.one_or_more(),
                 to_run.optional(),
                 RegularExpression.literal("`").optional(),
                 SkillCommand.SETUP_PERSONAL_NOTES,
@@ -211,9 +227,9 @@ class GateCommand:
         """
         return RegularExpression.sequence(
             gate.__name__.removeprefix(f"{PackageLocation.DIRECTORY.name}."),
-            " ",
+            Separator.SPACE,
             GateOption.SKILL,
-            " ",
+            Separator.SPACE,
             CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
             .one_or_more()
             .captured_as(GateGroup.SKILL),

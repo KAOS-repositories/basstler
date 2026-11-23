@@ -8,7 +8,9 @@ from enum import StrEnum
 
 from basstler.regular_expression import (
     CharacterSet,
+    HtmlComment,
     RegularExpression,
+    Separator,
     Wildcard,
 )
 from basstler.shell_configuration import PersonalNotesSetting
@@ -108,13 +110,12 @@ class ClaudeLocalSection(StrEnum):
             CharacterSet.any_except(">").zero_or_more(),
         )
         pattern = RegularExpression.sequence(
-            f"<!-- BEGIN-{self}",
-            label.optional(),
-            " -->\n",
+            HtmlComment(f" BEGIN-{self}", label.optional(), " "),
+            Separator.LINE_BREAK,
             Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
                 SectionGroup.CONTENT
             ),
-            self.comment("END-" + self),
+            HtmlComment(f" END-{self} "),
         )
         return pattern.compiled().search(text)[SectionGroup.CONTENT]
 

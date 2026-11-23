@@ -45,7 +45,9 @@ from basstler.regular_expression import (
     CharacterClass,
     CharacterRange,
     CharacterSet,
+    DoubleQuoted,
     RegularExpression,
+    Separator,
     Wildcard,
 )
 from basstler.shell_configuration import PersonalNotesSetting
@@ -132,6 +134,27 @@ class ContractGroup(StrEnum):
     """
 
 
+class InstallCommand(StrEnum):
+    """
+    The commands that install a package and the dependencies its metadata declares.
+    """
+
+    PIP = "pip install"
+    """
+    pip's own install.
+    """
+
+    UV_PIP = "uv pip install"
+    """
+    uv's pip-compatible install.
+    """
+
+    UV_SYNC = "uv sync"
+    """
+    uv's install of a project's environment.
+    """
+
+
 class ContractPattern:
     """
     The patterns that read the shell configuration, the workflows and the skill documents.
@@ -149,14 +172,15 @@ class ContractPattern:
             CharacterSet.any_of(CharacterRange.ASCII_UPPERCASE_LETTER, "_")
             .one_or_more()
             .captured_as(ContractGroup.VARIABLE),
-            '="',
-            RegularExpression.sequence(
-                PACKAGE_NAME,
+            "=",
+            DoubleQuoted(
                 RegularExpression.sequence(
-                    ".", lowercase_name.one_or_more()
-                ).one_or_more(),
-            ).captured_as(ContractGroup.MODULE_PATH),
-            '"',
+                    PACKAGE_NAME,
+                    RegularExpression.sequence(
+                        ".", lowercase_name.one_or_more()
+                    ).one_or_more(),
+                ).captured_as(ContractGroup.MODULE_PATH)
+            ),
         ).compiled()
 
     @classproperty
@@ -166,7 +190,7 @@ class ContractPattern:
         declares, however the caller spells the directory, as ``uv sync --package``.
         """
         return RegularExpression.sequence(
-            RegularExpression.either("pip install", "uv pip install", "uv sync"),
+            RegularExpression.either(*InstallCommand),
             Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
             PACKAGE_NAME,
         ).compiled()
@@ -178,10 +202,10 @@ class ContractPattern:
         ``uv sync --package basstler``.
         """
         return RegularExpression.sequence(
-            "uv sync",
+            InstallCommand.UV_SYNC,
             Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
             "--package",
-            CharacterClass.WHITESPACE,
+            Separator.WHITESPACE,
             PACKAGE_NAME,
         ).compiled()
 
@@ -235,7 +259,8 @@ def invocation_of(module: PackageModule) -> re.Pattern[str]:
     )
     variables = [
         RegularExpression.sequence(
-            RegularExpression.either("${", "$"),
+            "$",
+            RegularExpression.literal("{").optional(),
             variable,
             Anchor.WORD_BOUNDARY,
         )
@@ -244,7 +269,7 @@ def invocation_of(module: PackageModule) -> re.Pattern[str]:
     ]
     module_run = RegularExpression.sequence(
         "-m",
-        CharacterClass.WHITESPACE.one_or_more(),
+        Separator.WHITESPACE.one_or_more(),
         module.command_path,
         RegularExpression.negative_lookahead(
             CharacterSet.any_of(CharacterClass.WORD_CHARACTER, ".")

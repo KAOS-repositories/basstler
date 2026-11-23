@@ -8,11 +8,7 @@ import re
 from enum import StrEnum
 
 from basstler.class_property import classproperty
-from basstler.regular_expression import (
-    CharacterRange,
-    CharacterSet,
-    RegularExpression,
-)
+from basstler.regular_expression import CharacterRange, CharacterSet, RegularExpression
 
 # %% what is read back
 

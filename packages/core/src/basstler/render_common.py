@@ -19,7 +19,7 @@ import nh3
 
 from basstler.class_property import classproperty
 from basstler.locations import INSTALLED_PACKAGE, ShippedPath
-from basstler.regular_expression import CharacterSet, RegularExpression
+from basstler.regular_expression import CharacterSet, MarkupTag, RegularExpression
 
 
 class AllowedUrlScheme(StrEnum):
@@ -88,14 +88,12 @@ class HeadingShift(IntEnum):
         levels = "".join(
             str(level) for level in range(1, HeadingShift.DEEPEST_LEVEL + 1)
         )
-        return RegularExpression.sequence(
-            "<",
+        return MarkupTag(
             RegularExpression.literal("/")
             .optional()
             .captured_as(HeadingTagGroup.CLOSING_MARK),
             "h",
             CharacterSet.any_of(levels).captured_as(HeadingTagGroup.LEVEL),
-            ">",
         ).compiled()
 
     @classmethod

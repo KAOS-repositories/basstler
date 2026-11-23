@@ -18,6 +18,7 @@ from basstler.regular_expression import (
     Anchor,
     CharacterClass,
     RegularExpression,
+    Separator,
     Wildcard,
 )
 
@@ -145,7 +146,7 @@ class StagedLines:
             Anchor.LINE_END,
         )
         line_count = RegularExpression.sequence(
-            ",",
+            Separator.COMMA,
             CharacterClass.DIGIT.one_or_more().captured_as(DiffHeaderGroup.LINE_COUNT),
         )
         block_header = RegularExpression.sequence(

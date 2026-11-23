@@ -31,9 +31,9 @@ from basstler.python_module import PythonModule
 from basstler.package_map import REQUIREMENT_NAME, Workspace
 from basstler.regular_expression import (
     Anchor,
-    CharacterClass,
     CharacterSet,
     RegularExpression,
+    Separator,
 )
 
 # %% imports
@@ -214,7 +214,7 @@ class PackageCrossings:
 EXTRA_MARKER = RegularExpression.sequence(
     Anchor.WORD_BOUNDARY,
     "extra",
-    CharacterClass.WHITESPACE.zero_or_more(),
+    Separator.WHITESPACE.zero_or_more(),
     "==",
 ).compiled()
 """

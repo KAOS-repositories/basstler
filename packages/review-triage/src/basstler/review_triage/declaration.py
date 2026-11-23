@@ -15,11 +15,7 @@ from pydantic import Field
 from basstler.class_property import classproperty
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.json_model import ValidatedJSONModel
-from basstler.regular_expression import (
-    CharacterClass,
-    RegularExpression,
-    Wildcard,
-)
+from basstler.regular_expression import HtmlComment, Separator, Wildcard
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import Rename, RenameDecisions
 
@@ -89,16 +85,14 @@ class TriageDeclaration(ValidatedJSONModel):
 
         :return: The HTML comment holding the declaration, after its marker line.
         """
-        return RegularExpression.sequence(
-            "<!--",
-            CharacterClass.WHITESPACE.zero_or_more(),
+        return HtmlComment(
+            Separator.WHITESPACE.zero_or_more(),
             cls.marker,
-            CharacterClass.WHITESPACE.zero_or_more(),
-            "\n",
+            Separator.WHITESPACE.zero_or_more(),
+            Separator.LINE_BREAK,
             Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
                 DeclarationGroup.DECLARATION
             ),
-            "-->",
         ).compiled()
 
     @classmethod

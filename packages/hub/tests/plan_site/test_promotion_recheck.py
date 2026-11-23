@@ -22,9 +22,7 @@ from basstler.github.pull_request_state import (
 )
 from basstler.plan_site.__main__ import RepositorySite
 from basstler.plan_site.cards import PromotionAttribute
-from basstler.regular_expression import (
-    Wildcard,
-)
+from basstler.regular_expression import Wildcard
 from basstler.stack.promotability import PromotionBlocker
 
 from basstler_testing.constants.stack import StackLabel

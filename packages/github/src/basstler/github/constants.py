@@ -15,10 +15,10 @@ from enum import Enum, IntEnum, StrEnum
 
 from basstler.regular_expression import (
     Anchor,
-    CharacterClass,
     CharacterRange,
     CharacterSet,
     RegularExpression,
+    Separator,
 )
 
 
@@ -86,7 +86,7 @@ class DescriptionPattern(Enum):
     HEADING = RegularExpression.sequence(
         Anchor.LINE_START,
         RegularExpression.literal("#").repeated(1, HeadingLevel.DEEPEST),
-        " ",
+        Separator.SPACE,
     ).compiled()
     r"""
     The start of a Markdown heading line, which ends the section before it.
@@ -97,7 +97,7 @@ class DescriptionPattern(Enum):
 
     LINK_TARGET = RegularExpression.sequence(
         RegularExpression.lookbehind("]("),
-        CharacterSet.any_except(")", CharacterClass.WHITESPACE).one_or_more(),
+        CharacterSet.any_except(")", Separator.WHITESPACE).one_or_more(),
         RegularExpression.lookahead(")"),
     ).compiled()
     """

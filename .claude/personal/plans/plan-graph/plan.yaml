@@ -133,7 +133,6 @@ items:
   depends_on:
   - findings-and-resolutions
   - common-parent
-  - basstler-packages/playbook-model
   status: not started
   recommended_model: sonnet
   notes: 'The skill only judges: it reads a finding''s evidence, picks one of its enumerated
@@ -164,7 +163,6 @@ items:
   depends_on:
   - graph-model
   - overlap-detector
-  - basstler-packages/playbook-model
   status: not started
   recommended_model: sonnet
   notes: 'A Graph tab in the plan page header, and a graph link on each item card opening

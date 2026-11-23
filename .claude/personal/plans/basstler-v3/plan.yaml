@@ -1,11 +1,11 @@
 schema_version: 1
 id: basstler-v3
 title: 'basstler v3: light, reliable and easy for anyone to use and extend'
-description: 'Rebuild basstler next to v2 so code does the mechanics and Claude only judges: each skill
-  runs one command that prints a brief, makes its judgment, and records the result with one command. Stacks
-  come from pull request bases and upstream reviews are mirrored by an Action; plans stay in plan.yaml.
-  v2 areas are deleted as v3 covers them. Plans
-  are basstler-v3-plans and stacks and reviews basstler-v3-stacks.
+description: 'Rebuild basstler next to v2 so code does the mechanics and Claude only judges:
+  each skill runs one command that prints a brief, makes its judgment, and records the result
+  with one command. Stacks come from pull request bases and upstream reviews are mirrored
+  by an Action; plans stay in plan.yaml. v2 areas are deleted as v3 covers them. Plans are
+  basstler-v3-plans and stacks and reviews basstler-v3-stacks.
 
   '
 default_repository: KAOS-repositories/basstler
@@ -35,7 +35,6 @@ items:
   - basstler-v3-stacks/upstream-promotion
   - basstler-v3-stacks/upstream-review-mirror
   - mcp-server
-  - basstler-packages/playbook-model
   status: not started
   recommended_model: sonnet
   notes: 'Each SKILL.md at most about 2 KB; no reference documents to read. Native plan mode
@@ -53,7 +52,6 @@ items:
   track: cutover
   depends_on:
   - basstler-v3-plans/item-brief
-  - basstler-packages/playbook-model
   status: not started
   recommended_model: opus
   notes: 'A FastMCP server (the official mcp SDK) in the plugin''s .mcp.json, used by every
@@ -86,8 +84,8 @@ items:
   - basstler-v3-stacks/maintenance-action
   status: not started
   recommended_model: opus
-  notes: 'Removes the bash layer, the dashboards and the old maintenance; plan.yaml and its tooling stay
-    while basstler-v3-plans is deferred. Major release: removed commands, files and settings. Release
-    notes list each removed command with its replacement.
+  notes: 'Removes the bash layer, the dashboards and the old maintenance; plan.yaml and its
+    tooling stay while basstler-v3-plans is deferred. Major release: removed commands, files
+    and settings. Release notes list each removed command with its replacement.
 
     '

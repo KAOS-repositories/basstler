@@ -30,23 +30,6 @@ tracks:
   name: Code rules from krrood
   wave: extensibility
 items:
-- id: playbook-model
-  title: A Playbook dataclass model that every distribution contributes commands, skills,
-    hooks and rules to
-  track: playbook
-  branch: claude/sweet-ritchie-5la2qb
-  pull_request_number: 290
-  session: https://claude.ai/code/session_018wfiv8h2JMn5sT4DJs496i
-  depends_on: []
-  status: in progress
-  recommended_model: opus
-  notes: 'Draft PR 290: basstler.playbook in core (PackageContribution per distribution via
-    basstler.contributions, Playbook, DefaultPlaybook, root basstler_playbook.py declaring
-    BASSTLER_PLAYBOOK) with kinds CommandGroup, Skill (a class per skill; skills build rewrites
-    the SKILL.md frontmatter and title above each hand-written body), per-event HookDefinition
-    (skills build writes hooks.json), Ruleset and SetupSteps. A kind lands with its first
-    instance: McpTool, SitePanel, ItemAttribute, ActionsWorkflow, PostToolUseHook come later.
-    Next: review round 3. release:minor.'
 - id: krrood-sync
   title: basstler-rules is the rule engine krrood's development tools build on
   track: rules
@@ -64,7 +47,6 @@ items:
   title: A guide to writing your own playbook and ruleset
   track: playbook
   depends_on:
-  - playbook-model
   - feature-docs
   - krrood-sync
   - playbook-setup-wizard
@@ -92,8 +74,7 @@ items:
 - id: playbook-settings
   title: A typed settings model for every value a workflow may differ in
   track: playbook
-  depends_on:
-  - playbook-model
+  depends_on: []
   status: not started
   recommended_model: opus
   notes: Owners whose repositories may be written to, notes branch and its place (per repository
@@ -117,8 +98,7 @@ items:
 - id: session-report-sections
   title: Session start as a list of report sections a playbook composes
   track: playbook
-  depends_on:
-  - playbook-model
+  depends_on: []
   status: not started
   recommended_model: sonnet
   notes: 'SessionReportSection component kind: each section reports that something holds (CI
@@ -127,8 +107,7 @@ items:
 - id: item-lifecycle
   title: Work-item stages, transitions and who may make them
   track: playbook
-  depends_on:
-  - playbook-model
+  depends_on: []
   status: not started
   recommended_model: opus
   notes: 'An ItemLifecycle model: stages, allowed transitions and whether a session or only
@@ -194,8 +173,7 @@ items:
 - id: project-plugin-files
   title: A project's playbook decides which skills and hooks Claude loads in it
   track: playbook
-  depends_on:
-  - playbook-model
+  depends_on: []
   status: not started
   recommended_model: opus
   notes: Today skills and hooks come from the plugin's fixed files, so leaving one out of
@@ -205,8 +183,7 @@ items:
 - id: feature-docs
   title: A README and a docs page for every basstler feature, easy to read and navigate
   track: playbook
-  depends_on:
-  - playbook-model
+  depends_on: []
   status: not started
   recommended_model: sonnet
   notes: A README per distribution (what it holds, what it depends on, how to install it alone)
@@ -214,4 +191,4 @@ items:
     from one index with a table of contents on every page. The existing docs/ pages (SETUP,
     plan-handover, review-triage, stack) become pages of it. Asked in review of PR 290. Docs
     only, so a patch release.
-landed_item_count: 7
+landed_item_count: 8

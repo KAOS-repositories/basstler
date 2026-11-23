@@ -19,7 +19,6 @@ from basstler.git.commands import CommitTrailer, GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
 from basstler.render_common import create_template_environment
-from basstler.yaml_syntax import YamlSyntax
 from basstler.github.basstler_project import BasstlerProject
 
 # %% the Action branch's names
@@ -180,8 +179,7 @@ class ActionInstallation:
         return RegularExpression.sequence(
             Anchor.LINE_START,
             CharacterClass.WHITESPACE.zero_or_more(),
-            ReviewsWorkflowInput.BRANCH_OR_TAG,
-            YamlSyntax.MAPPING_VALUE,
+            f"{ReviewsWorkflowInput.BRANCH_OR_TAG}:",
             CharacterClass.WHITESPACE.zero_or_more(),
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
                 InstalledWorkflowGroup.BRANCH_OR_TAG

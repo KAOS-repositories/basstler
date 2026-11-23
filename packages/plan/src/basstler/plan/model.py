@@ -24,14 +24,12 @@ from basstler.class_property import classproperty
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
 from basstler.regular_expression import (
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
-    LINE_BREAK,
     Anchor,
     CharacterClass,
     RegularExpression,
+    Wildcard,
 )
 from basstler.text_file import TextFile
-from basstler.yaml_syntax import YamlSyntax
 
 
 class ItemStatus(StrEnum):
@@ -128,17 +126,6 @@ class PlanDocument(StrEnum):
         return (ProjectLocation.PLANS / plan_identifier / self.value).as_posix()
 
 
-class ProseSyntax(StrEnum):
-    """
-    The characters prose is wrapped with.
-    """
-
-    HYPHEN = "-"
-    """
-    Joins the parts of a compound word.
-    """
-
-
 class ItemLayout(StrEnum):
     """
     The whitespace and markers an item block in ``plan.yaml`` is laid out with.
@@ -212,7 +199,7 @@ class Prose:
         A line holding nothing but whitespace, which separates two paragraphs.
         """
         return RegularExpression.sequence(
-            LINE_BREAK, CharacterClass.WHITESPACE.zero_or_more(), LINE_BREAK
+            "\n", CharacterClass.WHITESPACE.zero_or_more(), "\n"
         ).compiled()
 
     @classproperty
@@ -220,7 +207,7 @@ class Prose:
         """
         A hyphen its author wrapped the line right after.
         """
-        return RegularExpression.sequence(ProseSyntax.HYPHEN, LINE_BREAK).compiled()
+        return RegularExpression.sequence("-\n").compiled()
 
     @property
     def paragraphs(self) -> list[str]:
@@ -233,7 +220,7 @@ class Prose:
         space.
         """
         return [
-            self.wrapped_hyphen.sub(ProseSyntax.HYPHEN, paragraph.strip())
+            self.wrapped_hyphen.sub("-", paragraph.strip())
             for paragraph in self.paragraph_break.split(self.text.strip())
         ]
 
@@ -551,10 +538,9 @@ class ManifestKey(KeySpecification, Enum):
         return RegularExpression.sequence(
             Anchor.LINE_START,
             CharacterClass.WHITESPACE.zero_or_more(),
-            self.key,
-            YamlSyntax.MAPPING_VALUE,
+            f"{self.key}:",
             CharacterClass.WHITESPACE.zero_or_more(),
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
             Anchor.LINE_END,
         ).compiled()
 

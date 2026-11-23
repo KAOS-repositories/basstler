@@ -5,7 +5,6 @@ A class's own name, spelled the way a command line or a document spells it.
 from __future__ import annotations
 
 import re
-from enum import StrEnum
 
 from basstler.class_property import classproperty
 from basstler.regular_expression import (
@@ -16,17 +15,6 @@ from basstler.regular_expression import (
 )
 
 # %% hyphenating
-
-
-class NameSyntax(StrEnum):
-    """
-    The symbols a hyphenated name is spelled with.
-    """
-
-    WORD_SEPARATOR = "-"
-    """
-    Joins the words of a hyphenated name.
-    """
 
 
 class ClassNameWords:
@@ -84,4 +72,4 @@ class HyphenatedClassName:
         :return: The class name in lower case, words joined by hyphens.
         """
         words = cls.__name__.removesuffix(suffix)
-        return cls.word_start.sub(NameSyntax.WORD_SEPARATOR, words).lower()
+        return cls.word_start.sub("-", words).lower()

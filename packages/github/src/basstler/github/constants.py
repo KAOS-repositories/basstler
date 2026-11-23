@@ -40,32 +40,6 @@ class GitHubExecutable(StrEnum):
     """
 
 
-class MarkdownSyntax(StrEnum):
-    """
-    The Markdown a pull request description is read by.
-    """
-
-    HEADING_MARKER = "#"
-    """
-    Starts a heading, repeated once per level.
-    """
-
-    HEADING_SEPARATOR = " "
-    """
-    Separates a heading's markers from its text.
-    """
-
-    LINK_TARGET_START = "]("
-    """
-    Ends a link's text and opens the URL it points at.
-    """
-
-    LINK_TARGET_END = ")"
-    """
-    Closes the URL a link points at.
-    """
-
-
 class ClaudeCodeSessionLink(StrEnum):
     """
     The link to a Claude Code session.
@@ -107,21 +81,17 @@ class DescriptionPattern(Enum):
 
     HEADING = RegularExpression.sequence(
         Anchor.LINE_START,
-        RegularExpression.literal(MarkdownSyntax.HEADING_MARKER).repeated(
-            1, HeadingLevel.DEEPEST
-        ),
-        MarkdownSyntax.HEADING_SEPARATOR,
+        RegularExpression.literal("#").repeated(1, HeadingLevel.DEEPEST),
+        " ",
     ).compiled()
     """
     The start of a Markdown heading line, which ends the section before it.
     """
 
     LINK_TARGET = RegularExpression.sequence(
-        RegularExpression.lookbehind(MarkdownSyntax.LINK_TARGET_START),
-        CharacterSet.any_except(
-            MarkdownSyntax.LINK_TARGET_END, CharacterClass.WHITESPACE
-        ).one_or_more(),
-        RegularExpression.lookahead(MarkdownSyntax.LINK_TARGET_END),
+        RegularExpression.lookbehind("]("),
+        CharacterSet.any_except(")", CharacterClass.WHITESPACE).one_or_more(),
+        RegularExpression.lookahead(")"),
     ).compiled()
     """
     The URL a Markdown hyperlink points at.

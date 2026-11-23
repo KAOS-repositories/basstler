@@ -5,7 +5,6 @@ quotes.
 
 from __future__ import annotations
 
-import posixpath
 import re
 from dataclasses import dataclass
 from enum import Enum, StrEnum
@@ -31,42 +30,14 @@ from basstler.upstream_reviews.clients import (
 # %% the log behind a failed check
 
 
-class LogSyntax(StrEnum):
-    """
-    The symbols a runner writes into its log around a line's text.
-    """
-
-    CONTROL_SEQUENCE_INTRODUCER = "\x1b["
-    """
-    Starts a terminal escape sequence, such as one setting a colour.
-    """
-
-    PARAMETER_SEPARATOR = ";"
-    """
-    Separates the numbers a terminal escape sequence carries.
-    """
-
-    UTC_DESIGNATOR = "Z"
-    """
-    Ends a timestamp given in UTC.
-    """
-
-    TIMESTAMP_SEPARATOR = " "
-    """
-    Separates a runner's timestamp from the line's text.
-    """
-
-
 class LogFormatting(Enum):
     """
     What gets written around a log line's text that does not survive being quoted.
     """
 
     TERMINAL_ESCAPE = RegularExpression.sequence(
-        LogSyntax.CONTROL_SEQUENCE_INTRODUCER,
-        CharacterSet.any_of(
-            CharacterRange.ASCII_DIGIT, LogSyntax.PARAMETER_SEPARATOR
-        ).zero_or_more(),
+        "\x1b[",
+        CharacterSet.any_of(CharacterRange.ASCII_DIGIT, ";").zero_or_more(),
         CharacterRange.ASCII_LETTER,
     ).compiled()
     """
@@ -76,8 +47,7 @@ class LogFormatting(Enum):
     TIMESTAMP = RegularExpression.sequence(
         Anchor.LINE_START,
         CharacterClass.NON_WHITESPACE.one_or_more(),
-        LogSyntax.UTC_DESIGNATOR,
-        LogSyntax.TIMESTAMP_SEPARATOR,
+        "Z ",
     ).compiled()
     """
     The timestamp a runner writes in front of every line it records, as
@@ -112,27 +82,6 @@ class LogMarker(StrEnum):
     """
 
 
-class JobLinkSegment(StrEnum):
-    """
-    The fixed parts of the path a link to an Actions job takes.
-    """
-
-    ACTIONS = "actions"
-    """
-    The repository's Actions.
-    """
-
-    RUNS = "runs"
-    """
-    Precedes a workflow run's number.
-    """
-
-    JOB = "job"
-    """
-    Precedes the job's number within the run.
-    """
-
-
 @dataclass(frozen=True)
 class FailedJob:
     """
@@ -159,15 +108,9 @@ class FailedJob:
         """
         digits = CharacterSet.any_of(CharacterRange.ASCII_DIGIT).one_or_more()
         return RegularExpression.sequence(
-            posixpath.sep,
-            JobLinkSegment.ACTIONS,
-            posixpath.sep,
-            JobLinkSegment.RUNS,
-            posixpath.sep,
+            "/actions/runs/",
             digits,
-            posixpath.sep,
-            JobLinkSegment.JOB,
-            posixpath.sep,
+            "/job/",
             digits.captured_as(cls.identifier_group),
         ).compiled()
 

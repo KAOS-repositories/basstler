@@ -22,7 +22,9 @@ from basstler.github.pull_request_state import (
 )
 from basstler.plan_site.__main__ import RepositorySite
 from basstler.plan_site.cards import PromotionAttribute
-from basstler.regular_expression import ANY_CHARACTER_EXCEPT_LINE_BREAK
+from basstler.regular_expression import (
+    Wildcard,
+)
 from basstler.stack.promotability import PromotionBlocker
 
 from basstler_testing.constants.stack import StackLabel
@@ -44,14 +46,14 @@ class LinkAttribute:
         """
         An attribute value that holds something, which a button with a link has.
         """
-        return ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().compiled()
+        return Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().compiled()
 
     @classproperty
     def any_value(cls) -> re.Pattern[str]:
         """
         Any attribute value at all, which only a button without the attribute lacks.
         """
-        return ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().compiled()
+        return Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().compiled()
 
 
 # %% a plan in a fork

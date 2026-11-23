@@ -7,9 +7,7 @@ from __future__ import annotations
 import re
 from enum import StrEnum
 
-from basstler.bash import ShellToken
 from basstler.class_property import classproperty
-from basstler.github.constants import MarkdownSyntax
 from basstler.regular_expression import (
     CharacterRange,
     CharacterSet,
@@ -59,7 +57,7 @@ class ShellPattern:
         The start of a ``${NAME}`` reference, capturing the variable's name.
         """
         return RegularExpression.sequence(
-            ShellToken.BRACED_PARAMETER_START,
+            "${",
             cls.variable_name.captured_as(DocumentGroup.VARIABLE),
         ).compiled()
 
@@ -79,9 +77,9 @@ class MarkdownLinkPattern:
         :return: A Markdown link, capturing its target, as ``](docs/a.md)``.
         """
         return RegularExpression.sequence(
-            MarkdownSyntax.LINK_TARGET_START,
-            CharacterSet.any_except(MarkdownSyntax.LINK_TARGET_END, *refused)
+            "](",
+            CharacterSet.any_except(")", *refused)
             .one_or_more()
             .captured_as(DocumentGroup.LINK_TARGET),
-            MarkdownSyntax.LINK_TARGET_END,
+            ")",
         )

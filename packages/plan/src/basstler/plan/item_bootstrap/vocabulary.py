@@ -9,9 +9,7 @@ from enum import Enum, StrEnum
 
 from basstler.exit_codes import ExitCode
 from basstler.plan.model import ManifestKey, Prose
-from basstler.yaml_syntax import YamlSyntax
 from basstler.regular_expression import (
-    LINE_BREAK,
     Anchor,
     CharacterClass,
     CharacterSet,
@@ -55,10 +53,7 @@ class ManifestLinePattern(Enum):
     ITEM_START = RegularExpression.sequence(
         Anchor.LINE_START,
         CharacterClass.WHITESPACE.zero_or_more(),
-        YamlSyntax.SEQUENCE_ENTRY,
-        YamlSyntax.INDICATOR_SEPARATOR,
-        ManifestKey.IDENTIFIER.key,
-        YamlSyntax.MAPPING_VALUE,
+        f"- {ManifestKey.IDENTIFIER.key}:",
     ).compiled()
     """
     Matches the first line of an item block, which is always its ``id``, as
@@ -68,7 +63,7 @@ class ManifestLinePattern(Enum):
     SEQUENCE_ENTRY = RegularExpression.sequence(
         Anchor.LINE_START,
         CharacterClass.WHITESPACE.zero_or_more(),
-        YamlSyntax.SEQUENCE_ENTRY,
+        "-",
         CharacterClass.WHITESPACE,
     ).compiled()
     """
@@ -78,7 +73,7 @@ class ManifestLinePattern(Enum):
 
     TOP_LEVEL_KEY = RegularExpression.sequence(
         Anchor.LINE_START,
-        CharacterSet.any_except(CharacterClass.WHITESPACE, YamlSyntax.SEQUENCE_ENTRY),
+        CharacterSet.any_except(CharacterClass.WHITESPACE, "-"),
     ).compiled()
     """
     Matches a top-level ``plan.yaml`` key such as ``items:``, which is where the last
@@ -91,7 +86,7 @@ class ManifestLinePattern(Enum):
         RegularExpression.either(
             *sorted(manifest_key.key for manifest_key in ManifestKey.block_styled())
         ),
-        YamlSyntax.MAPPING_VALUE,
+        ":",
     ).compiled()
     """
     Matches a key whose value may run over the following lines, as ``    notes: >``,
@@ -281,4 +276,4 @@ class BlockScalarStyle(StrEnum):
         """
         if self is BlockScalarStyle.LITERAL:
             return Prose.paragraph_break
-        return RegularExpression.literal(LINE_BREAK).one_or_more().compiled()
+        return RegularExpression.literal("\n").one_or_more().compiled()

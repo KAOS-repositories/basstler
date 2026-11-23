@@ -234,7 +234,7 @@ class InstalledLibraries:
         """
         A run of the characters a distribution's name is spelled with between its words.
         """
-        return CharacterSet.any_of("-", "_", ".").one_or_more().compiled()
+        return CharacterSet.any_of("-_.").one_or_more().compiled()
 
     @staticmethod
     def canonical_distribution_name(name: str) -> str:

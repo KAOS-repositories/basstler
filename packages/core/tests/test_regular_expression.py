@@ -9,13 +9,12 @@ from enum import StrEnum
 import pytest
 
 from basstler.regular_expression import (
-    ANY_CHARACTER,
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
     Anchor,
     CharacterClass,
     CharacterRange,
     CharacterSet,
     RegularExpression,
+    Wildcard,
 )
 
 # %% parts the tests build from
@@ -149,7 +148,9 @@ def test_the_shortest_repeat_stops_at_the_first_text_that_follows():
     The repeat ends at the earliest place the rest of the pattern matches.
     """
     pattern = RegularExpression.sequence(
-        ANY_CHARACTER.zero_or_more(shortest=True).captured_as(ExampleGroup.NUMBER),
+        Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
+            ExampleGroup.NUMBER
+        ),
         ExampleWord.VERSION,
     ).compiled()
     match = pattern.match(f"12{ExampleWord.VERSION}34{ExampleWord.VERSION}")
@@ -287,7 +288,10 @@ def test_any_character_includes_a_line_break_and_the_other_wildcard_does_not():
     """
     assert [
         wildcard.compiled().fullmatch("\n") is not None
-        for wildcard in (ANY_CHARACTER, ANY_CHARACTER_EXCEPT_LINE_BREAK)
+        for wildcard in (
+            Wildcard.ANY_CHARACTER,
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK,
+        )
     ] == [True, False]
 
 

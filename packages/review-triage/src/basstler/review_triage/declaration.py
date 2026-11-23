@@ -16,12 +16,10 @@ from basstler.class_property import classproperty
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.json_model import ValidatedJSONModel
 from basstler.regular_expression import (
-    ANY_CHARACTER,
-    LINE_BREAK,
     CharacterClass,
     RegularExpression,
+    Wildcard,
 )
-from basstler.render_common import HtmlSyntax
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import Rename, RenameDecisions
 
@@ -88,15 +86,15 @@ class TriageDeclaration(ValidatedJSONModel):
         :return: The HTML comment holding the declaration, after its marker line.
         """
         return RegularExpression.sequence(
-            HtmlSyntax.COMMENT_START,
+            "<!--",
             CharacterClass.WHITESPACE.zero_or_more(),
             cls.marker,
             CharacterClass.WHITESPACE.zero_or_more(),
-            LINE_BREAK,
-            ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
+            "\n",
+            Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
                 DeclarationGroup.DECLARATION
             ),
-            HtmlSyntax.COMMENT_END,
+            "-->",
         ).compiled()
 
     @classmethod

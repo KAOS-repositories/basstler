@@ -9,7 +9,7 @@ import pytest
 
 from basstler.code_rules.checker import DiffHeaderGroup, StagedLines
 from basstler.code_rules.package_boundaries import EXTRA_MARKER, InstalledLibraries
-from basstler.code_rules.prose_length import ProseSyntax, SourceProse, ToolDirective
+from basstler.code_rules.prose_length import SourceProse, ToolDirective
 from basstler.code_rules.rule import Section
 
 # %% a diff's headers
@@ -122,10 +122,10 @@ def test_a_line_starting_a_field_list_is_an_rst_field(line: str, is_a_field: boo
 @pytest.mark.parametrize(
     ("comment", "is_for_a_tool"),
     [
-        (f"{ProseSyntax.COMMENT_MARKER} {ToolDirective.LINT_SUPPRESSION}: E501", True),
-        (f"{ProseSyntax.COMMENT_MARKER}{ToolDirective.TYPE_COMMENT} ignore", True),
-        (f"{ProseSyntax.COMMENT_MARKER} {ToolDirective.INTERPRETER}/usr/bin/env", True),
-        (f"{ProseSyntax.COMMENT_MARKER} the noqa rule explained", False),
+        (f"# {ToolDirective.LINT_SUPPRESSION}: E501", True),
+        (f"#{ToolDirective.TYPE_COMMENT} ignore", True),
+        (f"# {ToolDirective.INTERPRETER}/usr/bin/env", True),
+        ("# the noqa rule explained", False),
         ("a line without a comment marker", False),
     ],
 )

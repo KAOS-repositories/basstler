@@ -56,11 +56,10 @@ from basstler.playbook.setup_steps import (
 )
 from basstler.plugin_root import PluginRoot
 from basstler.regular_expression import (
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
-    LINE_BREAK,
-    SPACE_OR_TAB,
     Anchor,
+    CharacterSet,
     RegularExpression,
+    Wildcard,
 )
 from basstler.shell_configuration import (
     FetchedBranchReference,
@@ -405,17 +404,6 @@ class PersonalNotesWriteRefusedError(RuntimeError):
         return f"could not save to the personal-notes branch: {self.detail}"
 
 
-class TomlSyntax(StrEnum):
-    """
-    The TOML a personal ``stack.toml`` is written in.
-    """
-
-    KEY_VALUE_SEPARATOR = "="
-    """
-    Separates a key from its value.
-    """
-
-
 @dataclass(frozen=True)
 class PersonalUpstream(HasRepository):
     """
@@ -430,12 +418,12 @@ class PersonalUpstream(HasRepository):
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            SPACE_OR_TAB.zero_or_more(),
+            CharacterSet.any_of(" \t").zero_or_more(),
             StackSetting.UPSTREAM_REPOSITORY,
-            SPACE_OR_TAB.zero_or_more(),
-            TomlSyntax.KEY_VALUE_SEPARATOR,
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
-            RegularExpression.either(LINE_BREAK, Anchor.LINE_END),
+            CharacterSet.any_of(" \t").zero_or_more(),
+            "=",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            RegularExpression.either("\n", Anchor.LINE_END),
         ).compiled()
 
     def written_over(self, existing: str) -> str:
@@ -449,7 +437,7 @@ class PersonalUpstream(HasRepository):
         if kept and not kept.endswith("\n"):
             kept += "\n"
         return (
-            f"{kept}{StackSetting.UPSTREAM_REPOSITORY} {TomlSyntax.KEY_VALUE_SEPARATOR} "
+            f"{kept}{StackSetting.UPSTREAM_REPOSITORY} = "
             f'"{self.repository.full_name}"\n'
         )
 

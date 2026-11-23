@@ -39,51 +39,15 @@ from basstler.exceptions import (
 from basstler.github.workflows import ActivityType, Job, TriggerEvent, Workflow
 from basstler.locations import PackageLocation, ProjectLocation
 from basstler.regular_expression import (
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
     Anchor,
     CharacterSet,
     RegularExpression,
+    Wildcard,
 )
 from basstler.render_common import create_template_environment
 from basstler.text_file import TextFile
 
 # %% vocabulary
-
-
-class WorkflowExpression(StrEnum):
-    """
-    The parts of a workflow's ``if`` condition a budget reads.
-    """
-
-    REPOSITORY = "github.repository"
-    """
-    The repository the run is in, as ``owner/name``.
-    """
-
-    EQUALS = "=="
-    """
-    Compares two values.
-    """
-
-    STRING_QUOTE = "'"
-    """
-    Encloses a string.
-    """
-
-    AND = "&&"
-    """
-    Holds when both conditions hold.
-    """
-
-    OR = "||"
-    """
-    Holds when either condition holds.
-    """
-
-    SEPARATOR = " "
-    """
-    Separates an operator from what it operates on.
-    """
 
 
 class BudgetDefinition(StrEnum):
@@ -158,20 +122,14 @@ class WorkflowLimits:
         as ``github.repository == 'owner/repo'``.
         """
         further_condition = RegularExpression.sequence(
-            WorkflowExpression.SEPARATOR,
-            WorkflowExpression.AND,
-            WorkflowExpression.SEPARATOR,
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            " && ",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
         )
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            WorkflowExpression.REPOSITORY,
-            WorkflowExpression.SEPARATOR,
-            WorkflowExpression.EQUALS,
-            WorkflowExpression.SEPARATOR,
-            WorkflowExpression.STRING_QUOTE,
-            CharacterSet.any_except(WorkflowExpression.STRING_QUOTE).one_or_more(),
-            WorkflowExpression.STRING_QUOTE,
+            "github.repository == '",
+            CharacterSet.any_except("'").one_or_more(),
+            "'",
             further_condition.optional(),
             Anchor.LINE_END,
         ).compiled()
@@ -186,7 +144,7 @@ class WorkflowLimits:
         if self.fork_push_condition in job.condition:
             return True
         return bool(self.repository_pin.match(job.condition)) and (
-            WorkflowExpression.OR not in job.condition
+            "||" not in job.condition
         )
 
     @classproperty

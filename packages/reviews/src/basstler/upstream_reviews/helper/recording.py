@@ -219,27 +219,6 @@ class HelperRecording(JSONModel):
         )
 
 
-class ChunkSyntax(StrEnum):
-    """
-    What separates and spells the parts of a chunk's line.
-    """
-
-    NUMBER_SEPARATOR = "-"
-    """
-    Precedes the chunk's index, and its count.
-    """
-
-    TEXT_SEPARATOR = ":"
-    """
-    Precedes the chunk's text.
-    """
-
-    BASE64_PUNCTUATION = "+/="
-    """
-    The characters of the chunk's base64 text that are neither letters nor digits.
-    """
-
-
 class ChunkGroup(StrEnum):
     """
     The parts of a chunk's line read back from its match.
@@ -305,15 +284,12 @@ class HelperChunk:
         """
         return RegularExpression.sequence(
             cls.marker(request_identifier),
-            ChunkSyntax.NUMBER_SEPARATOR,
+            "-",
             CharacterClass.DIGIT.one_or_more().captured_as(ChunkGroup.INDEX),
-            ChunkSyntax.NUMBER_SEPARATOR,
+            "-",
             CharacterClass.DIGIT.one_or_more().captured_as(ChunkGroup.COUNT),
-            ChunkSyntax.TEXT_SEPARATOR,
-            CharacterSet.any_of(
-                CharacterRange.ASCII_ALPHANUMERIC,
-                ChunkSyntax.BASE64_PUNCTUATION,
-            )
+            ":",
+            CharacterSet.any_of(CharacterRange.ASCII_ALPHANUMERIC, "+/=")
             .one_or_more()
             .captured_as(ChunkGroup.TEXT),
         ).compiled()

@@ -676,10 +676,12 @@ class StructuredDataRules(Section):
     )
 
     PATTERNS_FROM_NAMED_PARTS = (
-        "A regular expression reads as a sentence of what each part means: every "
-        "symbol that carries meaning - a shell operator, a delimiter, a group's name "
-        "- is an enum member or a named part, and the pattern is composed with "
-        f"{CodeReference(RegularExpression).path}"
+        "A regular expression reads as a sentence of what each part means, composed "
+        f"with {CodeReference(RegularExpression).path}: text the matched input holds "
+        "as written - a delimiter, a keyword, a `<` or `>` - is written as text, "
+        "adjacent pieces joined into one string or f-string, while pattern syntax - "
+        "a character class, a repeat, a lookaround - is a named part, and a group's "
+        "name is an enum member"
     )
 
     NO_PATTERN_TEXT = (

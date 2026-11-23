@@ -8,7 +8,11 @@ from dataclasses import dataclass
 
 from basstler.github.constants import DescriptionPattern, MaintenanceText
 from basstler.github.repository import HasRepository
-from basstler.regular_expression import SPACE_OR_TAB, Anchor, RegularExpression
+from basstler.regular_expression import (
+    Anchor,
+    CharacterSet,
+    RegularExpression,
+)
 
 # %% the upstream pull request a description links to
 
@@ -136,7 +140,10 @@ class PullRequestDescription:
         """
         found = (
             RegularExpression.sequence(
-                Anchor.LINE_START, heading, SPACE_OR_TAB.zero_or_more(), Anchor.LINE_END
+                Anchor.LINE_START,
+                heading,
+                CharacterSet.any_of(" \t").zero_or_more(),
+                Anchor.LINE_END,
             )
             .compiled()
             .search(self.text)

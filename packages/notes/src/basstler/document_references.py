@@ -8,7 +8,6 @@ Usage:
 
 from __future__ import annotations
 
-import posixpath
 import re
 from dataclasses import dataclass
 from collections.abc import Mapping
@@ -21,7 +20,6 @@ from pathlib import Path
 
 from cyclopts import App
 
-from basstler.bash import ShellQuote
 from basstler.class_property import classproperty
 from basstler.locations import PackageLocation, PluginLocation, WorkspaceLocation
 from basstler.package_layout import package_modules
@@ -48,27 +46,6 @@ PACKAGE_NAME = PackageLocation.DIRECTORY.name
 """
 The package every cited module belongs to.
 """
-
-
-class CitationSyntax(StrEnum):
-    """
-    The symbols a document cites a module or a skill with.
-    """
-
-    MODULE_SEPARATOR = "."
-    """
-    Separates the names in a dotted import path.
-    """
-
-    PYTHON_SUFFIX = ".py"
-    """
-    Ends the name of a Python source file.
-    """
-
-    WORD_SEPARATOR = "-"
-    """
-    Joins the words of a skill's name.
-    """
 
 
 class CitationGroup(StrEnum):
@@ -262,9 +239,7 @@ class CitedNames:
         A character that would continue a name, so the name before it is not the whole
         name.
         """
-        return CharacterSet.any_of(
-            CharacterClass.WORD_CHARACTER, CitationSyntax.WORD_SEPARATOR
-        )
+        return CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "-")
 
     @classproperty
     def dotted_citation(cls) -> re.Pattern[str]:
@@ -274,25 +249,17 @@ class CitedNames:
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(
-                CharacterSet.any_of(
-                    CharacterClass.WORD_CHARACTER,
-                    CitationSyntax.MODULE_SEPARATOR,
-                    posixpath.sep,
-                    CitationSyntax.WORD_SEPARATOR,
-                )
+                CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "./-")
             ),
             RegularExpression.negative_lookahead(
                 RegularExpression.sequence(
                     PluginLocation.ENTRY_POINT_SCRIPT.name, Anchor.WORD_BOUNDARY
                 )
             ),
-            PACKAGE_NAME,
-            CitationSyntax.MODULE_SEPARATOR,
+            f"{PACKAGE_NAME}.",
             RegularExpression.sequence(
                 cls.identifier,
-                RegularExpression.sequence(
-                    CitationSyntax.MODULE_SEPARATOR, cls.identifier
-                ).zero_or_more(),
+                RegularExpression.sequence(".", cls.identifier).zero_or_more(),
             ).captured_as(CitationGroup.CITED_NAME),
             RegularExpression.negative_lookahead(cls.name_continuation),
         ).compiled()
@@ -305,12 +272,11 @@ class CitedNames:
         """
         return RegularExpression.sequence(
             Anchor.WORD_BOUNDARY,
-            WorkspaceLocation.PACKAGE_SOURCE.as_posix(),
-            posixpath.sep,
-            CharacterSet.any_of(CharacterClass.WORD_CHARACTER, posixpath.sep)
+            f"{WorkspaceLocation.PACKAGE_SOURCE.as_posix()}/",
+            CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "/")
             .one_or_more()
             .captured_as(CitationGroup.CITED_NAME),
-            CitationSyntax.PYTHON_SUFFIX,
+            ".py",
             Anchor.WORD_BOUNDARY,
         ).compiled()
 
@@ -323,13 +289,11 @@ class CitedNames:
         return RegularExpression.sequence(
             Anchor.WORD_BOUNDARY,
             PluginLocation.ENTRY_POINT_SCRIPT.name,
-            RegularExpression.literal(ShellQuote.DOUBLE_QUOTE).optional(),
+            RegularExpression.literal('"').optional(),
             CharacterClass.WHITESPACE.one_or_more(),
             RegularExpression.sequence(
                 cls.module_name,
-                RegularExpression.sequence(
-                    CitationSyntax.MODULE_SEPARATOR, cls.module_name
-                ).zero_or_more(),
+                RegularExpression.sequence(".", cls.module_name).zero_or_more(),
             ).captured_as(CitationGroup.CITED_NAME),
             RegularExpression.negative_lookahead(cls.name_continuation),
         ).compiled()
@@ -344,11 +308,7 @@ class CitedNames:
         ).one_or_more()
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(
-                CharacterSet.any_of(
-                    CharacterClass.WORD_CHARACTER,
-                    posixpath.sep,
-                    CitationSyntax.MODULE_SEPARATOR,
-                )
+                CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "/.")
             ),
             SlashCommand.PREFIX,
             RegularExpression.sequence(
@@ -356,16 +316,10 @@ class CitedNames:
                 CharacterSet.any_of(
                     CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT
                 ).zero_or_more(),
-                RegularExpression.sequence(
-                    CitationSyntax.WORD_SEPARATOR, skill_name_word
-                ).one_or_more(),
+                RegularExpression.sequence("-", skill_name_word).one_or_more(),
             ).captured_as(CitationGroup.CITED_NAME),
             RegularExpression.negative_lookahead(
-                CharacterSet.any_of(
-                    CharacterClass.WORD_CHARACTER,
-                    posixpath.sep,
-                    CitationSyntax.WORD_SEPARATOR,
-                )
+                CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "/-")
             ),
         ).compiled()
 
@@ -378,8 +332,7 @@ class CitedNames:
             for name in cls.dotted_citation.findall(text)
         }
         source_files = {
-            path.replace(posixpath.sep, CitationSyntax.MODULE_SEPARATOR)
-            for path in cls.source_file_citation.findall(text)
+            path.replace("/", ".") for path in cls.source_file_citation.findall(text)
         }
         entry_points = set(cls.entry_point_citation.findall(text))
         return cls(

@@ -71,6 +71,17 @@ class PatternPart:
         """
         return re.compile(str(self).encode(), re.MULTILINE)
 
+    def __format__(self, format_spec: str) -> str:
+        """
+        :raises TypeError: Always: a part inside an f-string would turn into text that
+            matches its own pattern syntax. Pass it to
+            :meth:`RegularExpression.sequence` beside the text instead.
+        """
+        raise TypeError(
+            f"{type(self).__name__} cannot be formatted into text; pass it to "
+            "RegularExpression.sequence beside the text it follows"
+        )
+
     @property
     def grouped(self) -> str:
         """
@@ -175,6 +186,22 @@ class CharacterRange(PatternPart, StrEnum):
         :return: The range as a set of its own.
         """
         return f"[{self.value}]"
+
+
+class Wildcard(PatternPart, StrEnum):
+    """
+    Any one character, of a breadth no character class names.
+    """
+
+    ANY_CHARACTER = r"[\s\S]"
+    """
+    Any one character, a line break included.
+    """
+
+    ANY_CHARACTER_EXCEPT_LINE_BREAK = "."
+    """
+    Any one character but a line break.
+    """
 
 
 type CharacterSetMember = CharacterClass | CharacterRange | str
@@ -327,26 +354,3 @@ class RegularExpression(PatternPart):
         :return: The pattern text.
         """
         return self.source
-
-
-ANY_CHARACTER = CharacterSet.any_of(
-    CharacterClass.WHITESPACE, CharacterClass.NON_WHITESPACE
-)
-"""
-Any one character, a line break included.
-"""
-
-LINE_BREAK = "\n"
-"""
-What ends a line.
-"""
-
-SPACE_OR_TAB = CharacterSet.any_of(" ", "\t")
-"""
-One space or tab: whitespace within a line.
-"""
-
-ANY_CHARACTER_EXCEPT_LINE_BREAK = RegularExpression(".")
-"""
-Any one character but a line break.
-"""

@@ -360,9 +360,7 @@ REQUIREMENT_NAME = RegularExpression.sequence(
     CharacterRange.ASCII_ALPHANUMERIC,
     CharacterSet.any_of(
         CharacterRange.ASCII_ALPHANUMERIC,
-        ".",
-        "_",
-        "-",
+        "._-",
     ).zero_or_more(),
 ).compiled()
 """

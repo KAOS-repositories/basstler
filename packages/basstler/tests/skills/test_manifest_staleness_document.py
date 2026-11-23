@@ -13,7 +13,6 @@ covered without this file being edited.
 from __future__ import annotations
 
 import os
-import posixpath
 import re
 import subprocess
 from enum import StrEnum
@@ -114,27 +113,6 @@ def staleness_document() -> str:
     ).read_text(encoding="utf-8")
 
 
-class DocumentSyntax(StrEnum):
-    """
-    The symbols the staleness document's links and placeholders are written with.
-    """
-
-    HEADING_LINK_PREFIX = "#"
-    """
-    Starts a link to a heading on the same page.
-    """
-
-    PLACEHOLDER_START = "<"
-    """
-    Opens a placeholder a reader fills in.
-    """
-
-    PLACEHOLDER_END = ">"
-    """
-    Closes a placeholder a reader fills in.
-    """
-
-
 class DocumentPattern:
     """
     The patterns that read the staleness document.
@@ -145,9 +123,7 @@ class DocumentPattern:
         """
         A Markdown link to a file, capturing its target, as ``](../rule.md)``.
         """
-        return MarkdownLinkPattern.target(
-            DocumentSyntax.HEADING_LINK_PREFIX, CharacterClass.WHITESPACE
-        ).compiled()
+        return MarkdownLinkPattern.target("#", CharacterClass.WHITESPACE).compiled()
 
     @classproperty
     def placeholder(cls) -> re.Pattern[str]:
@@ -155,11 +131,11 @@ class DocumentPattern:
         A placeholder such as ``<plan-id>``, capturing its name.
         """
         return RegularExpression.sequence(
-            DocumentSyntax.PLACEHOLDER_START,
+            "<",
             CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
             .one_or_more()
             .captured_as(PlaceholderGroup.NAME),
-            DocumentSyntax.PLACEHOLDER_END,
+            ">",
         ).compiled()
 
     @classproperty
@@ -172,12 +148,11 @@ class DocumentPattern:
             CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT, "-"
         )
         return RegularExpression.sequence(
-            ProjectLocation.PLANS.name,
-            posixpath.sep,
-            RegularExpression.negative_lookahead(DocumentSyntax.PLACEHOLDER_START),
+            f"{ProjectLocation.PLANS.name}/",
+            RegularExpression.negative_lookahead("<"),
             CharacterRange.ASCII_LOWERCASE_LETTER,
             lowercase_hyphenated_words.zero_or_more(),
-            posixpath.sep,
+            "/",
         ).compiled()
 
 

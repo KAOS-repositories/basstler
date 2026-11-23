@@ -13,7 +13,6 @@ document reaches the model as the bare variable name: a document is cited by a l
 from __future__ import annotations
 
 import os
-import posixpath
 import re
 import subprocess
 from dataclasses import dataclass
@@ -22,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from basstler.bash import Bash, ShellExpansionCharacter, ShellQuote, ShellToken
+from basstler.bash import Bash
 from basstler.class_property import classproperty
 from basstler.locations import (
     BasstlerVariable,
@@ -31,16 +30,12 @@ from basstler.locations import (
     PluginLocation,
 )
 from basstler.regular_expression import (
-    ANY_CHARACTER,
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
-    LINE_BREAK,
     Anchor,
     CharacterClass,
     CharacterSet,
     RegularExpression,
+    Wildcard,
 )
-from basstler.render_common import HtmlSyntax
-from basstler.yaml_syntax import YamlSyntax
 
 from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory
 from basstler_testing.constants.patterns import (
@@ -86,24 +81,14 @@ class SkillDocumentName(StrEnum):
     """
 
 
-class FencedBlock(StrEnum):
+class FrontMatterGroup(StrEnum):
     """
-    The text of a fenced Markdown block holding bash.
-    """
-
-    FENCE = "```"
-    """
-    Opens and closes the block.
+    The parts of a skill document's front matter read back from its match.
     """
 
-    BASH = "bash"
+    DESCRIPTION = "description"
     """
-    Names the block's language, after the opening fence.
-    """
-
-    INDENT = " "
-    """
-    One space of the indentation the fences share.
+    The skill's description.
     """
 
 
@@ -120,32 +105,6 @@ class BashBlockGroup(StrEnum):
     COMMANDS = "commands"
     """
     The lines between the fences.
-    """
-
-
-class DocumentSyntax(StrEnum):
-    """
-    The symbols the skill documents are read by.
-    """
-
-    HOME_DIRECTORY = "~"
-    """
-    Starts a path under the home directory.
-    """
-
-    SYSTEM_TEMPORARY_DIRECTORY = "/tmp/"
-    """
-    The system's temporary directory, as a path prefix.
-    """
-
-    FRONT_MATTER_FENCE = "---"
-    """
-    Opens and closes a document's YAML front matter.
-    """
-
-    DESCRIPTION_KEY = "description"
-    """
-    The front matter key holding a skill's description, which it is read back under.
     """
 
 
@@ -175,18 +134,16 @@ class SkillDocumentPattern:
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            RegularExpression.literal(FencedBlock.INDENT)
+            RegularExpression.literal(" ")
             .zero_or_more()
             .captured_as(BashBlockGroup.INDENTATION),
-            FencedBlock.FENCE,
-            FencedBlock.BASH,
-            LINE_BREAK,
-            ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
+            "```bash\n",
+            Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
                 BashBlockGroup.COMMANDS
             ),
             Anchor.LINE_START,
             RegularExpression.backreference(BashBlockGroup.INDENTATION),
-            FencedBlock.FENCE,
+            "```",
         ).compiled()
 
     @classproperty
@@ -198,20 +155,11 @@ class SkillDocumentPattern:
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(
-                CharacterSet.any_of(
-                    CharacterClass.WORD_CHARACTER,
-                    posixpath.sep,
-                    ShellExpansionCharacter.PARAMETER_EXPANSION,
-                    ShellQuote.DOUBLE_QUOTE,
-                    ShellToken.BRACED_PARAMETER_START,
-                    ShellToken.BRACED_PARAMETER_END,
-                    "-",
-                )
+                CharacterSet.any_of(CharacterClass.WORD_CHARACTER, '/$"{}-')
             ),
-            InterpreterRun.PYTHON,
-            RegularExpression.literal(InterpreterRun.MAJOR_VERSION).optional(),
-            InterpreterRun.MODULE_FLAG,
-            PackageLocation.DIRECTORY.name,
+            "python",
+            RegularExpression.literal("3").optional(),
+            f" -m {PackageLocation.DIRECTORY.name}",
             Anchor.WORD_BOUNDARY,
         ).compiled()
 
@@ -223,14 +171,9 @@ class SkillDocumentPattern:
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(
-                CharacterSet.any_of(
-                    CharacterClass.WORD_CHARACTER,
-                    ".",
-                    DocumentSyntax.HOME_DIRECTORY,
-                    "-",
-                )
+                CharacterSet.any_of(CharacterClass.WORD_CHARACTER, ".~-")
             ),
-            DocumentSyntax.SYSTEM_TEMPORARY_DIRECTORY,
+            "/tmp/",
         ).compiled()
 
     @classproperty
@@ -240,18 +183,15 @@ class SkillDocumentPattern:
         """
         return RegularExpression.sequence(
             Anchor.TEXT_START,
-            DocumentSyntax.FRONT_MATTER_FENCE,
-            LINE_BREAK,
+            "---\n",
             RegularExpression.sequence(
-                ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(), LINE_BREAK
+                Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(), "\n"
             ).zero_or_more(shortest=True),
-            DocumentSyntax.DESCRIPTION_KEY,
-            YamlSyntax.MAPPING_VALUE,
-            YamlSyntax.INDICATOR_SEPARATOR,
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().captured_as(
-                DocumentSyntax.DESCRIPTION_KEY
+            "description: ",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().captured_as(
+                FrontMatterGroup.DESCRIPTION
             ),
-            LINE_BREAK,
+            "\n",
         ).compiled()
 
     @classproperty
@@ -259,7 +199,7 @@ class SkillDocumentPattern:
         """
         A character claude.ai strips from a skill's description as part of an XML tag.
         """
-        return CharacterSet.any_of(HtmlSyntax.TAG_START, HtmlSyntax.TAG_END).compiled()
+        return CharacterSet.any_of("<>").compiled()
 
 
 def bash_blocks(document: Path) -> list[str]:
@@ -522,27 +462,6 @@ def test_the_resolve_skill_links_the_pull_request_rules() -> None:
 # %% the interpreter a module is run with
 
 
-class InterpreterRun(StrEnum):
-    """
-    The words of a command running a module with an interpreter.
-    """
-
-    PYTHON = "python"
-    """
-    The interpreter's name.
-    """
-
-    MAJOR_VERSION = "3"
-    """
-    The version some systems name the interpreter with.
-    """
-
-    MODULE_FLAG = " -m "
-    """
-    Asks the interpreter to run a module.
-    """
-
-
 @pytest.mark.parametrize("document", skill_documents(), ids=document_identifier)
 def test_no_skill_document_runs_the_package_with_a_bare_interpreter(document: Path):
     """
@@ -594,7 +513,7 @@ def test_no_skill_description_holds_an_angle_bracket(document: Path) -> None:
 
     assert (
         SkillDocumentPattern.angle_bracket.findall(
-            description[DocumentSyntax.DESCRIPTION_KEY]
+            description[FrontMatterGroup.DESCRIPTION]
         )
         == []
     )

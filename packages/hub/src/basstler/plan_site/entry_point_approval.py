@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import os
-import posixpath
 import re
 import sys
 from collections.abc import Mapping
@@ -20,13 +19,6 @@ from pathlib import Path
 
 from cyclopts import App
 
-from basstler.bash import (
-    ShellBuiltin,
-    ShellExpansionCharacter,
-    ShellMetacharacter,
-    ShellQuote,
-    ShellToken,
-)
 from basstler.class_property import classproperty
 from basstler.exit_codes import StackExitCode
 from basstler.session_tool import BuiltInTool
@@ -74,17 +66,6 @@ class ShellCall(ValidatedJSONModel):
 # %% the command
 
 
-class WindowsPathSyntax(StrEnum):
-    """
-    The symbols of a Windows path that a plugin root expanded there can begin with.
-    """
-
-    DRIVE_SEPARATOR = ":"
-    """
-    Follows the letter naming a drive.
-    """
-
-
 class EntryPointGroup(StrEnum):
     """
     The parts of an entry point invocation read back from its match.
@@ -126,10 +107,7 @@ class EntryPointInvocation:
         quote.
         """
         return CharacterSet.any_except(
-            CharacterClass.WHITESPACE,
-            *ShellMetacharacter,
-            *ShellExpansionCharacter,
-            *ShellQuote,
+            CharacterClass.WHITESPACE, "|&;()<>", "$`", "'\"\\"
         ).one_or_more()
 
     @classproperty
@@ -141,14 +119,8 @@ class EntryPointInvocation:
             BasstlerVariable.PLUGIN_ROOT, ClaudeCodeVariable.PLUGIN_ROOT
         )
         return RegularExpression.either(
-            RegularExpression.sequence(
-                ShellToken.BRACED_PARAMETER_START,
-                variable_name,
-                ShellToken.BRACED_PARAMETER_END,
-            ),
-            RegularExpression.sequence(
-                ShellExpansionCharacter.PARAMETER_EXPANSION, variable_name
-            ),
+            RegularExpression.sequence("${", variable_name, "}"),
+            RegularExpression.sequence("$", variable_name),
         )
 
     @classproperty
@@ -157,27 +129,21 @@ class EntryPointInvocation:
         The plugin root once expanded: a plain absolute path, below ``/`` or a Windows
         drive, as a pattern whose group is that path.
         """
-        drive = RegularExpression.sequence(
-            CharacterSet.any_of(
-                CharacterRange.ASCII_LETTER,
-            ),
-            WindowsPathSyntax.DRIVE_SEPARATOR,
-        ).optional()
-        return RegularExpression.sequence(
-            drive, posixpath.sep, cls.plain_word
-        ).captured_as(EntryPointGroup.EXPANDED_ROOT)
+        drive = RegularExpression.sequence(CharacterRange.ASCII_LETTER, ":").optional()
+        return RegularExpression.sequence(drive, "/", cls.plain_word).captured_as(
+            EntryPointGroup.EXPANDED_ROOT
+        )
 
     @classproperty
     def script(cls) -> RegularExpression:
         """
         The entry point script below the plugin root, optionally double-quoted.
         """
-        double_quote = RegularExpression.literal(ShellQuote.DOUBLE_QUOTE).optional()
+        double_quote = RegularExpression.literal('"').optional()
         return RegularExpression.sequence(
             double_quote,
             RegularExpression.either(cls.plugin_root_variable, cls.plugin_root_path),
-            posixpath.sep,
-            PluginLocation.ENTRY_POINT_SCRIPT.as_posix(),
+            f"/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}",
             double_quote,
         )
 
@@ -188,10 +154,7 @@ class EntryPointInvocation:
         redirects.
         """
         argument = CharacterSet.any_except(
-            CharacterClass.WHITESPACE,
-            *ShellMetacharacter,
-            *ShellExpansionCharacter,
-            ShellQuote.ESCAPE,
+            CharacterClass.WHITESPACE, "|&;()<>", "$`", "\\"
         ).one_or_more()
         return RegularExpression.sequence(
             CharacterClass.WHITESPACE.one_or_more(), argument
@@ -204,13 +167,11 @@ class EntryPointInvocation:
         word.
         """
         return RegularExpression.sequence(
-            ShellBuiltin.CHANGE_DIRECTORY,
+            "cd",
             CharacterClass.WHITESPACE.one_or_more(),
             cls.plain_word,
             CharacterClass.WHITESPACE.zero_or_more(),
-            RegularExpression.either(
-                ShellToken.AND_LIST, ShellMetacharacter.COMMAND_SEPARATOR
-            ),
+            RegularExpression.either("&&", ";"),
             CharacterClass.WHITESPACE.zero_or_more(),
         ).optional()
 
@@ -219,19 +180,16 @@ class EntryPointInvocation:
         """
         What may follow the arguments: printing plain text and the script's exit status.
         """
-        plain_text = CharacterSet.any_except(
-            ShellQuote.DOUBLE_QUOTE, ShellQuote.ESCAPE, *ShellExpansionCharacter
-        ).zero_or_more()
+        plain_text = CharacterSet.any_except('"\\$`').zero_or_more()
         return RegularExpression.sequence(
             CharacterClass.WHITESPACE.zero_or_more(),
-            ShellMetacharacter.COMMAND_SEPARATOR,
+            ";",
             CharacterClass.WHITESPACE.zero_or_more(),
-            ShellBuiltin.ECHO,
+            "echo",
             CharacterClass.WHITESPACE.one_or_more(),
-            ShellQuote.DOUBLE_QUOTE,
+            '"',
             plain_text,
-            ShellToken.LAST_EXIT_STATUS,
-            ShellQuote.DOUBLE_QUOTE,
+            '$?"',
         ).optional()
 
     @classproperty

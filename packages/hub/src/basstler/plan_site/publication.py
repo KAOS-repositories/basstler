@@ -10,7 +10,6 @@ Usage:
 from __future__ import annotations
 
 import os
-import posixpath
 import re
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
@@ -93,11 +92,6 @@ class SymbolicReferenceListing(StrEnum):
     The text of the line ``git ls-remote --symref`` lists a symbolic reference on.
     """
 
-    PREFIX = "ref: "
-    """
-    Starts the line, before the reference pointed at.
-    """
-
     HEAD = "HEAD"
     """
     The reference naming a repository's default branch.
@@ -116,9 +110,7 @@ class SymbolicReferenceListing(StrEnum):
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            SymbolicReferenceListing.PREFIX,
-            Branch.namespace,
-            posixpath.sep,
+            f"ref: {Branch.namespace}/",
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
                 SymbolicReferenceListing.BRANCH_GROUP
             ),

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import posixpath
 import re
 import subprocess
 import sys
@@ -23,9 +22,9 @@ from pathlib import Path
 
 import pytest
 
-from basstler.bash import Bash, ShellExpansionCharacter, ShellQuote, ShellToken
+from basstler.bash import Bash
 from basstler.class_property import classproperty
-from basstler.document_references import CitationSyntax, PACKAGE_NAME
+from basstler.document_references import PACKAGE_NAME
 from basstler.environment import GitBashVariable
 from basstler.package_map import Workspace
 from basstler.locations import (
@@ -41,17 +40,16 @@ from basstler.package_layout import (
     package_modules,
 )
 from basstler.regular_expression import (
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
     Anchor,
     CharacterClass,
     CharacterRange,
     CharacterSet,
     RegularExpression,
+    Wildcard,
 )
 from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
 from basstler.upstream_reviews.action.branch import ReviewsWorkflowInput
-from basstler.yaml_syntax import YamlSyntax
 
 from basstler_testing.constants.environment import (
     ConfigurationVariable,
@@ -139,54 +137,6 @@ class ContractGroup(StrEnum):
     """
 
 
-class InstallCommand(StrEnum):
-    """
-    The commands that install a package and the dependencies its metadata declares.
-    """
-
-    PIP = "pip install"
-    """
-    pip's own install.
-    """
-
-    UV_PIP = "uv pip install"
-    """
-    uv's pip-compatible install.
-    """
-
-    UV_SYNC = "uv sync"
-    """
-    uv's install of a project's environment.
-    """
-
-
-class ContractSyntax(StrEnum):
-    """
-    The symbols the shell configuration, the workflows and the skill documents are read
-    by.
-    """
-
-    MODULE_FLAG = "-m"
-    """
-    Asks the interpreter to run a module.
-    """
-
-    ASSIGNMENT = "="
-    """
-    Assigns a shell variable its value.
-    """
-
-    PACKAGE_FLAG = "--package"
-    """
-    Names the distribution of the workspace a sync installs.
-    """
-
-    VERSION_SEPARATOR = "@"
-    """
-    Separates a reusable workflow's path from the branch or tag it is used at.
-    """
-
-
 class ContractPattern:
     """
     The patterns that read the shell configuration, the workflows and the skill documents.
@@ -204,15 +154,14 @@ class ContractPattern:
             CharacterSet.any_of(CharacterRange.ASCII_UPPERCASE_LETTER, "_")
             .one_or_more()
             .captured_as(ContractGroup.VARIABLE),
-            ContractSyntax.ASSIGNMENT,
-            ShellQuote.DOUBLE_QUOTE,
+            '="',
             RegularExpression.sequence(
                 PACKAGE_NAME,
                 RegularExpression.sequence(
-                    CitationSyntax.MODULE_SEPARATOR, lowercase_name.one_or_more()
+                    ".", lowercase_name.one_or_more()
                 ).one_or_more(),
             ).captured_as(ContractGroup.MODULE_PATH),
-            ShellQuote.DOUBLE_QUOTE,
+            '"',
         ).compiled()
 
     @classproperty
@@ -222,8 +171,8 @@ class ContractPattern:
         declares, however the caller spells the directory, as ``uv sync --package``.
         """
         return RegularExpression.sequence(
-            RegularExpression.either(*InstallCommand),
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            RegularExpression.either("pip install", "uv pip install", "uv sync"),
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
             PACKAGE_NAME,
         ).compiled()
 
@@ -234,9 +183,9 @@ class ContractPattern:
         ``uv sync --package basstler``.
         """
         return RegularExpression.sequence(
-            InstallCommand.UV_SYNC,
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
-            ContractSyntax.PACKAGE_FLAG,
+            "uv sync",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            "--package",
             CharacterClass.WHITESPACE,
             PACKAGE_NAME,
         ).compiled()
@@ -249,17 +198,8 @@ class ContractPattern:
         """
         return RegularExpression.sequence(
             RegularExpression.either(
-                RegularExpression.sequence(
-                    PACKAGE_NAME,
-                    posixpath.sep,
-                    WorkflowLocation.UPSTREAM_REVIEWS.as_posix(),
-                    ContractSyntax.VERSION_SEPARATOR,
-                ),
-                RegularExpression.sequence(
-                    ReviewsWorkflowInput.BRANCH_OR_TAG,
-                    YamlSyntax.MAPPING_VALUE,
-                    YamlSyntax.INDICATOR_SEPARATOR,
-                ),
+                f"{PACKAGE_NAME}/{WorkflowLocation.UPSTREAM_REVIEWS.as_posix()}@",
+                f"{ReviewsWorkflowInput.BRANCH_OR_TAG}: ",
             ),
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
                 ContractGroup.BRANCH_OR_TAG
@@ -273,7 +213,7 @@ class ContractPattern:
         writes one.
         """
         return RegularExpression.sequence(
-            ShellToken.BRACED_PARAMETER_START,
+            "${",
             RegularExpression.sequence(
                 CharacterRange.ASCII_UPPERCASE_LETTER,
                 CharacterSet.any_of(
@@ -282,7 +222,7 @@ class ContractPattern:
                     "_",
                 ).zero_or_more(),
             ).captured_as(ContractGroup.VARIABLE),
-            ShellToken.BRACED_PARAMETER_END,
+            "}",
         ).compiled()
 
 
@@ -300,10 +240,7 @@ def invocation_of(module: PackageModule) -> re.Pattern[str]:
     )
     variables = [
         RegularExpression.sequence(
-            RegularExpression.either(
-                ShellToken.BRACED_PARAMETER_START,
-                ShellExpansionCharacter.PARAMETER_EXPANSION,
-            ),
+            RegularExpression.either("${", "$"),
             variable,
             Anchor.WORD_BOUNDARY,
         )
@@ -311,13 +248,11 @@ def invocation_of(module: PackageModule) -> re.Pattern[str]:
         if path == module.command_path
     ]
     module_run = RegularExpression.sequence(
-        ContractSyntax.MODULE_FLAG,
+        "-m",
         CharacterClass.WHITESPACE.one_or_more(),
         module.command_path,
         RegularExpression.negative_lookahead(
-            CharacterSet.any_of(
-                CharacterClass.WORD_CHARACTER, CitationSyntax.MODULE_SEPARATOR
-            )
+            CharacterSet.any_of(CharacterClass.WORD_CHARACTER, ".")
         ),
     )
     return RegularExpression.either(module_run, *variables).compiled()
@@ -404,7 +339,7 @@ def test_every_entry_point_answers_help_through_the_module_runner(
     on ``sys.path`` instead of the repository root, so its absolute imports of its
     siblings would not resolve. Every bash caller invokes them this way.
     """
-    result = run_as_a_caller(ContractSyntax.MODULE_FLAG, module.command_path, "--help")
+    result = run_as_a_caller("-m", module.command_path, "--help")
 
     assert result.returncode == 0, result.stderr
 

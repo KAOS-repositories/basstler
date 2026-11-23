@@ -19,14 +19,13 @@ import pytest
 from basstler.class_property import classproperty
 from basstler.document_references import PACKAGE_NAME, CitedNames
 from basstler.slash_command import SlashCommand
-from basstler.github.constants import MarkdownSyntax
 from basstler.locations import PluginLocation
 from basstler.regular_expression import (
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
     Anchor,
     CharacterClass,
     CharacterSet,
     RegularExpression,
+    Wildcard,
 )
 
 from basstler_testing.constants.paths import (
@@ -73,7 +72,7 @@ class SectionHeading:
         """
         What a second-level Markdown heading starts with, as ``## ``.
         """
-        return MarkdownSyntax.HEADING_MARKER * 2 + MarkdownSyntax.HEADING_SEPARATOR
+        return "#" * 2 + " "
 
     @classproperty
     def pattern(cls) -> re.Pattern[str]:
@@ -83,7 +82,7 @@ class SectionHeading:
         return RegularExpression.sequence(
             Anchor.LINE_START,
             cls.prefix,
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(
                 SectionGroup.TITLE
             ),
             Anchor.LINE_END,

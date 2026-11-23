@@ -48,27 +48,6 @@ class ProseKind(StrEnum):
     """
 
 
-class ProseSyntax(StrEnum):
-    """
-    The symbols that mark what is not prose in a docstring or a comment.
-    """
-
-    FIELD_MARKER = ":"
-    """
-    Encloses a reStructuredText field's name.
-    """
-
-    SECTION_HEADER = "# %%"
-    """
-    Starts a section header comment, which is a label, not prose.
-    """
-
-    COMMENT_MARKER = "#"
-    """
-    Starts a Python comment.
-    """
-
-
 class ToolDirective(StrEnum):
     """
     What a comment addressed to a tool starts with, after its comment marker.
@@ -157,12 +136,10 @@ class SourceProse:
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            ProseSyntax.FIELD_MARKER,
-            CharacterSet.any_except(
-                ProseSyntax.FIELD_MARKER, CharacterClass.WHITESPACE
-            ),
-            CharacterSet.any_except(ProseSyntax.FIELD_MARKER).zero_or_more(),
-            ProseSyntax.FIELD_MARKER,
+            ":",
+            CharacterSet.any_except(":", CharacterClass.WHITESPACE),
+            CharacterSet.any_except(":").zero_or_more(),
+            ":",
         ).compiled()
 
     @classproperty
@@ -172,7 +149,7 @@ class SourceProse:
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
-            ProseSyntax.COMMENT_MARKER,
+            "#",
             CharacterClass.WHITESPACE.zero_or_more(),
             RegularExpression.either(*ToolDirective),
         ).compiled()
@@ -247,9 +224,9 @@ class SourceProse:
         for token in tokenize.generate_tokens(io.StringIO(self.source).readline):
             if token.type != tokenize.COMMENT or token.line.strip() != token.string:
                 continue
-            if token.string.startswith(
-                ProseSyntax.SECTION_HEADER
-            ) or self.tool_directive.match(token.string):
+            if token.string.startswith("# %%") or self.tool_directive.match(
+                token.string
+            ):
                 continue
             if lines and token.start[0] != lines[-1] + 1:
                 yield ProseBlock(ProseKind.COMMENT, lines[0], lines[-1], len(lines))

@@ -154,53 +154,6 @@ class MalformedDependencyDeclarationError(UnreadableDependencyDeclarationError):
         )
 
 
-class ConstraintStart(StrEnum):
-    """
-    The characters that end a distribution's name in a PEP 508 specifier, each
-    beginning what constrains it.
-    """
-
-    LESS_THAN = "<"
-    """
-    Begins an upper version bound.
-    """
-
-    GREATER_THAN = ">"
-    """
-    Begins a lower version bound.
-    """
-
-    EQUALS = "="
-    """
-    Begins an exact version.
-    """
-
-    EXCLUSION = "!"
-    """
-    Begins a version left out.
-    """
-
-    COMPATIBLE_RELEASE = "~"
-    """
-    Begins a compatible release.
-    """
-
-    MARKER_SEPARATOR = ";"
-    """
-    Begins an environment marker.
-    """
-
-    EXTRAS_START = "["
-    """
-    Begins the extras.
-    """
-
-    SPACE = " "
-    """
-    Separates the name from whatever follows it.
-    """
-
-
 @dataclass(frozen=True)
 class Dependency:
     """
@@ -213,7 +166,7 @@ class Dependency:
     """
 
     constraint_start: re.Pattern[str] = field(
-        default=CharacterSet.any_of(*ConstraintStart).compiled(),
+        default=CharacterSet.any_of("<>=!~;[ ").compiled(),
         repr=False,
         compare=False,
     )

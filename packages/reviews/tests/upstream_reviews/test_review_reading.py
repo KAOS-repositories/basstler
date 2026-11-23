@@ -15,13 +15,13 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+
 from basstler.slash_command import SlashCommand
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
 )
 from basstler.regular_expression import Anchor, CharacterClass, RegularExpression
-from basstler.yaml_syntax import YamlSyntax
 
 from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory
 
@@ -49,14 +49,14 @@ def promotion_label() -> str:
     return CommittedStackConfiguration().values()[StackSetting.IN_REVIEW_LABEL]
 
 
-class FrontMatterKey(StrEnum):
+class FrontMatterGroup(StrEnum):
     """
-    The keys of a skill's front matter.
+    The parts of a skill document's front matter read back from its match.
     """
 
     NAME = "name"
     """
-    Holds the skill's name, which it is read back under.
+    The skill's name.
     """
 
 
@@ -70,11 +70,10 @@ def upstream_reviews_invocation() -> str:
     name = (
         RegularExpression.sequence(
             Anchor.LINE_START,
-            FrontMatterKey.NAME,
-            YamlSyntax.MAPPING_VALUE,
+            "name:",
             CharacterClass.WHITESPACE.zero_or_more(),
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
-                FrontMatterKey.NAME
+                FrontMatterGroup.NAME
             ),
             CharacterClass.WHITESPACE.zero_or_more(),
             Anchor.LINE_END,
@@ -82,7 +81,7 @@ def upstream_reviews_invocation() -> str:
         .compiled()
         .search(frontmatter)
     )
-    return f"{SlashCommand.PREFIX}{name[FrontMatterKey.NAME]}"
+    return f"{SlashCommand.PREFIX}{name[FrontMatterGroup.NAME]}"
 
 
 # %% the resolve skill's upstream read

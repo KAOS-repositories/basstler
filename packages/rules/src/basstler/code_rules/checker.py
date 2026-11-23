@@ -15,10 +15,10 @@ from pathlib import Path
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandRunner
 from basstler.regular_expression import (
-    ANY_CHARACTER_EXCEPT_LINE_BREAK,
     Anchor,
     CharacterClass,
     RegularExpression,
+    Wildcard,
 )
 
 # %% violations
@@ -83,52 +83,6 @@ class CodeRuleChecker(ABC):
 # %% the staged change
 
 
-class UnifiedDiffSyntax(StrEnum):
-    """
-    The text that marks the headers of a diff git writes.
-    """
-
-    FILE_HEADER = "diff --git"
-    """
-    Starts the header of each file the diff changes.
-    """
-
-    OLD_FILE_PREFIX = "a/"
-    """
-    Precedes the file's path before the change.
-    """
-
-    NEW_FILE_PREFIX = "b/"
-    """
-    Precedes the file's path after the change.
-    """
-
-    HUNK_MARKER = "@@"
-    """
-    Encloses the line ranges of a changed block.
-    """
-
-    OLD_RANGE_PREFIX = "-"
-    """
-    Precedes the block's lines before the change.
-    """
-
-    NEW_RANGE_PREFIX = "+"
-    """
-    Precedes the block's lines after the change.
-    """
-
-    RANGE_COUNT_SEPARATOR = ","
-    """
-    Separates a range's first line from its number of lines.
-    """
-
-    FIELD_SEPARATOR = " "
-    """
-    Separates the parts of a header.
-    """
-
-
 class DiffHeaderGroup(StrEnum):
     """
     The parts of a diff header read back from its match.
@@ -177,33 +131,26 @@ class StagedLines:
         """
         file_header = RegularExpression.sequence(
             Anchor.LINE_START,
-            UnifiedDiffSyntax.FILE_HEADER,
-            UnifiedDiffSyntax.FIELD_SEPARATOR,
-            UnifiedDiffSyntax.OLD_FILE_PREFIX,
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more(),
-            UnifiedDiffSyntax.FIELD_SEPARATOR,
-            UnifiedDiffSyntax.NEW_FILE_PREFIX,
-            ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(
+            "diff --git a/",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more(),
+            " b/",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(
                 DiffHeaderGroup.STAGED_FILE
             ),
             Anchor.LINE_END,
         )
         line_count = RegularExpression.sequence(
-            UnifiedDiffSyntax.RANGE_COUNT_SEPARATOR,
+            ",",
             CharacterClass.DIGIT.one_or_more().captured_as(DiffHeaderGroup.LINE_COUNT),
         )
         block_header = RegularExpression.sequence(
             Anchor.LINE_START,
-            UnifiedDiffSyntax.HUNK_MARKER,
-            UnifiedDiffSyntax.FIELD_SEPARATOR,
-            UnifiedDiffSyntax.OLD_RANGE_PREFIX,
+            "@@ -",
             CharacterClass.NON_WHITESPACE.one_or_more(),
-            UnifiedDiffSyntax.FIELD_SEPARATOR,
-            UnifiedDiffSyntax.NEW_RANGE_PREFIX,
+            " +",
             CharacterClass.DIGIT.one_or_more().captured_as(DiffHeaderGroup.FIRST_LINE),
             line_count.optional(),
-            UnifiedDiffSyntax.FIELD_SEPARATOR,
-            UnifiedDiffSyntax.HUNK_MARKER,
+            " @@",
         )
         return RegularExpression.either(file_header, block_header).compiled()
 

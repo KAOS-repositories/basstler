@@ -38,52 +38,6 @@ class AllowedUrlScheme(StrEnum):
     """
 
 
-class HtmlSyntax(StrEnum):
-    """
-    The parts of an HTML tag.
-    """
-
-    TAG_START = "<"
-    """
-    Opens a tag.
-    """
-
-    TAG_END = ">"
-    """
-    Closes a tag.
-    """
-
-    CLOSING_MARK = "/"
-    """
-    Marks a tag as the one ending an element.
-    """
-
-    HEADING_ELEMENT = "h"
-    """
-    Names a heading element, followed by its level.
-    """
-
-    TIME_ELEMENT = "time"
-    """
-    Names the element a time is shown in.
-    """
-
-    ATTRIBUTE_SEPARATOR = " "
-    """
-    Separates an HTML tag's name from its attributes.
-    """
-
-    COMMENT_START = "<!--"
-    """
-    Opens a comment.
-    """
-
-    COMMENT_END = "-->"
-    """
-    Closes a comment.
-    """
-
-
 class HeadingTagGroup(StrEnum):
     """
     The parts of a heading tag read back from its match.
@@ -132,13 +86,13 @@ class HeadingShift(IntEnum):
             str(level) for level in range(1, HeadingShift.DEEPEST_LEVEL + 1)
         )
         return RegularExpression.sequence(
-            HtmlSyntax.TAG_START,
-            RegularExpression.sequence(HtmlSyntax.CLOSING_MARK)
+            "<",
+            RegularExpression.literal("/")
             .optional()
             .captured_as(HeadingTagGroup.CLOSING_MARK),
-            HtmlSyntax.HEADING_ELEMENT,
+            "h",
             CharacterSet.any_of(levels).captured_as(HeadingTagGroup.LEVEL),
-            HtmlSyntax.TAG_END,
+            ">",
         ).compiled()
 
     @classmethod
@@ -155,10 +109,7 @@ class HeadingShift(IntEnum):
         closing_mark = heading_tag_match[HeadingTagGroup.CLOSING_MARK]
         original_level = int(heading_tag_match[HeadingTagGroup.LEVEL])
         shifted_level = min(original_level + cls.LEVELS, cls.DEEPEST_LEVEL)
-        return (
-            f"{HtmlSyntax.TAG_START}{closing_mark}{HtmlSyntax.HEADING_ELEMENT}"
-            f"{shifted_level}{HtmlSyntax.TAG_END}"
-        )
+        return f"<{closing_mark}h{shifted_level}>"
 
 
 def create_template_environment() -> jinja2.Environment:

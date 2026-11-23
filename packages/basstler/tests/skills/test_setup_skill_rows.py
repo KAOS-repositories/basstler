@@ -47,27 +47,6 @@ class RowReferenceGroup(StrEnum):
     """
 
 
-class RowSyntax(StrEnum):
-    """
-    The words and symbols the skill names a row with.
-    """
-
-    CODE_QUOTE = "`"
-    """
-    Encloses inline code.
-    """
-
-    ROW = " row"
-    """
-    The word after the code naming a row.
-    """
-
-    PLURAL_ENDING = "s"
-    """
-    What makes *row* plural.
-    """
-
-
 class RowReference:
     """
     How the skill names a row.
@@ -80,13 +59,12 @@ class RowReference:
         ``` `git_identity` row ```.
         """
         return RegularExpression.sequence(
-            RowSyntax.CODE_QUOTE,
+            "`",
             CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_")
             .one_or_more()
             .captured_as(RowReferenceGroup.WORD),
-            RowSyntax.CODE_QUOTE,
-            RowSyntax.ROW,
-            RegularExpression.literal(RowSyntax.PLURAL_ENDING).optional(),
+            "` row",
+            RegularExpression.literal("s").optional(),
             Anchor.WORD_BOUNDARY,
         ).compiled()
 

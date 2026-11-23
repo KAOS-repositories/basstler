@@ -203,6 +203,7 @@ class NameScope:
         reader = ScopeReader()
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
             reader.read_parameters(node.args)
+        parameters = reader.bindings_by_name()
         body = node.body if isinstance(node.body, list) else [node.body]
         reader.read(body)
         return cls(
@@ -210,7 +211,9 @@ class NameScope:
             class_body=isinstance(node, ast.ClassDef),
             star_imports=tuple(reader.star_imports),
             statement_order=(
-                StatementOrder(node.body) if isinstance(node.body, list) else None
+                StatementOrder(node.body, parameters)
+                if isinstance(node.body, list)
+                else None
             ),
         )
 
@@ -472,6 +475,12 @@ class StatementOrder:
     The scope's own statements.
     """
 
+    parameters: dict[str, tuple[NameBinding, ...]] = field(default_factory=dict)
+    """
+    The bindings of the scope's parameters by name, which hold before its first
+    statement runs.
+    """
+
     @cached_property
     def positions(self) -> dict[ast.AST, StatementPosition]:
         """
@@ -521,9 +530,10 @@ class StatementOrder:
     def reaching_bindings(self, use: ast.Name) -> tuple[NameBinding, ...] | None:
         """
         :param use: A name the code reads.
-        :return: The bindings of the last statement to bind it before the use, when
-            that statement always runs completely and nothing may rebind the name in
-            between; ``None`` when the order of the statements proves no such thing.
+        :return: The bindings of the last statement to bind it before the use, or of
+            the parameter when no statement does, when that statement always runs
+            completely and nothing may rebind the name in between; ``None`` when the
+            order of the statements proves no such thing.
         """
         name = use.id
         if name in self.declared_names:
@@ -540,7 +550,7 @@ class StatementOrder:
                     return None
                 return bindings
             if position.owner is None:
-                return None
+                return self.parameters.get(name)
             position = self.positions[position.owner]
         return None
 

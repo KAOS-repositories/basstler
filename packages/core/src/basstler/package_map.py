@@ -215,9 +215,7 @@ class DistributionDeclaration:
             it requires.
         """
         metadata = DistributionMetadata.from_json(
-            tomllib.loads(
-                TextFile(directory / WorkspaceLocation.METADATA).read()
-            )
+            tomllib.loads(TextFile(directory / WorkspaceLocation.METADATA).read())
         )
         distribution = Distribution(metadata.project.name)
         source = directory / WorkspaceLocation.PACKAGE_SOURCE

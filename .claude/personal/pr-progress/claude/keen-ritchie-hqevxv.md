@@ -1,11 +1,10 @@
 ## Plan
-- Move each name that one distribution uses (source and tests) into that distribution's own locations/environment/exceptions module; shared names stay in core
+- Move each name one distribution uses (source and tests) into its own locations/environment/exceptions module; shared and shell-only names stay in core
 
 ## Done
-- Merged main (#290) at 362ce59e and resolved conflicts; names main's core code or lower test environments use went back to core
-- CI-like per-distribution run passes (hub's 43 Playwright launch errors are sandbox-only); ruff, code-rules check, new-crossings pass
-- PR #297 description current
+- Bases in core declare each split enum's meaning once (ProjectFile, ActionsWorkflowFile, ...); renames REUSABLE_MARK_VIEWED and README; WORKFLOWS unified with WorkflowLocation.DIRECTORY; shell-only clause in the rule (ccc60b55)
+- CI-like per-distribution run passes (hub's Playwright errors are sandbox-only); CI passed on 362ce59e
 
 ## Next
-- Read CI's pytest jobs on 362ce59e
-- Owner to answer: test-only names, removing WorkspaceLocation.LOCK, renames and shared bases (WorkflowFile)
+- Read CI on ccc60b55
+- Owner to answer: point WorkspacePart / PackageSourceFile at WorkspaceLocation (keeps LOCK); further members repeating their subject

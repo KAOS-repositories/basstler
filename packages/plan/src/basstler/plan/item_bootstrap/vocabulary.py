@@ -8,10 +8,7 @@ import re
 from enum import Enum, StrEnum
 
 from basstler.exit_codes import ExitCode
-from basstler.plan.model import (
-    PARAGRAPH_BREAK,
-    ManifestKey,
-)
+from basstler.plan.model import ManifestKey, Prose
 from basstler.yaml_syntax import YamlSyntax
 from basstler.regular_expression import (
     LINE_BREAK,
@@ -281,5 +278,5 @@ class BlockScalarStyle(StrEnum):
         What separates two paragraphs in a value of this style once it has been read.
         """
         if self is BlockScalarStyle.LITERAL:
-            return PARAGRAPH_BREAK
+            return Prose.paragraph_break
         return RegularExpression.sequence(LINE_BREAK).one_or_more().compiled()

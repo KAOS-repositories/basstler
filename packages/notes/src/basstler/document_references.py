@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 import posixpath
+import re
 from dataclasses import dataclass
 from collections.abc import Mapping
 from enum import Enum, StrEnum
@@ -21,6 +22,7 @@ from pathlib import Path
 from cyclopts import App
 
 from basstler.bash import ShellQuote
+from basstler.class_property import classproperty
 from basstler.locations import PackageLocation, PluginLocation, WorkspaceLocation
 from basstler.package_layout import package_modules
 from basstler.package_map import Distribution
@@ -46,25 +48,31 @@ PACKAGE_NAME = PackageLocation.DIRECTORY.name
 The package every cited module belongs to.
 """
 
-MODULE_SEPARATOR = "."
-"""
-What separates the names in a dotted import path.
-"""
 
-PYTHON_SUFFIX = ".py"
-"""
-What a Python source file's name ends with.
-"""
+class CitationSyntax(StrEnum):
+    """
+    The symbols a document cites a module or a skill with.
+    """
 
-WORD_SEPARATOR = "-"
-"""
-What joins the words of a skill's name.
-"""
+    MODULE_SEPARATOR = "."
+    """
+    Separates the names in a dotted import path.
+    """
 
-COMMAND_PREFIX = "/"
-"""
-What a slash command starts with.
-"""
+    PYTHON_SUFFIX = ".py"
+    """
+    Ends the name of a Python source file.
+    """
+
+    WORD_SEPARATOR = "-"
+    """
+    Joins the words of a skill's name.
+    """
+
+    COMMAND_PREFIX = "/"
+    """
+    Starts a slash command.
+    """
 
 
 class CitationGroup(StrEnum):
@@ -76,118 +84,6 @@ class CitationGroup(StrEnum):
     """
     The module or skill cited.
     """
-
-
-IDENTIFIER = RegularExpression.sequence(
-    CharacterSet.any_of(
-        CharacterRange.ASCII_UPPERCASE_LETTER,
-        CharacterRange.ASCII_LOWERCASE_LETTER,
-        "_",
-    ),
-    CharacterClass.WORD_CHARACTER.zero_or_more(),
-)
-"""
-A Python name.
-"""
-
-MODULE_NAME = RegularExpression.sequence(
-    CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_"),
-    CharacterClass.WORD_CHARACTER.zero_or_more(),
-)
-"""
-A Python name in lower case, as a module is named.
-"""
-
-NAME_CONTINUATION = CharacterSet.any_of(CharacterClass.WORD_CHARACTER, WORD_SEPARATOR)
-"""
-A character that would continue a name, so the name before it is not the whole name.
-"""
-
-DOTTED_CITATION = RegularExpression.sequence(
-    RegularExpression.negative_lookbehind(
-        CharacterSet.any_of(
-            CharacterClass.WORD_CHARACTER,
-            MODULE_SEPARATOR,
-            posixpath.sep,
-            WORD_SEPARATOR,
-        )
-    ),
-    RegularExpression.negative_lookahead(
-        RegularExpression.sequence(
-            PluginLocation.ENTRY_POINT_SCRIPT.name, Anchor.WORD_BOUNDARY
-        )
-    ),
-    PACKAGE_NAME,
-    MODULE_SEPARATOR,
-    RegularExpression.sequence(
-        IDENTIFIER,
-        RegularExpression.sequence(MODULE_SEPARATOR, IDENTIFIER).zero_or_more(),
-    ).captured_as(CitationGroup.CITED_NAME),
-    RegularExpression.negative_lookahead(NAME_CONTINUATION),
-).compiled()
-"""
-Matches a dotted import path into the package, capturing it below the package.
-"""
-
-SOURCE_FILE_CITATION = RegularExpression.sequence(
-    Anchor.WORD_BOUNDARY,
-    WorkspaceLocation.PACKAGE_SOURCE.as_posix(),
-    posixpath.sep,
-    CharacterSet.any_of(CharacterClass.WORD_CHARACTER, posixpath.sep)
-    .one_or_more()
-    .captured_as(CitationGroup.CITED_NAME),
-    PYTHON_SUFFIX,
-    Anchor.WORD_BOUNDARY,
-).compiled()
-"""
-Matches a source file of the package, capturing its path below the package directory.
-"""
-
-ENTRY_POINT_CITATION = RegularExpression.sequence(
-    Anchor.WORD_BOUNDARY,
-    PluginLocation.ENTRY_POINT_SCRIPT.name,
-    RegularExpression.sequence(ShellQuote.DOUBLE_QUOTE).optional(),
-    CharacterClass.WHITESPACE.one_or_more(),
-    RegularExpression.sequence(
-        MODULE_NAME,
-        RegularExpression.sequence(MODULE_SEPARATOR, MODULE_NAME).zero_or_more(),
-    ).captured_as(CitationGroup.CITED_NAME),
-    RegularExpression.negative_lookahead(NAME_CONTINUATION),
-).compiled()
-"""
-Matches the module the plugin's entry point script is asked to run.
-"""
-
-SKILL_NAME_WORD = CharacterSet.any_of(
-    CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT
-).one_or_more()
-"""
-A word of a skill's name: small letters and digits.
-"""
-
-SKILL_CITATION = RegularExpression.sequence(
-    RegularExpression.negative_lookbehind(
-        CharacterSet.any_of(
-            CharacterClass.WORD_CHARACTER, posixpath.sep, MODULE_SEPARATOR
-        )
-    ),
-    COMMAND_PREFIX,
-    RegularExpression.sequence(
-        CharacterRange.ASCII_LOWERCASE_LETTER,
-        CharacterSet.any_of(
-            CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT
-        ).zero_or_more(),
-        RegularExpression.sequence(WORD_SEPARATOR, SKILL_NAME_WORD).one_or_more(),
-    ).captured_as(CitationGroup.CITED_NAME),
-    RegularExpression.negative_lookahead(
-        CharacterSet.any_of(
-            CharacterClass.WORD_CHARACTER, posixpath.sep, WORD_SEPARATOR
-        )
-    ),
-).compiled()
-"""
-Matches a slash command, capturing the skill it invokes.
-"""
 
 
 @dataclass(frozen=True)
@@ -341,24 +237,161 @@ class CitedNames:
     Every skill a cited slash command invokes, without the slash.
     """
 
+    @classproperty
+    def identifier(cls) -> RegularExpression:
+        """
+        A Python name, as in ``plan_manifest_tools``.
+        """
+        return RegularExpression.sequence(
+            CharacterSet.any_of(
+                CharacterRange.ASCII_UPPERCASE_LETTER,
+                CharacterRange.ASCII_LOWERCASE_LETTER,
+                "_",
+            ),
+            CharacterClass.WORD_CHARACTER.zero_or_more(),
+        )
+
+    @classproperty
+    def module_name(cls) -> RegularExpression:
+        """
+        A Python name in lower case, as a module is named.
+        """
+        return RegularExpression.sequence(
+            CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_"),
+            CharacterClass.WORD_CHARACTER.zero_or_more(),
+        )
+
+    @classproperty
+    def name_continuation(cls) -> RegularExpression:
+        """
+        A character that would continue a name, so the name before it is not the whole
+        name.
+        """
+        return CharacterSet.any_of(
+            CharacterClass.WORD_CHARACTER, CitationSyntax.WORD_SEPARATOR
+        )
+
+    @classproperty
+    def dotted_citation(cls) -> re.Pattern[str]:
+        """
+        A dotted import path into the package, capturing it below the package, as in
+        ``basstler.plan_manifest_tools``.
+        """
+        return RegularExpression.sequence(
+            RegularExpression.negative_lookbehind(
+                CharacterSet.any_of(
+                    CharacterClass.WORD_CHARACTER,
+                    CitationSyntax.MODULE_SEPARATOR,
+                    posixpath.sep,
+                    CitationSyntax.WORD_SEPARATOR,
+                )
+            ),
+            RegularExpression.negative_lookahead(
+                RegularExpression.sequence(
+                    PluginLocation.ENTRY_POINT_SCRIPT.name, Anchor.WORD_BOUNDARY
+                )
+            ),
+            PACKAGE_NAME,
+            CitationSyntax.MODULE_SEPARATOR,
+            RegularExpression.sequence(
+                cls.identifier,
+                RegularExpression.sequence(
+                    CitationSyntax.MODULE_SEPARATOR, cls.identifier
+                ).zero_or_more(),
+            ).captured_as(CitationGroup.CITED_NAME),
+            RegularExpression.negative_lookahead(cls.name_continuation),
+        ).compiled()
+
+    @classproperty
+    def source_file_citation(cls) -> re.Pattern[str]:
+        """
+        A source file of the package, capturing its path below the package directory,
+        as in ``src/basstler/plan_manifest_tools.py``.
+        """
+        return RegularExpression.sequence(
+            Anchor.WORD_BOUNDARY,
+            WorkspaceLocation.PACKAGE_SOURCE.as_posix(),
+            posixpath.sep,
+            CharacterSet.any_of(CharacterClass.WORD_CHARACTER, posixpath.sep)
+            .one_or_more()
+            .captured_as(CitationGroup.CITED_NAME),
+            CitationSyntax.PYTHON_SUFFIX,
+            Anchor.WORD_BOUNDARY,
+        ).compiled()
+
+    @classproperty
+    def entry_point_citation(cls) -> re.Pattern[str]:
+        """
+        The module the plugin's entry point script is asked to run, as in
+        ``basstler.sh plan_manifest_tools``.
+        """
+        return RegularExpression.sequence(
+            Anchor.WORD_BOUNDARY,
+            PluginLocation.ENTRY_POINT_SCRIPT.name,
+            RegularExpression.sequence(ShellQuote.DOUBLE_QUOTE).optional(),
+            CharacterClass.WHITESPACE.one_or_more(),
+            RegularExpression.sequence(
+                cls.module_name,
+                RegularExpression.sequence(
+                    CitationSyntax.MODULE_SEPARATOR, cls.module_name
+                ).zero_or_more(),
+            ).captured_as(CitationGroup.CITED_NAME),
+            RegularExpression.negative_lookahead(cls.name_continuation),
+        ).compiled()
+
+    @classproperty
+    def skill_citation(cls) -> re.Pattern[str]:
+        """
+        A slash command, capturing the skill it invokes, as in ``/plan-create``.
+        """
+        skill_name_word = CharacterSet.any_of(
+            CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT
+        ).one_or_more()
+        return RegularExpression.sequence(
+            RegularExpression.negative_lookbehind(
+                CharacterSet.any_of(
+                    CharacterClass.WORD_CHARACTER,
+                    posixpath.sep,
+                    CitationSyntax.MODULE_SEPARATOR,
+                )
+            ),
+            CitationSyntax.COMMAND_PREFIX,
+            RegularExpression.sequence(
+                CharacterRange.ASCII_LOWERCASE_LETTER,
+                CharacterSet.any_of(
+                    CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT
+                ).zero_or_more(),
+                RegularExpression.sequence(
+                    CitationSyntax.WORD_SEPARATOR, skill_name_word
+                ).one_or_more(),
+            ).captured_as(CitationGroup.CITED_NAME),
+            RegularExpression.negative_lookahead(
+                CharacterSet.any_of(
+                    CharacterClass.WORD_CHARACTER,
+                    posixpath.sep,
+                    CitationSyntax.WORD_SEPARATOR,
+                )
+            ),
+        ).compiled()
+
     @classmethod
     def in_text(cls, text: str) -> CitedNames:
         """:param text: A document's text.
         :return: The names it cites."""
         dotted = {
             ".".join(takewhile(lambda part: not part[:1].isupper(), name.split(".")))
-            for name in DOTTED_CITATION.findall(text)
+            for name in cls.dotted_citation.findall(text)
         }
         source_files = {
-            path.replace(posixpath.sep, MODULE_SEPARATOR)
-            for path in SOURCE_FILE_CITATION.findall(text)
+            path.replace(posixpath.sep, CitationSyntax.MODULE_SEPARATOR)
+            for path in cls.source_file_citation.findall(text)
         }
-        entry_points = set(ENTRY_POINT_CITATION.findall(text))
+        entry_points = set(cls.entry_point_citation.findall(text))
         return cls(
             modules=frozenset(
                 name for name in dotted | source_files | entry_points if name
             ),
-            skills=frozenset(SKILL_CITATION.findall(text)),
+            skills=frozenset(cls.skill_citation.findall(text)),
         )
 
     def stale(

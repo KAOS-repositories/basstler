@@ -128,22 +128,15 @@ class PlanDocument(StrEnum):
         return (ProjectLocation.PLANS / plan_identifier / self.value).as_posix()
 
 
-HYPHEN = "-"
-"""
-What joins the parts of a compound word.
-"""
+class ProseSyntax(StrEnum):
+    """
+    The characters prose is wrapped with.
+    """
 
-PARAGRAPH_BREAK = RegularExpression.sequence(
-    LINE_BREAK, CharacterClass.WHITESPACE.zero_or_more(), LINE_BREAK
-).compiled()
-"""
-A line holding nothing but whitespace, which separates two paragraphs.
-"""
-
-WRAPPED_HYPHEN = RegularExpression.sequence(HYPHEN, LINE_BREAK).compiled()
-"""
-A hyphen its author wrapped the line right after.
-"""
+    HYPHEN = "-"
+    """
+    Joins the parts of a compound word.
+    """
 
 
 class ItemLayout(StrEnum):
@@ -213,6 +206,22 @@ class Prose:
     The column a wrapped body line is kept under.
     """
 
+    @classproperty
+    def paragraph_break(cls) -> re.Pattern[str]:
+        """
+        A line holding nothing but whitespace, which separates two paragraphs.
+        """
+        return RegularExpression.sequence(
+            LINE_BREAK, CharacterClass.WHITESPACE.zero_or_more(), LINE_BREAK
+        ).compiled()
+
+    @classproperty
+    def wrapped_hyphen(cls) -> re.Pattern[str]:
+        """
+        A hyphen its author wrapped the line right after.
+        """
+        return RegularExpression.sequence(ProseSyntax.HYPHEN, LINE_BREAK).compiled()
+
     @property
     def paragraphs(self) -> list[str]:
         """
@@ -224,8 +233,8 @@ class Prose:
         space.
         """
         return [
-            WRAPPED_HYPHEN.sub(HYPHEN, paragraph.strip())
-            for paragraph in PARAGRAPH_BREAK.split(self.text.strip())
+            self.wrapped_hyphen.sub(ProseSyntax.HYPHEN, paragraph.strip())
+            for paragraph in self.paragraph_break.split(self.text.strip())
         ]
 
     def folded(self, indent: str) -> str:

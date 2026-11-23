@@ -40,7 +40,7 @@ class AllowedUrlScheme(StrEnum):
 
 class HtmlSyntax(StrEnum):
     """
-    The parts of an HTML heading tag.
+    The parts of an HTML tag.
     """
 
     TAG_START = "<"
@@ -61,6 +61,16 @@ class HtmlSyntax(StrEnum):
     HEADING_ELEMENT = "h"
     """
     Names a heading element, followed by its level.
+    """
+
+    TIME_ELEMENT = "time"
+    """
+    Names the element a time is shown in.
+    """
+
+    ATTRIBUTE_SEPARATOR = " "
+    """
+    Separates an HTML tag's name from its attributes.
     """
 
     COMMENT_START = "<!--"

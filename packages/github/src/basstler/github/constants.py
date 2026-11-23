@@ -11,7 +11,7 @@ Values a program derives for itself belong beside the code that derives them, no
 
 from __future__ import annotations
 
-from enum import Enum, StrEnum
+from enum import Enum, IntEnum, StrEnum
 
 from basstler.regular_expression import (
     Anchor,
@@ -66,15 +66,26 @@ class MarkdownSyntax(StrEnum):
     """
 
 
-SESSION_URL_PREFIX = "https://claude.ai/code/session_"
-"""
-What the link to a Claude Code session starts with, before the session's identifier.
-"""
+class ClaudeCodeSessionLink(StrEnum):
+    """
+    The link to a Claude Code session.
+    """
 
-DEEPEST_HEADING_LEVEL = 6
-"""
-The most heading markers a Markdown heading may have.
-"""
+    URL_PREFIX = "https://claude.ai/code/session_"
+    """
+    Starts the link, before the session's identifier.
+    """
+
+
+class HeadingLevel(IntEnum):
+    """
+    The levels a Markdown heading may have, which is how many markers it starts with.
+    """
+
+    DEEPEST = 6
+    """
+    The most markers a heading may have.
+    """
 
 
 class DescriptionPattern(Enum):
@@ -83,7 +94,7 @@ class DescriptionPattern(Enum):
     """
 
     SESSION_LINK = RegularExpression.sequence(
-        SESSION_URL_PREFIX,
+        ClaudeCodeSessionLink.URL_PREFIX,
         CharacterSet.any_of(
             CharacterRange.ASCII_UPPERCASE_LETTER,
             CharacterRange.ASCII_LOWERCASE_LETTER,
@@ -99,7 +110,7 @@ class DescriptionPattern(Enum):
     HEADING = RegularExpression.sequence(
         Anchor.LINE_START,
         RegularExpression.sequence(MarkdownSyntax.HEADING_MARKER).repeated(
-            1, DEEPEST_HEADING_LEVEL
+            1, HeadingLevel.DEEPEST
         ),
         MarkdownSyntax.HEADING_SEPARATOR,
     ).compiled()

@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from basstler.bash import Bash, ShellExpansionCharacter, ShellQuote, ShellToken
-from basstler.document_references import MODULE_SEPARATOR, PACKAGE_NAME
+from basstler.document_references import CitationSyntax, PACKAGE_NAME
 from basstler.environment import GitBashVariable
 from basstler.package_map import Workspace
 from basstler.locations import (
@@ -184,7 +184,7 @@ MODULE_VARIABLE = RegularExpression.sequence(
     RegularExpression.sequence(
         PACKAGE_NAME,
         RegularExpression.sequence(
-            MODULE_SEPARATOR, LOWERCASE_NAME.one_or_more()
+            CitationSyntax.MODULE_SEPARATOR, LOWERCASE_NAME.one_or_more()
         ).one_or_more(),
     ).captured_as(ContractGroup.MODULE_PATH),
     ShellQuote.DOUBLE_QUOTE,
@@ -233,7 +233,9 @@ def invocation_of(module: PackageModule) -> re.Pattern[str]:
         CharacterClass.WHITESPACE.one_or_more(),
         module.command_path,
         RegularExpression.negative_lookahead(
-            CharacterSet.any_of(CharacterClass.WORD_CHARACTER, MODULE_SEPARATOR)
+            CharacterSet.any_of(
+                CharacterClass.WORD_CHARACTER, CitationSyntax.MODULE_SEPARATOR
+            )
         ),
     )
     return RegularExpression.either(module_run, *variables).compiled()

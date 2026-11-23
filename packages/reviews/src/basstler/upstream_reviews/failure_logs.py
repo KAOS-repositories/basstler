@@ -31,25 +31,30 @@ from basstler.upstream_reviews.clients import (
 # %% the log behind a failed check
 
 
-CONTROL_SEQUENCE_INTRODUCER = "\x1b["
-"""
-What starts a terminal escape sequence, such as one setting a colour.
-"""
+class LogSyntax(StrEnum):
+    """
+    The symbols a runner writes into its log around a line's text.
+    """
 
-PARAMETER_SEPARATOR = ";"
-"""
-Separates the numbers a terminal escape sequence carries.
-"""
+    CONTROL_SEQUENCE_INTRODUCER = "\x1b["
+    """
+    Starts a terminal escape sequence, such as one setting a colour.
+    """
 
-UTC_DESIGNATOR = "Z"
-"""
-Ends a timestamp given in UTC.
-"""
+    PARAMETER_SEPARATOR = ";"
+    """
+    Separates the numbers a terminal escape sequence carries.
+    """
 
-TIMESTAMP_SEPARATOR = " "
-"""
-Separates a runner's timestamp from the line's text.
-"""
+    UTC_DESIGNATOR = "Z"
+    """
+    Ends a timestamp given in UTC.
+    """
+
+    TIMESTAMP_SEPARATOR = " "
+    """
+    Separates a runner's timestamp from the line's text.
+    """
 
 
 class LogFormatting(Enum):
@@ -58,9 +63,9 @@ class LogFormatting(Enum):
     """
 
     TERMINAL_ESCAPE = RegularExpression.sequence(
-        CONTROL_SEQUENCE_INTRODUCER,
+        LogSyntax.CONTROL_SEQUENCE_INTRODUCER,
         CharacterSet.any_of(
-            CharacterRange.ASCII_DIGIT, PARAMETER_SEPARATOR
+            CharacterRange.ASCII_DIGIT, LogSyntax.PARAMETER_SEPARATOR
         ).zero_or_more(),
         CharacterSet.any_of(
             CharacterRange.ASCII_UPPERCASE_LETTER, CharacterRange.ASCII_LOWERCASE_LETTER
@@ -73,8 +78,8 @@ class LogFormatting(Enum):
     TIMESTAMP = RegularExpression.sequence(
         Anchor.LINE_START,
         CharacterClass.NON_WHITESPACE.one_or_more(),
-        UTC_DESIGNATOR,
-        TIMESTAMP_SEPARATOR,
+        LogSyntax.UTC_DESIGNATOR,
+        LogSyntax.TIMESTAMP_SEPARATOR,
     ).compiled()
     """
     The timestamp a runner writes in front of every line it records.

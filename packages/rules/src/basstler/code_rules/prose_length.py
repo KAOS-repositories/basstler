@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import inspect
 import io
+import re
 import tokenize
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from typing import override
 import libcst
 from libcst.metadata import CodeRange
 
+from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.syntax import BodySyntax, ExpressionSyntax
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
@@ -46,31 +48,25 @@ class ProseKind(StrEnum):
     """
 
 
-FIELD_MARKER = ":"
-"""
-What encloses a reStructuredText field's name.
-"""
+class ProseSyntax(StrEnum):
+    """
+    The symbols that mark what is not prose in a docstring or a comment.
+    """
 
-FIELD_LIST_ITEM = RegularExpression.sequence(
-    Anchor.LINE_START,
-    FIELD_MARKER,
-    CharacterSet.any_except(FIELD_MARKER, CharacterClass.WHITESPACE),
-    CharacterSet.any_except(FIELD_MARKER).zero_or_more(),
-    FIELD_MARKER,
-).compiled()
-"""
-A reStructuredText field such as ``:param name:``, which starts a docstring's field list.
-"""
+    FIELD_MARKER = ":"
+    """
+    Encloses a reStructuredText field's name.
+    """
 
-SECTION_HEADER = "# %%"
-"""
-The start of a section header comment, which is a label, not prose.
-"""
+    SECTION_HEADER = "# %%"
+    """
+    Starts a section header comment, which is a label, not prose.
+    """
 
-COMMENT_MARKER = "#"
-"""
-What starts a Python comment.
-"""
+    COMMENT_MARKER = "#"
+    """
+    Starts a Python comment.
+    """
 
 
 class ToolDirective(StrEnum):
@@ -114,17 +110,6 @@ class ToolDirective(StrEnum):
     """
 
 
-TOOL_DIRECTIVE = RegularExpression.sequence(
-    Anchor.LINE_START,
-    COMMENT_MARKER,
-    CharacterClass.WHITESPACE.zero_or_more(),
-    RegularExpression.either(*ToolDirective),
-).compiled()
-"""
-A comment addressed to a tool rather than a reader.
-"""
-
-
 @dataclass(frozen=True)
 class ProseBlock:
     """
@@ -163,6 +148,34 @@ class SourceProse:
     """
     The text of the Python source.
     """
+
+    @classproperty
+    def field_list_item(cls) -> re.Pattern[str]:
+        """
+        A reStructuredText field such as ``:param name:``, which starts a docstring's
+        field list.
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            ProseSyntax.FIELD_MARKER,
+            CharacterSet.any_except(
+                ProseSyntax.FIELD_MARKER, CharacterClass.WHITESPACE
+            ),
+            CharacterSet.any_except(ProseSyntax.FIELD_MARKER).zero_or_more(),
+            ProseSyntax.FIELD_MARKER,
+        ).compiled()
+
+    @classproperty
+    def tool_directive(cls) -> re.Pattern[str]:
+        """
+        A comment addressed to a tool rather than a reader, such as ``# noqa``.
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            ProseSyntax.COMMENT_MARKER,
+            CharacterClass.WHITESPACE.zero_or_more(),
+            RegularExpression.either(*ToolDirective),
+        ).compiled()
 
     @property
     def blocks(self) -> list[ProseBlock]:
@@ -217,7 +230,7 @@ class SourceProse:
         prose_lines = 0
         text = ExpressionSyntax(statement.value).literal_text
         for line in inspect.cleandoc(text or "").splitlines():
-            if FIELD_LIST_ITEM.match(line):
+            if SourceProse.field_list_item.match(line):
                 break
             if line.strip() and not line[0].isspace():
                 prose_lines += 1
@@ -234,9 +247,9 @@ class SourceProse:
         for token in tokenize.generate_tokens(io.StringIO(self.source).readline):
             if token.type != tokenize.COMMENT or token.line.strip() != token.string:
                 continue
-            if token.string.startswith(SECTION_HEADER) or TOOL_DIRECTIVE.match(
-                token.string
-            ):
+            if token.string.startswith(
+                ProseSyntax.SECTION_HEADER
+            ) or self.tool_directive.match(token.string):
                 continue
             if lines and token.start[0] != lines[-1] + 1:
                 yield ProseBlock(ProseKind.COMMENT, lines[0], lines[-1], len(lines))

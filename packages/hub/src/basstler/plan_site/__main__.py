@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import sys
 import tempfile
 from abc import ABC, abstractmethod
@@ -33,6 +34,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from basstler.class_property import classproperty
 
 from basstler.github.pull_request_source import (
     GitHubPullRequestSource,
@@ -100,35 +103,6 @@ class SiteFile(StrEnum):
     """
 
 
-TIME_ELEMENT = "time"
-"""
-The HTML element a time is shown in.
-"""
-
-ATTRIBUTE_SEPARATOR = " "
-"""
-Separates an HTML tag's name from its attributes.
-"""
-
-BUILD_TIME_PATTERN = RegularExpression.sequence(
-    HtmlSyntax.TAG_START,
-    TIME_ELEMENT,
-    ATTRIBUTE_SEPARATOR,
-    CharacterSet.any_except(HtmlSyntax.TAG_END).zero_or_more(),
-    PlanTimeAttribute.REFRESHED,
-    CharacterSet.any_except(HtmlSyntax.TAG_END).zero_or_more(),
-    HtmlSyntax.TAG_END,
-    CharacterSet.any_except(HtmlSyntax.TAG_START).zero_or_more(),
-    HtmlSyntax.TAG_START,
-    HtmlSyntax.CLOSING_MARK,
-    TIME_ELEMENT,
-    HtmlSyntax.TAG_END,
-).compiled_for_bytes()
-"""
-The element a plan page shows the build time in.
-"""
-
-
 @dataclass(frozen=True)
 class SiteDigest:
     """
@@ -140,6 +114,26 @@ class SiteDigest:
     """
     The root directory the site was built into.
     """
+
+    @classproperty
+    def build_time_pattern(cls) -> re.Pattern[bytes]:
+        """
+        The element a plan page shows the build time in.
+        """
+        return RegularExpression.sequence(
+            HtmlSyntax.TAG_START,
+            HtmlSyntax.TIME_ELEMENT,
+            HtmlSyntax.ATTRIBUTE_SEPARATOR,
+            CharacterSet.any_except(HtmlSyntax.TAG_END).zero_or_more(),
+            PlanTimeAttribute.REFRESHED,
+            CharacterSet.any_except(HtmlSyntax.TAG_END).zero_or_more(),
+            HtmlSyntax.TAG_END,
+            CharacterSet.any_except(HtmlSyntax.TAG_START).zero_or_more(),
+            HtmlSyntax.TAG_START,
+            HtmlSyntax.CLOSING_MARK,
+            HtmlSyntax.TIME_ELEMENT,
+            HtmlSyntax.TAG_END,
+        ).compiled_for_bytes()
 
     @property
     def value(self) -> str:
@@ -162,7 +156,7 @@ class SiteDigest:
         :return: Its content without the build time, so a build that changed nothing
             else has the published digest and skips the deploy.
         """
-        return BUILD_TIME_PATTERN.sub(b"", path.read_bytes())
+        return SiteDigest.build_time_pattern.sub(b"", path.read_bytes())
 
     def write(self) -> None:
         """

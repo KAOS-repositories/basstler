@@ -6,6 +6,7 @@ third-party library it does not require.
 from __future__ import annotations
 
 import importlib.metadata
+import re
 import sys
 import tempfile
 from abc import ABC, abstractmethod
@@ -18,6 +19,7 @@ from types import TracebackType
 import libcst
 from libcst.helpers import get_full_name_for_node
 
+from basstler.class_property import classproperty
 from basstler.code_modification.patterns import Occurrence
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.source_file import PythonSourceFile
@@ -220,17 +222,18 @@ The environment marker of a requirement that only an extra brings in.
 """
 
 
-NAME_SEPARATORS = CharacterSet.any_of("-", "_", ".").one_or_more().compiled()
-"""
-A run of the characters a distribution's name is spelled with between its words.
-"""
-
-
 @dataclass(frozen=True)
 class InstalledLibraries:
     """
     The distributions installed in the running environment and what each requires.
     """
+
+    @classproperty
+    def name_separators(cls) -> re.Pattern[str]:
+        """
+        A run of the characters a distribution's name is spelled with between its words.
+        """
+        return CharacterSet.any_of("-", "_", ".").one_or_more().compiled()
 
     @staticmethod
     def canonical_distribution_name(name: str) -> str:
@@ -239,7 +242,7 @@ class InstalledLibraries:
         :return: The name with runs of ``-``, ``_`` and ``.`` read as one ``-``, in lower
             case.
         """
-        return NAME_SEPARATORS.sub("-", name).lower()
+        return InstalledLibraries.name_separators.sub("-", name).lower()
 
     @cached_property
     def distributions_by_package(self) -> Mapping[str, frozenset[str]]:

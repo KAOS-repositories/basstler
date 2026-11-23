@@ -13,7 +13,7 @@ Filesystem only: no network, no credentials, no scratch repository.
 
 from __future__ import annotations
 
-from basstler.document_references import COMMAND_PREFIX
+from basstler.document_references import CitationSyntax
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
@@ -73,7 +73,7 @@ def upstream_reviews_invocation() -> str:
         .compiled()
         .search(frontmatter)
     )
-    return f"{COMMAND_PREFIX}{name[NAME_KEY]}"
+    return f"{CitationSyntax.COMMAND_PREFIX}{name[NAME_KEY]}"
 
 
 # %% the resolve skill's upstream read

@@ -221,7 +221,7 @@ class HelperRecording(JSONModel):
 
 class ChunkSyntax(StrEnum):
     """
-    What separates the parts of a chunk's line.
+    What separates and spells the parts of a chunk's line.
     """
 
     NUMBER_SEPARATOR = "-"
@@ -232,6 +232,11 @@ class ChunkSyntax(StrEnum):
     TEXT_SEPARATOR = ":"
     """
     Precedes the chunk's text.
+    """
+
+    BASE64_PUNCTUATION = "+/="
+    """
+    The characters of the chunk's base64 text that are neither letters nor digits.
     """
 
 
@@ -254,12 +259,6 @@ class ChunkGroup(StrEnum):
     """
     The chunk's share of the output.
     """
-
-
-BASE64_PUNCTUATION = "+/="
-"""
-The characters of base64 text that are neither letters nor digits.
-"""
 
 
 @dataclass(frozen=True)
@@ -314,7 +313,7 @@ class HelperChunk:
                 CharacterRange.ASCII_UPPERCASE_LETTER,
                 CharacterRange.ASCII_LOWERCASE_LETTER,
                 CharacterRange.ASCII_DIGIT,
-                BASE64_PUNCTUATION,
+                ChunkSyntax.BASE64_PUNCTUATION,
             )
             .one_or_more()
             .captured_as(ChunkGroup.TEXT),

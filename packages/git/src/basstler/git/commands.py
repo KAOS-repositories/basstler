@@ -25,6 +25,11 @@ from basstler.text_file import TextFile
 
 # %% running git
 
+MERGE_CONFLICT_EXIT_STATUS = 1
+"""
+The status ``git merge-tree`` exits with when the merge conflicts.
+"""
+
 
 class RemoteSubcommand(StrEnum):
     """
@@ -118,6 +123,23 @@ class GitCommandResult:
                 arguments=self.arguments,
             )
         return self
+
+
+@dataclass(frozen=True)
+class MergeCommit:
+    """
+    A commit merging two others, made without touching any branch or the working tree.
+    """
+
+    commit: str
+    """
+    The merge commit, git's conflict markers left in the files it conflicts on.
+    """
+
+    conflicted_paths: frozenset[PurePosixPath]
+    """
+    The files the merge conflicts on, by their path in the merge commit.
+    """
 
 
 # %% what a pass is allowed to publish
@@ -385,6 +407,33 @@ class GitCommandRunner:
         """
         merge = self.attempt("merge-tree", "--write-tree", first, second)
         return merge.output.splitlines()[0] if merge.succeeded else None
+
+    def merge_commit(self, first: str, second: str, message: str) -> MergeCommit:
+        """
+        Merge two commits into a new commit, keeping the merge's conflicts in its files.
+
+        :param first: The merge's first parent.
+        :param second: Its second parent.
+        :param message: The commit message.
+        :return: The merge commit and the files it conflicts on.
+        :raises GitCommandFailed: If git fails for any reason other than a conflict.
+        """
+        merge = self.attempt(
+            "merge-tree",
+            "--write-tree",
+            "--name-only",
+            "--no-messages",
+            "-z",
+            first,
+            second,
+        )
+        if merge.exit_status != MERGE_CONFLICT_EXIT_STATUS:
+            merge.raise_if_failed()
+        tree, *conflicted_paths = merge.output.split("\0")
+        return MergeCommit(
+            self.run("commit-tree", tree, "-p", first, "-p", second, "-m", message),
+            frozenset(PurePosixPath(path) for path in conflicted_paths if path),
+        )
 
     def adds_only_merges(self, candidate: str, *references: str) -> bool:
         """:param candidate: The reference whose history is examined.

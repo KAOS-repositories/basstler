@@ -380,6 +380,13 @@ class Repository(GitRepository):
         """
         return f"{self.pull_requests_path}/{number}"
 
+    def pull_request_reviews_path(self, number: int) -> str:
+        """
+        :param number: The pull request's number.
+        :return: The REST path listing that pull request's reviews, oldest first.
+        """
+        return f"{self.pull_request_path(number)}/reviews"
+
     def open_pull_requests_from_branch_path(self, branch: str) -> str:
         """
         :param branch: A branch of this repository itself.

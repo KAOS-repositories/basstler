@@ -14,13 +14,9 @@ from pathlib import PurePosixPath
 from types import ModuleType
 from typing import Any
 
+from basstler.class_name import ClassNameWords
 from basstler.class_property import classproperty
 from basstler.code_rules.checker import CodeRuleChecker
-from basstler.regular_expression import (
-    CharacterRange,
-    CharacterSet,
-    RegularExpression,
-)
 
 # %% code named by rules
 
@@ -107,20 +103,8 @@ class Section(AgentRule, Enum):
         keeping acronyms such as ``CI`` in capitals, as ``CI pipeline`` for
         ``CIPipelineRules``.
         """
-        acronym = RegularExpression.sequence(
-            CharacterRange.ASCII_UPPERCASE_LETTER.one_or_more(),
-            RegularExpression.negative_lookahead(CharacterRange.ASCII_LOWERCASE_LETTER),
-        )
-        capitalized_word = RegularExpression.sequence(
-            CharacterRange.ASCII_UPPERCASE_LETTER,
-            CharacterSet.any_of(
-                CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT
-            ).zero_or_more(),
-        )
-        first_word, *other_words = (
-            RegularExpression.either(acronym, capitalized_word)
-            .compiled()
-            .findall(cls.__name__.removesuffix("Rules"))
+        first_word, *other_words = ClassNameWords.split(
+            cls.__name__.removesuffix("Rules")
         )
         return " ".join(
             [

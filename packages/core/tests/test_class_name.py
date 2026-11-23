@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from basstler.class_name import HyphenatedClassName
+from basstler.class_name import ClassNameWords, HyphenatedClassName
 
 # %% hyphenating a class name
 
@@ -53,3 +53,28 @@ def test_a_word_starts_before_each_capital_but_the_first_character(
     Each name is listed beside whether a word starts inside it.
     """
     assert (HyphenatedClassName.word_start.search(name) is not None) is has_word_start
+
+
+# %% the words of a class name
+
+
+@pytest.mark.parametrize(
+    ("name", "words"),
+    [
+        ("PlanItemKickoff", ["Plan", "Item", "Kickoff"]),
+        ("CIPipeline", ["CI", "Pipeline"]),
+        ("HTTPSettings", ["HTTP", "Settings"]),
+        ("PRReview", ["PR", "Review"]),
+        ("Python3Wheel", ["Python3", "Wheel"]),
+        ("Plan", ["Plan"]),
+        ("lowercase", []),
+        ("", []),
+    ],
+)
+def test_the_words_of_a_class_name_start_at_each_capital_and_keep_an_acronym_whole(
+    name: str, words: list[str]
+):
+    """
+    Each name is listed beside the words it is spelled in.
+    """
+    assert ClassNameWords.split(name) == words

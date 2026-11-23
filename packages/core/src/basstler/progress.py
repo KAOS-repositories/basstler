@@ -27,6 +27,9 @@ class BarSafeStreamHandler(StandardStreamHandler):
     """
 
     def emit(self, record: logging.LogRecord) -> None:
+        """
+        :meth:`StandardStreamHandler.emit`, through :meth:`tqdm.write`.
+        """
         tqdm.write(self.format(record), file=self.stream_for(record))
 
     @classmethod

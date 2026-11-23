@@ -275,6 +275,24 @@ class ModuleNameKeptSample(SampleTrees):
         return "module-name-kept"
 
 
+# %% an import respelled to the module a re-export reads from
+
+
+class ReexportedImportSample(SampleTrees):
+    """
+    A pull request moving two classes out of a module that re-exports one of them and
+    binds the other's name to a different class, with a caller importing each from its
+    new module.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "reexported-import"
+
+
 # %% the package root move
 
 

@@ -10,10 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from basstler.code_rules import rules
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.rule import Section
-from basstler.code_rules.rule_module import RuleModule
+from basstler.code_rules.ruleset import ProjectCodeRules
 from basstler.locations import InstructionsTemplate, ProjectLocation
 from basstler.render_common import create_template_environment
 from basstler.text_file import TextFile
@@ -39,9 +38,12 @@ class AgentsInstructions:
     def of_repository(cls, repository_root: Path) -> AgentsInstructions:
         """
         :param repository_root: The directory holding the repository's ``AGENTS.md``.
-        :return: The file listing the sections of :mod:`basstler.code_rules.rules`.
+        :return: The file listing the sections of the code rulesets the repository's
+            playbook holds.
         """
-        return cls(repository_root, RuleModule(rules).sections)
+        return cls(
+            repository_root, ProjectCodeRules.of_project(repository_root).sections
+        )
 
     @property
     def path(self) -> Path:

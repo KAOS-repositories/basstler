@@ -12,17 +12,19 @@ from basstler.maintenance.restack_procedure import restack
 from basstler.maintenance.restack_steps import RestackOutcome
 
 from basstler_testing.constants.stack import StackBranch, StackLabel
-from basstler_testing.maintenance.fork import (
+from basstler_testing.github.pull_request_samples import (
     A_SESSION_LINK,
-    FixtureFile,
-    ForkCheckout,
     PromotionSampleText,
     StackPullRequestNumber,
+)
+from basstler_testing.maintenance.fork import (
+    FixtureFile,
     a_parent_and_child,
     a_stack,
     make_configuration,
     the_board,
 )
+from basstler_testing.fork_checkout import ForkCheckout
 from .recorded_fork import (
     RecordedLabelWrite,
     RecordingPullRequests,

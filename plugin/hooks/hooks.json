@@ -4,8 +4,8 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
+            "type": "command"
           }
         ]
       }
@@ -14,31 +14,31 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh review_triage.stop_hook"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh review_triage.stop_hook",
+            "type": "command"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "mcp__claude-code-remote__add_repo",
         "hooks": [
           {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.attach_approval"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.attach_approval",
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": "mcp__claude-code-remote__add_repo"
       },
       {
-        "matcher": "Bash",
         "hooks": [
           {
-            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.entry_point_approval",
             "if": "Bash(*basstler.sh*)",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan_site.entry_point_approval"
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": "Bash"
       }
     ]
   }

@@ -12,7 +12,7 @@ import pytest
 import basstler.plan_site.build_start
 from basstler.github.credential import GitHubCommand
 from basstler.github.repository import Repository
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import BuiltInTool, CloudSessionTool
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
@@ -82,8 +82,8 @@ def test_a_cloud_session_is_told_to_attach_the_site_repository_and_ask_if_refuse
 
     description = BuildStart.attempt(SITE, client).describe(in_cloud_session=True)
 
-    assert SessionTool.ATTACH_REPOSITORY in description
-    assert SessionTool.ASK_USER in description
+    assert CloudSessionTool.ATTACH_REPOSITORY in description
+    assert BuiltInTool.ASK_USER in description
     assert SITE.repository.name in description
 
 
@@ -95,7 +95,7 @@ def test_a_local_session_is_not_told_to_attach_a_repository():
 
     description = BuildStart.attempt(SITE, client).describe(in_cloud_session=False)
 
-    assert SessionTool.ATTACH_REPOSITORY not in description
+    assert CloudSessionTool.ATTACH_REPOSITORY not in description
     assert GitHubCommand.LOG_IN in description
 
 

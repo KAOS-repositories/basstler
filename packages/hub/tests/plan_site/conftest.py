@@ -13,7 +13,7 @@ from basstler.github.repository import PullRequestReference
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.plan_site.__main__ import RepositorySite
 from basstler.plan_site.hub import NotesBranch, SiteAddress
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.site import SiteSampleText

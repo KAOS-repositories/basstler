@@ -35,7 +35,7 @@ from basstler.package_layout import (
     command_line_entry_points,
     package_modules,
 )
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
 
 from basstler_testing.constants.environment import (

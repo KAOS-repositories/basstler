@@ -6,18 +6,13 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
-from basstler.git.commands import GitCommandRunner
 from basstler.github.repository_access import GitHubRepository
-from basstler.locations import ClaudeCodeVariable
 from basstler.upstream_reviews.action.open_pull_requests import (
     OpenPullRequestsAnswer,
     OpenPullRequestsRequest,
     UpstreamPullRequests,
 )
-from basstler.maintenance.commands import MaintenancePass
-from basstler.maintenance.upstream_read_route import UpstreamReadRoute
 from basstler.upstream_reviews.action.__main__ import ActionCommand, main
 from basstler.upstream_reviews.action.branch import ActionFile, ActionInstallation
 from basstler.upstream_reviews.action.exchange import (
@@ -25,16 +20,14 @@ from basstler.upstream_reviews.action.exchange import (
     ActionRequestKind,
 )
 from basstler.upstream_reviews.action.read import ActionRead
-from basstler.upstream_reviews.exceptions import ActionNotInstalled
 
-from basstler_testing.maintenance.fork import (
+from basstler_testing.github.pull_request_samples import (
     PullRequestHeadRepository,
-    StackBranch,
     StackPullRequestNumber,
-    an_api_record,
-    make_configuration,
 )
-from basstler_testing.maintenance.fork import ListedRepository
+from basstler_testing.constants.stack import StackBranch
+from basstler_testing.github.listed_repository import an_api_record
+from basstler_testing.github.listed_repository import ListedRepository
 from .test_action import (
     BRANCH_OR_TAG,
     REQUEST_IDENTIFIER,
@@ -168,30 +161,3 @@ def test_the_answer_committed_for_the_request_is_collected(fork: Fork):
     fork.answer(answer)
 
     assert read.wait(timeout=0) == answer
-
-
-def test_a_pass_reading_through_the_action_asks_the_fork_s_action_branch(fork: Fork):
-    maintenance = MaintenancePass(
-        configuration=make_configuration(),
-        git=GitCommandRunner(fork.clone),
-        board=fork.clone / "board.json",
-        upstream_read=UpstreamReadRoute.ACTION,
-    )
-
-    with pytest.raises(ActionNotInstalled):
-        maintenance.upstream_pull_requests()
-
-
-# %% choosing the route
-
-
-def test_a_cloud_session_reads_through_the_action(monkeypatch):
-    monkeypatch.setenv(ClaudeCodeVariable.REMOTE, "true")
-
-    assert UpstreamReadRoute.for_this_session() is UpstreamReadRoute.ACTION
-
-
-def test_anywhere_else_reads_directly(monkeypatch):
-    monkeypatch.delenv(ClaudeCodeVariable.REMOTE, raising=False)
-
-    assert UpstreamReadRoute.for_this_session() is UpstreamReadRoute.DIRECT

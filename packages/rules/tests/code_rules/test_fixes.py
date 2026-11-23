@@ -12,7 +12,7 @@ import pytest
 
 from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_modification.specification import Specification
 from basstler.code_rules import rules
 from basstler.code_rules.exceptions import FixDoesNotConvergeError
@@ -24,8 +24,6 @@ from basstler.code_rules.fixes import (
     SourceFixer,
 )
 from basstler.code_rules.rule_module import RuleModule
-from basstler.code_rules.text_file_usage import TextFileChecker
-from basstler.locations import PackageLocation
 
 from basstler_testing.constants.paths import CodeModificationSnippet
 from .fix_example import FixExample
@@ -49,7 +47,7 @@ def fixed(example: FixExample) -> libcst.Module:
     """
     return (
         SourceFixer((example.checker,))
-        .fix_module(PythonSourceFile(example.before))
+        .fix_module(EditablePythonSourceFile(example.before))
         .result
     )
 
@@ -72,7 +70,7 @@ def test_a_fix_turns_each_example_into_its_fixed_code(example):
     """
     Fixing the code breaking the rule gives the fixed code, character for character.
     """
-    assert fixed(example).code == PythonSourceFile(example.after).read()
+    assert fixed(example).code == EditablePythonSourceFile(example.after).read()
 
 
 @pytest.mark.parametrize("example", EXAMPLES, ids=lambda example: example.identifier)
@@ -80,7 +78,7 @@ def test_undoing_a_fix_restores_each_example_exactly(example):
     """
     The inverse of a fix turns the fixed code back into the code it fixed.
     """
-    before = PythonSourceFile(example.before)
+    before = EditablePythonSourceFile(example.before)
     applied = SourceFixer((example.checker,)).fix_module(before)
 
     assert applied.inverse.apply(applied.result).result.code == before.read()
@@ -142,19 +140,5 @@ def test_a_fix_leaving_its_rule_broken_raises():
     """
     with pytest.raises(FixDoesNotConvergeError):
         SourceFixer((PrintCallChecker(),)).fix_module(
-            PythonSourceFile(CodeModificationSnippet.PRINT_CALL)
+            EditablePythonSourceFile(CodeModificationSnippet.PRINT_CALL)
         )
-
-
-# %% files a checker skips
-
-
-def test_a_checker_that_skips_a_file_fixes_nothing_in_it():
-    """
-    The program that runs without ``basstler`` keeps the path methods it reads with.
-    """
-    source_file = PythonSourceFile(PackageLocation.UPSTREAM_REVIEWS_FETCH)
-
-    fixed = SourceFixer((TextFileChecker(),)).fix_module(source_file)
-
-    assert fixed.result.code == source_file.read()

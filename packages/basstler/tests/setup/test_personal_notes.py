@@ -45,7 +45,7 @@ from basstler.setup.personal_notes import (
     SetupRequest,
 )
 from basstler.setup.report import CheckStatus, SetupCheck, SetupReport
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler_testing.constants.environment import (
     BashStubVariable,
     CheckSetupStubVariable,

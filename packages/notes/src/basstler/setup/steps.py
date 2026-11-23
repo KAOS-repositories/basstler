@@ -28,16 +28,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import os
 import re
 import subprocess
 import sys
 import tempfile
-from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import Path
 
 from basstler.git.remote_branch import RemoteBranch
@@ -49,10 +47,19 @@ from basstler.github.repository import HasRepository, Repository
 from basstler.github.stack_configuration import StackSetting
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
+from basstler.playbook.playbook import PlaybookFile
+from basstler.playbook.setup_steps import (
+    RepositoryCheckout,
+    SetupChecklist,
+    SetupStep,
+    SetupSteps,
+)
 from basstler.plugin_root import PluginRoot
 from basstler.shell_configuration import (
     FetchedBranchReference,
+    PersonalNotesSetting,
     ShellConfigurationFunction,
+    git_value,
 )
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
@@ -136,138 +143,6 @@ class SetupLink(StrEnum):
     """
 
 
-# %% reading a value out of the clone
-
-
-def git_value(project_root: Path, *arguments: str) -> str | None:
-    """
-    Read a value git can answer for a clone, or nothing when it has no answer.
-
-    An absent answer is an ordinary outcome here - an unset configuration key, a remote
-    the clone never added - so it is reported rather than raised, and every caller in
-    this module falls through to the next thing it knows.
-
-    :param project_root: The clone to run in.
-    :param arguments: The git subcommand and its arguments.
-    :return: The trimmed output, or ``None`` when the command failed or said nothing.
-    """
-    completed = subprocess.run(
-        ["git", *arguments],
-        cwd=project_root,
-        capture_output=True,
-        encoding="utf-8",
-    )
-    if completed.returncode != 0:
-        return None
-    return completed.stdout.strip() or None
-
-
-# %% the settings whose values the printed steps depend on
-
-
-@dataclass(frozen=True)
-class PersonalNotesSettingSpecification:
-    """
-    Where one personal-notes setting is read from, and what it falls back to.
-
-    resolve-personal-notes-config.sh is the definition of both the precedence and the
-    defaults; this mirrors them because the shell file exports nothing a child process
-    could read them from.
-    """
-
-    git_config_key: str
-    """
-    The git config key that takes precedence over everything else.
-    """
-
-    environment_variable: str
-    """
-    The environment variable read when no git config value is set.
-    """
-
-    default: str
-    """
-    The value in force when neither of the two above is set.
-    """
-
-    def resolve(self, project_root: Path, environment: Mapping[str, str]) -> str:
-        """
-        Read this setting's value as the hooks themselves would.
-
-        :param project_root: The clone whose git config to read.
-        :param environment: The environment to read the variable from.
-        :return: The value in force.
-        """
-        configured = git_value(project_root, "config", "--get", self.git_config_key)
-        if configured is not None:
-            return configured
-        return environment.get(self.environment_variable) or self.default
-
-
-class PersonalNotesSetting(PersonalNotesSettingSpecification, Enum):
-    """
-    The three settings that decide where personal notes live, in the order the printed
-    variable list uses them.
-
-    Each member *is* a specification, so a setting's own key, variable and default are
-    reached directly and no caller holds a parallel list of them.
-
-    .. note::
-       Both :meth:`__new__` and :meth:`__init__` are needed: the enum machinery builds a
-       member's value by calling the mixed-in type with the member's value as arguments,
-       which a specification with no defaulted field cannot survive.
-    """
-
-    def __new__(
-        cls, specification: PersonalNotesSettingSpecification
-    ) -> PersonalNotesSetting:
-        """
-        Make the member without letting the enum rebuild the specification from it.
-
-        :param specification: Where this setting is read from.
-        :return: The member, carrying that specification as its value.
-        """
-        member = object.__new__(cls)
-        member._value_ = specification
-        return member
-
-    def __init__(self, specification: PersonalNotesSettingSpecification) -> None:
-        """
-        Carry the specification's values on the member itself.
-
-        :param specification: Where this setting is read from.
-        """
-        for field in dataclasses.fields(PersonalNotesSettingSpecification):
-            object.__setattr__(self, field.name, getattr(specification, field.name))
-
-    REMOTE = PersonalNotesSettingSpecification(
-        git_config_key="claude.personalNotesRemote",
-        environment_variable="CLAUDE_PERSONAL_NOTES_REMOTE",
-        default="origin",
-    )
-    """
-    The remote, or raw URL, the notes branch lives on.
-    """
-
-    BRANCH = PersonalNotesSettingSpecification(
-        git_config_key="claude.personalNotesBranch",
-        environment_variable="CLAUDE_PERSONAL_NOTES_BRANCH",
-        default="claude/personal-notes",
-    )
-    """
-    The branch the notes are stored on.
-    """
-
-    PATH = PersonalNotesSettingSpecification(
-        git_config_key="claude.personalNotesPath",
-        environment_variable="CLAUDE_PERSONAL_NOTES_PATH",
-        default=ProjectLocation.PERSONAL_NOTES_DOCUMENT.as_posix(),
-    )
-    """
-    Where on that branch the notes file sits.
-    """
-
-
 # %% the repository the steps are about
 
 
@@ -290,47 +165,6 @@ def resolve_repository(project_root: Path, notes_remote: str) -> Repository | No
 
 
 # %% the steps themselves
-
-
-@dataclass(frozen=True)
-class SetupStep(ABC):
-    """
-    One setup step that no script can perform or verify, because it changes a setting
-    held by GitHub or by Claude rather than a file in this clone.
-    """
-
-    @property
-    @abstractmethod
-    def title(self) -> str:
-        """
-        What the step changes, in a few words.
-        """
-
-    @property
-    @abstractmethod
-    def reason(self) -> str:
-        """
-        What stops working until it is done.
-        """
-
-    @abstractmethod
-    def instructions(self) -> list[str]:
-        """
-        What to do, one line per action.
-
-        :return: The lines, printed under the title.
-        """
-
-    def render(self, number: int) -> str:
-        """
-        Render this step as the numbered block the reader sees.
-
-        :param number: The step's position in the printed list.
-        :return: The block, without a trailing newline.
-        """
-        lines = [f"{number}. {self.title}", f"   {self.reason}", ""]
-        lines.extend(f"   {instruction}" for instruction in self.instructions())
-        return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -510,43 +344,24 @@ class PersistentVariables(SetupStep):
         ]
 
 
-# %% the checklist they add up to
+# %% the steps this distribution contributes
 
 
 @dataclass(frozen=True)
-class SetupChecklist:
+class ForkSetupSteps(SetupSteps):
     """
-    The steps one clone leaves to its user, in the order they should be done.
-    """
-
-    steps: tuple[SetupStep, ...]
-    """
-    The steps that apply to this clone.
+    The steps the fork a repository checkout points at, and its own settings, leave to
+    its user; the fork's steps are omitted when no GitHub repository resolves from the
+    repository checkout's remotes.
     """
 
-    @classproperty
-    def heading(cls) -> str:
-        """
-        The line introducing the printed list.
-        """
-        return "These steps are yours - no script can do them:"
-
-    @classmethod
-    def for_clone(
-        cls, project_root: Path, environment: Mapping[str, str]
-    ) -> SetupChecklist:
-        """
-        Work out which steps a clone leaves to its user, and fill them in from it.
-
-        The repository-specific steps are omitted when no GitHub repository can be
-        resolved from the clone's remotes, since neither can be acted on without one.
-
-        :param project_root: The clone the steps are about.
-        :param environment: The environment its settings resolve from.
-        :return: The checklist.
-        """
-        notes_remote = PersonalNotesSetting.REMOTE.resolve(project_root, environment)
-        repository = resolve_repository(project_root, notes_remote)
+    def steps_for_repository_checkout(
+        self, repository_checkout: RepositoryCheckout
+    ) -> tuple[SetupStep, ...]:
+        notes_remote = PersonalNotesSetting.REMOTE.resolve(
+            repository_checkout.working_tree, repository_checkout.environment
+        )
+        repository = resolve_repository(repository_checkout.working_tree, notes_remote)
         steps: list[SetupStep] = []
         if repository is not None:
             steps.extend(
@@ -556,19 +371,12 @@ class SetupChecklist:
                     ForkActions(repository),
                 ]
             )
-        steps.append(PersistentVariables.resolve(project_root, environment))
-        return cls(steps=tuple(steps))
-
-    def render(self) -> str:
-        """
-        Render the whole checklist as it is printed.
-
-        :return: The full output.
-        """
-        blocks = [
-            step.render(number) for number, step in enumerate(self.steps, start=1)
-        ]
-        return "\n\n".join([self.heading, *blocks])
+        steps.append(
+            PersistentVariables.resolve(
+                repository_checkout.working_tree, repository_checkout.environment
+            )
+        )
+        return tuple(steps)
 
 
 # %% the steps a script performs
@@ -782,7 +590,10 @@ def main(argv: list[str] | None = None) -> int:
             f"{'now runs' if changed else 'already runs'} basstler {arguments.branch_or_tag}"
         )
         return 0
-    logger.info(SetupChecklist.for_clone(project_root, os.environ).render())
+    checklist = SetupChecklist.from_repository_checkout(
+        PlaybookFile(project_root).read(), RepositoryCheckout(project_root, os.environ)
+    )
+    logger.info(checklist.render())
     return 0
 
 

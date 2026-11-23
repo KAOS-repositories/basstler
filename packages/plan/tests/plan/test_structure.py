@@ -10,7 +10,6 @@ import pytest
 from basstler.github.pull_request_state import (
     LiveState,
 )
-from basstler.locations import SiteTemplate
 from basstler.plan.model import ItemStatus, ManifestKey
 from basstler.plan.model_alias import ModelAlias
 from basstler.plan.structure import Item, Plan
@@ -60,17 +59,6 @@ def test_status_and_drift_css_class_with_drift():
     drifted_item = Item(title="A", branch="a", track="track-1", status=ItemStatus.DONE)
     drifted_item.drift_description = "marked done, but pull request #1 is still open"
     assert drifted_item.status_and_drift_css_class == "status-done has-drift"
-
-
-@pytest.mark.parametrize("status", list(ItemStatus))
-def test_the_site_styles_every_status_css_class(status):
-    """
-    A status value holds spaces, so the class is built from the member's name, and the
-    stylesheet has to know that name.
-    """
-    item = Item(title="A", branch="a", track="track-1", status=status)
-    stylesheet = SiteTemplate.STYLESHEET.read_text(encoding="utf-8")
-    assert f".item.{item.status_and_drift_css_class} " in stylesheet
 
 
 def test_is_ready_to_unblock_dependents_true_when_done():

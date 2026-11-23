@@ -132,8 +132,8 @@ def test_the_repositories_are_read_from_the_configured_urls(
     Both are read from the URLs the clone configures, not from git's rewrite of them to
     where it actually fetches.
     """
-    scratch_repository.serve_origin_as(CHECKOUT)
-    scratch_repository.serve_notes_remote_as(SEPARATE_NOTES)
+    scratch_repository.serve_origin_as(CHECKOUT.clone_url)
+    scratch_repository.serve_notes_remote_as(SEPARATE_NOTES.clone_url)
 
     access = NotesRepositoryAccess.of_clone(scratch_repository.project_root, {})
 
@@ -147,7 +147,7 @@ def test_a_notes_remote_naming_no_repository_has_no_access_to_check(
     A notes remote given as a local path, as in a clone set up by hand, names no GitHub
     repository a session could attach.
     """
-    scratch_repository.serve_origin_as(CHECKOUT)
+    scratch_repository.serve_origin_as(CHECKOUT.clone_url)
     scratch_repository.resolve_notes_remote_to()
 
     assert NotesRepositoryAccess.of_clone(scratch_repository.project_root, {}) is None

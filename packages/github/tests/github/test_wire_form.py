@@ -9,13 +9,10 @@ from pydantic import ValidationError
 
 from basstler.git.branch import Branch
 from basstler.github.exceptions import RepositoryUnknown
-from basstler.github.pull_request_models import UpstreamPullRequestSnapshot
-from basstler.github.repository import HasRepository, PullRequestReference, Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.repository_details import RepositoryDetails, RepositoryDetailsRead
 from basstler.github.rest_models import PullRequestEnd, PullRequestEndForm
 
-from basstler_testing.upstream_reviews.recorded_rest_pull_request import UPSTREAM
-from basstler_testing.upstream_reviews.replay import RecordedResponse
 
 REPOSITORY = Repository("an-owner", "a-project")
 """
@@ -90,26 +87,3 @@ def test_a_pull_request_end_is_written_back_as_it_was_read():
     form = PullRequestEndForm()
 
     assert form.read(form.write(end), None) == end
-
-
-# %% a pull request named by its number
-
-
-def test_a_pull_request_read_by_number_belongs_to_the_repository_read():
-    pull_request = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded(
-        UPSTREAM
-    ).pull_request
-
-    assert pull_request.reference.repository == UPSTREAM
-
-
-def test_a_snapshot_keeps_the_pull_request_it_was_assembled_from():
-    pull_request = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded(
-        UPSTREAM
-    ).pull_request
-
-    snapshot = UpstreamPullRequestSnapshot.assemble(pull_request, [])
-
-    assert snapshot.reference == PullRequestReference(
-        UPSTREAM, pull_request.reference.number
-    )

@@ -28,14 +28,15 @@ from basstler.maintenance.restack_steps import (
 from basstler.stack.model import PullRequest
 
 from basstler_testing.constants.stack import RemoteName, StackBranch, StackLabel
-from basstler_testing.maintenance.fork import (
+from basstler_testing.github.pull_request_samples import (
     A_SESSION_LINK,
-    UPSTREAM_BASE,
-    FixtureFile,
-    ForkCheckout,
     PromotionSampleText,
     PullRequestHeadRepository,
     StackPullRequestNumber,
+)
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.maintenance.fork import (
+    FixtureFile,
     a_board_entry,
     a_parent_and_child,
     a_stack,

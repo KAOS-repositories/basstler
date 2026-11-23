@@ -15,6 +15,11 @@ dynamic = ["version", "dependencies"]
 "Source" = "https://github.com/KAOS-repositories/basstler"
 "Bug Tracker" = "https://github.com/KAOS-repositories/basstler/issues"
 
+# What this distribution adds to the default playbook: `basstler.playbook.contribution`
+# loads this group.
+[project.entry-points."basstler.contributions"]
+basstler-plan = "basstler.plan.contribution:PlanContribution"
+
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "0.0.0"
@@ -48,11 +53,9 @@ packages = ["src/basstler"]
 dev = [
     "pytest",
     "pytest-xdist",
-    "basstler",
     "basstler-core",
     "basstler-git",
     "basstler-github",
-    "basstler-hub",
     "basstler-notes",
     "basstler-reviews",
     "basstler-stack",

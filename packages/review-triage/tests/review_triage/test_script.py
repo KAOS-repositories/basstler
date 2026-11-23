@@ -331,7 +331,8 @@ def test_basstler_is_installed_from_a_clone_of_its_workspace(
     completed = basstler_source.run(home, tmp_path / "python-calls.log")
 
     assert completed.returncode == 0, completed.stderr
-    assert TextFile(basstler_source.uv_log).read().splitlines() == [
+    *arguments, project = TextFile(basstler_source.uv_log).read().splitlines()
+    assert arguments == [
         "sync",
         "--quiet",
         "--frozen",
@@ -340,8 +341,8 @@ def test_basstler_is_installed_from_a_clone_of_its_workspace(
         "--no-dev",
         "--no-editable",
         "--project",
-        str(home / "basstler"),
     ]
+    assert Path(project) == home / "basstler"
 
 
 def test_the_clone_installed_from_holds_the_commit_asked_for(

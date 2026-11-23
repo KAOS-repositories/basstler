@@ -196,6 +196,13 @@ items:
   title: "basstler-regular-expression: the pattern builder installable on its own"
   branch: null
   track: package-split
+  notes: >
+    After KAOS-repositories/basstler#260 lands. Move basstler.regular_expression and
+    basstler.markdown_code_block from basstler-core into packages/regular-expression
+    (basstler-regular-expression), which core depends on, with their doctests and tests. Add the
+    workspace member, uv.lock entry, sibling-pin hook and package_map layer; move
+    REGULAR_EXPRESSION_MODULE's shipped path so HandWrittenPatternChecker's exemption holds. Ask:
+    keep the name basstler.regular_expression or a standalone one. release:minor.
   depends_on: []
   status: not started
   recommended_model: sonnet

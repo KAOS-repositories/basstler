@@ -9,6 +9,7 @@ import ast
 import io
 import keyword
 import tokenize
+import warnings
 from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -554,7 +555,17 @@ class PythonSource:
 
         :raises SyntaxError: If the file is not valid Python.
         """
-        return ast.parse(self.text)
+        return self.parse()
+
+    def parse(self) -> ast.Module:
+        """
+        :return: A new syntax tree of the file, without the warnings Python gives about
+            the code it parses.
+        :raises SyntaxError: If the file is not valid Python.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            return ast.parse(self.text)
 
     @cached_property
     def parses(self) -> bool:
@@ -573,7 +584,7 @@ class PythonSource:
             rename replaced.
         :raises SyntaxError: If the file is not valid Python.
         """
-        tree = ast.parse(self.text)
+        tree = self.parse()
         if renames.renames:
             IdentifierRenamer(renames).visit(tree)
         return tree
@@ -581,9 +592,9 @@ class PythonSource:
     def code_tree(self, renames: RenameMap) -> ast.Module:
         """
         :param renames: The renames to apply first.
-        :return: The file's syntax tree without its imports, other than those of
-            ``__future__``, and with every documentation string emptied; not to be
-            modified, as it is kept for the next call.
+        :return: The file's syntax tree without its imports and with every
+            documentation string emptied; not to be modified, as it is kept for the
+            next call.
         """
         if renames in self.code_trees:
             return self.code_trees[renames]
@@ -611,10 +622,7 @@ class PythonSource:
         :return: Its statements other than imports, each documentation string emptied.
         """
         for statement in statements:
-            if isinstance(statement, ast.Import) or (
-                isinstance(statement, ast.ImportFrom)
-                and statement.module != FUTURE_MODULE
-            ):
+            if isinstance(statement, (ast.Import, ast.ImportFrom)):
                 continue
             if PythonSource.is_documentation(statement):
                 yield ast.Expr(ast.Constant(""))
@@ -727,14 +735,13 @@ class PythonSource:
     @cached_property
     def import_statements(self) -> str:
         """
-        The file's import statements, other than those of ``__future__``, dumped as text
+        The file's import statements, those of ``__future__`` included, dumped as text
         in the order they occur.
         """
         return "\n".join(
             ast.dump(node)
             for node in ast.walk(self.tree)
-            if isinstance(node, ast.Import)
-            or (isinstance(node, ast.ImportFrom) and node.module != FUTURE_MODULE)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
         )
 
     @cached_property

@@ -37,7 +37,6 @@
 set -euo pipefail
 
 readonly basstler_repository="https://github.com/KAOS-repositories/basstler"
-readonly default_rules=(--select-rule module-documentation)
 readonly minimum_python="3.12"
 
 fail() {
@@ -187,7 +186,7 @@ triage() {
         output_options=(--summary-only)
     fi
     (cd "$clone" && "$(environment_python)" -m basstler review-triage "$command_name" "$1" \
-        --repository "$repository" "${default_rules[@]}" \
+        --repository "$repository" \
         ${output_options[@]+"${output_options[@]}"} ${passed_on[@]+"${passed_on[@]}"})
 }
 

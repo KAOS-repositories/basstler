@@ -51,6 +51,10 @@ def triaged(sample: FileSample, renames: RenameMap) -> FileVerdict:
     ("sample", "kinds"),
     [
         (FileSample.KEYWORD_ARGUMENTS_ADDED, {KeywordChange.KEYWORD_ARGUMENTS}),
+        (
+            FileSample.KEYWORD_ARGUMENTS_ADDED_THROUGH_IMPORT_ALIAS,
+            {KeywordChange.KEYWORD_ARGUMENTS},
+        ),
         (FileSample.KEYWORD_ONLY_PARAMETERS, {KeywordChange.KEYWORD_ONLY}),
         (FileSample.IDENTITY_DECORATOR_ADDED, {KeywordChange.IDENTITY_DECORATORS}),
         (FileSample.CODE_REFORMATTED, {MechanicalChange.FORMATTING}),
@@ -119,11 +123,27 @@ def test_a_method_of_a_receiver_whose_class_is_inferred_is_resolved(
     [
         (
             FileSample.RECEIVER_TYPE_UNKNOWN,
-            UnprovenKeywordCall(16, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN),
+            UnprovenKeywordCall(
+                16,
+                "plot",
+                UnprovenBinding.RECEIVER_CLASS_UNKNOWN,
+                ("GoalPlotter.plot",),
+            ),
         ),
         (
             FileSample.RECEIVER_BINDS_DIFFERENTLY,
-            UnprovenKeywordCall(14, "plot", UnprovenBinding.BINDS_DIFFERENTLY),
+            UnprovenKeywordCall(
+                14, "plot", UnprovenBinding.BINDS_DIFFERENTLY, ("GoalPlotter.plot",)
+            ),
+        ),
+        (
+            FileSample.RECEIVER_OVERRIDES_INCOMPATIBLE,
+            UnprovenKeywordCall(
+                20,
+                "plot",
+                UnprovenBinding.INCOMPATIBLE_OVERRIDES,
+                ("GoalPlotter.plot",),
+            ),
         ),
     ],
 )
@@ -131,9 +151,24 @@ def test_a_call_not_shown_to_bind_as_before_is_the_reason_for_review(
     sample: FileSample, unproven: UnprovenKeywordCall
 ):
     """
-    A file needing review names each call not shown to bind as before, and why.
+    A file needing review names each call not shown to bind as before, why, and the
+    definitions it may reach that bind the arguments otherwise.
     """
     assert triaged(sample, RenameMap()).reasons == (unproven,)
+
+
+def test_the_explanation_names_the_definitions_binding_otherwise():
+    """
+    The explanation of a call not shown to bind as before lists the definitions that
+    bind its arguments otherwise.
+    """
+    cause = UnprovenBinding.BINDS_DIFFERENTLY
+    reason = UnprovenKeywordCall(
+        1, "plot", cause, ("FirstPlotter.plot", "Plotter.plot")
+    )
+    assert reason.explanation == (
+        f"`plot` - {cause}: `FirstPlotter.plot`, `Plotter.plot`"
+    )
 
 
 def test_a_name_bound_to_different_classes_leaves_the_receiver_unknown():
@@ -144,8 +179,44 @@ def test_a_name_bound_to_different_classes_leaves_the_receiver_unknown():
     """
     reasons = triaged(FileSample.RECEIVER_TYPE_AMBIGUOUS, RenameMap()).reasons
     assert reasons == tuple(
-        UnprovenKeywordCall(line, "plot", UnprovenBinding.RECEIVER_CLASS_UNKNOWN)
+        UnprovenKeywordCall(
+            line,
+            "plot",
+            UnprovenBinding.RECEIVER_CLASS_UNKNOWN,
+            ("TrajectoryPlotter.plot",),
+        )
         for line in (21, 25, 30, 38)
+    )
+
+
+# %% receivers rebound in order
+
+
+def test_a_receiver_reassigned_has_the_class_of_its_last_assignment():
+    """
+    A name reassigned has, at a call, the class of the assignment that last ran before
+    it, through branches that do not rebind it and calls of the name itself.
+    """
+    sample = FileSample.RECEIVER_TYPE_REASSIGNED
+    assert triaged(sample, RenameMap()) == MechanicalFile(
+        sample.change(), frozenset({KeywordChange.KEYWORD_ARGUMENTS})
+    )
+
+
+def test_a_receiver_that_may_be_rebound_before_the_call_has_no_class():
+    """
+    A name a loop, a closure, a ``try`` body or a condition may rebind before the call
+    gives the receiver no class.
+    """
+    reasons = triaged(FileSample.RECEIVER_REBOUND_OUT_OF_ORDER, RenameMap()).reasons
+    assert reasons == tuple(
+        UnprovenKeywordCall(
+            line,
+            "plot",
+            UnprovenBinding.RECEIVER_CLASS_UNKNOWN,
+            ("GoalPlotter.plot",),
+        )
+        for line in (17, 28, 38, 44)
     )
 
 

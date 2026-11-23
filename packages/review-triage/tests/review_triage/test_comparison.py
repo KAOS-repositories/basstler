@@ -22,7 +22,6 @@ from basstler.review_triage.comparison import (
     ProseComparison,
     PythonComparison,
 )
-from basstler.review_triage.rules import TriageRule
 from basstler.review_triage.renames import Rename, RenameMap
 
 from .samples import TEMPLATE_REINDENTED, FileSample
@@ -60,6 +59,24 @@ def test_a_mechanical_change_is_reported_with_its_kinds(
     assert FileTriager(JudgmentContext(old_name_renamed)).triage(
         change
     ) == MechanicalFile(change, frozenset(kinds))
+
+
+def test_a_future_import_added_is_mechanical():
+    """
+    A ``__future__`` import the head version has and the base version lacks is a change
+    of imports.
+    """
+    with_import = FileSample.IMPORT_ADDED_UNUSED.change().base_text
+    without_import = with_import.split("\n", 2)[2]
+    change = replace(
+        FileSample.IMPORT_ADDED_UNUSED.change(),
+        base_text=without_import,
+        head_text=with_import,
+    )
+
+    assert FileTriager(JudgmentContext()).triage(change) == MechanicalFile(
+        change, frozenset({MechanicalChange.IMPORTS})
+    )
 
 
 @pytest.mark.parametrize(
@@ -247,31 +264,26 @@ def test_a_text_file_of_another_type_whose_whitespace_changes_needs_review():
 
 # %% rules
 
-MODULE_DOCUMENTATION_SKIPPED = JudgmentContext(
-    rules=frozenset({TriageRule.MODULE_DOCUMENTATION})
-)
-"""
-The context of a triage that skips the documentation at the top of modules.
-"""
 
-
-def test_a_reworded_module_documentation_is_mechanical_once_its_rule_is_enabled():
+def test_a_reworded_module_documentation_is_mechanical_by_default():
     """
-    A file whose only change is its module's documentation is mechanical under the
-    module documentation rule.
+    A file whose only change is its module's documentation is mechanical unless the
+    module documentation rule is turned off.
     """
     change = FileSample.MODULE_DOCUMENTATION_REWORDED.change()
-    assert FileTriager(MODULE_DOCUMENTATION_SKIPPED).triage(change) == MechanicalFile(
+    assert FileTriager(JudgmentContext()).triage(change) == MechanicalFile(
         change, frozenset({MechanicalChange.MODULE_DOCUMENTATION})
     )
 
 
-def test_a_reworded_module_documentation_needs_review_by_default():
+def test_a_reworded_module_documentation_needs_review_once_its_rule_is_off():
     """
-    No rule is enabled unless asked for, so reworded module documentation needs review.
+    With no rule on, reworded module documentation needs review.
     """
     change = FileSample.MODULE_DOCUMENTATION_REWORDED.change()
-    assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
+    assert FileTriager(JudgmentContext(rules=frozenset())).triage(
+        change
+    ) == FileNeedingReview(change)
 
 
 @pytest.mark.parametrize(
@@ -285,9 +297,7 @@ def test_the_module_documentation_rule_skips_nothing_else(sample: FileSample):
     the module documentation rule too.
     """
     change = sample.change()
-    assert FileTriager(MODULE_DOCUMENTATION_SKIPPED).triage(
-        change
-    ) == FileNeedingReview(change)
+    assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
 
 
 # %% extending the triage

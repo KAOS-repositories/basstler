@@ -1,6 +1,5 @@
 """
-The opt-in rules of the review triage, and how a project and the command line choose
-them.
+The rules of the review triage, and how a project and the command line choose them.
 """
 
 from __future__ import annotations
@@ -20,13 +19,19 @@ from basstler.locations import ProjectLocation
 
 class TriageRule(StrEnum):
     """
-    A rule widening what the triage counts as mechanical, off until it is selected.
+    A rule widening what the triage counts as mechanical.
     """
 
     MODULE_DOCUMENTATION = "module-documentation"
     """
     Any change to the documentation at the top of a module is mechanical.
     """
+
+
+DEFAULT_RULES = frozenset({TriageRule.MODULE_DOCUMENTATION})
+"""
+The rules on unless a project or the command line turns them off.
+"""
 
 
 # %% choosing rules
@@ -51,9 +56,9 @@ class RuleSelection:
     @property
     def enabled(self) -> frozenset[TriageRule]:
         """
-        The rules left on.
+        The rules left on, the default rules among them unless ignored.
         """
-        return self.select - self.ignore
+        return (DEFAULT_RULES | self.select) - self.ignore
 
     def applied_to(self, base: RuleSelection) -> frozenset[TriageRule]:
         """

@@ -9,7 +9,7 @@ import pytest
 
 from basstler.git.commit_tree import CommitTree
 from basstler.review_triage.commit_tree import CommitModules
-from basstler.review_triage.calls import ClassTarget
+from basstler.review_triage.calls import ClassTarget, ReachableDefinition
 from basstler.review_triage.definitions import DefinitionIndex
 from basstler.review_triage.signatures import SignatureReader
 
@@ -114,8 +114,8 @@ def test_a_hierarchy_reaching_a_module_that_does_not_parse_is_unreadable(
     conflicted_class_headers: CommitModules,
 ):
     """
-    A class one of whose subclasses may be defined in a module that does not parse has
-    a hierarchy that cannot be read; a subclass whose own hierarchy avoids that module
+    A class one of whose subclasses may be defined in a module that does not parse has a
+    hierarchy that cannot be read; a subclass whose own hierarchy avoids that module
     can.
     """
     index = DefinitionIndex(conflicted_class_headers)
@@ -135,4 +135,6 @@ def test_a_class_whose_hierarchy_cannot_be_read_has_an_unreadable_signature(
     """
     reader = SignatureReader(DefinitionIndex(conflicted_class_headers))
 
-    assert ClassTarget(BASE_CLASS).reachable_signatures(reader) == [None]
+    assert ClassTarget(BASE_CLASS).reachable_definitions(reader) == [
+        ReachableDefinition(BASE_CLASS, None)
+    ]

@@ -243,9 +243,10 @@ def report(
         as one, as GitHub's view of its last commits shows them.
     :param from_merge_base: Triage the whole change, not only what changed since your
         last review.
-    :param select_rule: An opt-in rule to turn on, adding to the checkout's
+    :param select_rule: A rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
-    :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param ignore_rule: A rule to turn off, one on by default included, outranking
+        those settings; repeatable.
     :param plan: A code modification plan a commit applied, as ``commit=plan``, for a
         commit whose message does not record it; repeatable.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
@@ -307,9 +308,10 @@ def mark_viewed(
         as one, as GitHub's view of its last commits shows them.
     :param from_merge_base: Triage the whole change, not only what changed since your
         last review.
-    :param select_rule: An opt-in rule to turn on, adding to the checkout's
+    :param select_rule: A rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
-    :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param ignore_rule: A rule to turn off, one on by default included, outranking
+        those settings; repeatable.
     :param plan: A code modification plan a commit applied, as ``commit=plan``, for a
         commit whose message does not record it; repeatable.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.

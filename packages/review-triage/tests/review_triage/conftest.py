@@ -230,6 +230,34 @@ class RefusingWriter(GitHubWriter):
         return refusal(self.status, write.method, write.path)
 
 
+@dataclass
+class FlakyWriter(FileListingWriter):
+    """
+    Lists the pull request's files, and answers the first markings with a server error.
+    """
+
+    failures: int = 0
+    """
+    How many of the first markings are answered with a server error.
+    """
+
+    def attempt_send(self, write: GitHubWrite) -> GitHubResponse:
+        answer = super().attempt_send(write)
+        if write in self.markings and len(self.markings) <= self.failures:
+            return refusal(HTTPStatus.BAD_GATEWAY, write.method, write.path)
+        return answer
+
+
+def flaky_listing_of(triage: TriageOutcome, failures: int) -> FlakyWriter:
+    """
+    :param triage: A triaged pull request.
+    :param failures: How many of the first markings fail.
+    :return: A listing of every file it changes that fails the first markings.
+    """
+    listing = listing_of(triage)
+    return FlakyWriter(listing.head_commit, listing.pages, failures=failures)
+
+
 WORKFLOW_REPOSITORY_DETAILS: dict[str, Any] = json.loads(
     TextFile(DatasetLocation.REPOSITORY_TRUNK_DEFAULT_BRANCH).read()
 )

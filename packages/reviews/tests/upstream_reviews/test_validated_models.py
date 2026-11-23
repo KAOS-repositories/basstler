@@ -76,6 +76,20 @@ def test_a_member_reads_as_itself():
     assert ReviewState.from_github_name(ReviewState.APPROVED) is ReviewState.APPROVED
 
 
+# %% a review that is not submitted yet
+
+
+def test_a_pending_review_reads_without_a_submission_time():
+    """
+    GitHub omits the submission time of a pending review, which reads as no time.
+    """
+    pending = RestReview.from_json(
+        {"id": 1, "user": {"login": "reviewer"}, "state": "PENDING", "body": ""}
+    )
+
+    assert pending.submitted_at is None
+
+
 # %% the keys a model reads
 
 

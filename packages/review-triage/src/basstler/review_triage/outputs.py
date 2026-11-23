@@ -5,8 +5,9 @@ built-in outputs.
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Annotated, Any
@@ -14,7 +15,7 @@ from typing import Annotated, Any
 from pydantic import Field
 
 from basstler.class_property import classproperty
-from basstler.github.client import GitHubWriter
+from basstler.github.client import GitHubResponse, GitHubWriter, RetryPolicy
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.github.review_models import PageInfo
@@ -257,6 +258,12 @@ class ViewedMarking(TriageOutput):
     How many files one request marks at most.
     """
 
+    retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
+    """
+    When a request answered with a server error is sent again; reading the files or
+    marking one viewed twice changes nothing, so asking again is safe.
+    """
+
     def publish(self, outcome: TriageOutcome) -> None:
         refusals = self.refusals(outcome)
         if refusals:
@@ -322,7 +329,7 @@ class ViewedMarking(TriageOutput):
         :param request: The request to send.
         :return: Its result, or what GitHub refused it with.
         """
-        response = self.github.attempt_send(request)
+        response = self.send_retrying(request)
         if response.failure is not None:
             return AttemptedRequest(refusals=(response.failure.error_message(),))
         answer = GraphQLResponse.from_json(response.body)
@@ -331,3 +338,17 @@ class ViewedMarking(TriageOutput):
                 refusals=tuple(error.message for error in answer.errors)
             )
         return AttemptedRequest(answer.data or {})
+
+    def send_retrying(self, request: GraphQLRequest) -> GitHubResponse:
+        """
+        :param request: The request to send.
+        :return: GitHub's last answer, the request sent again as :attr:`retry_policy`
+            says while GitHub answers with a server error.
+        """
+        response = self.github.attempt_send(request)
+        for delay in self.retry_policy.delays():
+            if not response.is_server_error:
+                break
+            time.sleep(delay.total_seconds())
+            response = self.github.attempt_send(request)
+        return response

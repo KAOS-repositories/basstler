@@ -18,7 +18,7 @@ from basstler.review_triage.triage import PullRequestTriager
 
 from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
-from .samples import SubclassSubstitutionSample
+from .samples import SubclassSubstitutionSample, SubclassSubstitutionSourceLayoutSample
 from basstler.text_file import TextFile
 
 # %% the sample
@@ -148,3 +148,26 @@ def test_a_caller_of_a_subclass_doing_more_needs_review(
         with_subclass_module(subclass_substitution, head_text)
     )
     assert CALLER in {file.change.path for file in triage.files_needing_review}
+
+
+# %% a package kept under a directory that is not a package
+
+
+def test_a_caller_switching_to_a_relatively_imported_subclass_is_mechanical(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A subclass imports its base class relatively, and the package sits under a
+    directory that is not itself a package.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        SubclassSubstitutionSourceLayoutSample.BASE_TREE,
+        SubclassSubstitutionSourceLayoutSample.HEAD_TREE,
+    )
+    triage = PullRequestTriager().triage(changes)
+    assert {file.change.path: file.kinds for file in triage.mechanical_files} == {
+        PurePosixPath("src/package/caller.py"): frozenset(
+            {MechanicalChange.IMPORTS, MechanicalChange.SUBCLASS_SUBSTITUTED}
+        )
+    }

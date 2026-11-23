@@ -302,6 +302,12 @@ class RegularExpression(PatternPart):
     @classmethod
     def lookahead(cls, piece: PatternPiece) -> RegularExpression:
         """
+        The position before a part, which the match does not take in.
+
+        >>> before_one = RegularExpression.lookahead("1")
+        >>> RegularExpression.sequence("v", before_one).compiled().sub("V", "v1 v2")
+        'V1 v2'
+
         :param piece: The part that has to come next.
         :return: The position it follows, matching no character.
         """
@@ -310,6 +316,12 @@ class RegularExpression(PatternPart):
     @classmethod
     def negative_lookahead(cls, piece: PatternPiece) -> RegularExpression:
         """
+        A position not before a part.
+
+        >>> not_before_one = RegularExpression.negative_lookahead("1")
+        >>> RegularExpression.sequence("v", not_before_one).compiled().sub("V", "v1 v2")
+        'v1 V2'
+
         :param piece: The part that must not come next.
         :return: A position it does not follow, matching no character.
         """
@@ -318,6 +330,13 @@ class RegularExpression(PatternPart):
     @classmethod
     def lookbehind(cls, piece: PatternPiece) -> RegularExpression:
         """
+        The position after a part, which the match does not take in.
+
+        >>> after_link_text = RegularExpression.lookbehind("](")
+        >>> url = RegularExpression.sequence(after_link_text, "url")
+        >>> url.compiled().findall("[a](url)")
+        ['url']
+
         :param piece: The part that has to come before, of a fixed length.
         :return: The position right after it, matching no character.
         """
@@ -326,6 +345,13 @@ class RegularExpression(PatternPart):
     @classmethod
     def negative_lookbehind(cls, piece: PatternPiece) -> RegularExpression:
         """
+        A position not after a part.
+
+        >>> not_after_hyphen = RegularExpression.negative_lookbehind("-")
+        >>> identifier = RegularExpression.sequence(not_after_hyphen, "id")
+        >>> identifier.compiled().sub("ID", "id x-id")
+        'ID x-id'
+
         :param piece: The part that must not come before, of a fixed length.
         :return: A position not right after it, matching no character.
         """

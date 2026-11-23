@@ -126,8 +126,13 @@ class StagedLines:
     @classproperty
     def diff_header(cls) -> re.Pattern[str]:
         """
-        A file's header, or a changed block's, in a diff without context lines, as
-        ``diff --git a/old.py b/new.py`` or ``@@ -3 +7,4 @@``.
+        A file's header, or a changed block's, in a diff without context lines.
+
+        >>> pattern = StagedLines.diff_header
+        >>> pattern.match("diff --git a/old.py b/new.py")[DiffHeaderGroup.STAGED_FILE]
+        'new.py'
+        >>> StagedLines.diff_header.match("@@ -3 +7,4 @@")[DiffHeaderGroup.FIRST_LINE]
+        '7'
         """
         file_header = RegularExpression.sequence(
             Anchor.LINE_START,

@@ -118,8 +118,14 @@ class WorkflowLimits:
     @classproperty
     def repository_pin(cls) -> re.Pattern[str]:
         """
-        A condition that runs a job in one named repository only, which a fork never is,
-        as ``github.repository == 'owner/repo'``.
+        A condition that runs a job in one named repository only, which a fork never is.
+
+        >>> pattern = WorkflowLimits.repository_pin
+        >>> bool(pattern.fullmatch("github.repository == 'owner/repo'"))
+        True
+        >>> pattern = WorkflowLimits.repository_pin
+        >>> bool(pattern.fullmatch("github.repository != 'owner/repo'"))
+        False
         """
         further_condition = RegularExpression.sequence(
             " && ",

@@ -40,8 +40,11 @@ class LogFormatting(Enum):
         CharacterSet.any_of(CharacterRange.ASCII_DIGIT, ";").zero_or_more(),
         CharacterRange.ASCII_LETTER,
     ).compiled()
-    """
-    The colour a test runner writes around its own output, as ``ESC[31;1m``.
+    r"""
+    The colour a test runner writes around its own output.
+
+    >>> LogFormatting.TERMINAL_ESCAPE.value.sub("", "\x1b[31;1mFAILED\x1b[0m")
+    'FAILED'
     """
 
     TIMESTAMP = RegularExpression.sequence(
@@ -50,8 +53,10 @@ class LogFormatting(Enum):
         "Z ",
     ).compiled()
     """
-    The timestamp a runner writes in front of every line it records, as
-    ``2026-11-23T00:11:26Z ``.
+    The timestamp a runner writes in front of every line it records.
+
+    >>> LogFormatting.TIMESTAMP.value.sub("", "2026-11-23T00:11:26.1Z FAILED")
+    'FAILED'
     """
 
     @classmethod
@@ -103,8 +108,12 @@ class FailedJob:
     @classproperty
     def link_pattern(cls) -> re.Pattern[str]:
         """
-        Where a check's own output link carries the job that produced it, as
-        ``/actions/runs/123/job/456``.
+        Where a check's own output link carries the job that produced it.
+
+        >>> pattern = FailedJob.link_pattern
+        >>> link = pattern.search("https://github.com/o/r/actions/runs/123/job/456")
+        >>> link[FailedJob.identifier_group]
+        '456'
         """
         digits = CharacterSet.any_of(CharacterRange.ASCII_DIGIT).one_or_more()
         return RegularExpression.sequence(

@@ -44,7 +44,10 @@ class ShellPattern:
     @classproperty
     def variable_name(cls) -> RegularExpression:
         """
-        A name the shell gives a variable or a function, as ``BASSTLER_PLUGIN_ROOT``.
+        A name the shell gives a variable or a function.
+
+        >>> ShellPattern.variable_name.compiled().match("BASSTLER_PLUGIN_ROOT}")[0]
+        'BASSTLER_PLUGIN_ROOT'
         """
         return RegularExpression.sequence(
             CharacterSet.any_of(CharacterRange.ASCII_LETTER, "_"),
@@ -55,6 +58,9 @@ class ShellPattern:
     def braced_variable(cls) -> re.Pattern[str]:
         """
         The start of a ``${NAME}`` reference, capturing the variable's name.
+
+        >>> ShellPattern.braced_variable.findall("${BASSTLER_PYTHON} -m basstler")
+        ['BASSTLER_PYTHON']
         """
         return RegularExpression.sequence(
             "${",
@@ -73,8 +79,11 @@ class MarkdownLinkPattern:
     @staticmethod
     def target(*refused: str) -> RegularExpression:
         """
+        >>> MarkdownLinkPattern.target("#").compiled().findall("[a](docs/a.md) [b](#b)")
+        ['docs/a.md']
+
         :param refused: Characters the target may not hold, beside the one closing it.
-        :return: A Markdown link, capturing its target, as ``](docs/a.md)``.
+        :return: A Markdown link, capturing its target.
         """
         return RegularExpression.sequence(
             "](",

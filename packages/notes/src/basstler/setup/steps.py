@@ -413,8 +413,12 @@ class PersonalUpstream(HasRepository):
 
     @classproperty
     def setting_line(cls) -> re.Pattern[str]:
-        """
+        r"""
         A ``stack.toml`` line naming the upstream, wherever it sits in the file.
+
+        >>> pattern = PersonalUpstream.setting_line
+        >>> pattern.search('fork = "a/b"\nupstream_repository = "o/r"\n')[0]
+        'upstream_repository = "o/r"\n'
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,

@@ -195,8 +195,11 @@ class Prose:
 
     @classproperty
     def paragraph_break(cls) -> re.Pattern[str]:
-        """
+        r"""
         A line holding nothing but whitespace, which separates two paragraphs.
+
+        >>> Prose.paragraph_break.split("one\n  \ntwo")
+        ['one', 'two']
         """
         return RegularExpression.sequence(
             "\n", CharacterClass.WHITESPACE.zero_or_more(), "\n"
@@ -204,8 +207,11 @@ class Prose:
 
     @classproperty
     def wrapped_hyphen(cls) -> re.Pattern[str]:
-        """
+        r"""
         A hyphen its author wrapped the line right after.
+
+        >>> Prose.wrapped_hyphen.sub("-", "plan-\nsite")
+        'plan-site'
         """
         return RegularExpression.sequence("-\n").compiled()
 
@@ -531,9 +537,11 @@ class ManifestKey(KeySpecification, Enum):
 
     @property
     def pattern(self) -> re.Pattern[str]:
-        """
-        Matches this key wherever it already appears in an item block, as
-        ``    branch: claude/work`` for ``branch``.
+        r"""
+        Matches this key wherever it already appears in an item block.
+
+        >>> ManifestKey.BRANCH.pattern.search("  - id: a\n    branch: claude/work\n")[0]
+        '    branch: claude/work'
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,

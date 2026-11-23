@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import pytest
 
+from basstler.github.basstler_project import BasstlerWorkflowInput
 from basstler.upstream_reviews.action.branch import (
     ActionInstallation,
-    InstalledWorkflowGroup,
-    ReviewsWorkflowInput,
 )
 from basstler.upstream_reviews.failure_logs import FailedJob, LogFormatting
 from basstler.upstream_reviews.helper.recording import ChunkGroup, HelperChunk
@@ -22,11 +21,11 @@ from basstler.upstream_reviews.helper.recording import ChunkGroup, HelperChunk
 @pytest.mark.parametrize(
     ("line", "branch_or_tag"),
     [
-        (f"{ReviewsWorkflowInput.BRANCH_OR_TAG}: v4.2.2", "v4.2.2"),
-        (f"    {ReviewsWorkflowInput.BRANCH_OR_TAG}:main  ", "main"),
-        (f"{ReviewsWorkflowInput.BRANCH_OR_TAG}:", None),
-        (f"# {ReviewsWorkflowInput.BRANCH_OR_TAG}: v1", None),
-        (f"other_{ReviewsWorkflowInput.BRANCH_OR_TAG}: v1", None),
+        (f"{BasstlerWorkflowInput.BRANCH_OR_TAG}: v4.2.2", "v4.2.2"),
+        (f"    {BasstlerWorkflowInput.BRANCH_OR_TAG}:main  ", "main"),
+        (f"{BasstlerWorkflowInput.BRANCH_OR_TAG}:", None),
+        (f"# {BasstlerWorkflowInput.BRANCH_OR_TAG}: v1", None),
+        (f"other_{BasstlerWorkflowInput.BRANCH_OR_TAG}: v1", None),
         ("uses: basstler/.github/workflows/upstream-reviews.yml@v1", None),
     ],
 )
@@ -39,7 +38,7 @@ def test_the_branch_or_tag_is_read_from_the_line_naming_it(
     found = ActionInstallation.branch_or_tag_line.search(line)
 
     assert (
-        found[InstalledWorkflowGroup.BRANCH_OR_TAG] if found else None
+        found[BasstlerWorkflowInput.BRANCH_OR_TAG] if found else None
     ) == branch_or_tag
 
 

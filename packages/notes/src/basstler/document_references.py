@@ -213,7 +213,10 @@ class CitedNames:
     @classproperty
     def identifier(cls) -> RegularExpression:
         """
-        A Python name, as in ``plan_manifest_tools``.
+        A Python name.
+
+        >>> CitedNames.identifier.compiled().match("plan_manifest_tools.py")[0]
+        'plan_manifest_tools'
         """
         return RegularExpression.sequence(
             CharacterSet.any_of(
@@ -227,6 +230,10 @@ class CitedNames:
     def module_name(cls) -> RegularExpression:
         """
         A Python name in lower case, as a module is named.
+
+        >>> pattern = CitedNames.module_name.compiled()
+        >>> pattern.match("plan_manifest_tools.PlanDocument")[0]
+        'plan_manifest_tools'
         """
         return RegularExpression.sequence(
             CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_"),
@@ -238,14 +245,20 @@ class CitedNames:
         """
         A character that would continue a name, so the name before it is not the whole
         name.
+
+        >>> CitedNames.name_continuation.compiled().findall("a-b.c")
+        ['a', '-', 'b', 'c']
         """
         return CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "-")
 
     @classproperty
     def dotted_citation(cls) -> re.Pattern[str]:
         """
-        A dotted import path into the package, capturing it below the package, as in
-        ``basstler.plan_manifest_tools``.
+        A dotted import path into the package, capturing it below the package.
+
+        >>> pattern = CitedNames.dotted_citation
+        >>> pattern.findall("run basstler.plan.model or my-basstler.plan")
+        ['plan.model']
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(
@@ -267,8 +280,10 @@ class CitedNames:
     @classproperty
     def source_file_citation(cls) -> re.Pattern[str]:
         """
-        A source file of the package, capturing its path below the package directory,
-        as in ``src/basstler/plan_manifest_tools.py``.
+        A source file of the package, capturing its path below the package directory.
+
+        >>> CitedNames.source_file_citation.findall("see src/basstler/plan/model.py")
+        ['plan/model']
         """
         return RegularExpression.sequence(
             Anchor.WORD_BOUNDARY,
@@ -283,11 +298,17 @@ class CitedNames:
     @classproperty
     def entry_point_citation(cls) -> re.Pattern[str]:
         """
-        The module the plugin's entry point script is asked to run, as in
-        ``basstler.sh plan_manifest_tools``.
+        The module the plugin's entry point script is asked to run, the script written
+        as a command: after its path, a quote or a backtick, never as a word of prose.
+
+        >>> pattern = CitedNames.entry_point_citation
+        >>> pattern.findall('"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh" setup.gate')
+        ['setup.gate']
+        >>> pattern.findall("the basstler.sh script")
+        []
         """
         return RegularExpression.sequence(
-            Anchor.WORD_BOUNDARY,
+            RegularExpression.lookbehind(CharacterSet.any_of('/"`')),
             PluginLocation.ENTRY_POINT_SCRIPT.name,
             RegularExpression.literal('"').optional(),
             CharacterClass.WHITESPACE.one_or_more(),
@@ -301,7 +322,11 @@ class CitedNames:
     @classproperty
     def skill_citation(cls) -> re.Pattern[str]:
         """
-        A slash command, capturing the skill it invokes, as in ``/plan-create``.
+        A slash command, capturing the skill it invokes.
+
+        >>> pattern = CitedNames.skill_citation
+        >>> pattern.findall("run /plan-create, not a/plan-create or /plan")
+        ['plan-create']
         """
         skill_name_word = CharacterSet.any_of(
             CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT

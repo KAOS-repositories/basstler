@@ -25,8 +25,10 @@ class ClassNameWords:
     @classproperty
     def pattern(cls) -> re.Pattern[str]:
         """
-        One word of a class name, an acronym counting as one word, as ``CI`` and
-        ``Pipeline`` in ``CIPipeline``.
+        One word of a class name, an acronym counting as one word.
+
+        >>> ClassNameWords.pattern.findall("CIPipeline")
+        ['CI', 'Pipeline']
         """
         acronym = RegularExpression.sequence(
             CharacterRange.ASCII_UPPERCASE_LETTER.one_or_more(),
@@ -58,7 +60,10 @@ class HyphenatedClassName:
     def word_start(cls) -> re.Pattern[str]:
         """
         The position before each capital letter but the first character, where a word
-        starts, as before the ``I`` of ``PlanItem``.
+        starts.
+
+        >>> HyphenatedClassName.word_start.sub("-", "PlanItem")
+        'Plan-Item'
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(Anchor.TEXT_START),

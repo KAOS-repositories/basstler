@@ -77,6 +77,10 @@ class DescriptionPattern(Enum):
     """
     The session link a pull request description carries, which is the only channel for
     telling a branch's owner that their branch needs them.
+
+    >>> pattern = DescriptionPattern.SESSION_LINK.value
+    >>> pattern.search("Session: https://claude.ai/code/session_01Ab-c.")[0]
+    'https://claude.ai/code/session_01Ab-c'
     """
 
     HEADING = RegularExpression.sequence(
@@ -84,8 +88,11 @@ class DescriptionPattern(Enum):
         RegularExpression.literal("#").repeated(1, HeadingLevel.DEEPEST),
         " ",
     ).compiled()
-    """
+    r"""
     The start of a Markdown heading line, which ends the section before it.
+
+    >>> DescriptionPattern.HEADING.value.findall("## Done\n#hashtag\n### Next")
+    ['## ', '### ']
     """
 
     LINK_TARGET = RegularExpression.sequence(
@@ -95,6 +102,10 @@ class DescriptionPattern(Enum):
     ).compiled()
     """
     The URL a Markdown hyperlink points at.
+
+    >>> pattern = DescriptionPattern.LINK_TARGET.value
+    >>> pattern.findall("[pull request](https://github.com/o/r/pull/1)")
+    ['https://github.com/o/r/pull/1']
     """
 
     def first_in(self, text: str | None) -> str | None:

@@ -171,8 +171,11 @@ class Dependency:
         compare=False,
     )
     """
-    The first character that ends a distribution's name and begins a version bound, an extra
-    or an environment marker, in a PEP 508 specifier.
+    The first character that ends a distribution's name and begins a version bound, an
+    extra or an environment marker, in a PEP 508 specifier.
+
+    >>> Dependency.constraint_start.search("pydantic[email]>=2")[0]
+    '['
     """
 
     @property

@@ -113,7 +113,8 @@ class ProseBlock:
     prose_lines: int
     """
     How many of its lines are prose: for a docstring, the non-blank lines before its
-    field list that are not indented below its own margin, such as a literal block.
+    field list that are neither indented below its own margin, such as a literal block,
+    nor part of an example, from its ``>>>`` to the next blank line.
     """
 
 
@@ -131,8 +132,10 @@ class SourceProse:
     @classproperty
     def field_list_item(cls) -> re.Pattern[str]:
         """
-        A reStructuredText field such as ``:param name:``, which starts a docstring's
-        field list.
+        A reStructuredText field, which starts a docstring's field list.
+
+        >>> SourceProse.field_list_item.match(":param name: The name.")[0]
+        ':param name:'
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
@@ -145,7 +148,12 @@ class SourceProse:
     @classproperty
     def tool_directive(cls) -> re.Pattern[str]:
         """
-        A comment addressed to a tool rather than a reader, as ``# noqa: E501``.
+        A comment addressed to a tool rather than a reader.
+
+        >>> pattern = SourceProse.tool_directive
+        >>> comments = ("# noqa: E501", "# the noqa rule")
+        >>> [bool(pattern.match(comment)) for comment in comments]
+        [True, False]
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,
@@ -205,11 +213,13 @@ class SourceProse:
         :return: It, measured as a docstring.
         """
         prose_lines = 0
+        in_example = False
         text = ExpressionSyntax(statement.value).literal_text
         for line in inspect.cleandoc(text or "").splitlines():
             if SourceProse.field_list_item.match(line):
                 break
-            if line.strip() and not line[0].isspace():
+            in_example = bool(line.strip()) and (in_example or line.startswith(">>>"))
+            if line.strip() and not line[0].isspace() and not in_example:
                 prose_lines += 1
         return ProseBlock(
             ProseKind.DOCSTRING, location.start.line, location.end.line, prose_lines

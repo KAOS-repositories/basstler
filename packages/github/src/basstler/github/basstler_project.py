@@ -32,6 +32,17 @@ class ProjectUrlLabel(StrEnum):
 # %% the project
 
 
+class BasstlerWorkflowInput(StrEnum):
+    """
+    The inputs every one of basstler's reusable workflows takes.
+    """
+
+    BRANCH_OR_TAG = "basstler_branch_or_tag"
+    """
+    The basstler branch or release tag the workflow installs and runs.
+    """
+
+
 class BasstlerProject:
     """
     Where basstler is developed and released.

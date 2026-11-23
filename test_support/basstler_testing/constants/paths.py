@@ -840,6 +840,11 @@ class ProseSnippet(PathEnumeration):
     A function docstring of two prose lines, a literal block and a field list.
     """
 
+    DOCSTRING_EXAMPLES = DIRECTORY / "docstring-examples.py"
+    """
+    A module whose docstring holds a summary and two examples, one with output.
+    """
+
     OVERLONG_ATTRIBUTE_DOCSTRING = DIRECTORY / "overlong-attribute-docstring.py"
     """
     A class whose attribute docstring holds five prose lines.

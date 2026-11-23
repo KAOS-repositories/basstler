@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from basstler.github.basstler_project import BasstlerWorkflowInput
 from basstler.bash import Bash
 from basstler.class_property import classproperty
 from basstler.document_references import PACKAGE_NAME
@@ -49,7 +50,6 @@ from basstler.regular_expression import (
 )
 from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
-from basstler.upstream_reviews.action.branch import ReviewsWorkflowInput
 
 from basstler_testing.constants.environment import (
     ConfigurationVariable,
@@ -131,11 +131,6 @@ class ContractGroup(StrEnum):
     The dotted path of a module of the package.
     """
 
-    BRANCH_OR_TAG = "branch_or_tag"
-    """
-    The basstler branch or release tag a caller uses.
-    """
-
 
 class ContractPattern:
     """
@@ -199,10 +194,10 @@ class ContractPattern:
         return RegularExpression.sequence(
             RegularExpression.either(
                 f"{PACKAGE_NAME}/{WorkflowLocation.UPSTREAM_REVIEWS.as_posix()}@",
-                f"{ReviewsWorkflowInput.BRANCH_OR_TAG}: ",
+                f"{BasstlerWorkflowInput.BRANCH_OR_TAG}: ",
             ),
             CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
-                ContractGroup.BRANCH_OR_TAG
+                BasstlerWorkflowInput.BRANCH_OR_TAG
             ),
         ).compiled()
 

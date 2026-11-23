@@ -82,7 +82,11 @@ class TriageDeclaration(ValidatedJSONModel):
 
     @classmethod
     def comment_pattern(cls) -> re.Pattern[str]:
-        """
+        r"""
+        >>> pattern = TriageDeclaration.comment_pattern()
+        >>> pattern.search("<!-- review-triage\n[]\n-->")[DeclarationGroup.DECLARATION]
+        '[]\n'
+
         :return: The HTML comment holding the declaration, after its marker line.
         """
         return RegularExpression.sequence(

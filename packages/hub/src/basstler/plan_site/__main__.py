@@ -117,8 +117,11 @@ class SiteDigest:
     @classproperty
     def build_time_pattern(cls) -> re.Pattern[bytes]:
         """
-        The element a plan page shows the build time in, as
-        ``<time data-refreshed-at ...>12:00</time>``.
+        The element a plan page shows the build time in.
+
+        >>> pattern = SiteDigest.build_time_pattern
+        >>> pattern.search(b'<p><time data-refreshed-at="1">12:00</time></p>')[0]
+        b'<time data-refreshed-at="1">12:00</time>'
         """
         return RegularExpression.sequence(
             "<time ",

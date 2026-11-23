@@ -364,8 +364,10 @@ REQUIREMENT_NAME = RegularExpression.sequence(
     ).zero_or_more(),
 ).compiled()
 """
-The distribution name a requirement specifier starts with, as ``pydantic`` in
-``pydantic>=2``.
+The distribution name a requirement specifier starts with.
+
+>>> REQUIREMENT_NAME.match("pydantic>=2")[0]
+'pydantic'
 """
 
 

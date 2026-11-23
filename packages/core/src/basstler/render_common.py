@@ -79,6 +79,9 @@ class HeadingShift(IntEnum):
     @cache
     def tag_pattern() -> re.Pattern[str]:
         """
+        >>> [tag[0] for tag in HeadingShift.tag_pattern().finditer("<h2>Plan</h2>")]
+        ['<h2>', '</h2>']
+
         :return: The pattern matching one opening or closing HTML heading tag, ``<h1>``
             through ``</h6>``.
         """

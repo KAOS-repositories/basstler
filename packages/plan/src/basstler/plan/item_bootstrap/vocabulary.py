@@ -56,8 +56,10 @@ class ManifestLinePattern(Enum):
         f"- {ManifestKey.IDENTIFIER.key}:",
     ).compiled()
     """
-    Matches the first line of an item block, which is always its ``id``, as
-    ``  - id: first-item``.
+    Matches the first line of an item block, which is always its ``id``.
+
+    >>> ManifestLinePattern.ITEM_START.value.match("  - id: first-item") is not None
+    True
     """
 
     SEQUENCE_ENTRY = RegularExpression.sequence(
@@ -67,8 +69,12 @@ class ManifestLinePattern(Enum):
         CharacterClass.WHITESPACE,
     ).compiled()
     """
-    Matches one entry of a block sequence, which YAML lets sit either indented under its
-    key or flush with it, as ``    - one blocker``.
+    Matches one entry of a block sequence, which YAML lets sit either indented under
+    its key or flush with it.
+
+    >>> pattern = ManifestLinePattern.SEQUENCE_ENTRY.value
+    >>> [bool(pattern.match(line)) for line in ("  - a blocker", "- a blocker", "-1")]
+    [True, True, False]
     """
 
     TOP_LEVEL_KEY = RegularExpression.sequence(
@@ -76,8 +82,12 @@ class ManifestLinePattern(Enum):
         CharacterSet.any_except(CharacterClass.WHITESPACE, "-"),
     ).compiled()
     """
-    Matches a top-level ``plan.yaml`` key such as ``items:``, which is where the last
-    item block ends. A sequence entry flush with its key starts with ``-`` and is not one.
+    Matches a top-level ``plan.yaml`` key, which is where the last item block ends. A
+    sequence entry flush with its key starts with ``-`` and is not one.
+
+    >>> pattern = ManifestLinePattern.TOP_LEVEL_KEY.value
+    >>> [bool(pattern.match(line)) for line in ("items:", "- id: a", "  notes: x")]
+    [True, False, False]
     """
 
     BLOCK_VALUE = RegularExpression.sequence(
@@ -89,9 +99,11 @@ class ManifestLinePattern(Enum):
         ":",
     ).compiled()
     """
-    Matches a key whose value may run over the following lines, as ``    notes: >``,
-    derived from
+    Matches a key whose value may run over the following lines, derived from
     :meth:`ManifestKey.block_styled` rather than listing those keys a second time.
+
+    >>> ManifestLinePattern.BLOCK_VALUE.value.match("    notes: >") is not None
+    True
     """
 
     def matches(self, line: str) -> bool:
@@ -271,8 +283,11 @@ class BlockScalarStyle(StrEnum):
 
     @property
     def paragraph_separator(self) -> re.Pattern[str]:
-        """
+        r"""
         What separates two paragraphs in a value of this style once it has been read.
+
+        >>> BlockScalarStyle.FOLDED.paragraph_separator.split("one\ntwo")
+        ['one', 'two']
         """
         if self is BlockScalarStyle.LITERAL:
             return Prose.paragraph_break

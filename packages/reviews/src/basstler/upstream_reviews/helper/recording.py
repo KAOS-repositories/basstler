@@ -278,13 +278,15 @@ class HelperChunk:
     @classmethod
     def pattern(cls, request_identifier: str) -> re.Pattern[str]:
         """
+        >>> pattern = HelperChunk.pattern("7")
+        >>> pattern.search("> BASSTLER-UPSTREAM-REVIEWS-7-1-3:QUJD")[ChunkGroup.TEXT]
+        'QUJD'
+
         :param request_identifier: The request's identifier.
-        :return: What one chunk looks like, wherever it is quoted, as
-            ``BASSTLER-UPSTREAM-REVIEWS-<request>-1-3:QUJD``.
+        :return: What one chunk looks like, wherever it is quoted.
         """
         return RegularExpression.sequence(
-            cls.marker(request_identifier),
-            "-",
+            f"{cls.marker(request_identifier)}-",
             CharacterClass.DIGIT.one_or_more().captured_as(ChunkGroup.INDEX),
             "-",
             CharacterClass.DIGIT.one_or_more().captured_as(ChunkGroup.COUNT),

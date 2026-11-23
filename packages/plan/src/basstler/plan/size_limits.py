@@ -407,21 +407,30 @@ class RoadmapLine(Enum):
         Anchor.LINE_START, RoadmapMarker.TITLE, CharacterClass.NON_WHITESPACE
     ).compiled()
     """
-    The roadmap's one heading, its first line, as ``# Roadmap``.
+    The roadmap's one heading, its first line.
+
+    >>> RoadmapLine.TITLE.matches("# Roadmap")
+    True
     """
 
     ENTRY = RegularExpression.sequence(
         Anchor.LINE_START, RoadmapMarker.ENTRY, CharacterClass.NON_WHITESPACE
     ).compiled()
     """
-    The first line of an entry, as ``- A rule every item follows.``
+    The first line of an entry.
+
+    >>> RoadmapLine.ENTRY.matches("- A rule every item follows.")
+    True
     """
 
     CONTINUATION = RegularExpression.sequence(
         Anchor.LINE_START, RoadmapMarker.CONTINUATION, CharacterClass.NON_WHITESPACE
     ).compiled()
     """
-    A further line of the entry above it, as two spaces and the text.
+    A further line of the entry above it, indented below its text.
+
+    >>> RoadmapLine.CONTINUATION.matches("  and goes on here.")
+    True
     """
 
     def matches(self, line: str) -> bool:

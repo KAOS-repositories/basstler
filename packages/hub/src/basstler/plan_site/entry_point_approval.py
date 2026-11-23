@@ -105,6 +105,9 @@ class EntryPointInvocation:
         """
         A word with nothing the shell would interpret: no metacharacter, expansion or
         quote.
+
+        >>> EntryPointInvocation.plain_word.compiled().match("~/repo; ls")[0]
+        '~/repo'
         """
         return CharacterSet.any_except(
             CharacterClass.WHITESPACE, "|&;()<>", "$`", "'\"\\"
@@ -114,6 +117,10 @@ class EntryPointInvocation:
     def plugin_root_variable(cls) -> RegularExpression:
         """
         The plugin root as the skills write it, through either variable.
+
+        >>> pattern = EntryPointInvocation.plugin_root_variable.compiled()
+        >>> pattern.findall("${CLAUDE_PLUGIN_ROOT} $BASSTLER_PLUGIN_ROOT")
+        ['${CLAUDE_PLUGIN_ROOT}', '$BASSTLER_PLUGIN_ROOT']
         """
         variable_name = RegularExpression.either(
             BasstlerVariable.PLUGIN_ROOT, ClaudeCodeVariable.PLUGIN_ROOT
@@ -128,6 +135,10 @@ class EntryPointInvocation:
         """
         The plugin root once expanded: a plain absolute path, below ``/`` or a Windows
         drive, as a pattern whose group is that path.
+
+        >>> pattern = EntryPointInvocation.plugin_root_path.compiled()
+        >>> pattern.findall("C:/plugins/basstler /opt/basstler")
+        ['C:/plugins/basstler', '/opt/basstler']
         """
         drive = RegularExpression.sequence(CharacterRange.ASCII_LETTER, ":").optional()
         return RegularExpression.sequence(drive, "/", cls.plain_word).captured_as(
@@ -138,6 +149,10 @@ class EntryPointInvocation:
     def script(cls) -> RegularExpression:
         """
         The entry point script below the plugin root, optionally double-quoted.
+
+        >>> pattern = EntryPointInvocation.script.compiled()
+        >>> bool(pattern.fullmatch('"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh"'))
+        True
         """
         double_quote = RegularExpression.literal('"').optional()
         return RegularExpression.sequence(
@@ -152,6 +167,10 @@ class EntryPointInvocation:
         """
         What may follow the script: words with nothing that chains, substitutes or
         redirects.
+
+        >>> pattern = EntryPointInvocation.arguments.compiled()
+        >>> pattern.match(" setup.gate --check | tee log")[0]
+        ' setup.gate --check'
         """
         argument = CharacterSet.any_except(
             CharacterClass.WHITESPACE, "|&;()<>", "$`", "\\"
@@ -165,6 +184,10 @@ class EntryPointInvocation:
         """
         What may come before the script: a change into a directory named by a plain
         word.
+
+        >>> pattern = EntryPointInvocation.directory_change.compiled()
+        >>> pattern.match("cd ~/repo && basstler.sh")[0]
+        'cd ~/repo && '
         """
         return RegularExpression.sequence(
             "cd",
@@ -179,6 +202,10 @@ class EntryPointInvocation:
     def status_report(cls) -> RegularExpression:
         """
         What may follow the arguments: printing plain text and the script's exit status.
+
+        >>> pattern = EntryPointInvocation.status_report.compiled()
+        >>> bool(pattern.fullmatch('; echo "exit status: $?"'))
+        True
         """
         plain_text = CharacterSet.any_except('"\\$`').zero_or_more()
         return RegularExpression.sequence(
@@ -196,6 +223,14 @@ class EntryPointInvocation:
     def command_line(cls) -> re.Pattern[str]:
         """
         What a whole command line has to match.
+
+        >>> pattern = EntryPointInvocation.command_line
+        >>> script = '"${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh"'
+        >>> bool(pattern.fullmatch(f"cd ~/repo && {script} setup.gate"))
+        True
+        >>> pattern = EntryPointInvocation.command_line
+        >>> bool(pattern.fullmatch(f"{script} setup.gate && rm -r ~"))
+        False
         """
         return RegularExpression.sequence(
             CharacterClass.WHITESPACE.zero_or_more(),

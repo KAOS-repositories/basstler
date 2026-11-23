@@ -218,8 +218,10 @@ EXTRA_MARKER = RegularExpression.sequence(
     "==",
 ).compiled()
 """
-The environment marker of a requirement that only an extra brings in, as ``extra ==
-'email'``.
+The environment marker of a requirement that only an extra brings in.
+
+>>> EXTRA_MARKER.search("email-validator; extra == 'email'") is not None
+True
 """
 
 
@@ -233,6 +235,9 @@ class InstalledLibraries:
     def name_separators(cls) -> re.Pattern[str]:
         """
         A run of the characters a distribution's name is spelled with between its words.
+
+        >>> InstalledLibraries.name_separators.sub("-", "typing_extensions.zope")
+        'typing-extensions-zope'
         """
         return CharacterSet.any_of("-_.").one_or_more().compiled()
 

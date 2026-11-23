@@ -19,7 +19,6 @@ from basstler.github.pull_request_changes import (
     CommitStart,
     ComparisonStart,
     LastCommitsStart,
-    LastReviewStart,
     MergeBaseStart,
     PullRequestChangesReader,
 )
@@ -27,6 +26,7 @@ from basstler.github.repository import PullRequestReference, Repository
 from basstler.locations import ClaudeCodeVariable
 from basstler.review_triage.command_names import ReviewTriageCommand
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
+from basstler.review_triage.file_listing import FileListingReader, GraphQLAttempts
 from basstler.review_triage.outputs import (
     MarkdownReport,
     TriageOutput,
@@ -45,6 +45,11 @@ from basstler.review_triage.viewed_request import (
     ViewedMarkingRoutes,
 )
 from basstler.review_triage.viewed_setup import MarkViewedSetup
+from basstler.review_triage.viewed_states import (
+    ViewedCheckpoints,
+    ViewedFilesTriage,
+    ViewedStateStart,
+)
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -90,7 +95,7 @@ class TriagePublication:
     Renames given and rejected beyond the description's, outranking them.
     """
 
-    start: ComparisonStart = LastReviewStart()
+    start: ComparisonStart = ViewedStateStart()
     """
     Where the changes are triaged from.
     """
@@ -135,8 +140,8 @@ class TriagePublication:
         :param from_merge_base: Whether to triage the whole change.
         :param plans: Plans commits applied, each as ``commit=plan``.
         :return: The publication triaging from *since*, else from before the *last*
-            commits, else from the merge base if *from_merge_base*, else from the
-            viewer's last review.
+            commits, else from the merge base if *from_merge_base*, else each file from
+            where the viewer last viewed it.
         """
         if since is not None:
             start: ComparisonStart = CommitStart(since)
@@ -145,7 +150,7 @@ class TriagePublication:
         elif from_merge_base:
             start = MergeBaseStart()
         else:
-            start = LastReviewStart()
+            start = ViewedStateStart()
         return cls(
             pull_request,
             repository,
@@ -163,11 +168,8 @@ class TriagePublication:
         """
         git = GitCommandRunner(Path.cwd())
         checkout = Path(git.run("rev-parse", "--show-toplevel"))
-        changes = PullRequestChangesReader(git, GitHubRestClient()).read(
-            Repository.from_name_or_remote(self.repository, git, self.remote),
-            self.pull_request,
-            self.start,
-        )
+        repository = Repository.from_name_or_remote(self.repository, git, self.remote)
+        reader = PullRequestChangesReader(git, GitHubRestClient())
         default = PullRequestTriager()
         triager = replace(
             default,
@@ -180,7 +182,15 @@ class TriagePublication:
             ),
             plan_records=self.plan_records,
         )
-        return triager.triage(changes)
+        if isinstance(self.start, ViewedStateStart):
+            return ViewedFilesTriage(
+                triager,
+                reader,
+                repository,
+                FileListingReader(GraphQLAttempts(GitHubRestClient())),
+                ViewedCheckpoints.for_pull_request(git, repository, self.pull_request),
+            ).outcome(self.pull_request)
+        return triager.triage(reader.read(repository, self.pull_request, self.start))
 
     def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
         """
@@ -229,8 +239,8 @@ def report(
     plan: tuple[str, ...] = (),
 ) -> ReviewTriageExitCode:
     """
-    Print which files of a pull request need review, as Markdown; by default only the
-    changes since your last review, the whole change if you have not reviewed it.
+    Print which files of a pull request need review, as Markdown; by default each file
+    from where you last viewed it, the files you viewed as they are left out.
 
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
@@ -241,8 +251,8 @@ def report(
         a file only merges of the base branch changed since is mechanical.
     :param last: How many of the pull request's last commits to triage, a merge counting
         as one, as GitHub's view of its last commits shows them.
-    :param from_merge_base: Triage the whole change, not only what changed since your
-        last review.
+    :param from_merge_base: Triage the whole change, not each file from where you last
+        viewed it.
     :param select_rule: A rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, one on by default included, outranking
@@ -289,8 +299,8 @@ def mark_viewed(
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the logged-in account, or, where
-    that fails, ask a repository's Actions to; then print the triage. By default only
-    the changes since that account's last review, the whole change without one.
+    that fails, ask a repository's Actions to; then print the triage. By default each
+    file from where that account last viewed it.
 
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
@@ -306,8 +316,8 @@ def mark_viewed(
         a file only merges of the base branch changed since is mechanical.
     :param last: How many of the pull request's last commits to triage, a merge counting
         as one, as GitHub's view of its last commits shows them.
-    :param from_merge_base: Triage the whole change, not only what changed since your
-        last review.
+    :param from_merge_base: Triage the whole change, not each file from where you last
+        viewed it.
     :param select_rule: A rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, one on by default included, outranking
@@ -331,13 +341,17 @@ def mark_viewed(
         plan,
     ).outcome()
     (TriageSummary() if summary_only else MarkdownReport()).publish(outcome)
+    marked_repository = Repository.from_name_or_remote(repository, git)
     routes = ViewedMarkingRoutes(
-        ViewedMarking(GitHubRestClient()),
+        ViewedMarking(
+            GitHubRestClient(),
+            checkpoints=ViewedCheckpoints.for_pull_request(
+                git, marked_repository, pull_request
+            ),
+        ),
         MarkViewedRequest(
             Repository.from_name_or_remote(workflow_repository, git),
-            PullRequestReference(
-                Repository.from_name_or_remote(repository, git), pull_request
-            ),
+            PullRequestReference(marked_repository, pull_request),
         ),
         GitHubRestClient(),
         ClaudeCodeVariable.REMOTE.is_true(),

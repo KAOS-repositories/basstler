@@ -3,6 +3,9 @@
 Changes since {{ outcome.start.reason }}.
 
 {% include "review_triage_summary.md.jinja" %}
+{% if outcome.viewed_files %}
+{{ outcome.viewed_files | length }} files you viewed as they are now are left out.
+{% endif %}
 
 
 {% if outcome.renames.identifier_renames %}

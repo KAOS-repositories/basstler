@@ -384,6 +384,12 @@ class RepositoryStateLocation(PathEnumeration):
     were marked at.
     """
 
+    VIEWED_CHECKPOINTS = DIRECTORY / "viewed-checkpoints"
+    """
+    The head commit each pull request's files were last seen viewed at, a file per
+    pull request under its repository's owner and name.
+    """
+
     PERSONAL_SETTINGS_SYNC_STAMP = DIRECTORY / "personal-settings-sync-hash"
     """
     The hash of the personal settings last synced into, or saved out of, this clone's

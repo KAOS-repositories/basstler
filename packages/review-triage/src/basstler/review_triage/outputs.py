@@ -26,6 +26,7 @@ from basstler.review_triage.file_listing import (
     ViewedFilesVariable,
 )
 from basstler.review_triage.triage import TriageOutcome
+from basstler.review_triage.viewed_states import ViewedCheckpoints
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -151,10 +152,21 @@ class ViewedMarking(TriageOutput):
     marking one viewed twice changes nothing, so asking again is safe.
     """
 
+    checkpoints: ViewedCheckpoints | None = None
+    """
+    Where the files marked are recorded as viewed at the head, ``None`` to record
+    nothing.
+    """
+
     def publish(self, outcome: TriageOutcome) -> None:
         refusals = self.refusals(outcome)
         if refusals:
             raise GraphQLErrorsReturned(refusals)
+        if self.checkpoints is not None:
+            self.checkpoints.record(
+                outcome.pull_request.head.commit,
+                frozenset(file.change.path for file in outcome.mechanical_files),
+            )
 
     @property
     def attempts(self) -> GraphQLAttempts:

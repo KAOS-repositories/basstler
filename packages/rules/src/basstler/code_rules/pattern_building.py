@@ -20,7 +20,7 @@ from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.references import ReferenceTo
 from basstler.code_rules.checker import CodeRuleViolation
 from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
-from basstler.locations import PackageLocation
+from basstler.locations import PackageLocation, ShippedPath
 
 # %% what reads pattern text
 
@@ -104,23 +104,36 @@ class PatternTextCall(CodePattern):
 @dataclass(frozen=True)
 class HandWrittenPatternChecker(SyntaxTreeChecker):
     """
-    Reports every call of a :class:`PatternFunction` outside the modules allowed one.
+    Reports every call of a :class:`PatternFunction` outside :attr:`exempt_modules`.
     """
 
-    allowed_modules: tuple[Path, ...] = (
-        PackageLocation.REGULAR_EXPRESSION_MODULE,
-        PackageLocation.UPSTREAM_REVIEWS_FETCH,
+    exempt_modules: tuple[ShippedPath, ...] = (
+        ShippedPath.REGULAR_EXPRESSION_MODULE,
+        ShippedPath.UPSTREAM_REVIEWS_FETCH,
     )
     """
     The module building every pattern, and the program that can import nothing of the
     package and compiles a pattern the package built.
     """
 
+    def is_exempt(self, path: Path) -> bool:
+        """
+        :param path: A file.
+        :return: Whether it is one of :attr:`exempt_modules` in the ``basstler``
+            package, whichever distribution of it is installed here.
+        """
+        return any(
+            path.resolve()
+            .as_posix()
+            .endswith(f"/{PackageLocation.DIRECTORY.name}/{module.as_posix()}")
+            for module in self.exempt_modules
+        )
+
     @override
     def violations_of_module(
         self, path: Path, module: PositionedModule
     ) -> Iterator[CodeRuleViolation]:
-        if path.resolve() in {allowed.resolve() for allowed in self.allowed_modules}:
+        if self.is_exempt(path):
             return
         for occurrence in PatternTextCall.found_in(module):
             yield CodeRuleViolation(

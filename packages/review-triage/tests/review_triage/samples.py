@@ -258,6 +258,23 @@ class ModuleMoveSample(SampleTrees):
         return "module-move"
 
 
+# %% an import respelled to another module that still exists
+
+
+class ModuleNameKeptSample(SampleTrees):
+    """
+    A pull request respelling an import to another module binding another object of the
+    same name, while the module it imported from stays.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "module-name-kept"
+
+
 # %% the package root move
 
 

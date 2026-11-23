@@ -115,12 +115,26 @@ class CommitTree:
             PurePosixPath(path) for path in listing.split(PATH_TERMINATOR) if path
         )
 
+    @cached_property
+    def path_names(self) -> frozenset[str]:
+        """
+        The name of every directory and the stem of every file in the commit.
+
+        :raises GitCommandFailed: If the listing fails.
+        """
+        return frozenset(
+            name for path in self.file_paths for name in (*path.parent.parts, path.stem)
+        )
+
     def mentions(self, word: str) -> bool:
         """
         :param word: A name or any other fixed string.
-        :return: Whether any file of the commit holds it as a whole word.
+        :return: Whether any file of the commit holds it as a whole word, or one of
+            :attr:`path_names` is it.
         :raises GitCommandFailed: If the search itself fails.
         """
+        if word in self.path_names:
+            return True
         search = self.git.attempt(
             "grep",
             "--quiet",
@@ -141,8 +155,11 @@ class CommitTree:
             :meth:`mentions` decides each.
         :raises GitCommandFailed: If a search itself fails.
         """
-        identifiers = frozenset(word for word in words if WORD.fullmatch(word))
-        others = frozenset(word for word in words - identifiers if self.mentions(word))
+        named = words & self.path_names
+        identifiers = frozenset(word for word in words - named if WORD.fullmatch(word))
+        others = named | frozenset(
+            word for word in words - named - identifiers if self.mentions(word)
+        )
         if not identifiers:
             return others
         search = self.git.attempt(

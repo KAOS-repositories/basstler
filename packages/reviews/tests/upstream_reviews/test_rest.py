@@ -10,7 +10,6 @@ the same report.
 
 from __future__ import annotations
 
-
 import pytest
 
 from basstler.github.rest_models import (
@@ -29,7 +28,6 @@ from basstler.upstream_reviews.readers import (
 from basstler.upstream_reviews.report import (
     UpstreamPullRequestReport,
 )
-
 from basstler_testing.upstream_reviews.recorded_rest_pull_request import (
     NUMBER,
     ROUTE,

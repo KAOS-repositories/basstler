@@ -96,11 +96,13 @@ class ValidatedJSONModel(JSONModel, JSONSerializable):
                 readers[key] = name
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> Self:
+    def from_json(cls, data: dict[str, Any], read: object = None) -> Self:
         """
+        :param read: The read that was served the object, which fields owned by what it
+            reads take their owner from; ``None`` for an object read on its own.
         :raises pydantic.ValidationError: If the object does not have the model's shape.
         """
-        return TypeAdapter(cls).validate_python(data)
+        return TypeAdapter(cls).validate_python(data, context=read)
 
     def to_json(self) -> dict[str, Any]:
         """
@@ -118,6 +120,9 @@ class ValidatedJSONModel(JSONModel, JSONSerializable):
             keys |= cls.field_keys(name, field_info)
             for model in cls.nested_models(field_info.annotation):
                 keys |= model.read_keys
+            for reader in field_info.metadata:
+                if isinstance(reader, ObjectReader):
+                    keys |= reader.read_keys
         return frozenset(keys)
 
     @staticmethod
@@ -171,6 +176,22 @@ class ValidatedJSONModel(JSONModel, JSONSerializable):
             for argument in get_args(annotation)
             for model in ValidatedJSONModel.nested_models(argument)
         ]
+
+
+# %% reading a field out of an object
+
+
+class ObjectReader(ABC):
+    """
+    A field annotation reading the field out of an object of the data.
+    """
+
+    @property
+    @abstractmethod
+    def read_keys(self) -> frozenset[str]:
+        """
+        Every key it reads out of the object, at any depth.
+        """
 
 
 # %% reading a raw value

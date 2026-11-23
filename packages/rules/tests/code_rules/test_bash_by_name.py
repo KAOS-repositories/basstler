@@ -9,21 +9,17 @@ from pathlib import Path
 
 
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_rules.bash_by_name import BashByNameChecker, BashEnvironment
 from basstler.code_rules.checker import CodeRulesCheck
 
-from basstler_testing.constants.paths import BashByNameSnippet, RuleFixExample, RuleFixExampleFile
+from basstler_testing.constants.paths import (
+    BashByNameSnippet,
+    RuleFixExample,
+    RuleFixExampleFile,
+)
 
-# %% helpers
-
-
-def violation_lines(path: Path) -> list[int]:
-    """
-    :return: The first line of each violation the checker reports in *path*.
-    """
-    return [violation.first_line for violation in BashByNameChecker().violations(path)]
-
+from .marked_snippet import MarkedSnippet
 
 # %% commands
 
@@ -32,21 +28,32 @@ def test_a_subprocess_call_running_bash_by_its_name_is_reported():
     """
     A command line handed to :mod:`subprocess` is reported.
     """
-    assert violation_lines(BashByNameSnippet.SUBPROCESS_CALL) == [9]
+    snippet = MarkedSnippet(BashByNameSnippet.SUBPROCESS_CALL)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
+
+
+def test_a_subprocess_imported_under_another_name_is_resolved():
+    """
+    A call is a :mod:`subprocess` call by what it imports, not by how it is spelled.
+    """
+    snippet = MarkedSnippet(BashByNameSnippet.IMPORTED_SUBPROCESS)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
 
 
 def test_a_returned_command_running_bash_by_its_name_is_reported():
     """
     A command line returned for a caller to run is reported.
     """
-    assert violation_lines(BashByNameSnippet.RETURNED_COMMAND) == [12]
+    snippet = MarkedSnippet(BashByNameSnippet.RETURNED_COMMAND)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
 
 
 def test_the_located_bash_and_a_tuple_of_names_are_not_reported():
     """
     The located bash is not, and neither is a tuple of names that runs nothing.
     """
-    assert violation_lines(BashByNameSnippet.LOCATED_BASH) == []
+    snippet = MarkedSnippet(BashByNameSnippet.LOCATED_BASH)
+    assert snippet.reported_lines(BashByNameChecker()) == snippet.marked_lines
 
 
 # %% the environment bash is located in
@@ -56,7 +63,7 @@ def located_environments(path: Path) -> list[BashEnvironment]:
     """
     :return: The environment the fix locates bash in, for each command line in *path*.
     """
-    module = PositionedModule(PythonSourceFile(path).parse())
+    module = PositionedModule(EditablePythonSourceFile(path).parse())
     return [
         command.environment
         for command in BashByNameChecker().specifications_of_module(module)

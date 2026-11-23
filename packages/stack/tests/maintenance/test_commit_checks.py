@@ -26,7 +26,7 @@ from basstler_testing.upstream_reviews.recorded_rest_pull_request import (
     make_reader,
     pull_request_responses,
 )
-from basstler_testing.maintenance.fork import PullRequestHeadRepository
+from basstler_testing.github.pull_request_samples import PullRequestHeadRepository
 
 # %% a client answering from recorded pages
 

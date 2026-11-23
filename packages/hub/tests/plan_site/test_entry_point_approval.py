@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import basstler.plan_site.entry_point_approval
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import BuiltInTool
 from basstler.locations import BasstlerVariable, PluginLocation
 from basstler.maintenance.commands import FastForwardCommand, RestackCommand
 from basstler.plan_site.attach_approval import AttachAnswer, PermissionDecision
@@ -40,7 +40,7 @@ The entry point script as a skill writes it.
 """
 
 
-def shell(command: str, tool: str = SessionTool.RUN_SHELL_COMMAND) -> ShellCall:
+def shell(command: str, tool: str = BuiltInTool.RUN_SHELL_COMMAND) -> ShellCall:
     """
     :param command: The command line the call runs.
     :param tool: The tool called.
@@ -94,9 +94,21 @@ def test_an_expanded_path_to_this_plugin_is_allowed(
     """
     script = invocation.plugin_root.path_of(PluginLocation.ENTRY_POINT_SCRIPT)
 
-    answer = invocation.permit(shell(f'"{script}" maintenance'))
+    answer = invocation.permit(shell(f'"{script.as_posix()}" maintenance'))
 
     assert answer.allowed.decision is PermissionDecision.ALLOW
+
+
+def test_an_expanded_root_on_a_windows_drive_is_read_as_that_root():
+    """
+    A plugin root expanded below a Windows drive is read whole, drive included.
+    """
+    root = "D:/plugins/basstler"
+    command = f'"{root}/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}" maintenance'
+
+    match = EntryPointInvocation.command_line.fullmatch(command)
+
+    assert match.group("expanded_root") == root
 
 
 # %% leaving the decision alone
@@ -162,7 +174,7 @@ def test_another_tool_is_left_alone(invocation: EntryPointInvocation):
     """
     command = f'"{ENTRY_POINT}" maintenance'
 
-    assert invocation.permit(shell(command, tool=SessionTool.ASK_USER)) is None
+    assert invocation.permit(shell(command, tool=BuiltInTool.ASK_USER)) is None
 
 
 # %% registering the hook
@@ -185,7 +197,7 @@ def test_the_plugin_runs_the_hook_before_the_shell_tool():
     (registration,) = [
         entry
         for entry in manifest["hooks"][HOOK_EVENT]
-        if entry["matcher"] == SessionTool.RUN_SHELL_COMMAND
+        if entry["matcher"] == BuiltInTool.RUN_SHELL_COMMAND
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(

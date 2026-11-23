@@ -312,6 +312,13 @@ class NamingRules(Section):
         "passes this test"
     )
 
+    NO_AMBIGUOUS_NAMES = (
+        "A name is unambiguous: a word that also names something else a reader may "
+        "know - a wheel, a release, a package - carries the word that says which, as "
+        "`PythonWheel` does, so the name says what the class represents without its "
+        "module beside it"
+    )
+
     NO_BARE_PREPOSITION_NAMES = (
         "A method name is never a bare preposition such as `of`, `for` or `with`: it "
         "says nothing without its class and its arguments beside it. Name what it "

@@ -29,7 +29,7 @@ from basstler.github.pull_request_record import (
     PullRequestRecord,
 )
 from basstler.github.pull_request_state import PullRequestState
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, Repository
 from basstler.github.rest_models import (
     RestCheckRunPage,
     RestCombinedStatusPage,
@@ -242,7 +242,7 @@ class PullRequestListingSpecification:
         return self._path(
             ends.base.repository,
             {
-                ListingParameter.HEAD: ends.head.qualified_name,
+                ListingParameter.HEAD: ends.head.repository.branch_label(ends.head),
                 ListingParameter.BASE: ends.base.name,
             },
         )
@@ -299,15 +299,10 @@ class PullRequestListState(PullRequestListingSpecification, Enum):
 
 @dataclass(frozen=True)
 class GitHubRepository(
-    ForkPullRequests, CommitChecks, RepositoryLabels, CredentialHolder
+    HasRepository, ForkPullRequests, CommitChecks, RepositoryLabels, CredentialHolder
 ):
     """
     Every pull-request and label call this tooling makes, against one repository.
-    """
-
-    repository: Repository
-    """
-    The repository to read and write.
     """
 
     client: GitHubClient
@@ -398,7 +393,7 @@ class GitHubRepository(
 
     def _every_entry(
         self, path: GitHubRepositoryPath, filters: Mapping[ListingParameter, str]
-    ) -> list[Any]:
+    ) -> list[dict[str, Any]]:
         """
         Read a listing below the repository whose pages are lists, to its end.
 
@@ -406,11 +401,7 @@ class GitHubRepository(
         :param filters: The query parameters narrowing the listing.
         :return: Every entry, first page first.
         """
-        return [
-            entry
-            for page in self.client.get_pages(self._listing(str(path), filters))
-            for entry in page
-        ]
+        return self.client.get_entries(self._listing(str(path), filters))
 
     def _listing(self, path: str, filters: Mapping[ListingParameter, str]) -> str:
         """

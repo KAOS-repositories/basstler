@@ -97,6 +97,21 @@ class ProjectCheckout:
         """
         return bool(self.run_git("ls-remote", "--heads", remote, branch).strip())
 
+    def notes_branch_paths(self, directory: Path) -> list[PurePosixPath]:
+        """
+        :param directory: A directory of the notes branch, relative to its root.
+        :return: Every file under *directory* on the fetched notes branch, relative to
+            its root; none when the branch has no such directory.
+        """
+        listing = self.run_git(
+            "ls-tree",
+            "-r",
+            "--name-only",
+            FetchedBranchReference.PERSONAL_NOTES,
+            directory.as_posix(),
+        )
+        return [PurePosixPath(path) for path in listing.splitlines()]
+
     def check_out_manifests(self, destination: Path) -> PlanDirectory:
         """
         Write every plan's manifest on the fetched notes branch out as plain files.
@@ -104,14 +119,7 @@ class ProjectCheckout:
         :param destination: An empty directory to write into, one subdirectory per plan.
         :return: The plans the manifests were written to.
         """
-        listing = self.run_git(
-            "ls-tree",
-            "-r",
-            "--name-only",
-            FetchedBranchReference.PERSONAL_NOTES,
-            ProjectLocation.PLANS.as_posix(),
-        )
-        for path in map(PurePosixPath, listing.splitlines()):
+        for path in self.notes_branch_paths(ProjectLocation.PLANS):
             if (
                 path.name != PlanDocument.MANIFEST
                 or path.parent.parent != PurePosixPath(ProjectLocation.PLANS)
@@ -277,33 +285,14 @@ class PlanDocuments:
         :raises PlanSaveRefusedError: If the script refuses the documents.
         :raises PlanNotWrittenError: If the branch does not carry the edit afterwards.
         """
-        with tempfile.TemporaryDirectory() as scratch_directory:
-            scratch = Path(scratch_directory)
-            written = {
-                PlanDocument.MANIFEST: manifest_text,
-                PlanDocument.ROADMAP: roadmap_text,
-            }
-            for document, content in written.items():
-                TextFile(scratch / document.value).write(content)
-            saved = subprocess.run(
-                Bash.locate(os.environ).command(
-                    PluginRoot.locate(os.environ).path_of(
-                        PluginLocation.PLAN_SAVING_SCRIPT
-                    ),
-                    self.plan_identifier,
-                    PlanSavingOption.MANIFEST,
-                    str(scratch / PlanDocument.MANIFEST.value),
-                    PlanSavingOption.ROADMAP,
-                    str(scratch / PlanDocument.ROADMAP.value),
-                    PlanSavingOption.READ_AT,
-                    self.read_at,
-                ),
-                cwd=project_root,
-                capture_output=True,
-                encoding="utf-8",
-            )
-        if saved.returncode != 0:
-            raise PlanSaveRefusedError(detail=saved.stderr.strip())
+        written = {
+            PlanDocument.MANIFEST: manifest_text,
+            PlanDocument.ROADMAP: roadmap_text,
+        }
+        PlanSaveScript(plan_identifier=self.plan_identifier, read_at=self.read_at).run(
+            version=PlanVersion(manifest_text=manifest_text, roadmap_text=roadmap_text),
+            project_root=project_root,
+        )
         self.confirm_written(written, project_root)
 
     def confirm_written(
@@ -335,3 +324,56 @@ class PlanDocuments:
                 plan_identifier=self.plan_identifier,
                 documents=tuple(dict.fromkeys(part.document for part in unapplied)),
             )
+
+
+# %% saving through the hook script
+
+
+@dataclass(frozen=True)
+class PlanSaveScript:
+    """
+    ``save-plan.sh``, saving one plan's documents as edits of the plan as it stood at a
+    commit of the personal-notes branch.
+    """
+
+    plan_identifier: str
+    """
+    The plan's id.
+    """
+
+    read_at: str
+    """
+    The personal-notes commit the edits are made against; a plan that commit lacks is
+    saved whole.
+    """
+
+    def run(self, *, version: PlanVersion, project_root: Path) -> None:
+        """
+        Save both documents of *version*.
+
+        :param version: The manifest and roadmap to save.
+        :param project_root: The repository to run the script from.
+        :raises PlanSaveRefusedError: If the script refuses the documents.
+        """
+        with tempfile.TemporaryDirectory() as scratch_directory:
+            scratch = Path(scratch_directory)
+            version.write(scratch)
+            saved = subprocess.run(
+                Bash.locate(os.environ).command(
+                    PluginRoot.locate(os.environ).path_of(
+                        PluginLocation.PLAN_SAVING_SCRIPT
+                    ),
+                    self.plan_identifier,
+                    PlanSavingOption.MANIFEST,
+                    str(scratch / PlanDocument.MANIFEST.value),
+                    PlanSavingOption.ROADMAP,
+                    str(scratch / PlanDocument.ROADMAP.value),
+                    PlanSavingOption.READ_AT,
+                    self.read_at,
+                ),
+                cwd=project_root,
+                capture_output=True,
+                encoding="utf-8",
+            )
+        if saved.returncode != 0:
+            raise PlanSaveRefusedError(detail=saved.stderr.strip())

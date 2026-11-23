@@ -22,6 +22,13 @@ from basstler.code_rules.rule import CodeReference, Section
 from basstler.code_rules.text_file_usage import TextFileChecker
 from basstler.code_rules.tree_removal import TreeRemovalChecker
 from basstler.directory_tree import DirectoryTree
+from basstler.locations import BasstlerRepositoryLocation, PluginLocation, SkillLocation
+from basstler.playbook.contribution import (
+    ContributionEntryPointGroup,
+    PackageContribution,
+)
+from basstler.playbook.commands import SkillsCommand
+from basstler.playbook.skill import Skill
 from basstler.text_file import TextFile
 
 
@@ -46,8 +53,22 @@ class PackageAndPluginRules(Section):
         "`packages/<part>/src/` of the distribution that owns its subject, and its "
         "tests under that distribution's `packages/<part>/tests/`; helpers the tests "
         "of several distributions share live in `test_support/`. The plugin under "
-        "`plugin/` carries only its `SKILL.md` files, manifest and bash entry points, "
+        "`plugin/` carries only its skills' files, manifest and bash entry points, "
         "which call the installed package with `python -m basstler.<module>`"
+    )
+
+    CONTRIBUTE_THROUGH_THE_PLAYBOOK = (
+        "A distribution adds its command groups, skills, hooks, code rulesets and "
+        "setup steps to the default playbook through one "
+        f"{CodeReference(PackageContribution).path}, registered under the "
+        f"`{ContributionEntryPointGroup.CONTRIBUTIONS}` entry point group of its "
+        "`pyproject.toml`. "
+        f"`{(BasstlerRepositoryLocation.PLUGIN / PluginLocation.HOOK_REGISTRATIONS).as_posix()}` and "
+        f"the frontmatter and title of every skill's `{SkillLocation.INSTRUCTIONS.as_posix()}` "
+        f"are generated from the playbook: change a hook or a {CodeReference(Skill).path} "
+        f"class in its contribution and run `{SkillsCommand.BUILD.invocation}`, never "
+        "edit the generated parts; a skill's instructions below its title are written by "
+        "hand"
     )
 
     NAME_FILES_AND_VARIABLES_ONCE = (
@@ -68,7 +89,9 @@ class PackageAndPluginRules(Section):
         "A package imports only the basstler packages its pyproject lists: every "
         "module belongs to the distribution whose `packages/<part>` folder holds it, "
         "and imports only from that distribution and the ones its `pyproject.toml` "
-        f"lists, which {CodeReference(package_map).path} reads into layers",
+        f"lists, which {CodeReference(package_map).path} reads into layers; it imports "
+        "only the third-party libraries that `pyproject.toml` or a distribution it "
+        "lists requires, directly or through what those libraries require",
         (),
         PackageBoundaryChecker(),
     )

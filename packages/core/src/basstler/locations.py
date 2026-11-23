@@ -65,7 +65,7 @@ class ShippedPath(PathEnumeration):
     distribution ships the templates it renders.
     """
 
-    STACK_CONFIGURATION = Path("stack") / "stack.toml"
+    STACK_CONFIGURATION = Path("github") / "stack.toml"
     """
     The shipped stack configuration every run starts from, before a project's and a
     user's overrides.
@@ -81,22 +81,21 @@ class ShippedPath(PathEnumeration):
     The program a helper session runs without ``basstler``, so it imports nothing of it.
     """
 
+    PLAN_ITEM_MODE_DEFAULTS = Path("plan") / "plan-item-modes.toml"
+    """
+    The shipped plan-item execution modes.
+    """
+
+    GITHUB_REPOSITORY_MODULE = Path("github") / "repository.py"
+    """
+    The module whose :class:`basstler.github.repository.Repository` builds every
+    address within a repository.
+    """
 
     PULL_REQUEST_FILES = Path("review_triage") / "pull_request_files.graphql"
     """
     The GraphQL query reading one page of the files GitHub lists in a pull request,
     with its head commit.
-    """
-
-    GITHUB_REPOSITORY_MODULE = Path("github") / "repository.py"
-    """
-    The module whose :class:`basstler.github.repository.Repository` builds every address
-    within a repository.
-    """
-
-    PLAN_ITEM_MODE_DEFAULTS = Path("plan") / "plan-item-modes.toml"
-    """
-    The shipped plan-item execution modes.
     """
 
 
@@ -271,7 +270,7 @@ class PackageLocation(PathEnumeration):
 
     STACK_CONFIGURATION = INSTALLED_PACKAGE.shipped(ShippedPath.STACK_CONFIGURATION)
     """
-    :attr:`ShippedPath.STACK_CONFIGURATION`, where the stack distribution ships it.
+    :attr:`ShippedPath.STACK_CONFIGURATION`, where the github distribution ships it.
     """
 
     META_PACKAGE_METADATA = (
@@ -343,6 +342,12 @@ class RepositoryStateLocation(PathEnumeration):
     The personal-notes commit this clone last read plan state at.
 
     The shell configuration's ``PLAN_STATE_SYNC_STAMP`` spells the same name.
+    """
+
+    VIEWED_MARKING_STAMP = DIRECTORY / "viewed-marked-head"
+    """
+    The pull request the files were last marked viewed on, and the head commit they
+    were marked at.
     """
 
     PERSONAL_SETTINGS_SYNC_STAMP = DIRECTORY / "personal-settings-sync-hash"
@@ -469,6 +474,63 @@ class InstructionsTemplate(PathEnumeration):
     The content of ``AGENTS.md``: rules under the headings of their sections.
     """
 
+    SKILL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "skill.md.jinja")
+    """
+    The content of a skill's ``SKILL.md``: its frontmatter and title above its body.
+    """
+
+
+class PlanHandoverLocation(PathEnumeration):
+    """
+    The files a plan handover holds, relative to its directory.
+    """
+
+    GUIDE = Path("HANDOVER.md")
+    """
+    The instructions a coding agent continues the handed-over plans from without basstler.
+    """
+
+    PLANS = Path("plans")
+    """
+    One directory per plan, holding its documents as the notes branch does.
+    """
+
+    PULL_REQUEST_PROGRESS = Path("pr-progress")
+    """
+    The progress note of each handed-over item's branch, named after the branch.
+    """
+
+    REPOSITORY_RULES = Path("repository-rules.yaml")
+    """
+    The rules every plan of the repository follows, in the notes branch's format.
+    """
+
+    GUIDE_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "plan_handover_guide.md.jinja"
+    )
+    """
+    The template :attr:`GUIDE` is rendered from.
+    """
+
+    TAKEN_OVER_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "plan_handover_taken_over.md.jinja"
+    )
+    """
+    The template of the comment a handover pull request is closed with.
+    """
+
+    PULL_REQUEST_DIRECTORY = Path("plan-handover")
+    """
+    Where a handover pull request's commit holds the handover, relative to its root.
+    """
+
+    PULL_REQUEST_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "plan_handover_pull_request.md.jinja"
+    )
+    """
+    The template a handover pull request's description is rendered from.
+    """
+
 
 class ReviewTriageLocation(PathEnumeration):
     """
@@ -555,6 +617,11 @@ class PluginLocation(PathEnumeration):
     PERSONAL_NOTES_BRANCH_CREATION_SCRIPT = HOOKS / "create-personal-notes-branch.sh"
     """
     The helper that creates the personal-notes branch where it does not exist yet.
+    """
+
+    HOOK_REGISTRATIONS = HOOKS / "hooks.json"
+    """
+    The hooks the plugin registers with Claude Code, generated from the playbook.
     """
 
     ENTRY_POINT_SCRIPT = HOOKS / "basstler.sh"
@@ -669,6 +736,17 @@ class PluginSkillLocation(PathEnumeration):
     """
 
 
+class SkillLocation(PathEnumeration):
+    """
+    The files every skill carries, relative to the skill's own directory.
+    """
+
+    INSTRUCTIONS = Path("SKILL.md")
+    """
+    The instructions Claude Code loads the skill from.
+    """
+
+
 class ProjectLocation(PathEnumeration):
     """
     The files this package reads, runs or writes in a project, relative to its root.
@@ -697,6 +775,23 @@ class ProjectLocation(PathEnumeration):
     """
     The stack settings a project commits, naming its own upstream - layered over
     :attr:`PackageLocation.STACK_CONFIGURATION`.
+    """
+
+    GIT_IDENTITY = PERSONAL_NOTES / "git-identity"
+    """
+    The git identity of the notes repository's owner, which a clone with none of its
+    own is given.
+
+    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
+    CONTRIBUTOR_GIT_IDENTITIES = PERSONAL_NOTES / "git-identities"
+    """
+    The git identities of everyone else who shares the notes branch, one file per GitHub
+    login.
+
+    Mirrors ``CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY`` in
+    ``resolve-personal-notes-config.sh``.
     """
 
     PERSONAL_NOTES_DOCUMENT = PERSONAL_NOTES / "notes.md"
@@ -731,6 +826,14 @@ class ProjectLocation(PathEnumeration):
     The rules every plan of the repository follows, one entry per rule.
     """
 
+    PULL_REQUEST_PROGRESS = PERSONAL_NOTES / "pr-progress"
+    """
+    Where the personal-notes branch keeps each branch's progress note, named after the
+    branch.
+
+    Mirrors ``PR_PROGRESS_DIRECTORY`` in ``resolve-personal-notes-config.sh``.
+    """
+
     PERSONAL_STACK_CONFIGURATION = PERSONAL_NOTES / "stack.toml"
     """
     The per-user override of :attr:`PROJECT_STACK_CONFIGURATION`.
@@ -754,6 +857,11 @@ class ProjectLocation(PathEnumeration):
     AGENTS_INSTRUCTIONS = Path("AGENTS.md")
     """
     The instructions agents read, generated from :mod:`basstler.code_rules.rules`.
+    """
+
+    PLAYBOOK = Path("basstler_playbook.py")
+    """
+    The module declaring the project's own playbook, where it has one.
     """
 
 

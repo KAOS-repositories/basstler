@@ -23,6 +23,7 @@ from basstler.plan.exceptions import (
     DuplicateItemId,
     InvalidBlockers,
     InvalidDependsOn,
+    InvalidExternalDependencies,
     InvalidLandedItemCount,
     InvalidManifestRoot,
     InvalidSchemaVersion,
@@ -42,7 +43,7 @@ from basstler.plan.exceptions import (
     UnknownWave,
     ValidationProblem,
 )
-from basstler.plan.model import ItemStatus, ManifestKey
+from basstler.plan.model import ExternalDependency, ItemStatus, ManifestKey
 from basstler.plan.model_alias import ModelAlias
 
 # %% dependency cycles
@@ -455,6 +456,19 @@ class PlanValidator:
                 for entry in depends_on or []
                 if (problem := self.dependency_problem(item_identifier, entry))
                 is not None
+            )
+        external_dependencies = item.get(ManifestKey.EXTERNAL_DEPENDENCIES.key)
+        if external_dependencies is not None and not isinstance(
+            external_dependencies, list
+        ):
+            problems.append(
+                InvalidExternalDependencies(item_identifier, external_dependencies)
+            )
+        else:
+            problems.extend(
+                InvalidExternalDependencies(item_identifier, entry)
+                for entry in external_dependencies or []
+                if not ExternalDependency.is_readable(entry)
             )
         blockers = item.get(ManifestKey.BLOCKERS.key)
         if blockers is not None and not isinstance(blockers, list):

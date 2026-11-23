@@ -188,7 +188,7 @@ class CommandLineFinder(libcst.CSTVisitor):
         """
         Keep the command line *node* hands on when it starts bash by its name.
         """
-        captures = BashStarted.captures(node)
+        captures = BashStarted.captures(node, self.module.metadata)
         if captures is None:
             return
         command = libcst.ensure_type(

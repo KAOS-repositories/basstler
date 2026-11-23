@@ -1,11 +1,32 @@
 name: Windows tests
 
-# Runs the whole suite on a Windows runner for every pull request ready for review, since
-# what breaks only on Windows passes the Linux tests unnoticed. A draft and a push to main
-# run nothing here: a Windows runner costs twice the minutes of a Linux one.
+# Runs the whole suite on a Windows runner, since what breaks only on Windows passes the
+# Linux tests unnoticed. Every push to main runs it as a job of the tests, which the
+# release waits for. A pull request runs it only when it changes what Windows is known
+# to treat differently; the portability code rules cover the rest on Linux, and any
+# branch can be run here by hand. A Windows runner costs twice the minutes of a Linux one.
 on:
+  workflow_call:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/windows-tests.yml"
+      - ".gitattributes"
+      - "plugin/hooks/**"
+      - "pyproject.toml"
+      - "packages/core/src/basstler/bash.py"
+      - "packages/core/src/basstler/directory_tree.py"
+      - "packages/core/src/basstler/environment.py"
+      - "packages/git/src/basstler/git/**"
+      - "packages/core/src/basstler/locations.py"
+      - "packages/core/src/basstler/plugin_root.py"
+      - "packages/notes/src/basstler/setup/**"
+      - "packages/core/src/basstler/shell_configuration.py"
+      - "packages/basstler/tests/bash_path.py"
+      - "test_support/basstler_testing/fixtures.py"
+      - "test_support/basstler_testing/executable_stubs.py"
+      - "test_support/basstler_testing/suite_shard.py"
 
 concurrency:
   group: windows-tests-${{ github.ref }}
@@ -15,12 +36,22 @@ permissions:
   contents: read
 
 jobs:
+  # The suite is split into shards run at once, since one Windows runner takes over half
+  # an hour for it; each shard runs its share from the job's index and the job total.
   test:
-    name: pytest on Windows
+    name: pytest on Windows (shard ${{ matrix.shard }})
     if: "!github.event.pull_request.draft"
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
+      # Defender scans every file git and the tests write and every process they start.
+      - name: Stop scanning files as they are written
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
       # The tags give the installed package its release version, which the tests read.
       - uses: actions/checkout@v4
         with:
@@ -44,13 +75,28 @@ jobs:
       - name: Install the browser the page tests run in
         run: python -m playwright install chromium
 
+      # The runner's temporary directory is on its faster drive. Each distribution's tests
+      # run the shard's share; the plugin declaring the shard options comes from
+      # test_support, which is not installed.
       - name: Run each distribution's tests
         shell: bash
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          PYTHONPATH: test_support
         run: |
           failed=""
           for directory in packages/*/; do
             echo "::group::${directory}"
-            python -m pytest "${directory}tests" -n auto || failed="${failed} ${directory}"
+            status=0
+            python -m pytest "${directory}tests" -n auto --durations=20 \
+              -p basstler_testing.suite_shard \
+              --shard-index "$((${{ strategy.job-index }}))" \
+              --shard-count "$((${{ strategy.job-total }}))" || status=$?
+            # Status 5: this shard holds none of the distribution's tests.
+            if [ "${status}" -ne 0 ] && [ "${status}" -ne 5 ]; then
+              failed="${failed} ${directory}"
+            fi
             echo "::endgroup::"
           done
           if [ -n "${failed}" ]; then

@@ -8,7 +8,7 @@ from __future__ import annotations
 from basstler.code_rules.checker import CodeRulesCheck
 from basstler.code_rules.posix_path_text import PosixPathTextChecker
 
-from ..constants.paths import PosixPathTextSnippet
+from basstler_testing.constants.paths import PosixPathTextSnippet
 
 # %% text that is no path
 

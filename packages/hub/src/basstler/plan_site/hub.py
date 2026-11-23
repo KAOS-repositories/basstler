@@ -38,12 +38,15 @@ import yaml
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
-from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository import GitHubAddress, HasRepository, Repository
 from basstler.locations import ProjectLocation
 from basstler.plan.structure import Item
-from basstler.plan_site.exceptions import RegistryUnreadableError
+from basstler.plan_site.exceptions import (
+    PlansCheckoutFailedError,
+    RegistryUnreadableError,
+)
 from basstler.plan_site.workflows import PlanSiteSecret
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -311,20 +314,37 @@ class PlanHistory:
 
 
 @dataclass(frozen=True)
-class NotesBranch:
+class NotesBranch(HasRepository):
     """
     One listed repository's notes branch, fetched into a scratch repository.
-    """
-
-    repository: Repository
-    """
-    The repository the branch belongs to.
     """
 
     git: GitCommandRunner
     """
     Runs git in the scratch repository the branch was fetched into.
     """
+
+    @classproperty
+    def remote(cls) -> str:
+        """
+        The name a scratch repository gives the repository whose notes branch it
+        fetches.
+        """
+        return "origin"
+
+    @classproperty
+    def tip(cls) -> str:
+        """
+        The ref the fetched notes branch is read from.
+        """
+        return "FETCH_HEAD"
+
+    @classproperty
+    def prefetch_batch_size(cls) -> int:
+        """
+        How many file contents one request downloads, few enough for any command line.
+        """
+        return 200
 
     @classmethod
     def fetch(
@@ -333,7 +353,6 @@ class NotesBranch:
         branch: str,
         remote_root: str,
         scratch: Path,
-        remote: str = "origin",
     ) -> NotesBranch | None:
         """
         :param repository: The repository to fetch from.
@@ -341,16 +360,17 @@ class NotesBranch:
         :param remote_root: Where repositories are fetched from, as
             :meth:`Repository.clone_url_under` takes it.
         :param scratch: An empty directory of its own to fetch into.
-        :param remote: The name the scratch repository gives the repository.
         :return: The fetched branch, or ``None`` when it cannot be fetched.
         """
         scratch.mkdir(parents=True, exist_ok=True)
         git = GitCommandRunner(scratch)
         git.run("init", "--quiet")
-        git.run("remote", "add", remote, repository.clone_url_under(remote_root))
+        git.run("remote", "add", cls.remote, repository.clone_url_under(remote_root))
         # The whole history without old file contents dates each plan; checking a file
         # out downloads its content from the remote when it is needed.
-        fetched = git.attempt("fetch", "--quiet", "--filter=blob:none", remote, branch)
+        fetched = git.attempt(
+            "fetch", "--quiet", "--filter=blob:none", cls.remote, branch
+        )
         if not fetched.succeeded:
             logger.warning(
                 f"{repository}: cannot fetch {branch}: {fetched.error_output}; "
@@ -364,7 +384,7 @@ class NotesBranch:
         :param path: A file's path relative to the branch's root.
         :return: The file's content, or ``None`` when the branch has no such file.
         """
-        return self.git.file_at("FETCH_HEAD", path)
+        return self.git.file_at(self.tip, path)
 
     def history_of(self, plan_directory_name: str) -> PlanHistory | None:
         """
@@ -374,7 +394,7 @@ class NotesBranch:
         dates = self.git.run(
             "log",
             "--format=%cI",
-            "FETCH_HEAD",
+            self.tip,
             "--",
             (ProjectLocation.PLANS / plan_directory_name).as_posix(),
         ).splitlines()
@@ -386,16 +406,48 @@ class NotesBranch:
 
     def check_out_plans(self) -> Path:
         """
-        Write the branch's plans directory out as plain files.
+        Write the branch's plans directory out as plain files, downloading their
+        contents in a few requests first rather than one request a file.
 
+        :raises PlansCheckoutFailedError: If the plans cannot be written out.
         :return: The plans directory, empty when the branch has none.
         """
-        self.git.attempt(
-            "checkout", "FETCH_HEAD", "--", ProjectLocation.PLANS.as_posix()
-        )
+        plans = ProjectLocation.PLANS.as_posix()
+        contents = self.git.run(
+            "ls-tree", "-r", "--format=%(objectname)", self.tip, "--", plans
+        ).split()
+        if contents:
+            self.prefetch(contents)
+            checked_out = self.git.attempt("checkout", self.tip, "--", plans)
+            if not checked_out.succeeded:
+                raise PlansCheckoutFailedError(
+                    self.repository, checked_out.error_output
+                )
         plans_directory = self.git.working_directory / ProjectLocation.PLANS
         plans_directory.mkdir(parents=True, exist_ok=True)
         return plans_directory
+
+    def prefetch(self, contents: list[str]) -> None:
+        """
+        Download file contents the filtered fetch left out, a batch a request, leaving
+        the fetched branch's tip where it is. A batch that fails is left for the
+        checkout to download file by file.
+
+        :param contents: The object ids of the contents.
+        """
+        for start in range(0, len(contents), self.prefetch_batch_size):
+            self.git.attempt(
+                "-c",
+                "fetch.negotiationAlgorithm=noop",
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--no-write-fetch-head",
+                "--recurse-submodules=no",
+                "--filter=blob:none",
+                self.remote,
+                *contents[start : start + self.prefetch_batch_size],
+            )
 
 
 def main() -> int:

@@ -8,9 +8,14 @@ Usage:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from cyclopts import App
 
 from basstler.exit_codes import StackExitCode
+from basstler.git.commands import GitCommandRunner
+from basstler.github.basstler_project import BasstlerProject
+from basstler.github.release_version import PublishedReleases, ReleaseVersion
 from basstler.plan_site.build_start import recorded_site
 from basstler.plan_site.publication import clone_publication
 from basstler.standard_streams import StandardStreamHandler
@@ -31,14 +36,20 @@ The command, which takes no arguments.
 def refresh_merge_workflow() -> StackExitCode:
     """
     Print what is left to the user once the current merge workflow is proposed, and
-    nothing when the default branch holds it or no merge workflow, or no plan site lists
-    this repository.
+    nothing when the default branch holds it or no merge workflow, no plan site lists
+    this repository, or a newer release than this one is published, whose workflow a
+    proposal from this one would revert.
 
     :return: :attr:`StackExitCode.SUCCESS`, also when a step is left: the line printed
         is the answer.
     """
     site = recorded_site()
     if site is None:
+        return StackExitCode.SUCCESS
+    releases = PublishedReleases(
+        GitCommandRunner(Path.cwd()), BasstlerProject.repository.clone_url
+    )
+    if releases.is_ahead_of(ReleaseVersion.installed()):
         return StackExitCode.SUCCESS
     step = clone_publication(
         BasstlerSource.LATEST_RELEASE.value, site.repository.full_name

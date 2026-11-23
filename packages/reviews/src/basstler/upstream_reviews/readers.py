@@ -19,7 +19,7 @@ from basstler.github.pull_request_models import (
     UpstreamPullRequestSnapshot,
 )
 from basstler.github.query_documents import GraphQLDocument, QueryVariable
-from basstler.github.repository import Repository
+from basstler.github.repository import HasRepository, PullRequestReference, Repository
 from basstler.github.rest_models import (
     RestCheckRunPage,
     RestCombinedStatusPage,
@@ -171,7 +171,8 @@ class UpstreamPullRequestReader(PullRequestSource):
                         QueryVariable.NUMBER: pull_request_number,
                         QueryVariable.THREAD_CURSOR: cursor,
                     },
-                )
+                ),
+                HasRepository(self.upstream_repository),
             ).pull_request
             page = pull_request.review_threads
             threads.extend(page.threads)
@@ -182,14 +183,9 @@ class UpstreamPullRequestReader(PullRequestSource):
 
 
 @dataclass(frozen=True)
-class UpstreamRestRoute:
+class UpstreamRestRoute(HasRepository):
     """
     The REST paths reading one upstream repository's pull requests takes.
-    """
-
-    repository: Repository
-    """
-    The repository the paths are under.
     """
 
     @classproperty
@@ -320,12 +316,11 @@ class RestPullRequestReader(PullRequestSource):
             self.client.get(self.route.pull_request(pull_request_number))
         )
         return UpstreamPullRequestSnapshot(
-            number=pull_request.number,
+            reference=PullRequestReference(self.route.repository, pull_request.number),
             title=pull_request.title,
-            page_url=pull_request.page_url,
             reviews=self._reviews(pull_request_number),
             threads=self._threads(pull_request_number),
-            checks=self._checks(pull_request.head.object_hash),
+            checks=self._checks(pull_request.head.commit),
         )
 
     def _reviews(self, pull_request_number: int) -> list[Review]:

@@ -25,6 +25,7 @@ from basstler.exceptions import (
 )
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import NamespacePackage, WorkspaceLocation
+from basstler.text_file import TextFile
 
 # %% layers and distributions
 
@@ -127,6 +128,11 @@ class Distribution(StrEnum):
     The GitHub client and the models of GitHub's data.
     """
 
+    PACKAGING = "basstler-packaging", Layer.GITHUB
+    """
+    The model of a Python release and of the workflow that publishes it.
+    """
+
     REVIEWS = "basstler-reviews", Layer.COLLABORATION
     """
     Reading an upstream pull request's checks and review threads.
@@ -194,6 +200,12 @@ class DistributionDeclaration:
     The distributions it may import.
     """
 
+    libraries: tuple[str, ...] = ()
+    """
+    The names, as its ``pyproject.toml`` spells them, of the third-party libraries it
+    requires itself.
+    """
+
     @classmethod
     def read(cls, directory: Path) -> DistributionDeclaration:
         """
@@ -204,7 +216,7 @@ class DistributionDeclaration:
         """
         metadata = DistributionMetadata.from_json(
             tomllib.loads(
-                (directory / WorkspaceLocation.METADATA).read_text(encoding="utf-8")
+                TextFile((directory / WorkspaceLocation.METADATA)).read()
             )
         )
         distribution = Distribution(metadata.project.name)
@@ -225,6 +237,7 @@ class DistributionDeclaration:
                 for name in metadata.requirement_names
                 if name in names
             ),
+            tuple(name for name in metadata.requirement_names if name not in names),
         )
 
     def claim_length(self, module: str) -> int:
@@ -310,6 +323,22 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
                 graph.add_edge(nodes[declaration.distribution], nodes[dependency], None)
         return graph
 
+    def libraries_required_by_distribution(
+        self, distribution: Distribution
+    ) -> frozenset[str]:
+        """
+        :param distribution: A declared distribution.
+        :return: The third-party libraries it requires itself, and those of every
+            distribution it lists, as their ``pyproject.toml`` files spell them.
+        """
+        declaration = self[distribution]
+        return frozenset(declaration.libraries).union(
+            *(
+                self.libraries_required_by_distribution(dependency)
+                for dependency in declaration.dependencies
+            )
+        )
+
     def claiming(self, module: str) -> DistributionDeclaration | None:
         """
         :param module: A module's dotted name within ``basstler``.
@@ -337,6 +366,12 @@ The distribution name a requirement specifier starts with.
 class SiblingPinsSettings(ValidatedJSONModel):
     """
     The settings of the hatch hook pinning a distribution's basstler requirements.
+    """
+
+    family: str = ""
+    """
+    The name of the family of distributions whose requirements are pinned, empty for a
+    distribution without the hook.
     """
 
     dependencies: tuple[str, ...] = ()
@@ -461,7 +496,7 @@ class Workspace:
             sorted(
                 metadata.parent
                 for metadata in (self.root / WorkspaceLocation.PACKAGES).glob(
-                    f"*/{WorkspaceLocation.METADATA}"
+                    f"*/{WorkspaceLocation.METADATA.as_posix()}"
                 )
             )
         )

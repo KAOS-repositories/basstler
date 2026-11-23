@@ -153,3 +153,12 @@ jobs:
             echo "Tests failed for:${failed}" >> "${GITHUB_STEP_SUMMARY}"
             exit 1
           fi
+
+  # A push to main runs the suite on Windows too, so the release never tags a commit that
+  # fails there; a pull request runs it in its own workflow, for the files it names.
+  windows:
+    name: Windows
+    if: >-
+      (github.event_name != 'push' || !github.event.repository.fork) &&
+      github.event_name == 'push'
+    uses: ./.github/workflows/windows-tests.yml

@@ -20,7 +20,7 @@ from cyclopts import App
 
 from basstler.class_property import classproperty
 from basstler.exit_codes import StackExitCode
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import BuiltInTool
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
 from basstler.plan_site.attach_approval import AllowedAttach, AttachAnswer
@@ -31,7 +31,7 @@ from basstler.plugin_root import PluginRoot
 
 class ShellArguments(ValidatedJSONModel):
     """
-    The command a call of :attr:`SessionTool.RUN_SHELL_COMMAND` runs.
+    The command a call of :attr:`BuiltInTool.RUN_SHELL_COMMAND` runs.
     """
 
     command: str
@@ -52,7 +52,7 @@ class ShellCall(ValidatedJSONModel):
 
     tool_input: ShellArguments
     """
-    The tool's arguments, read as those of :attr:`SessionTool.RUN_SHELL_COMMAND`.
+    The tool's arguments, read as those of :attr:`BuiltInTool.RUN_SHELL_COMMAND`.
     """
 
 
@@ -62,9 +62,9 @@ class ShellCall(ValidatedJSONModel):
 @dataclass(frozen=True)
 class EntryPointInvocation:
     """
-    A command line that runs this plugin's entry point script alone, whether it names the
-    plugin root through a variable or by its path, with arguments the shell leaves as
-    they are.
+    A command line that runs this plugin's entry point script alone, whether it names
+    the plugin root through a variable or by its path, with arguments the shell leaves
+    as they are.
     """
 
     plugin_root: PluginRoot
@@ -99,10 +99,11 @@ class EntryPointInvocation:
     @classproperty
     def plugin_root_path(cls) -> str:
         """
-        The plugin root once expanded, a plain path with nothing the shell would
-        interpret, as a pattern whose group is that path.
+        The plugin root once expanded, a plain absolute path with nothing the shell
+        would interpret, below ``/`` or a Windows drive, as a pattern whose group is
+        that path.
         """
-        return r"(?P<expanded_root>/[^\s\"'`$;&|<>()\\]+)"
+        return r"(?P<expanded_root>(?:[A-Za-z]:)?/[^\s\"'`$;&|<>()\\]+)"
 
     @classproperty
     def arguments(cls) -> str:
@@ -141,7 +142,7 @@ class EntryPointInvocation:
         :return: The answer allowing it when it is this invocation, ``None`` to leave
             the decision to the normal permission flow.
         """
-        if call.tool_name != SessionTool.RUN_SHELL_COMMAND:
+        if call.tool_name != BuiltInTool.RUN_SHELL_COMMAND:
             return None
         if not self.matches(call.tool_input.command):
             return None
@@ -159,8 +160,8 @@ The command, which reads the hook input from standard input.
 @app.default
 def answer_hook() -> StackExitCode:
     """
-    Print the answer allowing the command on standard output, and nothing when it is
-    not the entry point.
+    Print the answer allowing the command on standard output, and nothing when it is not
+    the entry point.
 
     :return: :attr:`StackExitCode.SUCCESS`, also when nothing is printed.
     """

@@ -17,18 +17,19 @@ import basstler.setup.steps
 from basstler.github.repository import Repository
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import PluginLocation
+from basstler.playbook.playbook import DefaultPlaybook
+from basstler.playbook.setup_steps import RepositoryCheckout, SetupChecklist
 from basstler.setup.steps import (
     ForkActions,
     ForkLabels,
+    ForkSetupSteps,
     Host,
     PersistentVariables,
-    PersonalNotesSetting,
     RepositoryAccess,
-    SetupChecklist,
     SetupLink,
-    git_value,
     resolve_repository,
 )
+from basstler.shell_configuration import PersonalNotesSetting
 
 from basstler_testing.constants.environment import ScrubbedEnvironmentPrefix
 from basstler_testing.constants.paths import RepositoryLocation
@@ -146,31 +147,6 @@ def test_a_clone_with_no_github_remote_resolves_no_repository(
     Nothing is invented when the clone names no GitHub repository.
     """
     assert resolve_repository(scratch_repository.project_root, "origin") is None
-
-
-# %% reading a value out of the clone
-
-
-def test_a_value_git_cannot_answer_is_reported_rather_than_raised(
-    scratch_repository: ScratchRepository,
-) -> None:
-    """
-    Both callers fall through to something else when git has no answer, so an unset key
-    and an unknown remote have to come back as nothing at all.
-    """
-    root = scratch_repository.project_root
-    assert git_value(root, "config", "--get", "claude.notSet") is None
-    assert git_value(root, "remote", "get-url", "no-such-remote") is None
-
-
-def test_a_value_git_does_answer_comes_back_trimmed(
-    clone_with_fork_remote: ScratchRepository,
-) -> None:
-    """
-    The answer is the value itself, without the newline git writes after it.
-    """
-    root = clone_with_fork_remote.project_root
-    assert git_value(root, "remote", "get-url", "origin") == FORK_REMOTE_URL
 
 
 # %% the labels step
@@ -332,41 +308,6 @@ def test_a_value_with_nothing_to_escape_is_left_bare(
     )
 
 
-def test_git_config_outranks_the_environment(
-    scratch_repository: ScratchRepository,
-) -> None:
-    """
-    The precedence the hooks apply - git config, then environment, then default.
-    """
-    scratch_repository.run_git(
-        "config", PersonalNotesSetting.PATH.git_config_key, "configured/notes.md"
-    )
-    resolved = PersonalNotesSetting.PATH.resolve(
-        scratch_repository.project_root,
-        {PersonalNotesSetting.PATH.environment_variable: "environment/notes.md"},
-    )
-    assert resolved == "configured/notes.md"
-
-
-def test_the_settings_are_the_ones_the_hooks_resolve() -> None:
-    """
-    Every key, variable and default named here is named by resolve-personal-notes-
-    config.sh, which is what the hooks themselves read.
-    """
-    configuration = RESOLVE_CONFIG_SCRIPT.read_text(encoding="utf-8")
-    missing = [
-        value
-        for setting in PersonalNotesSetting
-        for value in (
-            setting.git_config_key,
-            setting.environment_variable,
-            setting.default,
-        )
-        if value not in configuration
-    ]
-    assert missing == []
-
-
 # %% the list as a whole
 
 
@@ -382,8 +323,10 @@ def test_a_resolvable_fork_gets_every_step(
     """
     All three steps are printed, with the two repository-specific ones first.
     """
-    checklist = SetupChecklist.for_clone(clone_with_fork_remote.project_root, {})
-    assert checklist.steps == (
+    steps = ForkSetupSteps().steps_for_repository_checkout(
+        RepositoryCheckout(clone_with_fork_remote.project_root, {})
+    )
+    assert steps == (
         ForkLabels(FORK),
         RepositoryAccess(FORK),
         ForkActions(FORK),
@@ -398,8 +341,10 @@ def test_the_repository_steps_are_dropped_when_no_fork_resolves(
     A clone naming no GitHub repository is given the step that still applies to it,
     rather than steps addressed to a repository nobody could name.
     """
-    checklist = SetupChecklist.for_clone(scratch_repository.project_root, {})
-    assert checklist.steps == (PersistentVariables(variable_lines=()),)
+    steps = ForkSetupSteps().steps_for_repository_checkout(
+        RepositoryCheckout(scratch_repository.project_root, {})
+    )
+    assert steps == (PersistentVariables(variable_lines=()),)
 
 
 def test_running_the_module_prints_the_steps_for_its_own_clone(
@@ -418,5 +363,7 @@ def test_running_the_module_prints_the_steps_for_its_own_clone(
         module_name=SETUP_STEPS_MODULE,
     ).run()
     assert result.returncode == 0, result.stderr
-    expected = SetupChecklist.for_clone(clone_with_fork_remote.project_root, {})
+    expected = SetupChecklist.from_repository_checkout(
+        DefaultPlaybook(), RepositoryCheckout(clone_with_fork_remote.project_root, {})
+    )
     assert result.stdout == expected.render() + "\n"

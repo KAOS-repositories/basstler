@@ -4,7 +4,7 @@ description: Run one maintenance pass over a fork's stacked pull requests, or ov
 allowed-tools: Bash, Read, Write, AskUserQuestion, mcp__github__update_pull_request
 ---
 
-# Stacked-PR maintenance
+# Stacked PR maintenance
 
 Run commands as [`running-commands.md`](../running-commands.md) says, with
 `${CLAUDE_PLUGIN_ROOT}` as the `${BASSTLER_PLUGIN_ROOT}` it and every linked document name.

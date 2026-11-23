@@ -137,6 +137,11 @@ class ConfigurationVariable(StrEnum):
     The ref the personal-notes branch is fetched into.
     """
 
+    PULL_REQUEST_PROGRESS_DIRECTORY = "PR_PROGRESS_DIRECTORY"
+    """
+    The notes branch's directory of progress notes.
+    """
+
 
 class SearchPathVariable(EnvironmentVariable):
     """
@@ -179,6 +184,17 @@ class InterpreterName(StrEnum):
     """
     The name the shell configuration falls back to before the package environment
     exists, which a Windows virtual environment does not provide.
+    """
+
+
+class InterpreterVariable(StrEnum):
+    """
+    Variables the Python interpreter reads when it starts.
+    """
+
+    HASH_SEED = "PYTHONHASHSEED"
+    """
+    The seed the interpreter hashes strings with.
     """
 
 

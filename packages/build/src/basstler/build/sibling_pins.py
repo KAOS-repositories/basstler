@@ -11,8 +11,9 @@ from hatchling.metadata.plugin.interface import MetadataHookInterface
 from hatchling.plugin import hookimpl
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
-from packaging.utils import canonicalize_name
 from packaging.version import Version
+
+from basstler.build.distribution_family import DistributionFamily
 
 # %% the hook
 
@@ -20,21 +21,20 @@ from packaging.version import Version
 class SiblingPinsHook(MetadataHookInterface):
     """
     Sets the distribution's dependencies to the hook's ``dependencies`` setting, each
-    requirement of a basstler distribution pinned to the version being built.
+    requirement of a distribution of the hook's ``family`` pinned to the version being
+    built.
 
     A distribution lists the hook as ``[tool.hatch.metadata.hooks.basstler-sibling-pins]``
     and names ``dependencies`` in ``project.dynamic``.
+
+    .. warning::
+        Every published source distribution builds with the newest release of this hook:
+        never remove or rename a setting, and give every new one a default.
     """
 
     PLUGIN_NAME = "basstler-sibling-pins"
     """
     The name a ``pyproject.toml`` configures the hook under.
-    """
-
-    family = "basstler"
-    """
-    The distribution whose name, alone or followed by a hyphen and a part, names a
-    sibling.
     """
 
     def update(self, metadata: dict[str, Any]) -> None:
@@ -43,20 +43,23 @@ class SiblingPinsHook(MetadataHookInterface):
             ``dependencies`` are replaced.
         """
         version = Version(metadata["version"])
+        family = DistributionFamily(self.config["family"])
         metadata["dependencies"] = [
-            str(self.pinned(Requirement(specifier), version))
+            str(self.pinned(Requirement(specifier), family, version))
             for specifier in self.config.get("dependencies", [])
         ]
 
-    def pinned(self, requirement: Requirement, version: Version) -> Requirement:
+    def pinned(
+        self, requirement: Requirement, family: DistributionFamily, version: Version
+    ) -> Requirement:
         """
         :param requirement: One requirement of the distribution.
+        :param family: The family whose distributions are pinned.
         :param version: The version being built.
         :return: *requirement*, its markers and extras kept, pinned to *version* when it
             names a sibling; else *requirement* itself.
         """
-        name = canonicalize_name(requirement.name)
-        if name != self.family and not name.startswith(f"{self.family}-"):
+        if not family.includes_distribution(requirement.name):
             return requirement
         pinned = Requirement(str(requirement))
         pinned.specifier = SpecifierSet(f"=={version}")

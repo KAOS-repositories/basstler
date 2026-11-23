@@ -13,6 +13,7 @@ from basstler.git.branch import Branch
 from basstler.github.exceptions import BasstlerSourceUnknown
 from basstler.github.repository import Repository
 from basstler.locations import PackageLocation
+from basstler.package_map import Distribution
 
 # %% the package metadata
 
@@ -49,18 +50,18 @@ class BasstlerProject:
         The repository basstler is developed in, whose reusable workflows users' callers
         run.
         """
-        return cls._source_repository(cls.name)
+        return cls._source_repository(Distribution.GITHUB)
 
     @classproperty
-    def default_branch(cls) -> Branch:
+    def default_branch(cls) -> Branch[Repository]:
         """
         The branch of :attr:`repository` that holds what is developed next.
         """
-        return Branch("main")
+        return Branch(cls.repository, "main")
 
     @staticmethod
     @functools.cache
-    def _source_repository(distribution: str) -> Repository:
+    def _source_repository(distribution: Distribution) -> Repository:
         """
         :param distribution: The installed distribution whose metadata is read.
         :return: The repository its ``Project-URL`` labels as the source.

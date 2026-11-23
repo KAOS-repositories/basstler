@@ -234,6 +234,12 @@ pr_progress_path() {
 # with the same tool that reads it means the two can never disagree.
 PERSONAL_GIT_IDENTITY_PATH=".claude/personal/git-identity"
 
+# CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY: where everyone but the notes repository's
+# owner records their identity, one file per GitHub login, so colleagues sharing a
+# notes branch each author as themselves. Mirrors ProjectLocation in
+# basstler.locations; git_identity_path picks the file that applies.
+CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY=".claude/personal/git-identities"
+
 # format_git_identity: prints a name and email in the one form every message
 # about an identity uses, so the same pair can't be rendered two ways in two
 # different reports.
@@ -281,20 +287,36 @@ repository_local_git_identity() {
 # above: "nothing is recorded yet" and "what is recorded cannot be used" are
 # different answers needing different advice, and a single failing lookup
 # collapses them into one.
+#
+# Both read the file at $1, default git_identity_path's answer.
 recorded_git_identity_exists() {
-  git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${PERSONAL_GIT_IDENTITY_PATH}" 2>/dev/null
+  local identity_path="${1:-$(git_identity_path)}"
+  git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${identity_path}" 2>/dev/null
 }
 
 recorded_git_identity() {
-  recorded_git_identity_exists || return 1
+  local identity_path="${1:-$(git_identity_path)}"
+  recorded_git_identity_exists "${identity_path}" || return 1
   local identity_file name email
   identity_file="$(mktemp)"
-  git show "${PERSONAL_NOTES_REFERENCE}:${PERSONAL_GIT_IDENTITY_PATH}" > "${identity_file}"
+  git show "${PERSONAL_NOTES_REFERENCE}:${identity_path}" > "${identity_file}"
   name="$(git config --file "${identity_file}" --get user.name || true)"
   email="$(git config --file "${identity_file}" --get user.email || true)"
   rm -f "${identity_file}"
   [ -n "${name}" ] && [ -n "${email}" ] || return 1
   printf '%s\t%s\n' "${name}" "${email}"
+}
+
+# git_identity_path: prints where the notes branch records the identity of the
+# account this session works as - PERSONAL_GIT_IDENTITY_PATH for the notes
+# repository's owner, a file below CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY for anyone
+# else (see basstler.personal_notes.git_identity). The owner's path when the
+# package cannot run or GitHub does not say who the session is.
+git_identity_path() {
+  local identity_path
+  identity_path="$("${BASSTLER_PYTHON}" -m "${GIT_IDENTITY_MODULE}" 2>/dev/null)" \
+    || identity_path=""
+  printf '%s\n' "${identity_path:-${PERSONAL_GIT_IDENTITY_PATH}}"
 }
 
 # PLANS_DIR / PLAN_MANIFEST_FILENAME / PLAN_ROADMAP_FILENAME: the one,
@@ -385,6 +407,9 @@ PLAN_SITE_MERGE_WORKFLOW_REFRESH_MODULE="basstler.plan_site.merge_workflow_refre
 # basstler.personal_notes.access: in a cloud session, prints how to attach a notes
 # repository other than the checkout's own when the session cannot reach it.
 NOTES_ACCESS_MODULE="basstler.personal_notes.access"
+# basstler.personal_notes.git_identity: prints where the notes branch records the
+# git identity of the account this session works as.
+GIT_IDENTITY_MODULE="basstler.personal_notes.git_identity"
 # basstler.plan.item_brief: prints one plan item's brief - the plan header, the item,
 # its dependencies' live readiness and the plan's standing rules.
 ITEM_BRIEF_MODULE="basstler.plan.item_brief"
@@ -1211,21 +1236,38 @@ install_uv() {
     "${BASSTLER_UV_DIRECTORY}" uv 2>&1)"
 }
 
-# install_basstler_into_environment: runs basstler_install_command's sync,
-# cloning the plugin's release first outside a checkout, leaving the installer's
-# own output (both streams) in BASSTLER_INSTALL_OUTPUT for a caller to report,
-# and returning its exit status. On success, records the source it installed
-# from.
+# install_basstler_from_pypi: installs the plugin's release from PyPI into the
+# environment and succeeds only once the package runs there, leaving uv's output
+# in BASSTLER_INSTALL_OUTPUT. Fails at once in a checkout, whose package is the
+# checkout's own, and where the plugin names no release.
+install_basstler_from_pypi() {
+  [ -z "${BASSTLER_CHECKOUT}" ] || return 1
+  local release uv
+  release="$(plugin_release)" || return 1
+  uv="$(available_uv)" || return 1
+  BASSTLER_INSTALL_OUTPUT="$("${uv}" pip install --python \
+    "${BASSTLER_ENVIRONMENT_INTERPRETER}" "basstler==${release#v}" 2>&1)" || return
+  "${BASSTLER_ENVIRONMENT_INTERPRETER}" -m basstler --help > /dev/null 2>&1
+}
+
+# install_basstler_into_environment: installs the package into its environment,
+# from PyPI at the plugin's release where that works, else with
+# basstler_install_command's sync, cloning the plugin's release first outside a
+# checkout. Leaves the installer's own output (both streams) in
+# BASSTLER_INSTALL_OUTPUT for a caller to report, and returns its exit status.
+# On success, records the source it installed from.
 install_basstler_into_environment() {
   local source
   source="$(basstler_package_source)"
   basstler_install_command || return 1
   if ! available_uv > /dev/null; then
-    BASSTLER_INSTALL_OUTPUT="no uv to install the package's lock with"
+    BASSTLER_INSTALL_OUTPUT="no uv to install the package with"
     return 1
   fi
-  clone_basstler_release || return
-  BASSTLER_INSTALL_OUTPUT="$("${BASSTLER_INSTALL_COMMAND[@]}" 2>&1)" || return
+  if ! install_basstler_from_pypi; then
+    clone_basstler_release || return
+    BASSTLER_INSTALL_OUTPUT="$("${BASSTLER_INSTALL_COMMAND[@]}" 2>&1)" || return
+  fi
   printf '%s\n' "${source}" > "${BASSTLER_INSTALLED_SOURCE_FILE}"
   plugin_content_digest > "${BASSTLER_INSTALLED_PLUGIN_DIGEST_FILE}"
 }

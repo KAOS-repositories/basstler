@@ -8,7 +8,7 @@ from http import HTTPStatus
 
 import pytest
 
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.locations import WorkflowLocation
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.repository import PullRequestReference, Repository
@@ -47,9 +47,9 @@ REQUEST = MarkViewedRequest(FORK, PullRequestReference(SAMPLE_REPOSITORY, 7))
 A request for the fork's workflow to mark a pull request of the sample repository.
 """
 
-DEFAULT_BRANCH = RepositoryDetails.from_json(
-    WORKFLOW_REPOSITORY_DETAILS
-).default_branch.name
+DEFAULT_BRANCH = (
+    RepositoryDetailsRead(FORK).parse(WORKFLOW_REPOSITORY_DETAILS).default_branch.name
+)
 """
 The branch the stand-in workflow repository reports as its default.
 """

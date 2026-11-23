@@ -7,12 +7,9 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-import pytest
-from pydantic import ValidationError
 
 from basstler.github.actions_settings import (
     ActionsEnabling,
-    ActionsSecretRead,
     ActionsPermissions,
     ActionsPermissionsRead,
     WorkflowDetails,
@@ -21,7 +18,6 @@ from basstler.github.actions_settings import (
 from basstler.github.repository import Repository
 from basstler.github.user_steps import AllowActions, EnableWorkflow
 from basstler.locations import WorkflowLocation
-from basstler.review_triage.viewed_request import ReviewTriageSecret
 
 from basstler_testing.github.path_answering_client import PathAnsweringClient
 
@@ -48,22 +44,6 @@ def test_a_refused_read_parses_nothing_and_keeps_github_s_refusal():
         None,
         HTTPStatus.FORBIDDEN,
     )
-
-
-def test_a_secret_read_gives_the_secret_it_asked_for():
-    secret = ReviewTriageSecret.VIEWER_TOKEN
-    client = PathAnsweringClient({secret.path_on(REPOSITORY): {"name": secret.value}})
-    reading = ActionsSecretRead(REPOSITORY, secret).attempt(client)
-    assert reading.resource.secret is secret
-
-
-def test_a_secret_read_refuses_a_name_of_another_kind():
-    secret = ReviewTriageSecret.VIEWER_TOKEN
-    client = PathAnsweringClient(
-        {secret.path_on(REPOSITORY): {"name": f"NOT_{secret.value}"}}
-    )
-    with pytest.raises(ValidationError):
-        ActionsSecretRead(REPOSITORY, secret).attempt(client)
 
 
 # %% writing a resource

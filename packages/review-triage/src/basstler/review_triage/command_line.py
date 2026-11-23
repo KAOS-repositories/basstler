@@ -201,7 +201,7 @@ The options choosing the commit a triage starts from, at most one of them given.
 """
 
 review_triage_app = App(
-    name=ReviewTriageCommand.GROUP,
+    name=ReviewTriageCommand.group,
     help="Tell a pull request's mechanical files from those a reviewer has to read.",
 )
 """
@@ -384,7 +384,6 @@ def set_up_mark_viewed(
     workflow_repository: str | None = None,
     repository: str | None = None,
     branch_or_tag: str = BasstlerProject.default_branch.name,
-    on_every_pull_request: bool = False,
 ) -> ReviewTriageExitCode:
     """
     Set a repository's Actions up to mark files viewed, as far as a command can, and
@@ -395,18 +394,13 @@ def set_up_mark_viewed(
     :param repository: The repository the pull requests are opened on; the workflow
         repository's parent, or itself, by default.
     :param branch_or_tag: The basstler branch or tag the installed workflow runs.
-    :param on_every_pull_request: Also run it for every pull request opened or updated
-        on the workflow repository, which then defaults to the pull requests'.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     git = GitCommandRunner(Path.cwd())
-    if on_every_pull_request and workflow_repository is None:
-        workflow_repository = repository
     setup = MarkViewedSetup(
         Repository.from_name_or_remote(workflow_repository, git),
         Repository.parse(repository) if repository else None,
         branch_or_tag,
-        on_every_pull_request,
     )
     logger.info(setup.run(GitHubRestClient()))
     return ReviewTriageExitCode.SUCCESS

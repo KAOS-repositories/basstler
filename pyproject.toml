@@ -12,6 +12,7 @@ basstler-core = { workspace = true }
 basstler-git = { workspace = true }
 basstler-rules = { workspace = true }
 basstler-github = { workspace = true }
+basstler-packaging = { workspace = true }
 basstler-reviews = { workspace = true }
 basstler-review-triage = { workspace = true }
 basstler-stack = { workspace = true }

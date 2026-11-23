@@ -8,10 +8,10 @@ from __future__ import annotations
 from dataclasses import replace
 from urllib.parse import parse_qs, urlsplit
 
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.actions_secret import ActionsSecret
 from basstler.github.token_form import (
     FineGrainedTokenForm,
-    PermissionLevel,
     RepositoryPermission,
     SharedToken,
     StoredSecret,
@@ -128,8 +128,8 @@ def test_the_joined_token_reaches_each_job_s_repository_once():
 def test_the_joined_token_is_stored_as_every_job_s_secret():
     token = SharedToken.from_requested_use("a token", BUILD, (REVIEW,))
     assert token.secrets == [
-        StoredSecret(BUILD.secret, NOTES),
-        StoredSecret(REVIEW.secret, NOTES),
+        StoredSecret(repository=NOTES, secret=BUILD.secret),
+        StoredSecret(repository=NOTES, secret=REVIEW.secret),
     ]
 
 

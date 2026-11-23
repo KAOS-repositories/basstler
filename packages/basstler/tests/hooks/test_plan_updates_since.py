@@ -26,7 +26,6 @@ from basstler.plan.updates_since_support import (
     PlanUpdatesSinceOption,
     no_default_repository_message,
 )
-
 from basstler_testing.constants.environment import (
     ScrubbedEnvironmentPrefix,
     SearchPathVariable,
@@ -34,6 +33,7 @@ from basstler_testing.constants.environment import (
 from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.executable_stubs import (
+    NEEDS_STUB_AHEAD_OF_GIT_TOOLS,
     ExecutableStubDirectory,
     path_hiding_executables,
 )
@@ -389,6 +389,7 @@ def test_prints_tracking_issue_comments_via_the_gh_backend(
     assert "since=" in logged_call
 
 
+@NEEDS_STUB_AHEAD_OF_GIT_TOOLS
 def test_prints_tracking_issue_comments_via_the_curl_fallback(
     scratch_repo: ScratchRepository, stub_bin: ExecutableStubDirectory, tmp_path: Path
 ):

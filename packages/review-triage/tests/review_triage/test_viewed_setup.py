@@ -6,10 +6,13 @@ from __future__ import annotations
 
 import base64
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 import pytest
 
+from basstler.github.actions_secret import ActionsSecret
+from basstler.github.permission_level import PermissionLevel
 from basstler.git.branch import Branch
 from basstler.github.actions_settings import (
     ActionsEnabling,
@@ -23,10 +26,10 @@ from basstler.github.client import (
 from basstler.github.file_proposal import FileWrite, NewBranch
 from basstler.github.fork_sync import ForkFastForward
 from basstler.github.pull_request import NewPullRequest
-from basstler.github.repository import Repository, RepositoryBranch
-from basstler.github.repository_details import RepositoryDetails
+from basstler.github.repository import Repository
+from basstler.github.repository_details import RepositoryDetailsRead
+from basstler.github.workflows import TriggerEvent, Workflow
 from basstler.github.token_form import (
-    PermissionLevel,
     RepositoryPermission,
     TokenUse,
 )
@@ -44,14 +47,17 @@ from basstler.review_triage.viewed_setup import (
     ProposalBranch,
     SetupState,
 )
-from basstler.plan_site.workflows import PlanSiteSecret
 
 from basstler_testing.constants.paths import RepositoryLocation
 from basstler_testing.github.path_answering_client import PathAnsweringClient
 from .conftest import WORKFLOW_REPOSITORY_DETAILS
-from basstler.text_file import TextFile
 
 # %% a stand-in for GitHub
+
+ANOTHER_RELEASE = "v1.0.0"
+"""
+A basstler release other than the default the setup installs the workflow at.
+"""
 
 FORK = Repository("a-reviewer", "project")
 """
@@ -63,14 +69,14 @@ UPSTREAM = Repository("an-organisation", "project")
 The repository the fork was made from, where the pull requests are opened.
 """
 
-STAND_IN_DEFAULT_BRANCH = RepositoryDetails.from_json(
-    WORKFLOW_REPOSITORY_DETAILS
-).default_branch
+STAND_IN_DEFAULT_BRANCH = (
+    RepositoryDetailsRead(FORK).parse(WORKFLOW_REPOSITORY_DETAILS).default_branch
+)
 """
 The default branch of every stand-in repository.
 """
 
-WORKFLOW_PROPOSAL_BRANCH = Branch(ProposalBranch.MARK_VIEWED)
+WORKFLOW_PROPOSAL_BRANCH = Branch(FORK, ProposalBranch.MARK_VIEWED)
 """
 The branch the setup proposes the workflow on.
 """
@@ -189,7 +195,9 @@ def fork_proposal_answers(**overrides: Any) -> PathAnsweringClient:
     """
     client = answers(**({"WORKFLOW_FILE": None, "WORKFLOW": None} | overrides))
     setup = MarkViewedSetup(FORK)
-    proposal = setup.workflow_proposal(RepositoryDetails.from_json(fork_details()))
+    proposal = setup.workflow_proposal(
+        RepositoryDetailsRead(FORK).parse(fork_details())
+    )
     client.answers[proposal.open_pull_requests_path] = []
     client.answers[proposal.open_from_branch_path] = []
     client.answers[UPSTREAM.branch_reference_path(STAND_IN_DEFAULT_BRANCH)] = (
@@ -216,11 +224,13 @@ def test_a_fork_s_workflow_is_proposed_to_its_parent_from_a_fork_branch():
     client = fork_proposal_answers()
     setup = MarkViewedSetup(FORK)
     setup.run(client)
-    proposal = setup.workflow_proposal(RepositoryDetails.from_json(fork_details()))
+    proposal = setup.workflow_proposal(
+        RepositoryDetailsRead(FORK).parse(fork_details())
+    )
     assert sent_of(client, NewPullRequest) == [
         NewPullRequest(
-            base=RepositoryBranch(STAND_IN_DEFAULT_BRANCH.name, UPSTREAM),
-            head=RepositoryBranch(WORKFLOW_PROPOSAL_BRANCH.name, FORK),
+            base=Branch(UPSTREAM, STAND_IN_DEFAULT_BRANCH.name),
+            head=Branch(FORK, WORKFLOW_PROPOSAL_BRANCH.name),
             title=proposal.commit.message,
             body=proposal.description,
             draft=False,
@@ -234,8 +244,8 @@ def test_a_fork_s_proposal_branch_starts_at_its_parent_s_default_branch():
     assert sent_of(client, NewBranch) == [
         NewBranch(
             repository=FORK,
-            object_hash=BASE_COMMIT,
-            name=WORKFLOW_PROPOSAL_BRANCH.name,
+            branch=WORKFLOW_PROPOSAL_BRANCH,
+            start_commit=BASE_COMMIT,
         )
     ]
 
@@ -293,7 +303,7 @@ def test_a_fork_holding_another_version_gets_it_proposed_not_replaced():
     client = fork_proposal_answers(
         WORKFLOW_FILE=installed_workflow(MarkViewedSetup(FORK)), WORKFLOW=None
     )
-    setup = MarkViewedSetup(FORK, on_every_pull_request=True)
+    setup = MarkViewedSetup(FORK, branch_or_tag=ANOTHER_RELEASE)
     setup.run(client)
     assert [
         (write.branch.name, write.text) for write in sent_of(client, FileWrite)
@@ -316,7 +326,7 @@ def unforked_answers(**overrides: Any) -> PathAnsweringClient:
     :return: A repository that is no fork, lacking the workflow and any proposal of it.
     """
     proposal = MarkViewedSetup(FORK).workflow_proposal(
-        RepositoryDetails.from_json(fork_details(is_fork=False))
+        RepositoryDetailsRead(FORK).parse(fork_details(is_fork=False))
     )
     unset_up = {
         "WORKFLOW_FILE": None,
@@ -334,7 +344,7 @@ def test_a_repository_that_is_no_fork_gets_a_pull_request_adding_the_workflow():
     setup = MarkViewedSetup(FORK)
     setup.run(client)
     proposal = setup.workflow_proposal(
-        RepositoryDetails.from_json(fork_details(is_fork=False))
+        RepositoryDetailsRead(FORK).parse(fork_details(is_fork=False))
     )
     assert [
         write
@@ -343,13 +353,13 @@ def test_a_repository_that_is_no_fork_gets_a_pull_request_adding_the_workflow():
     ] == [
         NewBranch(
             repository=FORK,
-            object_hash=BASE_COMMIT,
-            name=WORKFLOW_PROPOSAL_BRANCH.name,
+            branch=WORKFLOW_PROPOSAL_BRANCH,
+            start_commit=BASE_COMMIT,
         ),
         proposal.commit.write_replacing(None),
         NewPullRequest(
-            base=RepositoryBranch(STAND_IN_DEFAULT_BRANCH.name, FORK),
-            head=RepositoryBranch(WORKFLOW_PROPOSAL_BRANCH.name, FORK),
+            base=Branch(FORK, STAND_IN_DEFAULT_BRANCH.name),
+            head=Branch(FORK, WORKFLOW_PROPOSAL_BRANCH.name),
             title=proposal.commit.message,
             body=proposal.description,
             draft=False,
@@ -366,7 +376,7 @@ def test_merging_the_proposal_is_the_step_left():
 def test_an_open_proposal_is_not_opened_again():
     setup = MarkViewedSetup(FORK)
     proposal = setup.workflow_proposal(
-        RepositoryDetails.from_json(fork_details(is_fork=False))
+        RepositoryDetailsRead(FORK).parse(fork_details(is_fork=False))
     )
     client = unforked_answers(
         PROPOSAL_BRANCH=branch_at_base(WORKFLOW_PROPOSAL_BRANCH),
@@ -378,7 +388,7 @@ def test_an_open_proposal_is_not_opened_again():
 
 
 def test_a_proposal_branch_holding_another_version_is_updated():
-    setup = MarkViewedSetup(FORK, on_every_pull_request=True)
+    setup = MarkViewedSetup(FORK, branch_or_tag=ANOTHER_RELEASE)
     client = unforked_answers(
         PROPOSAL_BRANCH=branch_at_base(WORKFLOW_PROPOSAL_BRANCH),
         PROPOSED_FILE=installed_workflow(MarkViewedSetup(FORK)),
@@ -401,7 +411,7 @@ def test_a_refused_proposal_is_reported_as_refused():
 def test_a_refused_proposal_leaves_no_file_to_commit_by_hand():
     client = unforked_answers(WORKFLOW_FILE=installed_workflow(MarkViewedSetup(FORK)))
     client.write_refusal = HTTPStatus.FORBIDDEN
-    setup = MarkViewedSetup(FORK, on_every_pull_request=True)
+    setup = MarkViewedSetup(FORK, branch_or_tag=ANOTHER_RELEASE)
     setup.run(client)
     assert setup.user_steps == []
 
@@ -499,47 +509,48 @@ def test_an_unreadable_secret_is_reported_unread_with_the_token_steps_left():
         [SetupState.UNREADABLE],
         list(
             setup.token_steps(
-                RepositoryDetails.from_json(fork_details()), may_be_done=True
+                RepositoryDetailsRead(FORK).parse(fork_details()), may_be_done=True
             )
         ),
     )
 
 
-def test_basstler_s_own_caller_marks_every_pull_request():
+def test_basstler_s_own_caller_is_the_workflow_the_setup_writes():
     """
-    Basstler's own repository marks files viewed on every pull request with the workflow
-    the setup writes.
+    Basstler's own repository runs the workflow the setup writes.
     """
-    installed = TextFile(RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read()
-    assert (
-        installed
-        == MarkViewedSetup(
-            BasstlerProject.repository, on_every_pull_request=True
-        ).caller_workflow
+    installed = (RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read_text(
+        encoding="utf-8"
     )
+    assert installed == MarkViewedSetup(BasstlerProject.repository).caller_workflow
 
 
-# %% every pull request
+# %% when the workflow runs
 
 
-def test_the_workflow_runs_on_every_pull_request_only_when_asked():
-    triggers = [
-        "pull_request_target"
-        in MarkViewedSetup(FORK, on_every_pull_request=asked).caller_workflow
-        for asked in (False, True)
+def test_the_workflow_runs_only_when_started(tmp_path: Path):
+    """
+    The files are marked when someone asks, never by a pull request event.
+    """
+    written = tmp_path / WorkflowLocation.MARK_VIEWED.name
+    written.write_text(MarkViewedSetup(FORK).caller_workflow, encoding="utf-8")
+    assert [trigger.event for trigger in Workflow.at(written).triggers] == [
+        TriggerEvent.WORKFLOW_DISPATCH
     ]
-    assert triggers == [False, True]
-
-
-def test_a_fork_cannot_run_on_its_parent_s_pull_requests():
-    setup = MarkViewedSetup(FORK, on_every_pull_request=True)
-    setup.run(answers(WORKFLOW_FILE=installed_workflow(setup)))
-    assert [
-        step.state for step in setup.steps if UPSTREAM.full_name in step.reason
-    ] == [SetupState.LEFT_TO_USER]
 
 
 # %% one token for several jobs
+
+
+class AnotherJobSecret(ActionsSecret):
+    """
+    The secret another job of basstler's reads its token from.
+    """
+
+    TOKEN = "ANOTHER_JOB_TOKEN"
+    """
+    The token the other job starts a workflow with.
+    """
 
 
 def shared_use(owner: str) -> TokenUse:
@@ -551,7 +562,7 @@ def shared_use(owner: str) -> TokenUse:
         "starts a build",
         (Repository(owner, "site"),),
         {RepositoryPermission.ACTIONS: PermissionLevel.WRITE},
-        PlanSiteSecret.TOKEN,
+        AnotherJobSecret.TOKEN,
         (FORK,),
     )
 
@@ -571,7 +582,7 @@ def test_a_job_on_the_pull_requests_owner_shares_the_token():
 def test_a_job_on_another_owner_s_repositories_gets_a_token_of_its_own():
     setup = MarkViewedSetup(FORK, shared_uses=(shared_use("someone-else"),))
     setup.run(answers(SECRET=None))
-    alone = setup.token_use(RepositoryDetails.from_json(fork_details()))
+    alone = setup.token_use(RepositoryDetailsRead(FORK).parse(fork_details()))
     assert [step.token.uses for step in setup.user_steps] == [(alone,), (alone,)]
 
 
@@ -622,8 +633,13 @@ def carrying_pull_request(base: str) -> dict[str, Any]:
             "ref": "another-branch",
             "sha": HEAD_COMMIT,
             "user": {"login": FORK.owner},
+            "repo": {"full_name": FORK.full_name},
         },
-        "base": {"ref": base, "sha": BASE_COMMIT},
+        "base": {
+            "ref": base,
+            "sha": BASE_COMMIT,
+            "repo": {"full_name": FORK.full_name},
+        },
     }
 
 
@@ -638,7 +654,7 @@ def carried_workflow(
     """
     client = unforked_answers()
     proposal = setup.workflow_proposal(
-        RepositoryDetails.from_json(fork_details(is_fork=False))
+        RepositoryDetailsRead(FORK).parse(fork_details(is_fork=False))
     )
     client.answers[proposal.open_pull_requests_path] = [carrying_pull_request(base)]
     client.answers[FORK.contents_path(WORKFLOW_FILE_PATH, HEAD_COMMIT)] = {
@@ -684,7 +700,7 @@ def test_a_refused_pull_request_gets_the_form_with_everything_filled_in():
     setup = MarkViewedSetup(FORK)
     setup.run(client)
     proposal = setup.workflow_proposal(
-        RepositoryDetails.from_json(fork_details(is_fork=False))
+        RepositoryDetailsRead(FORK).parse(fork_details(is_fork=False))
     )
     assert (
         setup.user_steps[0]
@@ -704,7 +720,7 @@ def test_of_two_stacked_pull_requests_carrying_the_workflow_the_lower_is_reporte
         head=dict(lower["head"], ref="an-upper-branch"),
     )
     proposal = setup.workflow_proposal(
-        RepositoryDetails.from_json(fork_details(is_fork=False))
+        RepositoryDetailsRead(FORK).parse(fork_details(is_fork=False))
     )
     client.answers[proposal.open_pull_requests_path] = [upper, lower]
     setup.run(client)

@@ -32,7 +32,9 @@ from basstler.exceptions import MalformedEmailAddressError
 from basstler.exit_codes import CommandFailure, PersonalNotesSetupExitCode
 from basstler.git.commands import TransientGitSetting
 from basstler.github.client import GitHubRestClient
+from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository_access import GitHubRepository
+from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import (
     ClaudeCodeVariable,
@@ -47,7 +49,8 @@ from basstler.setup.report import (
     SetupCheckScript,
     SetupReport,
 )
-from basstler.setup.steps import PersonalNotesSetting, resolve_repository
+from basstler.setup.steps import resolve_repository
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -257,19 +260,20 @@ class PersonalNotesSetup:
         Perform every step, then report what is true now.
 
         :return: The status check-setup.sh finishes with.
-        :raises ForeignNotesRemoteError: If the notes remote is somebody else's.
+        :raises ForeignNotesRemoteError: If the notes remote is somebody else's and holds
+            no notes branch the credential's account may share.
         :raises HookScriptFailedError: If a step's hook script fails.
         :raises CheckSetupFailedError: If check-setup.sh fails or its report is
             incomplete.
         :raises GitHubRequestFailed: If GitHub refuses a call a step depends on.
         """
-        self.verify_notes_remote_owner()
         requested_remote = TransientGitSetting(
             PersonalNotesSetting.REMOTE.git_config_key, self.request.remote
         )
         initial_report = SetupReport.from_completed_process(
             self.run_check_setup(requested_remote)
         )
+        self.verify_notes_remote_access(initial_report)
         self.point_notes_remote()
         self.create_notes_branch(initial_report)
         self.seed_notes(initial_report)
@@ -283,14 +287,17 @@ class PersonalNotesSetup:
         final_report = SetupReport.from_completed_process(final_check)
         return PersonalNotesSetupExitCode(final_report.exit_code)
 
-    def verify_notes_remote_owner(self) -> None:
+    def verify_notes_remote_access(self, initial_report: SetupReport) -> None:
         """
-        Refuse a notes remote GitHub says is somebody else's.
+        Refuse a notes remote GitHub says is somebody else's, unless it holds a notes
+        branch the credential's account may push to, which colleagues then share.
 
-        Without GitHub access the owner is reported unchecked and allowed, since
+        Without GitHub access the remote is reported unchecked and allowed, since
         ``--remote`` named it explicitly.
 
-        :raises ForeignNotesRemoteError: If the remote's owner is not the credential's.
+        :param initial_report: check-setup.sh's report from before anything was written.
+        :raises ForeignNotesRemoteError: If the remote is neither the credential's own
+            nor a notes branch it may share.
         """
         if self.github is None:
             logger.info(
@@ -299,10 +306,20 @@ class PersonalNotesSetup:
                 f"{SetupOption.REMOTE} named it."
             )
             return
+        repository = self.github.repository
         login = self.github.authenticated_login()
-        if self.github.repository.owner.casefold() != login.casefold():
-            raise ForeignNotesRemoteError(self.github.repository, login)
-        logger.info(f"'{self.github.repository.full_name}' is owned by '{login}'.")
+        if repository.owner.casefold() == login.casefold():
+            logger.info(f"'{repository.full_name}' is owned by '{login}'.")
+            return
+        details = RepositoryDetailsRead(repository)
+        access = details.parse(self.github.client.get(details.path)).contents_access
+        notes_branch = initial_report.results[SetupCheck.NOTES_BRANCH].status
+        if notes_branch is not CheckStatus.OK or access is not PermissionLevel.WRITE:
+            raise ForeignNotesRemoteError(repository, login)
+        logger.info(
+            f"'{repository.full_name}' is owned by '{repository.owner}'; '{login}' "
+            f"may push to it and joins its notes branch."
+        )
 
     def point_notes_remote(self) -> None:
         """

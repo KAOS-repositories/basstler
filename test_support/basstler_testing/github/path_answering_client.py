@@ -1,6 +1,5 @@
 """
-GitHub's answer refusing a call, and a stand-in for its REST API that answers each path
-with a canned body.
+A stand-in for GitHub's REST API that answers each path with a canned body.
 """
 
 from __future__ import annotations
@@ -9,6 +8,8 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from typing import Any
 
+from basstler.github.credential import CredentialProvider
+from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.client import (
     GitHubAttemptClient,
     GitHubResponse,
@@ -16,10 +17,8 @@ from basstler.github.client import (
     HttpMethod,
 )
 
-from basstler.github.credential import CredentialProvider
-from basstler.github.exceptions import GitHubRequestFailed
 
-# %% the refusal
+# %% the stand-in
 
 
 def refusal(status: HTTPStatus, method: HttpMethod, path: str) -> GitHubResponse:
@@ -39,9 +38,6 @@ def refusal(status: HTTPStatus, method: HttpMethod, path: str) -> GitHubResponse
             credential_origin=CredentialProvider.CALLER,
         ),
     )
-
-
-# %% the stand-in
 
 
 @dataclass

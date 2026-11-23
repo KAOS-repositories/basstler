@@ -19,7 +19,8 @@ from basstler import directory_tree
 from basstler.class_property import classproperty
 from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.references import ReferenceTo
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_modification.specification import Specification
 from basstler.code_rules.checker import CodeRuleViolation
 from basstler.code_rules.commands import CodeRulesCommand
@@ -47,16 +48,13 @@ class RemovalKeyword(StrEnum):
 
 class TreeRemovalCall(CodePattern):
     """
-    A call to :func:`shutil.rmtree`.
+    A call to :func:`shutil.rmtree`, whichever way the file imports it.
     """
 
     @classproperty
     def matcher(cls) -> matchers.Call:
         return matchers.Call(
-            func=matchers.Attribute(
-                value=matchers.Name(shutil.__name__),
-                attr=matchers.Name(shutil.rmtree.__name__),
-            )
+            func=ReferenceTo(f"{shutil.__name__}.{shutil.rmtree.__name__}").matcher
         )
 
 
@@ -116,8 +114,8 @@ class DirectoryTreeFix(CodeFix[Specification]):
 @dataclass(frozen=True)
 class TreeRemovalChecker(FixableChecker[Specification]):
     """
-    Finds calls to :func:`shutil.rmtree` outside :mod:`basstler.directory_tree`; they stop
-    at the read-only object files git leaves on Windows.
+    Finds calls to :func:`shutil.rmtree` outside :mod:`basstler.directory_tree`; they
+    stop at the read-only object files git leaves on Windows.
     """
 
     @classproperty
@@ -155,9 +153,9 @@ class TreeRemovalChecker(FixableChecker[Specification]):
         yield from super().violations(path)
         if not self.checks(path):
             return
-        module = PositionedModule(PythonSourceFile(path).parse())
+        module = PositionedModule(EditablePythonSourceFile(path).parse())
         for occurrence in TreeRemovalCall.found_in(module):
-            if ReplaceableTreeRemovalCall.matches(occurrence.node):
+            if ReplaceableTreeRemovalCall.matches(occurrence.node, module.metadata):
                 continue
             yield CodeRuleViolation(
                 path,

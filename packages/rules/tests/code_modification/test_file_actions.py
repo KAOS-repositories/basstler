@@ -24,6 +24,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.git.commit_tree import CommitTree
 
 from basstler_testing.constants.paths import RelocationTree
+from basstler_testing.executable_stubs import NEEDS_EXECUTABLE_BIT
 
 # %% the tree changed
 
@@ -131,6 +132,7 @@ def test_a_directory_a_write_empties_is_removed(before, tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
+@NEEDS_EXECUTABLE_BIT
 def test_a_moved_executable_stays_executable_on_disk(tmp_path):
     """
     A file's executable bit travels with it, so a moved script still runs.

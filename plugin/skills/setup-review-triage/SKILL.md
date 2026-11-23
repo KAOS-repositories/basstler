@@ -28,12 +28,7 @@ source "${CLAUDE_PLUGIN_ROOT}/hooks/resolve-personal-notes-config.sh" && echo "$
 
 Ask with `AskUserQuestion`, one question, these options in this order:
 
-- **Every pull request (Recommended)** - a workflow on the repository the pull requests
-  are opened on marks each one's files whenever it is opened or updated, with nothing
-  to run. It needs a repository whose workflows and secrets the user may change. Take
-  step 3 with `--on-every-pull-request` added to the command, and tell the user the
-  token's owner is the one account whose files are marked there.
-- **Actions** - a workflow on a repository the user owns marks the files with their
+- **Actions (Recommended)** - a workflow on a repository the user owns marks the files with their
   token when they ask, so any session can start it, a cloud one included.
 - **My computer** - `gh` on the user's computer marks them when they ask; no stored
   token, but the computer has to be on.
@@ -96,8 +91,8 @@ now, not what you expect. Call the route set up only when nothing is left.
 
 ## 4. Confirm
 
-Say which routes work now and how to use them. With every pull request set up, nothing
-is left to run: each pull request opened or updated there is marked. Otherwise:
+Say which routes work now and how to use them; a session's Stop hook marks its pull
+request each turn by whichever route works. Otherwise:
 - `basstler review-triage mark-viewed <number>` tries the computer route and falls back
   to Actions;
 - `basstler review-triage request-mark-viewed <number>` asks Actions directly.

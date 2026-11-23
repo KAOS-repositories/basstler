@@ -70,6 +70,11 @@ class RepositoryLocation(PathEnumeration):
     The workflow that tags a merge commit as a release.
     """
 
+    PUBLISH_WORKFLOW = WORKFLOWS / "publish.yml"
+    """
+    The workflow that publishes a release's distributions to PyPI.
+    """
+
     TESTS_WORKFLOW = WORKFLOWS / "tests.yml"
     """
     The workflow that lints and tests every pull request and every push to main.
@@ -88,8 +93,8 @@ class RepositoryLocation(PathEnumeration):
 
     WINDOWS_TESTS_WORKFLOW = WORKFLOWS / "windows-tests.yml"
     """
-    The workflow that runs the whole suite on Windows for every pull request ready for
-    review.
+    The workflow that runs the whole suite on Windows for every push to main, and for a
+    pull request changing what Windows is known to treat differently.
     """
 
     MAIN_FAILURE_WORKFLOW = WORKFLOWS / "main-failure.yml"
@@ -316,6 +321,11 @@ class DatasetLocation(PathEnumeration):
     The jobs of a failed run of the tests: one failed, one timed out, two passed.
     """
 
+    SESSION_PULL_REQUEST = DIRECTORY / "session-pull-request.json"
+    """
+    The REST response for an open pull request opened from the branch a session works on.
+    """
+
     MERGE_WORKFLOW_PULL_REQUEST = DIRECTORY / "merge-workflow-pull-request.json"
     """
     The REST response for the pull request proposing the plan site's merge workflow.
@@ -371,6 +381,18 @@ class DatasetLocation(PathEnumeration):
     :class:`ProgressBranch` that has one.
     """
 
+    HANDOVER = DIRECTORY / "handover"
+    """
+    A plan handover: two plans, one depending on the other's item, the progress notes
+    of their items' branches and the repository's rules, laid out as
+    :class:`basstler.locations.PlanHandoverLocation` names them.
+    """
+
+    UNRELATED_PROGRESS_NOTE = DIRECTORY / "handover-notes" / "unrelated-branch.md"
+    """
+    The progress note of a branch no plan of :attr:`HANDOVER` tracks.
+    """
+
     PLANS = DIRECTORY / "plans"
     """
     A plans directory the cross-plan reference tests resolve against: one subdirectory
@@ -410,6 +432,12 @@ class DatasetLocation(PathEnumeration):
     BUILD_START_STUB = STUBS / "build_start_prints_its_name.py"
     """
     A module standing in for :mod:`basstler.plan_site.build_start`, printing its name.
+    """
+
+    GIT_IDENTITY_OF_A_COLLEAGUE_STUB = STUBS / "git_identity_of_a_colleague.py"
+    """
+    A module standing in for :mod:`basstler.personal_notes.git_identity`, printing the
+    identity path of a colleague who does not own the notes repository.
     """
 
     BUILD_START_NEEDS_ACCESS_STUB = STUBS / "build_start_needs_access.py"
@@ -741,11 +769,6 @@ class PersonalNotesPath(PathEnumeration):
     reads a plan out of.
     """
 
-    GIT_IDENTITY = ProjectLocation.PERSONAL_NOTES / "git-identity"
-    """
-    The recorded git identity a clone with none of its own is given.
-    """
-
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"
     """
     The directory holding each pull request branch's progress notes, by branch name.
@@ -884,18 +907,25 @@ class BashByNameSnippet(PathEnumeration):
 
     SUBPROCESS_CALL = DIRECTORY / "subprocess-call.py"
     """
-    A :mod:`subprocess` call running bash by its name, on line 9.
+    A :mod:`subprocess` call running bash by its name, marked as a violation.
     """
 
     RETURNED_COMMAND = DIRECTORY / "returned-command.py"
     """
-    A function returning a command line that runs bash by its name, on line 12.
+    A function returning a command line that runs bash by its name, marked as a
+    violation.
     """
 
     LOCATED_BASH = DIRECTORY / "located-bash.py"
     """
     A run of the located bash, and a tuple of names starting with bash that is no
     command.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls running bash by its name through :mod:`subprocess` imported under other
+    names, marked as violations.
     """
 
 
@@ -1069,6 +1099,51 @@ class RuleFixExampleFile(StrEnum):
     """
 
 
+class PlaybookSnippet(PathEnumeration):
+    """
+    Projects' playbook modules and a plugin built from a playbook.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "playbook"
+    """
+    The snippets' directory.
+    """
+
+    DECLARED = DIRECTORY / "declared"
+    """
+    A project whose playbook module declares a playbook of basstler-core alone.
+    """
+
+    EMPTY = DIRECTORY / "empty"
+    """
+    A project whose playbook module declares a playbook with no components.
+    """
+
+    UNDECLARED = DIRECTORY / "undeclared"
+    """
+    A project whose playbook module assigns something other than a playbook.
+    """
+
+    PLUGIN = DIRECTORY / "plugin"
+    """
+    A plugin shipping a declared skill's instructions, a skill nothing
+    declares, a directory that is no skill, and the hook registrations of a
+    session-start hook and a shell-tool hook.
+    """
+
+    STALE_PLUGIN = DIRECTORY / "stale-plugin"
+    """
+    A plugin whose declared skill's instructions carry an outdated frontmatter and
+    title above the body of :attr:`PLUGIN`'s.
+    """
+
+    BODY_ONLY_PLUGIN = DIRECTORY / "body-only-plugin"
+    """
+    A plugin whose declared skill's instructions hold only the body of :attr:`PLUGIN`'s,
+    as a new skill's do before its first build.
+    """
+
+
 class TextFileUsageSnippet(PathEnumeration):
     """
     Source files the check for text read or written without a text file reads.
@@ -1104,8 +1179,7 @@ class LocaleEncodingSnippet(PathEnumeration):
 
     LOCALE_TEXT = DIRECTORY / "locale-text.py"
     """
-    Every kind of text read or written in the locale encoding, one per line from line
-    12 to line 16.
+    Every kind of text read or written in the locale encoding, one per marked line.
     """
 
     UTF_8_TEXT = DIRECTORY / "utf-8-text.py"
@@ -1118,6 +1192,12 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
     A function and a method that are not :func:`open`, given a file name and a binary
     mode.
+    """
+
+    IMPORTED_SUBPROCESS = DIRECTORY / "imported-subprocess.py"
+    """
+    Two calls decoding output in the locale encoding through :mod:`subprocess` imported
+    under other names, marked as violations.
     """
 
 
@@ -1174,7 +1254,18 @@ class TreeRemovalSnippet(PathEnumeration):
 
     SHUTIL_RMTREE = DIRECTORY / "shutil-rmtree.py"
     """
-    Two calls to :func:`shutil.rmtree`, on lines 10 and 11.
+    Two calls to :func:`shutil.rmtree`, marked as violations.
+    """
+
+    IMPORTED_RMTREE = DIRECTORY / "imported-rmtree.py"
+    """
+    Three calls to :func:`shutil.rmtree` through an aliased module and through names
+    imported from it, marked as violations.
+    """
+
+    OTHER_RMTREE = DIRECTORY / "other-rmtree.py"
+    """
+    A function and a method named ``rmtree`` that are not :func:`shutil.rmtree`.
     """
 
     HANDLED_RMTREE = DIRECTORY / "handled-rmtree.py"
@@ -1208,4 +1299,54 @@ class PackageBoundarySnippet(PathEnumeration):
     UNLISTED_IMPORT = LOWER_DISTRIBUTION / "src" / "basstler" / "low" / "upward.py"
     """
     The lower distribution importing the higher one.
+    """
+
+
+class ThirdPartyImportSnippet(PathEnumeration):
+    """
+    A workspace of two distributions, the lower one requiring ``pydantic``, whose
+    modules import libraries.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "third-party-imports"
+    """
+    The workspace's root.
+    """
+
+    LOWER_MODULES = DIRECTORY / "packages" / "low" / "src" / "basstler" / "low"
+    """
+    The lower distribution's part of ``basstler``.
+    """
+
+    LISTED = LOWER_MODULES / "listed_library.py"
+    """
+    Imports ``pydantic``, which the distribution lists.
+    """
+
+    REQUIRED = LOWER_MODULES / "required_library.py"
+    """
+    Imports ``annotated_types``, which ``pydantic`` requires.
+    """
+
+    UNREQUIRED = LOWER_MODULES / "unrequired_library.py"
+    """
+    Imports ``libcst``, which nothing the distribution lists leads to.
+    """
+
+    UNINSTALLED = LOWER_MODULES / "uninstalled_library.py"
+    """
+    Imports a library installed nowhere.
+    """
+
+    STANDARD = LOWER_MODULES / "standard_library.py"
+    """
+    Imports only the standard library.
+    """
+
+    INHERITED = (
+        DIRECTORY / "packages" / "high" / "src" / "basstler" / "high"
+    ) / "inherited_library.py"
+    """
+    The higher distribution importing ``pydantic``, which the lower one it lists
+    requires.
     """

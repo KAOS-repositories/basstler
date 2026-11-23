@@ -364,7 +364,7 @@ def test_a_checkout_lacking_the_commits_fetches_them(
     A checkout that has never seen the pull request's commits fetches them from the
     repository, then reads the same changes.
     """
-    scratch_repository.serve_origin_as(SAMPLE_REPOSITORY)
+    scratch_repository.serve_origin_as(SAMPLE_REPOSITORY.clone_url)
     pull_request = RestPullRequest.from_json(sample_payload)
     scratch_repository.run_git(
         "push",

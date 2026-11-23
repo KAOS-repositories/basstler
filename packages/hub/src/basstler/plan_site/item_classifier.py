@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from basstler.git.branch import Branch
 from basstler.github.constants import MergeableState
 from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_state import (
@@ -18,7 +19,6 @@ from basstler.github.pull_request_state import (
 from basstler.github.repository import (
     PullRequestReference,
     Repository,
-    RepositoryBranch,
 )
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
@@ -142,8 +142,8 @@ class ItemClassifier:
         fork = Repository.parse(self._repository_of(item))
         link = PromotionLink.for_target(
             PromotionTarget(
-                upstream_base=RepositoryBranch(
-                    lineage.upstream_default_branch, lineage.upstream_repository
+                upstream_base=Branch(
+                    lineage.upstream_repository, lineage.upstream_default_branch
                 ),
                 fork=fork,
             ),

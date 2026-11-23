@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from basstler.git.remote import Remote
 from basstler.environment import GitHubCredentialVariable
 from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
@@ -41,11 +42,11 @@ from basstler.plan_site.publication import PublicationOption
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.workflows import DispatchWorkflow, PlanSiteSecret
 from basstler.setup.report import CheckResult, CheckStatus
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.stack import RemoteName
-from basstler_testing.maintenance.fork import ForkCheckout
+from basstler_testing.fork_checkout import ForkCheckout
 from basstler_testing.upstream_reviews.replay import ReplayingRestClient
 from .test_hub import publish_notes
 
@@ -508,9 +509,8 @@ def notes_branch_of(
 ) -> RemoteBranch:
     """:return: The notes branch *notes_location* names, in the fork checkout."""
     return RemoteBranch(
+        Remote(GitCommandRunner(fork_checkout.project_root), notes_location.remote),
         notes_location.branch,
-        GitCommandRunner(fork_checkout.project_root),
-        notes_location.remote,
     )
 
 
@@ -537,7 +537,8 @@ def test_every_repository_the_registry_s_hub_lists_is_published(
         registry=OTHER_REPOSITORY.full_name, repositories=[NOTES_REPOSITORY.full_name]
     )
     RemoteBranch(
-        NOTES_BRANCH, GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN
+        Remote(GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN),
+        NOTES_BRANCH,
     ).write({ProjectLocation.PLAN_HUB.as_posix(): own_copy.to_text()}, "List the hub")
     registry_copy = PlanHub(
         registry=OTHER_REPOSITORY.full_name,

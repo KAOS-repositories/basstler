@@ -24,10 +24,16 @@ class PositionedModule:
     """
 
     @cached_property
+    def metadata(self) -> MetadataWrapper:
+        """
+        Resolves the metadata of the nodes of :attr:`module` itself, not of a copy.
+        """
+        return MetadataWrapper(self.module, unsafe_skip_copy=True)
+
+    @cached_property
     def positions(self) -> Mapping[libcst.CSTNode, CodeRange]:
         """
         The code range of each node of :attr:`module`, keyed by the node itself; lines
         count from one, columns from zero.
         """
-        wrapper = MetadataWrapper(self.module, unsafe_skip_copy=True)
-        return wrapper.resolve(PositionProvider)
+        return self.metadata.resolve(PositionProvider)

@@ -41,7 +41,7 @@ from basstler.render_common import TemplatePage
 from basstler_testing.constants.site import SitePlan, SiteSampleText
 from basstler_testing.github.pull_request_api import api_pull_request
 from basstler_testing.recorded_pull_requests import RecordedPullRequestSource
-from basstler_testing.plan_site.first_plan import (
+from basstler_testing.plan.first_plan import (
     ELSEWHERE_PULL_REQUEST,
     OPEN_PULL_REQUEST,
 )

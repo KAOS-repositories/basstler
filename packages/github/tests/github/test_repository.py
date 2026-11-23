@@ -6,6 +6,7 @@ remote URL.
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -15,18 +16,21 @@ from basstler.github.repository import (
     NewTokenPage,
     GitHubAddress,
     MalformedRepositoryError,
-    RepositoryBranch,
     PullRequestReference,
     Repository,
 )
-from basstler.setup.steps import Host
+
+GITHUB_HOST = urlsplit(GitHubAddress.WEB).hostname
+"""
+The bare host an SSH remote names GitHub by.
+"""
 
 REPOSITORY = Repository("an-owner", "a-repository")
 """
 The repository every well-formed reference and remote URL in these tests names.
 """
 
-BRANCH = Branch("main")
+BRANCH = Branch(REPOSITORY, "main")
 """
 The branch the page and path tests address.
 """
@@ -59,9 +63,9 @@ def test_repository_rejects_a_reference_that_is_not_owner_and_name(malformed: st
 @pytest.mark.parametrize(
     "url",
     [
-        f"{Host.GITHUB.url}/{REPOSITORY.full_name}.git",
-        f"{Host.GITHUB.url}/{REPOSITORY.full_name}",
-        f"git@{Host.GITHUB}:{REPOSITORY.full_name}.git",
+        f"{GitHubAddress.WEB}/{REPOSITORY.full_name}.git",
+        f"{GitHubAddress.WEB}/{REPOSITORY.full_name}",
+        f"git@{GITHUB_HOST}:{REPOSITORY.full_name}.git",
         f"http://127.0.0.1:41729/git/{REPOSITORY.full_name}",
     ],
 )
@@ -75,8 +79,11 @@ def test_repository_reads_the_owner_and_name_from_a_remote_url(url: str):
     assert Repository.from_remote_url(url) == REPOSITORY
 
 
-@pytest.mark.parametrize("malformed", ["", f"{Host.GITHUB.url}/only-one-segment"])
+@pytest.mark.parametrize("malformed", ["", f"{GitHubAddress.WEB}/only-one-segment"])
 def test_repository_rejects_a_remote_url_naming_no_repository(malformed: str):
+    """
+    A remote URL naming no owner and name is refused.
+    """
     with pytest.raises(MalformedRepositoryError):
         Repository.from_remote_url(malformed)
 
@@ -101,7 +108,7 @@ def test_without_a_name_the_remote_s_repository_is_meant(tmp_path: Path):
 @pytest.mark.parametrize(
     "url",
     [
-        f"git@{Host.GITHUB}:{REPOSITORY.full_name}.git",
+        f"git@{GITHUB_HOST}:{REPOSITORY.full_name}.git",
         REPOSITORY.clone_url_under(GitHubAddress.SSH),
     ],
 )
@@ -173,14 +180,14 @@ def test_a_file_s_page_is_under_its_branch():
 
 
 def test_the_compare_page_of_a_branch_on_the_same_repository_names_it_alone():
-    assert REPOSITORY.compare_url(BRANCH, RepositoryBranch("topic", REPOSITORY)) == (
+    assert REPOSITORY.compare_url(BRANCH, Branch(REPOSITORY, "topic")) == (
         f"{REPOSITORY.url}/compare/{BRANCH.name}...topic"
     )
 
 
 def test_the_compare_page_of_a_branch_on_a_fork_names_its_owner():
     fork = Repository("a-forker", REPOSITORY.name)
-    assert REPOSITORY.compare_url(BRANCH, RepositoryBranch("topic", fork)) == (
+    assert REPOSITORY.compare_url(BRANCH, Branch(fork, "topic")) == (
         f"{REPOSITORY.url}/compare/{BRANCH.name}...a-forker:topic"
     )
 
@@ -195,13 +202,18 @@ def test_a_token_form_is_under_github_s_web_root():
 
 
 def test_a_branch_on_its_pull_request_s_repository_is_named_alone():
-    branch = RepositoryBranch("topic", REPOSITORY)
-    assert branch.name_from(REPOSITORY) == branch.name
+    branch = Branch(REPOSITORY, "topic")
+    assert REPOSITORY.head_name(branch) == branch.name
 
 
 def test_a_branch_on_a_fork_is_named_under_the_fork_s_owner():
-    branch = RepositoryBranch("topic", Repository("a-forker", REPOSITORY.name))
-    assert branch.name_from(REPOSITORY) == branch.qualified_name == "a-forker:topic"
+    branch = Branch(Repository("a-forker", REPOSITORY.name), "topic")
+    assert REPOSITORY.head_name(branch) == "a-forker:topic"
+
+
+def test_a_branch_s_label_names_it_under_its_repository_s_owner():
+    branch = Branch(Repository("a-forker", REPOSITORY.name), "topic")
+    assert branch.repository.branch_label(branch) == "a-forker:topic"
 
 
 # %% REST paths

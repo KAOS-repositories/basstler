@@ -6,4 +6,4 @@ from __future__ import annotations
 
 import subprocess
 
-subprocess.run(["bash", "-c", "true"], check=True)
+subprocess.run(["bash", "-c", "true"], check=True)  # violation

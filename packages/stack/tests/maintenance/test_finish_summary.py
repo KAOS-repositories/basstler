@@ -40,20 +40,21 @@ from basstler.git.commands import IntegrationStrategy
 
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.stack import StackBranch
-from basstler_testing.maintenance.fork import (
+from basstler_testing.github.pull_request_samples import (
     A_SESSION_LINK,
-    UPSTREAM_BASE,
-    ForkCheckout,
     PromotionSampleText,
     PullRequestHeadRepository,
     StackPullRequestNumber,
+)
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.maintenance.fork import (
     a_board_entry,
     a_parent_and_child,
-    an_api_record,
     an_export,
     make_configuration,
     the_board,
 )
+from basstler_testing.github.listed_repository import an_api_record
 from .large_board import LargeBoard, OutputBudget
 from .recorded_fork import AlreadyResolvedPass
 

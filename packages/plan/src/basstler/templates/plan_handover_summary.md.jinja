@@ -1,0 +1,6 @@
+| Plan | Items | Underway | Not started |
+| --- | --- | --- | --- |
+{% for plan in handover.plans_in_saving_order %}
+{% set statuses = plan.manifest.items | map(attribute="status") | list %}
+| [{{ plan.manifest.content.title }}]({{ guide_url | default("") }}#plan-{{ plan.identifier }}) | {{ statuses | length }} | {{ statuses | select("equalto", status.IN_PROGRESS) | list | length }} | {{ statuses | select("equalto", status.NOT_STARTED) | list | length }} |
+{% endfor %}

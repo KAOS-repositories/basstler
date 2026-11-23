@@ -33,3 +33,37 @@ def test_writing_encodes_the_text_as_utf_8(tmp_path: Path):
     TextFile(written).write(text)
 
     assert written.read_bytes() == text.encode(UTF_8)
+
+
+# %% newlines
+
+CRLF_TEXT = "first\r\nsecond\nthird\r\n"
+"""
+Lines ended both ways, as a checkout with another newline setting leaves them.
+"""
+
+LF_TEXT = "first\nsecond\nthird\n"
+"""
+:data:`CRLF_TEXT` with every line ended by a line feed alone.
+"""
+
+
+def test_reading_ends_every_line_with_a_line_feed(tmp_path: Path):
+    """
+    The text read ends each line with ``\\n``, however the file's bytes end it.
+    """
+    stored = tmp_path / "stored.txt"
+    stored.write_bytes(CRLF_TEXT.encode(UTF_8))
+
+    assert TextFile(stored).read() == LF_TEXT
+
+
+def test_writing_keeps_every_line_ending_as_given(tmp_path: Path):
+    """
+    The file gets the text's line endings, none translated.
+    """
+    written = tmp_path / "written.txt"
+
+    TextFile(written).write(CRLF_TEXT)
+
+    assert written.read_bytes() == CRLF_TEXT.encode(UTF_8)

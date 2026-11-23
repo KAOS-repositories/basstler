@@ -9,6 +9,7 @@ import importlib.metadata
 
 from basstler.github.basstler_project import BasstlerProject, ProjectUrlLabel
 from basstler.locations import PackageLocation
+from basstler.package_map import Distribution
 
 # %% the repository
 
@@ -16,7 +17,7 @@ from basstler.locations import PackageLocation
 def test_the_repository_is_the_one_the_package_metadata_names_as_its_source():
     labelled = dict(
         entry.split(", ", 1)
-        for entry in importlib.metadata.metadata(BasstlerProject.name).get_all(
+        for entry in importlib.metadata.metadata(Distribution.GITHUB).get_all(
             "Project-URL"
         )
     )

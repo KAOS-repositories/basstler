@@ -8,7 +8,7 @@ from __future__ import annotations
 from basstler.code_rules.checker import CodeRulesCheck
 from basstler.code_rules.file_uri import FileUriChecker
 
-from ..constants.paths import FileUriSnippet
+from basstler_testing.constants.paths import FileUriSnippet
 
 # %% file URLs
 

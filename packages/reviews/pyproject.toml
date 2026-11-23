@@ -7,12 +7,18 @@ name = "basstler-reviews"
 description = "Reading an upstream pull request's checks and review threads."
 requires-python = ">=3.12"
 license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{name = "Abdelrhman Bassiouny", email = "bido.bassuny@gmail.com"}]
 dynamic = ["version", "dependencies"]
 
 [project.urls]
 "Source" = "https://github.com/KAOS-repositories/basstler"
 "Bug Tracker" = "https://github.com/KAOS-repositories/basstler/issues"
+
+# What this distribution adds to the default playbook: `basstler.playbook.contribution`
+# loads this group.
+[project.entry-points."basstler.contributions"]
+basstler-reviews = "basstler.upstream_reviews.contribution:ReviewsContribution"
 
 [tool.hatch.version]
 source = "vcs"
@@ -21,6 +27,7 @@ raw-options = {root = "../.."}
 
 # Built with every basstler requirement pinned to this release.
 [tool.hatch.metadata.hooks.basstler-sibling-pins]
+family = "basstler"
 dependencies = [
     "basstler-core",
     "basstler-git",
@@ -30,6 +37,12 @@ dependencies = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/basstler"]
 
+# The repository's licence and notices, put at the root of the source distribution so
+# the wheel built from it carries them.
+[tool.hatch.build.targets.sdist.force-include]
+"../../LICENSE" = "LICENSE"
+"../../NOTICE" = "NOTICE"
+
 # What this distribution's tests need besides itself.
 [dependency-groups]
 dev = [
@@ -38,6 +51,4 @@ dev = [
     "basstler-core",
     "basstler-git",
     "basstler-github",
-    "basstler-notes",
-    "basstler-stack",
 ]

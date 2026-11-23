@@ -14,8 +14,8 @@ import yaml
 
 from basstler.github import pull_request_source as pull_request_source_module
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
-from basstler.github.repository_access import PullRequestListState
 from basstler.github.repository import PullRequestReference, Repository
+from basstler.github.repository_access import PullRequestListState
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import PluginLocation, ProjectLocation
 from basstler.plan.check_dependency_readiness import ReadinessField
@@ -29,14 +29,16 @@ from basstler.plan.item_brief import (
     main,
 )
 from basstler.plan.model import (
+    ExternalDependency,
     ItemNotTrackedError,
+    ItemStatus,
     ManifestKey,
     PlanDocument,
+    PlanItem,
     PlanManifest,
 )
 from basstler.plan.repository_rules import RepositoryRules
 from basstler.plan.size_limits import Roadmap
-
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.fixture_plans import FixturePlanId, ForeignItemId
 from basstler_testing.github.pull_request_api import listing_path
@@ -272,17 +274,17 @@ def test_the_command_prints_the_brief(
     pull_request_source: RecordedPullRequestSource,
     capsys: pytest.CaptureFixture[str],
 ):
-    arguments = ItemBriefCommandLine.parser().parse_args(
+    """
+    The command line prints the same brief :meth:`ItemBrief.read` builds.
+    """
+    ItemBriefCommandLine(pull_request_source, briefed_repository.project_root).app(
         [
             ItemBriefOption.PLAN,
             BRIEFED_MANIFEST.identifier,
             ItemBriefOption.ITEM,
             BRIEFED_ITEM.identifier,
-        ]
-    )
-
-    ItemBriefCommandLine.run(
-        arguments, pull_request_source, briefed_repository.project_root
+        ],
+        result_action="return_value",
     )
 
     assert yaml.safe_load(capsys.readouterr().out) == read_brief(
@@ -325,3 +327,48 @@ def test_the_command_leaves_the_upstream_of_a_forked_plan_repository_unread(
     assert [
         path for path in client.reads if path.startswith(f"/{upstream.api_path}/")
     ] == []
+
+
+# %% work stacked on that was not handed over
+
+
+def test_the_brief_of_an_item_with_external_dependencies_says_what_to_do_with_them():
+    """
+    The session continuing the item is told to decide what to do with the external work,
+    and the records it decides from are the item's own.
+    """
+    record = ExternalDependency(
+        reference="other-plan/some-item",
+        title="Some item",
+        status=ItemStatus.IN_PROGRESS,
+        plan_description="What the other plan is for.",
+    )
+    item = PlanItem(
+        {
+            **BRIEFED_ITEM.content,
+            ManifestKey.EXTERNAL_DEPENDENCIES.key: [record.content],
+        }
+    )
+
+    brief = yaml.safe_load(
+        ItemBrief(
+            manifest=BRIEFED_MANIFEST,
+            item=item,
+            dependencies=[],
+            standing_rules=[],
+            repository_rules=RepositoryRules(),
+        ).render()
+    )
+
+    assert brief[ItemBriefKey.EXTERNAL_DEPENDENCIES_GUIDANCE] == (
+        ExternalDependency.guidance
+    )
+
+
+def test_the_brief_of_an_item_without_external_dependencies_has_no_such_guidance(
+    briefed_repository: ScratchRepository,
+    pull_request_source: RecordedPullRequestSource,
+):
+    brief = read_brief(briefed_repository, pull_request_source)
+
+    assert ItemBriefKey.EXTERNAL_DEPENDENCIES_GUIDANCE not in brief

@@ -65,8 +65,9 @@ are the hook scripts here, which also work one at a time:
 
 Every session start also gives the `basstler` package an environment of the project's own,
 under `~/.local/share/basstler/environments` (`$BASSTLER_HOME/environments` when set), with every
-distribution synced into it by `uv sync --frozen` from the workspace's `uv.lock` - the checkout's,
-editable, or a shallow clone of the plugin's release under `releases/` - wherever any of that is
+distribution installed into it - from PyPI at the plugin's release, else synced by `uv sync --frozen`
+from the workspace's `uv.lock`, the checkout's, editable, or a shallow clone of the plugin's release
+under `releases/` - wherever any of that is
 missing or the plugin names another release, for a project whose personal-notes branch resolves — reported on its `dependencies:`
 line, never fatal, and described in the repository's `README.md`. Its `release:` line says
 whether the plugin and the package are one release, and its `environments:` line names the
@@ -301,6 +302,14 @@ allows `basstler.sh <module> [arguments...]` without asking, however the skill s
 command line that chains, pipes, redirects or substitutes anything (`;`, `&&`, `|`, `<`, `>`, `$(...)`,
 backticks), any other program, and a script path that is not this plugin's own root, gets no answer, so Claude Code asks as before. As with the attach hook,
 Claude Code's own permission classifier may still have the last word.
+
+## Marking the session's pull request viewed
+
+A `Stop` hook ([`basstler.review_triage.stop_hook`](../../src/basstler/review_triage/stop_hook.py))
+runs `basstler review-triage mark-viewed` for the open pull request of the checked-out branch when a turn ends.
+It does so once for each head commit GitHub reports, recorded under the git directory's `basstler/`, so a turn that
+pushed nothing costs one read. A branch without an open pull request is left alone, and a marking that fails
+is reported and tried again at the next turn.
 
 ## Safety
 

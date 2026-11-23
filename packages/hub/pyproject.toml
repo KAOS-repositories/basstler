@@ -7,6 +7,7 @@ name = "basstler-hub"
 description = "The plan site: the hub, each repository's index and each plan's page."
 requires-python = ">=3.12"
 license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{name = "Abdelrhman Bassiouny", email = "bido.bassuny@gmail.com"}]
 dynamic = ["version", "dependencies"]
 
@@ -20,6 +21,11 @@ dynamic = ["version", "dependencies"]
 [project.entry-points."basstler.landed_closing_follow_ups"]
 plan-site-rebuild = "basstler.plan_site.build_start:PlanSiteRebuild"
 
+# What this distribution adds to the default playbook: `basstler.playbook.contribution`
+# loads this group.
+[project.entry-points."basstler.contributions"]
+basstler-hub = "basstler.plan_site.contribution:HubContribution"
+
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "0.0.0"
@@ -27,6 +33,7 @@ raw-options = {root = "../.."}
 
 # Built with every basstler requirement pinned to this release.
 [tool.hatch.metadata.hooks.basstler-sibling-pins]
+family = "basstler"
 dependencies = [
     "cyclopts>=5.3",
     "pyyaml>=6",
@@ -43,6 +50,12 @@ dependencies = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/basstler"]
 
+# The repository's licence and notices, put at the root of the source distribution so
+# the wheel built from it carries them.
+[tool.hatch.build.targets.sdist.force-include]
+"../../LICENSE" = "LICENSE"
+"../../NOTICE" = "NOTICE"
+
 # What this distribution's tests need besides itself.
 [dependency-groups]
 dev = [
@@ -55,5 +68,6 @@ dev = [
     "basstler-notes",
     "basstler-plan",
     "basstler-reviews",
+    "basstler-review-triage",
     "basstler-stack",
 ]

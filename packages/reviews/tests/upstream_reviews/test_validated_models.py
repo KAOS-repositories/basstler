@@ -18,6 +18,8 @@ from basstler.json_model import ValidatedJSONModel
 
 from basstler_testing.upstream_reviews.replay import RecordedResponse
 
+from .test_command_line import UPSTREAM
+
 # %% reading an object
 
 
@@ -40,9 +42,9 @@ def test_a_connection_reads_the_same_entries_as_the_listed_ones():
     """
     Entries read out of a connection's nodes equal the same entries given as a list.
     """
-    thread = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded().pull_request.review_threads.threads[
-        0
-    ]
+    thread = RecordedResponse.PULL_REQUEST_PAGE_ONE.recorded(
+        UPSTREAM
+    ).pull_request.review_threads.threads[0]
 
     listed = ReviewThread(
         thread.identifier,

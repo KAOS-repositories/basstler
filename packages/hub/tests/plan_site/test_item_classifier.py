@@ -19,7 +19,7 @@ from basstler.plan_site.workflows import PlanSiteSecret
 
 from basstler_testing.constants.site import SitePlan, SiteSampleText
 from basstler_testing.github.pull_request_api import refusal
-from basstler_testing.plan_site.first_plan import ELSEWHERE_PULL_REQUEST
+from basstler_testing.plan.first_plan import ELSEWHERE_PULL_REQUEST
 
 # %% the warning an item on an unreadable repository shows
 

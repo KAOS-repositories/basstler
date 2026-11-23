@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 from basstler import directory_tree
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.checker import CodeRulesCheck
 from basstler.code_rules.fixes import SourceFixer
@@ -19,6 +19,8 @@ from basstler.directory_tree import DirectoryTree
 
 from basstler_testing.constants.paths import TreeRemovalSnippet
 
+from .marked_snippet import MarkedSnippet
+
 # %% removals
 
 
@@ -26,8 +28,24 @@ def test_every_shutil_rmtree_is_reported():
     """
     Each call is reported, whether or not it ignores errors.
     """
-    violations = TreeRemovalChecker().violations(TreeRemovalSnippet.SHUTIL_RMTREE)
-    assert [violation.first_line for violation in violations] == [10, 11]
+    snippet = MarkedSnippet(TreeRemovalSnippet.SHUTIL_RMTREE)
+    assert snippet.reported_lines(TreeRemovalChecker()) == snippet.marked_lines
+
+
+def test_a_rmtree_imported_under_another_name_is_reported():
+    """
+    The module is resolved through its imports, not matched by its spelling.
+    """
+    snippet = MarkedSnippet(TreeRemovalSnippet.IMPORTED_RMTREE)
+    assert snippet.reported_lines(TreeRemovalChecker()) == snippet.marked_lines
+
+
+def test_a_function_named_rmtree_that_is_not_the_shutil_one_is_not_reported():
+    """
+    A function or method sharing the name is not :func:`shutil.rmtree`.
+    """
+    snippet = MarkedSnippet(TreeRemovalSnippet.OTHER_RMTREE)
+    assert snippet.reported_lines(TreeRemovalChecker()) == snippet.marked_lines
 
 
 def test_the_module_removing_trees_is_not_reported():
@@ -58,7 +76,7 @@ def test_the_fix_leaves_a_call_with_an_error_handler_as_it_is():
     """
     Fixing changes nothing in a module whose only removal has a handler.
     """
-    source_file = PythonSourceFile(TreeRemovalSnippet.HANDLED_RMTREE)
+    source_file = EditablePythonSourceFile(TreeRemovalSnippet.HANDLED_RMTREE)
     fixed = SourceFixer((TreeRemovalChecker(),)).fix_module(
         source_file.parse(), source_file.path
     )

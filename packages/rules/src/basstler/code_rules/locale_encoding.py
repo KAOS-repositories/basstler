@@ -305,9 +305,9 @@ class LocaleEncodingChecker(FixableChecker[CallLackingKeywordArgument]):
     ) -> Iterator[CallLackingKeywordArgument]:
         for occurrence in LocaleTextCall.found_in(module):
             call = libcst.ensure_type(occurrence.node, libcst.Call)
-            if BinaryOpen.matches(call):
+            if BinaryOpen.matches(call, module.metadata):
                 continue
-            captured = LocaleTextCall.captures(call)
+            captured = LocaleTextCall.captures(call, module.metadata)
             yield CallLackingKeywordArgument(
                 occurrence.location,
                 call,

@@ -7,8 +7,7 @@ independently of any employer or institution and maintains it in the
 KAOS-repositories organization on GitHub; contributors keep the copyright on
 their contributions.
 
-src/basstler/exceptions.py, src/basstler/class_property.py and
-src/basstler/code_rules/{rule,rule_module,instructions}.py contain code adapted
+packages/core/src/basstler/{exceptions,class_property}.py contain code adapted
 from krrood (https://github.com/cram2/cognitive_robot_abstract_machine/tree/main/krrood),
 copyright the krrood authors, which remains licensed under the GNU Lesser
 General Public License, version 3 only (LGPL-3.0-only).

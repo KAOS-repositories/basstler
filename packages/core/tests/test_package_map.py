@@ -5,7 +5,13 @@ modules each one claims.
 
 from __future__ import annotations
 
+import tomllib
+from pathlib import Path
+from typing import Annotated
+
 import pytest
+import rustworkx
+from pydantic import Field
 
 from basstler.exceptions import (
     InconsistentPackageMap,
@@ -15,14 +21,20 @@ from basstler.exceptions import (
 from basstler.package_layout import package_modules
 from basstler.locations import PackageLocation
 from basstler.package_map import (
+    REQUIREMENT_NAME,
     Distribution,
     DistributionDeclaration,
     Layer,
     PackageMap,
     Workspace,
 )
+from basstler.json_model import ValidatedJSONModel
+from basstler.locations import WorkspaceLocation
 
-from basstler_testing.constants.paths import PackageBoundarySnippet
+from basstler_testing.constants.paths import (
+    PackageBoundarySnippet,
+    ThirdPartyImportSnippet,
+)
 
 # %% the workspace's map
 
@@ -62,6 +74,134 @@ def test_a_distribution_ships_its_part_and_lists_what_its_metadata_requires():
         ),
         DistributionDeclaration(Distribution.CORE, Distribution.CORE.layer, ("low",)),
     )
+
+
+# %% what each distribution's tests need
+
+
+class DependencyGroups(ValidatedJSONModel):
+    """
+    A distribution's ``[dependency-groups]`` table.
+    """
+
+    development: Annotated[tuple[str, ...], Field(alias="dev")] = ()
+    """
+    The requirement specifiers its tests need besides the distribution itself.
+    """
+
+
+class DevelopmentRequirements(ValidatedJSONModel):
+    """
+    The part of a distribution's ``pyproject.toml`` that says what its tests need.
+    """
+
+    dependency_groups: Annotated[DependencyGroups, Field(alias="dependency-groups")] = (
+        DependencyGroups()
+    )
+    """
+    Its dependency groups.
+    """
+
+    @classmethod
+    def read(cls, directory: Path) -> DevelopmentRequirements:
+        """
+        :param directory: A distribution's directory in the workspace.
+        :return: What its ``pyproject.toml`` lists for its tests.
+        """
+        return cls.from_json(
+            tomllib.loads(
+                (directory / WorkspaceLocation.METADATA).read_text(encoding="utf-8")
+            )
+        )
+
+
+WORKSPACE = Workspace(PackageLocation.SOURCE_TREE.value)
+"""
+This checkout's workspace.
+"""
+
+TESTED_ALONE = [
+    (directory, declaration.distribution)
+    for directory, declaration in zip(
+        WORKSPACE.package_directories, WORKSPACE.package_map.declarations, strict=True
+    )
+    if declaration.distribution is not Distribution.META_PACKAGE
+]
+"""
+Each distribution whose tests run in an environment of their own, with its directory;
+the meta-package's tests cover the whole workspace, its build tooling included.
+"""
+
+
+@pytest.mark.parametrize(
+    ("directory", "distribution"),
+    TESTED_ALONE,
+    ids=lambda value: value.name if isinstance(value, Path) else "",
+)
+def test_a_distributions_tests_need_no_distribution_it_does_not_require(
+    directory, distribution
+):
+    """
+    The basstler distributions a distribution's ``dev`` group lists are ones it
+    requires, directly or through another, so its tests run in an environment of its
+    own.
+    """
+    package_map = WORKSPACE.package_map
+    node = next(
+        index
+        for index in package_map.dependency_graph.node_indices()
+        if package_map.dependency_graph[index] is distribution
+    )
+    required = {
+        package_map.dependency_graph[index]
+        for index in rustworkx.descendants(package_map.dependency_graph, node)
+    }
+    names = {member.value for member in Distribution}
+
+    assert {
+        Distribution(name)
+        for name in (
+            REQUIREMENT_NAME.match(specifier).group()
+            for specifier in DevelopmentRequirements.read(
+                directory
+            ).dependency_groups.development
+        )
+        if name in names
+    } - required == set()
+
+
+# %% required libraries
+
+
+@pytest.fixture
+def library_package_map() -> PackageMap:
+    """
+    :return: The map of the dataset's workspace, whose lower distribution requires
+        ``pydantic``.
+    """
+    return Workspace(ThirdPartyImportSnippet.DIRECTORY.value).package_map
+
+
+def test_a_distribution_lists_the_libraries_its_metadata_requires(library_package_map):
+    """
+    The lower distribution lists ``pydantic``, whose version constraint is not part of
+    the name; the higher one lists no library of its own.
+    """
+    assert {
+        declaration.distribution: declaration.libraries
+        for declaration in library_package_map.declarations
+    } == {Distribution.CORE: ("pydantic",), Distribution.GIT: ()}
+
+
+def test_a_distribution_requires_the_libraries_of_the_distributions_it_lists(
+    library_package_map,
+):
+    """
+    The higher distribution lists no library, yet needs the lower one's.
+    """
+    assert library_package_map.libraries_required_by_distribution(Distribution.GIT) == {
+        "pydantic"
+    }
 
 
 # %% looking up a declaration

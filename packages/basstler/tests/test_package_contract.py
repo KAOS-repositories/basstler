@@ -35,7 +35,7 @@ from basstler.package_layout import (
     command_line_entry_points,
     package_modules,
 )
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
 
 from basstler_testing.constants.environment import (
@@ -288,6 +288,43 @@ def test_every_workflow_that_runs_a_module_installs_the_dependencies_first():
     ] == []
 
 
+WORKSPACE_SYNC = re.compile(r"uv sync[^\n]*--package basstler")
+"""
+A step that installs this package from a clone of the workspace.
+"""
+
+
+def test_every_workflow_that_installs_the_package_syncs_it_from_the_workspace():
+    """
+    The repository root is a virtual workspace with no package of its own, and the
+    sibling distributions are pinned to versions only the lock resolves.
+    """
+    installing = [
+        workflow_path
+        for workflow_path in sorted(WORKFLOWS_DIRECTORY.glob("*.yml"))
+        if DEPENDENCY_INSTALL.search(workflow_path.read_text(encoding="utf-8"))
+    ]
+
+    assert installing != []
+    assert [
+        workflow_path.name
+        for workflow_path in installing
+        if not WORKSPACE_SYNC.search(workflow_path.read_text(encoding="utf-8"))
+    ] == []
+
+
+def test_the_windows_workflow_accepts_a_shard_holding_none_of_a_distributions_tests():
+    """
+    A distribution with few tests has none in some shard, which pytest reports with the
+    status for no tests collected, not as a failure.
+    """
+    workflow_text = (WORKFLOWS_DIRECTORY / "windows-tests.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert f"-ne {int(pytest.ExitCode.NO_TESTS_COLLECTED)}" in workflow_text
+
+
 BASSTLER_REFERENCE = re.compile(
     r"(?:basstler/\.github/workflows/upstream-reviews\.yml@|basstler_branch_or_tag: )(\S+)"
 )
@@ -365,6 +402,16 @@ def test_the_shell_fetches_the_notes_branch_where_the_package_reads_it():
     assert (
         configuration_value(ConfigurationVariable.PERSONAL_NOTES_REFERENCE)
         == FetchedBranchReference.PERSONAL_NOTES
+    )
+
+
+def test_the_shell_keeps_progress_notes_where_the_package_reads_them():
+    """
+    :attr:`ProjectLocation.PULL_REQUEST_PROGRESS` mirrors ``PR_PROGRESS_DIRECTORY``.
+    """
+    assert (
+        configuration_value(ConfigurationVariable.PULL_REQUEST_PROGRESS_DIRECTORY)
+        == ProjectLocation.PULL_REQUEST_PROGRESS.as_posix()
     )
 
 

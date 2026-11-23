@@ -22,7 +22,7 @@ from basstler.github.pull_request import NewPullRequest, PullRequestDescription
 from basstler.git.branch import Branch
 from basstler.github.file_proposal import NewBranch
 from basstler.github.fork_sync import ForkFastForward
-from basstler.github.repository import Repository, RepositoryBranch
+from basstler.github.repository import Repository
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.locations import WorkflowLocation
 
@@ -54,8 +54,8 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     (LabelReplacement(REPOSITORY, 1, ["bug"]), {"labels": ["bug"]}),
     (
         NewPullRequest(
-            RepositoryBranch("main", REPOSITORY),
-            RepositoryBranch("feature", REPOSITORY),
+            Branch(REPOSITORY, "main"),
+            Branch(REPOSITORY, "feature"),
             "a title",
         ),
         {
@@ -68,8 +68,8 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     ),
     (
         NewPullRequest(
-            RepositoryBranch("main", REPOSITORY),
-            RepositoryBranch("feature", FORK),
+            Branch(REPOSITORY, "main"),
+            Branch(FORK, "feature"),
             "a title",
         ),
         {
@@ -81,11 +81,17 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
         },
     ),
     (
-        NewBranch(repository=REPOSITORY, object_hash="a-commit", name="feature"),
-        {"ref": Branch("feature").reference, "sha": "a-commit"},
+        NewBranch(
+            repository=REPOSITORY,
+            branch=Branch(REPOSITORY, "feature"),
+            start_commit="a-commit",
+        ),
+        {"ref": Branch(REPOSITORY, "feature").reference, "sha": "a-commit"},
     ),
     (
-        ForkFastForward(repository=FORK, object_hash="a-commit", branch=Branch("main")),
+        ForkFastForward(
+            repository=FORK, object_hash="a-commit", branch=Branch(FORK, "main")
+        ),
         {"sha": "a-commit"},
     ),
     (PullRequestDescription(REPOSITORY, 1, "a description"), {"body": "a description"}),

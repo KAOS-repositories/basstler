@@ -18,12 +18,10 @@ from pathlib import Path
 import pytest
 
 import basstler.setup.steps
+from basstler.github.stack_configuration import StackSetting
 from basstler.locations import PluginLocation, ProjectLocation
 from basstler.setup.report import CheckResult, CheckStatus, SetupCheck, SetupReport
 from basstler.setup.steps import SetupCommand, SetupCommandOption
-from basstler.github.stack_configuration import StackSetting
-
-from basstler_testing.constants.paths import PersonalNotesPath
 from basstler_testing.scratch_repository import SCRATCH_IDENTITY, ScratchRepository
 from basstler_testing.script_runner import PythonModuleRunner
 
@@ -312,7 +310,7 @@ def test_the_recorded_identity_is_read_after_the_action_check_fetched_its_branch
     upstream_repository: ScratchRepository,
 ):
     upstream_repository.update_notes_branch_file(
-        PersonalNotesPath.GIT_IDENTITY, SCRATCH_IDENTITY.as_git_config_file()
+        ProjectLocation.GIT_IDENTITY, SCRATCH_IDENTITY.as_git_config_file()
     )
     configure_upstream(upstream_repository, UpstreamSample.UPSTREAM)
     install_action(upstream_repository, "v0.0.1")

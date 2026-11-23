@@ -9,12 +9,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from pydantic import Field
 
 from basstler.git.branch import Branch
 from basstler.git.commands import GitCommandRunner
+from basstler.git.repository import GitRepository
 
 
 class GitHubAddress(StrEnum):
@@ -99,7 +100,7 @@ class MalformedRepositoryError(ValueError):
 
 
 @dataclass(frozen=True)
-class Repository:
+class Repository(GitRepository):
     """
     A GitHub repository, identified the way GitHub itself writes it.
     """
@@ -142,6 +143,18 @@ class Repository:
         if name:
             return cls.parse(name)
         return cls.from_remote_url(git.run("remote", "get-url", remote))
+
+    @classmethod
+    def from_configured_remote(
+        cls, git: GitCommandRunner, remote: str = "origin"
+    ) -> Repository:
+        """
+        :param git: A checkout.
+        :param remote: One of its remotes.
+        :return: The repository the URL the checkout configures for *remote* names, not
+            git's rewrite of that URL.
+        """
+        return cls.from_remote_url(git.run("config", "--get", f"remote.{remote}.url"))
 
     @staticmethod
     def is_full_name(text: str) -> bool:
@@ -276,13 +289,31 @@ class Repository:
         """
         return f"{self.url}/blob/{branch.name}/{file_path}"
 
-    def compare_url(self, base: Branch, head: RepositoryBranch) -> str:
+    def compare_url(self, base: Branch[Repository], head: Branch[Repository]) -> str:
         """
-        :param base: The branch of this repository the comparison merges into.
-        :param head: The branch compared against it.
-        :return: The page comparing the two, from which a pull request is opened.
+        :param base: A branch of this repository.
+        :param head: A branch of this repository or of a fork of it.
+        :return: The page comparing *head* with *base*.
         """
-        return f"{self.url}/compare/{base.name}...{head.name_from(self)}"
+        return f"{self.url}/compare/{base.name}...{self.head_name(head)}"
+
+    def head_name(self, head: Branch[Repository]) -> str:
+        """
+        :param head: A branch of this repository or of a fork of it.
+        :return: The branch as a pull request opened on this repository names its
+            head: its name on this repository, else its :meth:`branch_label`.
+        """
+        if head.repository == self:
+            return head.name
+        return head.repository.branch_label(head)
+
+    def branch_label(self, branch: Branch[Repository]) -> str:
+        """
+        :param branch: A branch of this repository.
+        :return: The ``owner:branch`` label naming it among the repository and its
+            forks.
+        """
+        return f"{self.owner}:{branch.name}"
 
     @property
     def new_actions_secret_url(self) -> str:
@@ -355,6 +386,14 @@ class Repository:
         :return: The REST path listing that pull request's reviews, oldest first.
         """
         return f"{self.pull_request_path(number)}/reviews"
+
+    def open_pull_requests_from_branch_path(self, branch: str) -> str:
+        """
+        :param branch: A branch of this repository itself.
+        :return: The REST path listing the open pull requests opened from that branch.
+        """
+        query = urlencode({"head": f"{self.owner}:{branch}", "state": "open"}, safe=":")
+        return f"{self.pull_requests_path}?{query}"
 
     def compare_path(self, base: str) -> str:
         """
@@ -464,30 +503,6 @@ class HasRepository:
 
 
 @dataclass(frozen=True)
-class RepositoryBranch(HasRepository, Branch):
-    """
-    A branch of one GitHub repository.
-    """
-
-    @property
-    def qualified_name(self) -> str:
-        """
-        The ``owner:branch`` form naming the branch among a repository and its forks.
-        """
-        return f"{self.repository.owner}:{self.name}"
-
-    def name_from(self, repository: Repository) -> str:
-        """
-        :param repository: The repository a pull request from this branch is opened on.
-        :return: The branch as that pull request names its head: :attr:`name` on the
-            same repository, else :attr:`qualified_name`.
-        """
-        if repository == self.repository:
-            return self.name
-        return self.qualified_name
-
-
-@dataclass(frozen=True)
 class PullRequestReference(HasRepository):
     """
     One pull request, named by the repository it is opened on and its number.
@@ -514,3 +529,11 @@ class PullRequestReference(HasRepository):
         The pull request's address in GitHub's REST pulls API.
         """
         return f"{GitHubAddress.API}/{self.repository.pull_request_path(self.number)}"
+
+    @property
+    def head_reference(self) -> str:
+        """
+        The ref the repository keeps the pull request's head commit under, whichever
+        repository its branch is on.
+        """
+        return f"refs/pull/{self.number}/head"

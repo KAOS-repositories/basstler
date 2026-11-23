@@ -10,10 +10,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from basstler.git.commands import GitCommandRunner
+from basstler.git.remote import Remote
 from basstler.git.remote_branch import RemoteBranch
 from basstler.json_model import JSONSerializable, ValidatedJSONModel
 
-from basstler_testing.maintenance.fork import ForkCheckout, RemoteName
+from basstler_testing.fork_checkout import ForkCheckout
+from basstler_testing.constants.stack import RemoteName
 
 # %% helpers
 
@@ -23,7 +25,7 @@ def branch_on_fork(checkout: ForkCheckout, name: str) -> RemoteBranch:
     :return: The branch called *name* on the checkout's fork remote.
     """
     return RemoteBranch(
-        name, GitCommandRunner(checkout.project_root), RemoteName.ORIGIN
+        Remote(GitCommandRunner(checkout.project_root), RemoteName.ORIGIN), name
     )
 
 
@@ -137,15 +139,15 @@ def test_writing_keeps_the_files_already_on_the_branch(fork_checkout):
     branch.write({"second.txt": "two"}, "Second")
 
     tip = branch.fetch()
-    assert branch.git.file_at(tip, "first.txt") == "one"
-    assert branch.git.file_at(tip, "second.txt") == "two"
+    assert branch.repository.git.file_at(tip, "first.txt") == "one"
+    assert branch.repository.git.file_at(tip, "second.txt") == "two"
 
 
 def test_a_file_the_branch_lacks_reads_as_none(fork_checkout):
     branch = branch_on_fork(fork_checkout, "notes/someone")
     branch.write({"first.txt": "one"}, "First")
 
-    assert branch.git.file_at(branch.fetch(), "missing.txt") is None
+    assert branch.repository.git.file_at(branch.fetch(), "missing.txt") is None
 
 
 def test_two_branches_of_one_remote_are_kept_apart(fork_checkout):
@@ -154,8 +156,8 @@ def test_two_branches_of_one_remote_are_kept_apart(fork_checkout):
     first.write({"file.txt": "first"}, "First")
     second.write({"file.txt": "second"}, "Second")
 
-    assert first.git.file_at(first.fetch(), "file.txt") == "first"
-    assert second.git.file_at(second.fetch(), "file.txt") == "second"
+    assert first.repository.git.file_at(first.fetch(), "file.txt") == "first"
+    assert second.repository.git.file_at(second.fetch(), "file.txt") == "second"
 
 
 def test_the_branch_s_url_is_its_remote_s_url(fork_checkout):
@@ -164,7 +166,7 @@ def test_the_branch_s_url_is_its_remote_s_url(fork_checkout):
     """
     branch = branch_on_fork(fork_checkout, "first")
 
-    assert branch.url == fork_checkout.fork_path.as_uri()
+    assert branch.repository.url == fork_checkout.fork_path.as_uri()
 
 
 def test_the_latest_file_is_read_from_the_remote_s_current_tip(fork_checkout):

@@ -23,7 +23,7 @@ from libcst.helpers import get_full_name_for_node
 from basstler.class_property import classproperty
 from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_modification.specification import Specification
 from basstler.code_rules.fixes import (
     BehaviourDeclaration,
@@ -80,7 +80,7 @@ class ModuleSource:
         """
         The file's syntax tree.
         """
-        return PythonSourceFile(self.path).parse()
+        return EditablePythonSourceFile(self.path).parse()
 
     @staticmethod
     def of_module(dotted_name: str) -> ModuleSource | None:
@@ -95,12 +95,11 @@ class ModuleSource:
         specification = importlib.util.find_spec(package)
         if specification is None or not specification.submodule_search_locations:
             return None
-        base = Path(next(iter(specification.submodule_search_locations))).joinpath(
-            *submodules
-        )
-        for candidate in (base.with_suffix(".py"), base / "__init__.py"):
-            if candidate.is_file():
-                return ModuleSource(candidate)
+        for location in specification.submodule_search_locations:
+            base = Path(location).joinpath(*submodules)
+            for candidate in (base.with_suffix(".py"), base / "__init__.py"):
+                if candidate.is_file():
+                    return ModuleSource(candidate)
         return None
 
 

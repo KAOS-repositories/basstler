@@ -11,7 +11,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
+from collections.abc import Mapping
 from functools import cache
+from types import MappingProxyType
 from importlib.metadata import version
 from itertools import takewhile
 from pathlib import Path
@@ -20,6 +22,7 @@ from cyclopts import App
 
 from basstler.locations import PackageLocation
 from basstler.package_layout import package_modules
+from basstler.package_map import Distribution
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -83,30 +86,19 @@ class RetiredSkill(Enum):
     A skill the plugin once shipped and no longer does.
     """
 
-    PLAN_DASHBOARD = Retirement(
-        replacement="drop it: every plan save rebuilds the plan's page on the plan "
-        "site; link a page with plan_site_page_url <plan-id> [<item-id>]",
-        major_version=3,
-    )
-    """
-    Republished a plan's dashboard after each save.
-    """
-
-    PLAN_SYNC = Retirement(
-        replacement="drop it: the plan site shows an item whose pull request merged "
-        "as done",
-        major_version=3,
-    )
-    """
-    Marked items whose pull request merged as done.
-    """
-
     @property
     def invoked_as(self) -> str:
         """
         The slash command that invoked it.
         """
         return "/" + self._name_.lower().replace("_", "-")
+
+    @classmethod
+    def retirements(cls) -> dict[str, Retirement]:
+        """
+        :return: Each retired skill's retirement, by the skill's name without the slash.
+        """
+        return {skill.invoked_as.removeprefix("/"): skill.value for skill in cls}
 
 
 @dataclass(frozen=True)
@@ -157,7 +149,7 @@ class ShippedModules:
         """:return: The modules and major release of the package this runs from."""
         return cls(
             frozenset(module.name for module in package_modules()),
-            int(version(PACKAGE_NAME).partition(".")[0]),
+            int(version(Distribution.NOTES).partition(".")[0]),
         )
 
     @property
@@ -241,19 +233,27 @@ class CitedNames:
             skills=frozenset(SKILL_CITATION.findall(text)),
         )
 
-    def stale(self, shipped: ShippedModules) -> list[StaleReference]:
+    def stale(
+        self,
+        shipped: ShippedModules,
+        retirements: Mapping[str, Retirement] = MappingProxyType(
+            RetiredSkill.retirements()
+        ),
+    ) -> list[StaleReference]:
         """
         :param shipped: What the installed package ships.
+        :param retirements: Each retired skill's retirement, by the skill's name without
+            the slash.
         :return: Every cited name it does not ship, skills retired in its major release
             first, each in name order.
         """
         retired = {
-            skill.invoked_as.removeprefix("/"): skill
-            for skill in RetiredSkill
-            if skill.value.major_version >= shipped.major_version
+            name: retirement
+            for name, retirement in retirements.items()
+            if retirement.major_version >= shipped.major_version
         }
         skills = [
-            StaleReference(retired[name].invoked_as, retired[name].value.replacement)
+            StaleReference(f"/{name}", retired[name].replacement)
             for name in sorted(self.skills & retired.keys())
         ]
         modules = []

@@ -22,13 +22,15 @@ import pytest
 import yaml
 
 from basstler.bash import Bash
+from basstler.git.branch import Branch
+from basstler.git.remote_branch import RemoteBranch
 from basstler.environment import GitHubCredentialVariable
 from basstler.git.commands import (
     GitCommandFailed,
     GitCommandResult,
     GitCommandRunner,
 )
-from basstler.github.remote_branch import GitHubRemoteBranch
+from basstler.github.remote import GitHubRemote
 from basstler.github.actions_budget import ActionsBudget
 from basstler.github.client import (
     GitHubReader,
@@ -49,7 +51,6 @@ from basstler.github.repository import (
     GitHubAddress,
     NewTokenPage,
     Repository,
-    RepositoryBranch,
 )
 from basstler.github.rest_models import RestPullRequestSummary
 from basstler.github.token_form import CreateToken, StoreToken, TokenStep
@@ -99,13 +100,13 @@ from basstler.plan_site.workflows import (
     WorkflowStep,
 )
 from basstler.review_triage.viewed_request import ReviewTriageSecret
-from basstler.setup.steps import PersonalNotesSetting
+from basstler.shell_configuration import PersonalNotesSetting
 from basstler.upstream_reviews.action.branch import BasstlerSource
 
 from basstler_testing.executable_stubs import NEEDS_SCRIPT_AS_EXECUTABLE
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.constants.stack import RemoteName
-from basstler_testing.maintenance.fork import UPSTREAM_BASE, ForkCheckout
+from basstler_testing.fork_checkout import UPSTREAM_BASE, ForkCheckout
 from basstler_testing.upstream_reviews.replay import ReplayingRestClient
 from basstler.text_file import TextFile
 
@@ -361,10 +362,8 @@ class Publishing:
         :return: The merge workflow as publishing proposes it into *base*.
         """
         return MergeWorkflowProposal(
-            RepositoryBranch(base, self.notes_repository),
-            RepositoryBranch(
-                PlanSitePublication.merge_workflow_branch, self.notes_repository
-            ),
+            Branch(self.notes_repository, base),
+            Branch(self.notes_repository, PlanSitePublication.merge_workflow_branch),
         )
 
     @property
@@ -774,13 +773,14 @@ def test_a_written_dispatch_workflow_reads_back_its_site_repository():
 # %% the site the notes branch records
 
 
-def notes_branch_of(fork_checkout: ForkCheckout) -> GitHubRemoteBranch:
+def notes_branch_of(fork_checkout: ForkCheckout) -> RemoteBranch[GitHubRemote]:
     """
     :param fork_checkout: The fork checkout.
     :return: Its notes branch on ``origin``.
     """
-    return GitHubRemoteBranch(
-        NOTES_BRANCH, GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN
+    return RemoteBranch(
+        GitHubRemote(GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN),
+        NOTES_BRANCH,
     )
 
 
@@ -1006,8 +1006,9 @@ def test_a_merge_workflow_branch_without_the_default_branch_s_history_is_rebuilt
     """
     publishing.create(publishing.site.repository)
     publication = publishing.publication(publishing.runs_none())
-    GitHubRemoteBranch(
-        publication.merge_workflow_branch, publication.git, RemoteName.ORIGIN
+    RemoteBranch(
+        GitHubRemote(publication.git, RemoteName.ORIGIN),
+        publication.merge_workflow_branch,
     ).write(
         {
             MergeWorkflow.location.as_posix(): MergeWorkflow(
@@ -1105,10 +1106,11 @@ def test_a_build_starting_workflow_keeps_to_the_actions_budget(
 def stale_merge_workflow(published: Publishing) -> Publishing:
     """:return: A notes repository whose default branch holds the merge workflow as an
     earlier release wrote it."""
-    GitHubRemoteBranch(
+    RemoteBranch(
+        GitHubRemote(
+            GitCommandRunner(published.checkout.project_root), RemoteName.ORIGIN
+        ),
         UPSTREAM_BASE,
-        GitCommandRunner(published.checkout.project_root),
-        RemoteName.ORIGIN,
     ).write(
         {
             MergeWorkflow.location.as_posix(): (

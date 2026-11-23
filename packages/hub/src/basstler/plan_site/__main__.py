@@ -68,8 +68,7 @@ from basstler.plan_site.plan_page import PlanPage, RenderedPlanPage
 from basstler.plan_site.plan_page_header import PlanPageHeader
 from basstler.regular_expression import (
     CharacterSet,
-    MarkupClosingTag,
-    MarkupTag,
+    MarkupElement,
     RegularExpression,
 )
 from basstler.standard_streams import StandardStreamHandler
@@ -128,15 +127,13 @@ class SiteDigest:
         >>> pattern.search(b'<p><time data-refreshed-at="1">12:00</time></p>')[0]
         b'<time data-refreshed-at="1">12:00</time>'
         """
-        return RegularExpression.sequence(
-            MarkupTag(
-                "time ",
-                CharacterSet.any_except(">").zero_or_more(),
-                PlanTimeAttribute.REFRESHED,
-                CharacterSet.any_except(">").zero_or_more(),
-            ),
+        any_other_attributes = CharacterSet.any_except(">").zero_or_more()
+        return MarkupElement(
+            "time",
             CharacterSet.any_except("<").zero_or_more(),
-            MarkupClosingTag("time"),
+            attributes=RegularExpression.sequence(
+                any_other_attributes, PlanTimeAttribute.REFRESHED, any_other_attributes
+            ),
         ).compiled_for_bytes()
 
     @property

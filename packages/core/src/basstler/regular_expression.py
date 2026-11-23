@@ -10,6 +10,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 
+from basstler.markdown_code_block import CodeBlockLanguage
+
 # %% the parts a pattern is built from
 
 
@@ -425,7 +427,7 @@ class RegularExpression(PatternPart):
 
 class EnclosedPattern(PatternPart, ABC):
     """
-    A pattern between an opening and a closing delimiter, which match as written.
+    A pattern between an opening and a closing delimiter.
     """
 
     content: RegularExpression
@@ -441,16 +443,16 @@ class EnclosedPattern(PatternPart, ABC):
 
     @property
     @abstractmethod
-    def opening(self) -> str:
+    def opening(self) -> PatternPiece:
         """
-        The text before the content.
+        What comes before the content, matched as written when it is text.
         """
 
     @property
     @abstractmethod
-    def closing(self) -> str:
+    def closing(self) -> PatternPiece:
         """
-        The text after the content.
+        What comes after the content, matched as written when it is text.
         """
 
     def __str__(self) -> str:
@@ -545,6 +547,54 @@ class MarkupClosingTag(EnclosedPattern):
         return ">"
 
 
+class MarkupElement(EnclosedPattern):
+    """
+    A pattern between the opening and the closing tag of one HTML element.
+
+    >>> element = MarkupElement("time", CharacterClass.DIGIT.one_or_more())
+    >>> element.compiled().findall('<time>12</time> <time id="a">3</time> <p>4</p>')
+    ['<time>12</time>']
+    """
+
+    tag_name: str
+    """
+    The name both tags carry, as ``time`` in ``<time>``.
+    """
+
+    attributes: RegularExpression | None
+    """
+    The attributes the opening tag carries after its name, or ``None`` for a tag
+    without attributes.
+    """
+
+    def __init__(
+        self,
+        tag_name: str,
+        *pieces: PatternPiece,
+        attributes: PatternPiece | None = None,
+    ) -> None:
+        """
+        :param tag_name: The name both tags carry.
+        :param pieces: The parts matched between the tags, in order.
+        :param attributes: The attributes the opening tag carries after its name.
+        """
+        super().__init__(*pieces)
+        self.tag_name = tag_name
+        self.attributes = (
+            None if attributes is None else RegularExpression.sequence(attributes)
+        )
+
+    @property
+    def opening(self) -> MarkupTag:
+        if self.attributes is None:
+            return MarkupTag(self.tag_name)
+        return MarkupTag(self.tag_name, Separator.SPACE, self.attributes)
+
+    @property
+    def closing(self) -> MarkupClosingTag:
+        return MarkupClosingTag(self.tag_name)
+
+
 class HtmlComment(EnclosedPattern):
     """
     A pattern between the delimiters of an HTML comment.
@@ -567,17 +617,19 @@ class CodeFence(EnclosedPattern):
     A pattern between the fences of a Markdown code block in one language, the content
     starting on the line after the opening fence.
 
-    >>> block = CodeFence("bash", Wildcard.ANY_CHARACTER.zero_or_more(shortest=True))
+    >>> block = CodeFence(
+    ...     CodeBlockLanguage.BASH, Wildcard.ANY_CHARACTER.zero_or_more(shortest=True)
+    ... )
     >>> block.compiled().findall("```bash\nls\n```")
     ['```bash\nls\n```']
     """
 
-    language: str
+    language: CodeBlockLanguage
     """
     The language the opening fence names.
     """
 
-    def __init__(self, language: str, *pieces: PatternPiece) -> None:
+    def __init__(self, language: CodeBlockLanguage, *pieces: PatternPiece) -> None:
         """
         :param language: The language the opening fence names.
         :param pieces: The parts matched between the fences, in order.
@@ -587,8 +639,8 @@ class CodeFence(EnclosedPattern):
 
     @property
     def opening(self) -> str:
-        return f"```{self.language}\n"
+        return f"{self.language.opening_fence}\n"
 
     @property
     def closing(self) -> str:
-        return "```"
+        return CodeBlockLanguage.fence

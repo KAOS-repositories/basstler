@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from basstler.markdown_code_block import CodeBlockLanguage
 from basstler.bash import Bash
 from basstler.class_property import classproperty
 from basstler.locations import (
@@ -138,7 +139,7 @@ class SkillDocumentPattern:
             Anchor.LINE_START,
             Separator.SPACE.zero_or_more().captured_as(BashBlockGroup.INDENTATION),
             CodeFence(
-                "bash",
+                CodeBlockLanguage.BASH,
                 Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
                     BashBlockGroup.COMMANDS
                 ),

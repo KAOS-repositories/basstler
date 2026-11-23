@@ -13,8 +13,6 @@ import sys
 from dataclasses import dataclass
 from typing import TextIO
 
-from tqdm import tqdm
-
 
 @dataclass(eq=False)
 class StandardStreamHandler(logging.Handler):
@@ -49,12 +47,11 @@ class StandardStreamHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         """
-        Write *record*'s message, and a line break, to its standard stream, above any
-        progress bar drawn at the time.
+        Write *record*'s message, and a line break, to its standard stream.
 
         :param record: The record to write.
         """
-        tqdm.write(self.format(record), file=self.stream_for(record))
+        self.stream_for(record).write(f"{self.format(record)}\n")
 
     @staticmethod
     def import_name(module_name: str) -> str:
@@ -68,6 +65,13 @@ class StandardStreamHandler(logging.Handler):
         """
         return sys.modules[module_name].__spec__.name
 
+    @staticmethod
+    def package_logger() -> logging.Logger:
+        """
+        :return: The logger every module's logger is under.
+        """
+        return logging.getLogger(__package__)
+
     @classmethod
     def logger_for(cls, module_name: str) -> logging.Logger:
         """
@@ -79,7 +83,7 @@ class StandardStreamHandler(logging.Handler):
         :param module_name: The ``__name__`` of a module inside the package.
         :return: That module's logger.
         """
-        package_logger = logging.getLogger(__package__)
+        package_logger = cls.package_logger()
         if not any(isinstance(handler, cls) for handler in package_logger.handlers):
             package_logger.addHandler(cls())
             package_logger.setLevel(logging.INFO)

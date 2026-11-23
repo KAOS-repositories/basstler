@@ -5,11 +5,15 @@ print through.
 
 from __future__ import annotations
 
+import ast
 import logging
+import sys
 from enum import StrEnum
+from pathlib import Path
 
 import basstler
 import basstler.standard_streams
+from basstler.python_source_file import PythonSourceFile
 from basstler.standard_streams import StandardStreamHandler
 
 MODULE_NAME = basstler.standard_streams.__name__
@@ -91,3 +95,29 @@ def test_asking_for_loggers_twice_attaches_one_handler():
         )
         == 1
     )
+
+
+# %% what it may import
+
+
+def test_the_module_imports_only_the_standard_library():
+    """
+    The dependency check logs through this module before anything is installed, so the
+    module imports nothing beyond the standard library.
+    """
+    tree = ast.parse(PythonSourceFile(Path(basstler.standard_streams.__file__)).read())
+    imported = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    assert {
+        name
+        for name in imported
+        if name.partition(".")[0] not in sys.stdlib_module_names
+    } == set()

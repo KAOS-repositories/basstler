@@ -183,6 +183,17 @@ class PackageLocation(PathEnumeration):
     :attr:`ShippedPath.UPSTREAM_REVIEWS_FETCH`, where the reviews distribution ships it.
     """
 
+    META_PACKAGE_METADATA = (
+        SOURCE_TREE
+        / WorkspaceLocation.PACKAGES
+        / DIRECTORY.name
+        / WorkspaceLocation.METADATA
+    )
+    """
+    The ``basstler`` distribution's metadata in a checkout: its name, the interpreters
+    it supports and where its version is read from.
+    """
+
 
 class RepositoryStateLocation(PathEnumeration):
     """
@@ -259,6 +270,23 @@ class PluginLocation(PluginFile):
     The helper that creates the personal-notes branch where it does not exist yet.
     """
 
+    HOOK_REGISTRATIONS = HOOKS / "hooks.json"
+    """
+    The hooks the plugin registers with Claude Code, generated from the playbook.
+    """
+
+    ENTRY_POINT_SCRIPT = HOOKS / "basstler.sh"
+    """
+    Runs one module of the package once the package is ready to run, saying in one
+    line why when it cannot be.
+    """
+
+    SESSION_START_SCRIPT = HOOKS / "session-start.sh"
+    """
+    The session-start hook: sets up the package's environment and loads the personal
+    notes.
+    """
+
     SESSION_START_MESSAGES_SCRIPT = HOOKS / "session-start-messages.sh"
     """
     The messages the session-start hook prints, sourced by it.
@@ -298,6 +326,50 @@ class PluginLocation(PluginFile):
         message that names it without knowing the root.
         """
         return f"${BasstlerVariable.PLUGIN_ROOT}/{self}"
+
+
+class BasstlerRepositoryLocation(PathEnumeration):
+    """
+    The directories of basstler's own repository a release reads, relative to its root.
+    """
+
+    PLUGIN = Path("plugin")
+    """
+    The Claude Code plugin.
+    """
+
+
+class PluginSkillLocation(PluginFile):
+    """
+    The files of the plugin's skills this package reads, relative to the plugin's root.
+    """
+
+    SKILLS = Path("skills")
+    """
+    The directory holding one directory per skill.
+    """
+
+
+class InstructionsTemplate(PathEnumeration):
+    """
+    The templates the agent instruction files are rendered from.
+    """
+
+    SKILL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "skill.md.jinja")
+    """
+    The content of a skill's ``SKILL.md``: its frontmatter and title above its body.
+    """
+
+
+class SkillLocation(PathEnumeration):
+    """
+    The files every skill carries, relative to the skill's own directory.
+    """
+
+    INSTRUCTIONS = Path("SKILL.md")
+    """
+    The instructions Claude Code loads the skill from.
+    """
 
 
 class ProjectLocation(PathEnumeration):
@@ -347,6 +419,26 @@ class ProjectLocation(PathEnumeration):
     The per-user override of :attr:`PROJECT_STACK_CONFIGURATION`.
     """
 
+    PLAYBOOK = Path("basstler_playbook.py")
+    """
+    The module declaring the project's own playbook, where it has one.
+    """
+
+    PLAN_BRANCH_INDEX = PLANS / "_generated" / "branch-index.tsv"
+    """
+    The generated index naming the plan each item branch belongs to.
+
+    Mirrors ``PLAN_BRANCH_INDEX_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
+    GIT_IDENTITY = PERSONAL_NOTES / "git-identity"
+    """
+    The git identity of the notes repository's owner, which a clone with none of its own
+    is given.
+
+    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
 
 class WorkflowLocation(PathEnumeration):
     """
@@ -357,6 +449,17 @@ class WorkflowLocation(PathEnumeration):
     DIRECTORY = Path(".github") / "workflows"
     """
     Where GitHub reads a branch's workflows from.
+    """
+
+    MARK_VIEWED = DIRECTORY / "mark-viewed.yml"
+    """
+    The workflow on the user's repository that calls :attr:`~basstler.review_triage.locations.ReviewTriageWorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED`
+    with the user's own token.
+    """
+
+    PLAN_SITE = DIRECTORY / "plan-site.yml"
+    """
+    The workflow on the user's site repository that calls :attr:`~basstler.plan_site.locations.SiteWorkflowLocation.PLAN_SITE_BUILD`.
     """
 
 

@@ -6,7 +6,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from basstler.locations import INSTALLED_PACKAGE, PathEnumeration, ShippedPath
+from basstler.locations import (
+    INSTALLED_PACKAGE,
+    PathEnumeration,
+    ShippedPath,
+    BasstlerRepositoryLocation,
+)
 
 
 class GitHubTemplate(PathEnumeration):
@@ -49,17 +54,14 @@ class GitHubProjectLocation(PathEnumeration):
     """
 
 
-class BasstlerRepositoryLocation(PathEnumeration):
+class ReleaseRepositoryLocation(PathEnumeration):
     """
-    The directories of basstler's own repository a release reads, relative to its root.
-    """
-
-    PLUGIN = Path("plugin")
-    """
-    The Claude Code plugin.
+    The files of basstler's own repository a release reads, relative to its root.
     """
 
-    PLUGIN_MANIFEST = PLUGIN / ".claude-plugin" / "plugin.json"
+    PLUGIN_MANIFEST = (
+        BasstlerRepositoryLocation.PLUGIN / ".claude-plugin" / "plugin.json"
+    )
     """
     The plugin's manifest: its name, description and, once released, version.
     """

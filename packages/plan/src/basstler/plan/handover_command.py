@@ -44,7 +44,7 @@ class PlanHandoverExitCode(ExitCode):
 
 
 plan_handover_app = App(
-    name=PlanHandoverCommand.GROUP,
+    name=PlanHandoverCommand.group,
     help="Hand plans over to another person, and take handed-over plans on.",
 )
 """

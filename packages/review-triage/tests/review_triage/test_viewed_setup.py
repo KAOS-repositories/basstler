@@ -39,7 +39,7 @@ from basstler.github.user_steps import (
     MergePullRequest,
     SyncFork,
 )
-from basstler.review_triage.locations import ReviewTriageWorkflowLocation
+from basstler.locations import WorkflowLocation
 from basstler.review_triage.exceptions import MarkViewedWorkflowRefused
 from basstler.review_triage.viewed_request import ReviewTriageSecret
 from basstler.review_triage.viewed_setup import (
@@ -81,7 +81,7 @@ WORKFLOW_PROPOSAL_BRANCH = Branch(FORK, ProposalBranch.MARK_VIEWED)
 The branch the setup proposes the workflow on.
 """
 
-WORKFLOW_FILE_PATH = ReviewTriageWorkflowLocation.MARK_VIEWED.as_posix()
+WORKFLOW_FILE_PATH = WorkflowLocation.MARK_VIEWED.as_posix()
 """
 The workflow file's path from the repository's root.
 """
@@ -99,7 +99,7 @@ class Resource:
     PROPOSED_FILE = FORK.contents_path(
         WORKFLOW_FILE_PATH, WORKFLOW_PROPOSAL_BRANCH.name
     )
-    WORKFLOW = FORK.workflow_resource_path(ReviewTriageWorkflowLocation.MARK_VIEWED)
+    WORKFLOW = FORK.workflow_resource_path(WorkflowLocation.MARK_VIEWED)
     SECRET = ReviewTriageSecret.VIEWER_TOKEN.path_on(FORK)
 
 
@@ -256,7 +256,7 @@ def test_a_fork_s_proposal_leaves_only_its_merge():
     assert setup.user_steps == [
         MergePullRequest(
             UPSTREAM.pull_request_url(3),
-            f"adding {ReviewTriageWorkflowLocation.MARK_VIEWED.name}",
+            f"adding {WorkflowLocation.MARK_VIEWED.name}",
         )
     ]
 
@@ -287,7 +287,7 @@ def test_a_fast_forwarded_fork_has_its_workflow_enabled():
     client = merged_upstream_answers(WORKFLOW={"state": "disabled_fork"})
     MarkViewedSetup(FORK).run(client)
     assert sent_of(client, WorkflowEnabling) == [
-        WorkflowEnabling(FORK, ReviewTriageWorkflowLocation.MARK_VIEWED)
+        WorkflowEnabling(FORK, WorkflowLocation.MARK_VIEWED)
     ]
 
 
@@ -425,9 +425,7 @@ def test_actions_turned_off_are_turned_on():
 def test_a_disabled_workflow_is_enabled():
     client = answers(WORKFLOW={"state": "disabled_fork"})
     MarkViewedSetup(FORK).run(client)
-    assert client.sent == [
-        WorkflowEnabling(FORK, ReviewTriageWorkflowLocation.MARK_VIEWED)
-    ]
+    assert client.sent == [WorkflowEnabling(FORK, WorkflowLocation.MARK_VIEWED)]
 
 
 def test_a_refused_setting_leaves_its_manual_step():
@@ -479,7 +477,7 @@ def test_the_settings_of_a_repository_that_is_no_fork_are_left_to_the_user():
         [],
         [
             AllowActions(FORK, known_off=True),
-            EnableWorkflow(FORK, ReviewTriageWorkflowLocation.MARK_VIEWED),
+            EnableWorkflow(FORK, WorkflowLocation.MARK_VIEWED),
         ],
     )
 
@@ -521,9 +519,9 @@ def test_basstler_s_own_caller_is_the_workflow_the_setup_writes():
     """
     Basstler's own repository runs the workflow the setup writes.
     """
-    installed = (
-        RepositoryLocation.ROOT / ReviewTriageWorkflowLocation.MARK_VIEWED
-    ).read_text(encoding="utf-8")
+    installed = (RepositoryLocation.ROOT / WorkflowLocation.MARK_VIEWED).read_text(
+        encoding="utf-8"
+    )
     assert installed == MarkViewedSetup(BasstlerProject.repository).caller_workflow
 
 
@@ -534,7 +532,7 @@ def test_the_workflow_runs_only_when_started(tmp_path: Path):
     """
     The files are marked when someone asks, never by a pull request event.
     """
-    written = tmp_path / ReviewTriageWorkflowLocation.MARK_VIEWED.name
+    written = tmp_path / WorkflowLocation.MARK_VIEWED.name
     written.write_text(MarkViewedSetup(FORK).caller_workflow, encoding="utf-8")
     assert [trigger.event for trigger in Workflow.at(written).triggers] == [
         TriggerEvent.WORKFLOW_DISPATCH
@@ -689,7 +687,7 @@ def test_a_carrying_pull_request_on_another_base_says_what_it_merges_into():
     setup = MarkViewedSetup(FORK)
     client = carried_workflow(setup, "a-stacked-base", setup.caller_workflow)
     setup.run(client)
-    installed = f"the {ReviewTriageWorkflowLocation.MARK_VIEWED.name} workflow on"
+    installed = f"the {WorkflowLocation.MARK_VIEWED.name} workflow on"
     (reason,) = [
         step.reason for step in setup.steps if step.description.startswith(installed)
     ]

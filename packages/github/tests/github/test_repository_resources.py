@@ -17,7 +17,7 @@ from basstler.github.actions_settings import (
 )
 from basstler.github.repository import Repository
 from basstler.github.user_steps import AllowActions, EnableWorkflow
-from basstler.review_triage.locations import ReviewTriageWorkflowLocation
+from basstler.locations import WorkflowLocation
 
 from basstler_testing.github.path_answering_client import PathAnsweringClient
 
@@ -59,10 +59,8 @@ def test_each_setting_write_names_the_setting_it_changes():
 def test_each_setting_write_is_taken_by_hand_as_its_own_user_step():
     assert (
         ActionsEnabling(REPOSITORY).manual_step,
-        WorkflowEnabling(
-            REPOSITORY, ReviewTriageWorkflowLocation.MARK_VIEWED
-        ).manual_step,
+        WorkflowEnabling(REPOSITORY, WorkflowLocation.MARK_VIEWED).manual_step,
     ) == (
         AllowActions(REPOSITORY, known_off=True),
-        EnableWorkflow(REPOSITORY, ReviewTriageWorkflowLocation.MARK_VIEWED),
+        EnableWorkflow(REPOSITORY, WorkflowLocation.MARK_VIEWED),
     )

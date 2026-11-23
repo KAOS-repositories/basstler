@@ -82,12 +82,6 @@ class ReviewTriageWorkflowLocation(PathEnumeration):
     basstler's reusable workflow that marks a pull request's mechanical files viewed.
     """
 
-    MARK_VIEWED = WorkflowLocation.DIRECTORY / "mark-viewed.yml"
-    """
-    The workflow on the user's repository that calls :attr:`REVIEW_TRIAGE_MARK_VIEWED`
-    with the user's own token.
-    """
-
 
 class ReviewTriageRepositoryLocation(PathEnumeration):
     """

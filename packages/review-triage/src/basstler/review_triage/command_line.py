@@ -108,7 +108,7 @@ class TriagePublication:
 # %% the commands
 
 review_triage_app = App(
-    name=ReviewTriageCommand.GROUP,
+    name=ReviewTriageCommand.group,
     help="Tell a pull request's mechanical files from those a reviewer has to read.",
 )
 """

@@ -8,7 +8,6 @@ from enum import StrEnum
 from pathlib import Path
 
 from basstler.locations import PackageLocation, PathEnumeration, ProjectLocation
-from basstler.plan.locations import PlanProjectLocation
 
 
 class RepositoryLocation(PathEnumeration):
@@ -757,7 +756,7 @@ class PersonalNotesPath(PathEnumeration):
     and writes its own permission grants into.
     """
 
-    BRANCH_INDEX = PlanProjectLocation.PLAN_BRANCH_INDEX
+    BRANCH_INDEX = ProjectLocation.PLAN_BRANCH_INDEX
     """
     The generated reverse index mapping an item's branch to the plan tracking it.
     """
@@ -1056,6 +1055,51 @@ class RuleFixExampleFile(StrEnum):
     AFTER = "after.py"
     """
     The same code once fixed, exactly as the fix writes it.
+    """
+
+
+class PlaybookSnippet(PathEnumeration):
+    """
+    Projects' playbook modules and a plugin built from a playbook.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "playbook"
+    """
+    The snippets' directory.
+    """
+
+    DECLARED = DIRECTORY / "declared"
+    """
+    A project whose playbook module declares a playbook of basstler-core alone.
+    """
+
+    EMPTY = DIRECTORY / "empty"
+    """
+    A project whose playbook module declares a playbook with no components.
+    """
+
+    UNDECLARED = DIRECTORY / "undeclared"
+    """
+    A project whose playbook module assigns something other than a playbook.
+    """
+
+    PLUGIN = DIRECTORY / "plugin"
+    """
+    A plugin shipping a declared skill's instructions, a skill nothing
+    declares, a directory that is no skill, and the hook registrations of a
+    session-start hook and a shell-tool hook.
+    """
+
+    STALE_PLUGIN = DIRECTORY / "stale-plugin"
+    """
+    A plugin whose declared skill's instructions carry an outdated frontmatter and
+    title above the body of :attr:`PLUGIN`'s.
+    """
+
+    BODY_ONLY_PLUGIN = DIRECTORY / "body-only-plugin"
+    """
+    A plugin whose declared skill's instructions hold only the body of :attr:`PLUGIN`'s,
+    as a new skill's do before its first build.
     """
 
 

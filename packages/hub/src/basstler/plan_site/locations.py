@@ -7,8 +7,6 @@ from __future__ import annotations
 from basstler.locations import (
     INSTALLED_PACKAGE,
     PathEnumeration,
-    PluginFile,
-    PluginLocation,
     ProjectLocation,
     ShippedPath,
     WorkflowLocation,
@@ -93,19 +91,14 @@ class SiteWorkflowLocation(PathEnumeration):
     basstler's reusable workflow that builds and deploys the plan site.
     """
 
-    PLAN_SITE = WorkflowLocation.DIRECTORY / "plan-site.yml"
-    """
-    The workflow on the user's site repository that calls :attr:`PLAN_SITE_BUILD`.
-    """
-
     PLAN_SITE_DISPATCH = WorkflowLocation.DIRECTORY / "plan-site-dispatch.yml"
     """
-    The workflow on a notes branch that starts :attr:`PLAN_SITE` on every push to it.
+    The workflow on a notes branch that starts :attr:`~basstler.locations.WorkflowLocation.PLAN_SITE` on every push to it.
     """
 
     PLAN_SITE_MERGE = WorkflowLocation.DIRECTORY / "plan-site-merge.yml"
     """
-    The workflow on a notes repository's default branch that starts :attr:`PLAN_SITE`
+    The workflow on a notes repository's default branch that starts :attr:`~basstler.locations.WorkflowLocation.PLAN_SITE`
     whenever a pull request merges.
     """
 
@@ -120,16 +113,4 @@ class SiteProjectLocation(PathEnumeration):
     The plan hub file: the site's address and every repository it publishes.
 
     Mirrors ``PLAN_HUB_PATH`` in ``resolve-personal-notes-config.sh``.
-    """
-
-
-class SitePluginLocation(PluginFile):
-    """
-    The plugin's scripts the plan site names, relative to the plugin's root.
-    """
-
-    ENTRY_POINT_SCRIPT = PluginLocation.HOOKS / "basstler.sh"
-    """
-    Runs one module of the package once the package is ready to run, saying in one
-    line why when it cannot be.
     """

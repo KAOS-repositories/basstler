@@ -9,7 +9,7 @@ from http import HTTPStatus
 import pytest
 
 from basstler.github.repository_details import RepositoryDetailsRead
-from basstler.review_triage.locations import ReviewTriageWorkflowLocation
+from basstler.locations import WorkflowLocation
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.client import GitHubWriter
@@ -67,7 +67,7 @@ def test_the_workflow_runs_on_the_default_branch_for_the_pull_request():
     assert client.sent == [
         MarkViewedDispatch(
             FORK,
-            ReviewTriageWorkflowLocation.MARK_VIEWED,
+            WorkflowLocation.MARK_VIEWED,
             DEFAULT_BRANCH,
             MarkViewedInputs(
                 str(REQUEST.pull_request.number), SAMPLE_REPOSITORY.full_name
@@ -83,7 +83,7 @@ def test_the_dispatch_sends_the_branch_and_the_inputs():
     """
     inputs = MarkViewedInputs("7", SAMPLE_REPOSITORY.full_name)
     dispatch = MarkViewedDispatch(
-        FORK, ReviewTriageWorkflowLocation.MARK_VIEWED, DEFAULT_BRANCH, inputs
+        FORK, WorkflowLocation.MARK_VIEWED, DEFAULT_BRANCH, inputs
     )
 
     assert dispatch.to_json() == {"ref": DEFAULT_BRANCH, "inputs": inputs.to_json()}
@@ -95,10 +95,7 @@ def test_the_answer_points_to_the_workflow_s_runs():
     """
     runs = REQUEST.send(WorkflowRepositoryClient())
 
-    assert (
-        runs
-        == f"{FORK.url}/actions/workflows/{ReviewTriageWorkflowLocation.MARK_VIEWED.name}"
-    )
+    assert runs == f"{FORK.url}/actions/workflows/{WorkflowLocation.MARK_VIEWED.name}"
 
 
 def test_an_unreadable_workflow_repository_dispatches_nothing():

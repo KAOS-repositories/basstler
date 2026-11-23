@@ -86,13 +86,6 @@ class PlanProjectLocation(PathEnumeration):
     The files of plans and their items on the personal-notes branch, relative to its root.
     """
 
-    PLAN_BRANCH_INDEX = ProjectLocation.PLANS / "_generated" / "branch-index.tsv"
-    """
-    The generated index naming the plan each item branch belongs to.
-
-    Mirrors ``PLAN_BRANCH_INDEX_PATH`` in ``resolve-personal-notes-config.sh``.
-    """
-
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"
     """
     Where the personal-notes branch keeps each branch's progress note, named after the

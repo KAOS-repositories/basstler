@@ -5,6 +5,7 @@ The paths the package names, and how a member stands in for its path.
 from __future__ import annotations
 
 import os
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -98,6 +99,18 @@ def test_the_package_directory_sits_under_its_distributions_src_directory():
     assert PackageLocation.DIRECTORY.value.parent.parent.parent == (
         PackageLocation.SOURCE_TREE / WorkspaceLocation.PACKAGES
     )
+
+
+def test_the_meta_package_metadata_names_the_package_s_own_distribution():
+    """
+    The metadata a checkout's requirements start from is that of the distribution the
+    package is named after.
+    """
+    metadata = tomllib.loads(
+        PackageLocation.META_PACKAGE_METADATA.value.read_text(encoding="utf-8")
+    )
+
+    assert metadata["project"]["name"] == PackageLocation.DIRECTORY.value.name
 
 
 # %% the plugin's files

@@ -389,7 +389,7 @@ class SiteWorkflow(PlanSiteWorkflow):
 
     @classproperty
     def location(cls) -> WorkflowLocation:
-        return SiteWorkflowLocation.PLAN_SITE
+        return WorkflowLocation.PLAN_SITE
 
     @classproperty
     def template(cls) -> PlanSiteTemplate:

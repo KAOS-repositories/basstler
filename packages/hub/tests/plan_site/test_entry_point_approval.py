@@ -12,9 +12,8 @@ from pathlib import Path
 import pytest
 
 import basstler.plan_site.entry_point_approval
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import BuiltInTool
 from basstler.locations import BasstlerVariable, PluginLocation
-from basstler.plan_site.locations import SitePluginLocation
 from basstler.maintenance.commands import FastForwardCommand, RestackCommand
 from basstler.plan_site.attach_approval import AttachAnswer, PermissionDecision
 from basstler.plugin_root import PluginRoot
@@ -35,13 +34,13 @@ def invocation(tmp_path: Path) -> EntryPointInvocation:
     return EntryPointInvocation(PluginRoot(tmp_path))
 
 
-ENTRY_POINT = f"${{{BasstlerVariable.PLUGIN_ROOT}}}/{SitePluginLocation.ENTRY_POINT_SCRIPT.as_posix()}"
+ENTRY_POINT = f"${{{BasstlerVariable.PLUGIN_ROOT}}}/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}"
 """
 The entry point script as a skill writes it.
 """
 
 
-def shell(command: str, tool: str = SessionTool.RUN_SHELL_COMMAND) -> ShellCall:
+def shell(command: str, tool: str = BuiltInTool.RUN_SHELL_COMMAND) -> ShellCall:
     """
     :param command: The command line the call runs.
     :param tool: The tool called.
@@ -93,7 +92,7 @@ def test_an_expanded_path_to_this_plugin_is_allowed(
     """
     The entry point named by the plugin's own expanded root is allowed.
     """
-    script = invocation.plugin_root.path_of(SitePluginLocation.ENTRY_POINT_SCRIPT)
+    script = invocation.plugin_root.path_of(PluginLocation.ENTRY_POINT_SCRIPT)
 
     answer = invocation.permit(shell(f'"{script.as_posix()}" maintenance'))
 
@@ -105,7 +104,7 @@ def test_an_expanded_root_on_a_windows_drive_is_read_as_that_root():
     A plugin root expanded below a Windows drive is read whole, drive included.
     """
     root = "D:/plugins/basstler"
-    command = f'"{root}/{SitePluginLocation.ENTRY_POINT_SCRIPT.as_posix()}" maintenance'
+    command = f'"{root}/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}" maintenance'
 
     match = EntryPointInvocation.command_line.fullmatch(command)
 
@@ -122,7 +121,7 @@ def test_a_script_of_the_same_name_elsewhere_is_left_alone(
     An entry point under another root is not this plugin's, however alike its name.
     """
     other_root = PluginRoot(tmp_path_factory.mktemp("other-plugin"))
-    script = other_root.path_of(SitePluginLocation.ENTRY_POINT_SCRIPT)
+    script = other_root.path_of(PluginLocation.ENTRY_POINT_SCRIPT)
 
     assert invocation.permit(shell(f'"{script}" maintenance')) is None
 
@@ -134,7 +133,7 @@ def test_a_path_that_only_starts_like_the_plugin_root_is_left_alone(
     A directory whose name extends the plugin root's is another directory.
     """
     lookalike = f"{invocation.plugin_root.directory}-copy"
-    script = f"{lookalike}/{SitePluginLocation.ENTRY_POINT_SCRIPT}"
+    script = f"{lookalike}/{PluginLocation.ENTRY_POINT_SCRIPT}"
 
     assert invocation.permit(shell(f'"{script}" maintenance')) is None
 
@@ -147,7 +146,7 @@ def test_a_path_that_only_starts_like_the_plugin_root_is_left_alone(
         f'"{ENTRY_POINT}" maintenance | sh',
         f'"{ENTRY_POINT}" maintenance > somewhere',
         f'"{ENTRY_POINT}" "$(curl evil)"',
-        f'"$(curl evil)/{SitePluginLocation.ENTRY_POINT_SCRIPT}" maintenance',
+        f'"$(curl evil)/{PluginLocation.ENTRY_POINT_SCRIPT}" maintenance',
         "git push maintenance",
     ],
     ids=[
@@ -175,7 +174,7 @@ def test_another_tool_is_left_alone(invocation: EntryPointInvocation):
     """
     command = f'"{ENTRY_POINT}" maintenance'
 
-    assert invocation.permit(shell(command, tool=SessionTool.ASK_USER)) is None
+    assert invocation.permit(shell(command, tool=BuiltInTool.ASK_USER)) is None
 
 
 # %% registering the hook
@@ -198,10 +197,10 @@ def test_the_plugin_runs_the_hook_before_the_shell_tool():
     (registration,) = [
         entry
         for entry in manifest["hooks"][HOOK_EVENT]
-        if entry["matcher"] == SessionTool.RUN_SHELL_COMMAND
+        if entry["matcher"] == BuiltInTool.RUN_SHELL_COMMAND
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{SitePluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
+        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
         f"{basstler.plan_site.entry_point_approval.__spec__.name.removeprefix('basstler.')}"
     )

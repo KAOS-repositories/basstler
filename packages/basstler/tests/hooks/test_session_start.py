@@ -34,14 +34,9 @@ from basstler.locations import (
     PluginLocation,
     ProjectLocation,
 )
-from basstler.personal_notes.locations import PersonalNotesProjectLocation
+from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.setup.locations import SetupPluginLocation
 from basstler.plan.locations import PlanPluginLocation
-from basstler.plan_site.locations import (
-    SiteWorkflowLocation,
-    SiteProjectLocation,
-    SitePluginLocation,
-)
 from basstler.plan_site.environment import SiteBasstlerVariable
 from basstler.personal_notes import access
 from basstler.plan.merged_items import __main__ as merged_items_command
@@ -226,7 +221,7 @@ def session_start_repository(
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
         PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
-        SetupPluginLocation.SESSION_START_SCRIPT.name,
+        PluginLocation.SESSION_START_SCRIPT.name,
         PluginLocation.SESSION_RULES.name,
         SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
         PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
@@ -256,7 +251,7 @@ def run_session_start(
     :return: The finished subprocess.
     """
     return repository.run_hook_script(
-        SetupPluginLocation.SESSION_START_SCRIPT.name, **(environment or {})
+        PluginLocation.SESSION_START_SCRIPT.name, **(environment or {})
     )
 
 
@@ -283,7 +278,7 @@ def publish_and_run(
     repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
-            PersonalNotesProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
             **(notes_branch_files or {}),
         }
     )
@@ -342,9 +337,7 @@ def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
     The session rules do not depend on the user having written any notes.
     """
     session_start_repository.publish_notes_branch(
-        {
-            PersonalNotesProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()
-        }
+        {ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
     )
     result = run_session_start(session_start_repository)
     assert result.returncode == 0, result.stderr
@@ -1618,7 +1611,7 @@ def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
         session_start_repository, tagged_release_repository
     )
     session_start_repository.install_hook_scripts(
-        SitePluginLocation.ENTRY_POINT_SCRIPT.name
+        PluginLocation.ENTRY_POINT_SCRIPT.name
     )
 
     call_log = ready_package(
@@ -1658,7 +1651,7 @@ def ready_package_of_an_older_plugin(
     :return: The invocations ``uv`` received, in order.
     """
     install_latest_release_for_another_plugin(repository, release_repository)
-    repository.install_hook_scripts(SitePluginLocation.ENTRY_POINT_SCRIPT.name)
+    repository.install_hook_scripts(PluginLocation.ENTRY_POINT_SCRIPT.name)
     call_log = ready_package(
         repository, release_repository, stub_bin, tmp_path, **stub_environment
     )

@@ -21,12 +21,12 @@ from libcst.helpers import get_full_name_for_node
 
 from basstler.code_modification.patterns import Occurrence
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.directory_tree import DirectoryTree
 from basstler.git.commands import GitCommandRunner
 from basstler.locations import PackageLocation, WorkspaceLocation
-from basstler.module import Module
+from basstler.python_module import PythonModule
 from basstler.package_map import REQUIREMENT_NAME, Workspace
 
 # %% imports
@@ -38,7 +38,7 @@ class HasImportedModule:
     Something that names a module of a distribution another module imports.
     """
 
-    imported_module: Module
+    imported_module: PythonModule
     """
     The module imported, relative to ``basstler``.
     """
@@ -50,7 +50,7 @@ class ImportStatement(Occurrence):
     An absolute import statement, for one imported module.
     """
 
-    module: Module
+    module: PythonModule
     """
     The module imported, or read from, as the statement spells it.
     """
@@ -79,7 +79,7 @@ class ImportCrossing(ABC):
     A module importing something its own distribution may not.
     """
 
-    importing_module: Module
+    importing_module: PythonModule
     """
     The module holding the import, relative to ``basstler``.
     """
@@ -111,7 +111,7 @@ class LibraryCrossing(ImportCrossing):
     A module importing a third-party library its own distribution does not require.
     """
 
-    imported_library: Module
+    imported_library: PythonModule
     """
     The top-level package imported.
     """
@@ -130,13 +130,13 @@ class ModuleRenames:
     The modules of the package a change moved.
     """
 
-    new_module_by_old_module: Mapping[Module, Module]
+    new_module_by_old_module: Mapping[PythonModule, PythonModule]
     """
     Each moved module, relative to ``basstler``, as it was before the change and as it
     is after.
     """
 
-    def current_module(self, module: Module) -> Module:
+    def current_module(self, module: PythonModule) -> PythonModule:
         """
         :param module: A module as it was before the change.
         :return: It as it is after the change; *module* itself when it did not move.
@@ -252,7 +252,7 @@ class InstalledLibraries:
             for distribution in importlib.metadata.distributions()
         }
 
-    def distributions_providing_package(self, package: Module) -> frozenset[str]:
+    def distributions_providing_package(self, package: PythonModule) -> frozenset[str]:
         """
         :param package: A top-level importable package.
         :return: The distributions providing it; none when it is installed nowhere.
@@ -299,11 +299,11 @@ class PackageBoundaryChecker(CodeRuleChecker):
     """
 
     @cached_property
-    def namespace_root(self) -> Module:
+    def namespace_root(self) -> PythonModule:
         """
         The package every distribution's modules lie in.
         """
-        return Module.from_dotted_name(PackageLocation.DIRECTORY.name)
+        return PythonModule.from_dotted_name(PackageLocation.DIRECTORY.name)
 
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         module = self.module_of_file(path)
@@ -390,7 +390,7 @@ class PackageBoundaryChecker(CodeRuleChecker):
                 new_module_by_old_module[old_module] = new_module
         return ModuleRenames(new_module_by_old_module)
 
-    def module_of_file(self, path: Path) -> Module | None:
+    def module_of_file(self, path: Path) -> PythonModule | None:
         """
         :param path: A Python source file.
         :return: The module it holds, relative to ``basstler``; none for a file outside
@@ -407,9 +407,8 @@ class PackageBoundaryChecker(CodeRuleChecker):
         )
         if directory is None:
             return None
-        parts = source.relative_to(directory).with_suffix("").parts
-        return Module(
-            parts[:-1] if parts[-1] == "__init__" else parts, self.namespace_root
+        return EditablePythonSourceFile(source).module_below(
+            directory, self.namespace_root
         )
 
     def crossings(self, path: Path) -> Iterator[ModuleImport]:
@@ -485,7 +484,7 @@ class PackageBoundaryChecker(CodeRuleChecker):
         :param path: A Python source file.
         :return: Each of its absolute imports, one per imported module.
         """
-        module = PositionedModule(PythonSourceFile(path).parse())
+        module = PositionedModule(EditablePythonSourceFile(path).parse())
         for statement, location in module.positions.items():
             if isinstance(statement, libcst.Import):
                 for alias in statement.names:
@@ -509,22 +508,22 @@ class PackageBoundaryChecker(CodeRuleChecker):
                 )
 
     @staticmethod
-    def spelled_module(name: libcst.Attribute | libcst.Name | None) -> Module:
+    def spelled_module(name: libcst.Attribute | libcst.Name | None) -> PythonModule:
         """
         :return: The module *name* spells; the module without parts where there is none.
         """
-        return Module.from_dotted_name(
+        return PythonModule.from_dotted_name(
             get_full_name_for_node(name) or "" if name is not None else ""
         )
 
-    def resolve_imported_module(self, package: Module, name: str) -> Module:
+    def resolve_imported_module(self, package: PythonModule, name: str) -> PythonModule:
         """
         :param package: The module, relative to ``basstler``, a ``from`` import reads
             from.
         :param name: A name it imports.
         :return: The module *name* is, when it is one, else *package*.
         """
-        candidate = Module((*package.parts, name), package.root)
+        candidate = PythonModule((*package.parts, name), package.root)
         namespace_package = self.workspace.namespace_package
         if namespace_package.every(candidate.path) or namespace_package.every(
             candidate.path.with_suffix(".py")

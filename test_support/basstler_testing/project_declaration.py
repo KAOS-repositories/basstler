@@ -16,7 +16,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from basstler.setup.locations import SetupPackageLocation
+from basstler.locations import PackageLocation
 from basstler.setup.dependencies import PyprojectKey
 
 
@@ -123,7 +123,7 @@ class ProjectDeclaration:
         """
         :return: The package's own ``[project]`` table, read straight from its source.
         """
-        return cls.read(SetupPackageLocation.META_PACKAGE_METADATA.value)
+        return cls.read(PackageLocation.META_PACKAGE_METADATA.value)
 
     def as_toml(self) -> str:
         """
@@ -179,4 +179,4 @@ class HatchVersionSource:
         """
         :return: The package's own version source, read straight from its source.
         """
-        return cls.read(SetupPackageLocation.META_PACKAGE_METADATA.value)
+        return cls.read(PackageLocation.META_PACKAGE_METADATA.value)

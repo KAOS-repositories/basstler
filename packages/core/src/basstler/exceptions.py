@@ -18,7 +18,7 @@ from basstler.exit_codes import CommandFailure, StackExitCode
 from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
 
 if TYPE_CHECKING:
-    from basstler.module import Module
+    from basstler.python_module import PythonModule
 
 
 class DataclassException(Exception, ABC):
@@ -164,12 +164,12 @@ class ModuleOutsideRootError(DataclassException, ValueError):
     Raised when a module is named relative to a root that does not hold it.
     """
 
-    module: Module
+    module: PythonModule
     """
     The module that was named relative to :attr:`root`.
     """
 
-    root: Module
+    root: PythonModule
     """
     The package or module that does not hold :attr:`module`.
     """

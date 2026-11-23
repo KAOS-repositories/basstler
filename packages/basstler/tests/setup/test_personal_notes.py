@@ -32,8 +32,7 @@ from basstler.github.repository_access import (
 )
 from basstler.github.tooling_labels import GitHubLabel
 from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
-from basstler.personal_notes.locations import PersonalNotesProjectLocation
-from basstler.setup.locations import SetupPluginLocation, PluginSkillLocation
+from basstler.setup.locations import SetupPluginLocation, SetupPluginSkillLocation
 from basstler.plugin_root import PluginRoot
 from basstler.setup.exceptions import CheckSetupFailedError, ForeignNotesRemoteError
 from basstler.setup.personal_notes import (
@@ -69,7 +68,7 @@ SCRIPTS_UNDER_TEST = (
     PluginLocation.PERSONAL_NOTES_BRANCH_CREATION_SCRIPT.name,
     PluginLocation.PERSONAL_NOTES_WRITER_SCRIPT.name,
     SetupPluginLocation.GIT_IDENTITY_SAVING_SCRIPT.name,
-    SetupPluginLocation.SESSION_START_SCRIPT.name,
+    PluginLocation.SESSION_START_SCRIPT.name,
     PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
 )
 """
@@ -167,12 +166,12 @@ def setup_repository(scratch_repository: ScratchRepository) -> ScratchRepository
     scratch_repository.install_package_environment()
     scratch_repository.write_setup_prerequisites()
     starter_notes = PluginRoot(scratch_repository.plugin_root).path_of(
-        PluginSkillLocation.STARTER_NOTES
+        SetupPluginSkillLocation.STARTER_NOTES
     )
     starter_notes.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(
         PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
-            PluginSkillLocation.STARTER_NOTES
+            SetupPluginSkillLocation.STARTER_NOTES
         ),
         starter_notes,
     )
@@ -331,7 +330,7 @@ def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     scripts_before_the_sync = [
         SetupPluginLocation.SETUP_CHECK_SCRIPT,
         PluginLocation.PERSONAL_NOTES_BRANCH_CREATION_SCRIPT,
-        SetupPluginLocation.SESSION_START_SCRIPT,
+        PluginLocation.SESSION_START_SCRIPT,
     ]
     # session start's base-branch sync reads the stack configuration through
     # ``bash -c``, which runs in the configured bash too
@@ -377,7 +376,7 @@ def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
     assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
         encoding="utf-8"
     ) == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
-        PluginSkillLocation.STARTER_NOTES
+        SetupPluginSkillLocation.STARTER_NOTES
     ).read_text(encoding="utf-8")
 
 
@@ -420,9 +419,7 @@ def test_records_the_git_identity_it_is_given(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    recorded = GitIdentity.from_git_config_file(
-        checkout / PersonalNotesProjectLocation.GIT_IDENTITY
-    )
+    recorded = GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
     assert recorded == SCRATCH_IDENTITY
 
 

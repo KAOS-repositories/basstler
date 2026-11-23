@@ -9,8 +9,7 @@ from pathlib import Path
 
 from cyclopts import App
 
-from basstler.code_modification.source_file import PythonSourceFile
-from basstler.code_rules import rules
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_rules.checker import CodeRulesCheck, StagedLines
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.fixes import SourceFixer
@@ -19,7 +18,7 @@ from basstler.code_rules.package_boundaries import (
     PackageAtCommit,
     PackageBoundaryChecker,
 )
-from basstler.code_rules.rule_module import RuleModule
+from basstler.code_rules.ruleset import ProjectCodeRules
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.code_rules.locations import CodeRulesProjectLocation
@@ -49,7 +48,7 @@ class CodeRulesExitCode(ExitCode):
 
 
 code_rules_app = App(
-    name=CodeRulesCommand.GROUP,
+    name=CodeRulesCommand.group,
     help=(
         "Check code against the repository's rules, fix it, and generate AGENTS.md "
         "from them."
@@ -71,7 +70,7 @@ def check(
     :param all_lines: Check every line, not only those the staged change touches.
     """
     code_rules_check = CodeRulesCheck(
-        RuleModule(rules).checkers,
+        ProjectCodeRules.of_project(Path.cwd()).checkers,
         None if all_lines else StagedLines(GitCommandRunner(Path.cwd())),
     )
     violations = code_rules_check.violations(paths or [])
@@ -90,10 +89,10 @@ def fix(paths: list[Path] | None = None) -> CodeRulesExitCode:
 
     :param paths: The Python files to fix.
     """
-    fixer = SourceFixer(RuleModule(rules).fixable_checkers)
+    fixer = SourceFixer(ProjectCodeRules.of_project(Path.cwd()).fixable_checkers)
     fixed_sources = {
         source_file: fixer.fix_module(source_file).result.code
-        for source_file in map(PythonSourceFile, paths or [])
+        for source_file in map(EditablePythonSourceFile, paths or [])
     }
     changed = {
         source_file: source

@@ -9,9 +9,9 @@ from pathlib import Path
 from basstler.locations import INSTALLED_PACKAGE, PathEnumeration, ShippedPath
 
 
-class InstructionsTemplate(PathEnumeration):
+class CodeRulesInstructionsTemplate(PathEnumeration):
     """
-    The templates the agent instruction files are rendered from.
+    The template ``AGENTS.md`` is rendered from.
     """
 
     AGENTS = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "agents.md.jinja")

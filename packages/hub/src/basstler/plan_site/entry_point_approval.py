@@ -20,10 +20,9 @@ from cyclopts import App
 
 from basstler.class_property import classproperty
 from basstler.exit_codes import StackExitCode
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import BuiltInTool
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import BasstlerVariable, ClaudeCodeVariable
-from basstler.plan_site.locations import SitePluginLocation
+from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
 from basstler.plan_site.attach_approval import AllowedAttach, AttachAnswer
 from basstler.plugin_root import PluginRoot
 
@@ -32,7 +31,7 @@ from basstler.plugin_root import PluginRoot
 
 class ShellArguments(ValidatedJSONModel):
     """
-    The command a call of :attr:`SessionTool.RUN_SHELL_COMMAND` runs.
+    The command a call of :attr:`BuiltInTool.RUN_SHELL_COMMAND` runs.
     """
 
     command: str
@@ -53,7 +52,7 @@ class ShellCall(ValidatedJSONModel):
 
     tool_input: ShellArguments
     """
-    The tool's arguments, read as those of :attr:`SessionTool.RUN_SHELL_COMMAND`.
+    The tool's arguments, read as those of :attr:`BuiltInTool.RUN_SHELL_COMMAND`.
     """
 
 
@@ -87,7 +86,7 @@ class EntryPointInvocation:
         """
         The entry point script's path below the plugin root, as a pattern.
         """
-        return re.escape(SitePluginLocation.ENTRY_POINT_SCRIPT.as_posix())
+        return re.escape(PluginLocation.ENTRY_POINT_SCRIPT.as_posix())
 
     @classproperty
     def plugin_root_variable(cls) -> str:
@@ -143,7 +142,7 @@ class EntryPointInvocation:
         :return: The answer allowing it when it is this invocation, ``None`` to leave
             the decision to the normal permission flow.
         """
-        if call.tool_name != SessionTool.RUN_SHELL_COMMAND:
+        if call.tool_name != BuiltInTool.RUN_SHELL_COMMAND:
             return None
         if not self.matches(call.tool_input.command):
             return None

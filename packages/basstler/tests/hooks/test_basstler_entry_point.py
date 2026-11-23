@@ -15,7 +15,6 @@ import pytest
 
 from basstler.bash import Bash
 from basstler.locations import PluginLocation
-from basstler.plan_site.locations import SitePluginLocation
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from basstler_testing.constants.environment import (
@@ -48,7 +47,7 @@ def entry_point_repository(scratch_repository: ScratchRepository) -> ScratchRepo
     """
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-        SitePluginLocation.ENTRY_POINT_SCRIPT.name,
+        PluginLocation.ENTRY_POINT_SCRIPT.name,
     )
     scratch_repository.install_package()
     scratch_repository.install_package_environment()
@@ -65,7 +64,7 @@ def run_entry_point(
     :return: The finished basstler.sh.
     """
     return repository.run_hook_script(
-        SitePluginLocation.ENTRY_POINT_SCRIPT.name, *arguments, **environment
+        PluginLocation.ENTRY_POINT_SCRIPT.name, *arguments, **environment
     )
 
 

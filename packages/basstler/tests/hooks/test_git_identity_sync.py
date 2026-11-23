@@ -62,7 +62,7 @@ def git_identity_repository(scratch_repository: ScratchRepository) -> ScratchRep
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
         PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
-        SetupPluginLocation.SESSION_START_SCRIPT.name,
+        PluginLocation.SESSION_START_SCRIPT.name,
         SetupPluginLocation.GIT_IDENTITY_SAVING_SCRIPT.name,
         PluginLocation.PERSONAL_NOTES_WRITER_SCRIPT.name,
     )
@@ -84,7 +84,7 @@ def publish_notes_branch(
     """
     files = {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n"}
     if identity_file is not None:
-        files[PersonalNotesProjectLocation.GIT_IDENTITY] = identity_file
+        files[ProjectLocation.GIT_IDENTITY] = identity_file
     repository.publish_notes_branch(files)
 
 
@@ -97,7 +97,7 @@ def run_session_start(
     :param repository: A fixture-built scratch repository.
     :return: The finished subprocess.
     """
-    return repository.run_hook_script(SetupPluginLocation.SESSION_START_SCRIPT.name)
+    return repository.run_hook_script(PluginLocation.SESSION_START_SCRIPT.name)
 
 
 # %% filling a gap in a clone that has no identity of its own
@@ -128,7 +128,7 @@ def test_reports_the_identity_it_set(git_identity_repository: ScratchRepository)
     assert summary_value(result.stdout, SummaryLine.GIT_IDENTITY) == summary_message(
         SummaryMessage.GIT_IDENTITY_WRITTEN,
         ScratchBranch.PERSONAL_NOTES,
-        PersonalNotesProjectLocation.GIT_IDENTITY,
+        ProjectLocation.GIT_IDENTITY,
         f"{RECORDED_IDENTITY.name} <{RECORDED_IDENTITY.email}>",
     )
 
@@ -189,7 +189,7 @@ def test_reports_that_no_identity_is_recorded(
     assert summary_value(result.stdout, SummaryLine.GIT_IDENTITY) == summary_message(
         SummaryMessage.NO_GIT_IDENTITY_RECORDED,
         ScratchBranch.PERSONAL_NOTES,
-        PersonalNotesProjectLocation.GIT_IDENTITY,
+        ProjectLocation.GIT_IDENTITY,
     )
 
 
@@ -217,7 +217,7 @@ def test_names_what_an_incomplete_recording_is_missing(
 
     assert summary_value(result.stdout, SummaryLine.GIT_IDENTITY) == summary_message(
         SummaryMessage.GIT_IDENTITY_INCOMPLETE,
-        PersonalNotesProjectLocation.GIT_IDENTITY,
+        ProjectLocation.GIT_IDENTITY,
         ScratchBranch.PERSONAL_NOTES,
     )
 
@@ -241,9 +241,7 @@ def test_records_the_given_identity_on_the_notes_branch(
     assert result.returncode == 0, result.stderr
     checkout = git_identity_repository.clone_notes_branch(tmp_path / "notes-checkout")
     assert (
-        GitIdentity.from_git_config_file(
-            checkout / PersonalNotesProjectLocation.GIT_IDENTITY
-        )
+        GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
         == RECORDED_IDENTITY
     )
 
@@ -364,7 +362,7 @@ def test_a_colleague_s_session_takes_their_own_identity_not_the_owner_s(
     colleague_repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
-            PersonalNotesProjectLocation.GIT_IDENTITY: RECORDED_IDENTITY.as_git_config_file(),
+            ProjectLocation.GIT_IDENTITY: RECORDED_IDENTITY.as_git_config_file(),
             COLLEAGUE_IDENTITY_PATH: COLLEAGUE_IDENTITY.as_git_config_file(),
         }
     )
@@ -408,9 +406,7 @@ def test_a_colleague_records_their_identity_beside_the_owner_s(
         == COLLEAGUE_IDENTITY
     )
     assert (
-        GitIdentity.from_git_config_file(
-            checkout / PersonalNotesProjectLocation.GIT_IDENTITY
-        )
+        GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
         == RECORDED_IDENTITY
     )
 
@@ -419,7 +415,7 @@ def test_the_identity_paths_match_the_shell_configuration_that_owns_them(
     git_identity_repository: ScratchRepository,
 ):
     """
-    :attr:`PersonalNotesProjectLocation.GIT_IDENTITY` and
+    :attr:`ProjectLocation.GIT_IDENTITY` and
     :attr:`PersonalNotesProjectLocation.CONTRIBUTOR_GIT_IDENTITIES` mirror two shell
     variables; this is what stops the mirrors drifting.
     """
@@ -429,7 +425,7 @@ def test_the_identity_paths_match_the_shell_configuration_that_owns_them(
     )
 
     owner_path, contributors_directory = resolved.strip().split("\n")
-    assert owner_path == PersonalNotesProjectLocation.GIT_IDENTITY.as_posix()
+    assert owner_path == ProjectLocation.GIT_IDENTITY.as_posix()
     assert (
         contributors_directory
         == PersonalNotesProjectLocation.CONTRIBUTOR_GIT_IDENTITIES.as_posix()

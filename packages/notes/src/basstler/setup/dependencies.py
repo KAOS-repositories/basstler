@@ -26,7 +26,6 @@ from typing import Any
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.locations import PackageLocation, WorkspaceLocation
-from basstler.setup.locations import SetupPackageLocation
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -228,7 +227,7 @@ class RequirementSource(ABC):
         :return: The checkout's workspace where the package runs from one, else the
             installed ``basstler`` distribution.
         """
-        if SetupPackageLocation.META_PACKAGE_METADATA.value.is_file():
+        if PackageLocation.META_PACKAGE_METADATA.value.is_file():
             return WorkspaceDeclaration(PackageLocation.SOURCE_TREE.value)
         return InstalledDistribution(PackageLocation.DIRECTORY.value.name)
 

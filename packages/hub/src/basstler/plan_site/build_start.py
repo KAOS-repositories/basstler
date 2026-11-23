@@ -30,8 +30,7 @@ from basstler.github.credential import GitHubCommand
 from basstler.github.repository_attachment import RepositoryAttachment
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.workflow_run import WorkflowDispatch
-from basstler.locations import ClaudeCodeVariable
-from basstler.plan_site.locations import SiteWorkflowLocation
+from basstler.locations import ClaudeCodeVariable, WorkflowLocation
 from basstler.plan_site.environment import SiteBasstlerVariable
 from basstler.maintenance.landed_closing import ClosedAsLanded
 from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUp
@@ -172,7 +171,7 @@ class BuildStart:
         dispatch = client.attempt_send(
             WorkflowDispatch(
                 site.repository,
-                SiteWorkflowLocation.PLAN_SITE,
+                WorkflowLocation.PLAN_SITE,
                 RepositoryDetailsRead(site.repository)
                 .parse(read.body)
                 .default_branch.name,

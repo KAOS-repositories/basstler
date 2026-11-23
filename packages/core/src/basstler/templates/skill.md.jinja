@@ -1,0 +1,7 @@
+{{ markup.FRONTMATTER_DELIMITER }}name: {{ skill.skill_name }}
+description: {{ skill.description }}
+allowed-tools: {{ skill.allowed_tools | join(", ") }}
+{{ markup.FRONTMATTER_DELIMITER }}
+{{ markup.TITLE_MARKER }}{{ skill.title }}
+
+{{ body }}

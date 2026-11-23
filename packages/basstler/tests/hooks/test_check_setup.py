@@ -22,7 +22,6 @@ from basstler.locations import (
     PluginLocation,
     ProjectLocation,
 )
-from basstler.personal_notes.locations import PersonalNotesProjectLocation
 from basstler.setup.locations import SetupPluginLocation
 from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.personal_notes import access
@@ -86,7 +85,7 @@ def check_setup_repository(scratch_repository: ScratchRepository) -> ScratchRepo
     scratch_repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "my notes\n",
-            PersonalNotesProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
         }
     )
     scratch_repository.resolve_notes_remote_to()
@@ -598,9 +597,7 @@ def test_reports_a_recorded_identity_that_matches_this_clone(
 def test_reports_a_notes_branch_that_records_no_identity(
     check_setup_repository: ScratchRepository,
 ):
-    check_setup_repository.remove_from_notes_branch(
-        PersonalNotesProjectLocation.GIT_IDENTITY
-    )
+    check_setup_repository.remove_from_notes_branch(ProjectLocation.GIT_IDENTITY)
 
     report = run_check_setup(check_setup_repository)
     assert report.exit_code is SetupCheckExitCode.SETUP_INCOMPLETE

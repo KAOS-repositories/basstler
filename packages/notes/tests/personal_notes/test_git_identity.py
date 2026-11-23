@@ -22,6 +22,7 @@ from basstler.github.repository import Repository
 from basstler.github.repository_access import GitHubPath
 from basstler.personal_notes.locations import PersonalNotesProjectLocation
 from basstler.personal_notes.git_identity import GitIdentityRecord
+from basstler.locations import ProjectLocation
 
 from basstler_testing.scratch_repository import ScratchRepository
 
@@ -80,7 +81,7 @@ class AccountReadingClient(GitHubAttemptClient):
 def test_the_owner_keeps_the_identity_file_it_always_had():
     record = GitIdentityRecord(notes_repository=SHARED_NOTES, login=SHARED_NOTES.owner)
 
-    assert record.path == PurePosixPath(PersonalNotesProjectLocation.GIT_IDENTITY)
+    assert record.path == PurePosixPath(ProjectLocation.GIT_IDENTITY)
 
 
 def test_the_owner_is_recognized_whatever_the_case_of_the_login():
@@ -103,13 +104,13 @@ def test_a_colleague_gets_a_file_named_after_their_login():
 def test_an_unknown_login_falls_back_to_the_owner_s_file():
     record = GitIdentityRecord(notes_repository=SHARED_NOTES, login=None)
 
-    assert record.path == PurePosixPath(PersonalNotesProjectLocation.GIT_IDENTITY)
+    assert record.path == PurePosixPath(ProjectLocation.GIT_IDENTITY)
 
 
 def test_a_notes_remote_naming_no_repository_falls_back_to_the_owner_s_file():
     record = GitIdentityRecord(notes_repository=None, login=COLLEAGUE)
 
-    assert record.path == PurePosixPath(PersonalNotesProjectLocation.GIT_IDENTITY)
+    assert record.path == PurePosixPath(ProjectLocation.GIT_IDENTITY)
 
 
 # %% reading the session

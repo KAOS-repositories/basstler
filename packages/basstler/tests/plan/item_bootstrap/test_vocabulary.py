@@ -13,7 +13,6 @@ import yaml
 
 from basstler.bash import Bash
 from basstler.locations import PluginLocation, ProjectLocation
-from basstler.plan.locations import PlanProjectLocation
 from basstler.plan_site.locations import SiteProjectLocation
 from basstler.plan.item_bootstrap.exceptions import (
     BranchAlreadyPublishedError,
@@ -196,7 +195,7 @@ def test_the_branch_index_matches_the_shell_configuration_that_owns_it(
     bootstrap_repository: ScratchRepository,
 ):
     """
-    ``PlanProjectLocation.PLAN_BRANCH_INDEX`` mirrors ``PLAN_BRANCH_INDEX_PATH``.
+    ``ProjectLocation.PLAN_BRANCH_INDEX`` mirrors ``PLAN_BRANCH_INDEX_PATH``.
     """
     resolved = subprocess.run(
         Bash.locate(os.environ).command(
@@ -209,7 +208,7 @@ def test_the_branch_index_matches_the_shell_configuration_that_owns_it(
         encoding="utf-8",
         check=True,
     )
-    assert resolved.stdout == (PlanProjectLocation.PLAN_BRANCH_INDEX).as_posix()
+    assert resolved.stdout == (ProjectLocation.PLAN_BRANCH_INDEX).as_posix()
 
 
 SCALAR_STYLED_KEYS = tuple(

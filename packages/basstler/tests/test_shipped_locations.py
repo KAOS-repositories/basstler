@@ -17,8 +17,7 @@ from basstler.locations import (
     PluginLocation,
 )
 from basstler.plan.locations import PlanPackageLocation, PlanPluginLocation
-from basstler.plan_site.locations import SitePluginLocation
-from basstler.setup.locations import SetupPackageLocation, SetupPluginLocation
+from basstler.setup.locations import SetupPluginLocation
 
 # %% the package's own files
 
@@ -30,7 +29,6 @@ from basstler.setup.locations import SetupPackageLocation, SetupPluginLocation
             PackageLocation,
             GitHubPackageLocation,
             CodeRulesPackageLocation,
-            SetupPackageLocation,
             PlanPackageLocation,
         )
     ),
@@ -50,7 +48,7 @@ def test_every_shipped_location_exists(location: PathEnumeration):
 
 @pytest.mark.parametrize(
     "location",
-    list(chain(SetupPluginLocation, PlanPluginLocation, SitePluginLocation)),
+    list(chain(SetupPluginLocation, PlanPluginLocation)),
     ids=lambda member: member._name_,
 )
 def test_a_distribution_s_plugin_script_is_one_of_the_plugin_s_hooks(

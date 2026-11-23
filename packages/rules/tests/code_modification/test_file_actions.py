@@ -174,6 +174,7 @@ def test_a_tree_read_from_a_commit_is_the_tree_committed(before, tmp_path):
     git = GitCommandRunner(tmp_path)
     git.run("init", "--quiet")
     git.run("add", "--all")
+    git.run("update-index", "--chmod=+x", script.as_posix())
     git.run(
         "-c",
         "user.name=Test Author",

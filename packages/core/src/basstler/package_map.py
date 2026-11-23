@@ -58,7 +58,7 @@ class Layer(IntEnum):
 
     NOTES = 5
     """
-    The personal notes and their setup.
+    The personal notes, their setup and what keeps its records in them.
     """
 
     PLANS = 6
@@ -138,7 +138,7 @@ class Distribution(StrEnum):
     Reading an upstream pull request's checks and review threads.
     """
 
-    REVIEW_TRIAGE = "basstler-review-triage", Layer.COLLABORATION
+    REVIEW_TRIAGE = "basstler-review-triage", Layer.NOTES
     """
     Telling a pull request's mechanical files from those a reviewer has to read.
     """

@@ -834,6 +834,12 @@ class ProjectLocation(PathEnumeration):
     ``resolve-personal-notes-config.sh``.
     """
 
+    VIEWED_CHECKPOINTS = PERSONAL_NOTES / "viewed-checkpoints"
+    """
+    The head commit each pull request's files were last seen viewed at, a file per
+    pull request under its repository's owner and name.
+    """
+
     PERSONAL_NOTES_DOCUMENT = PERSONAL_NOTES / "notes.md"
     """
     The notes file itself, unless a clone's settings put it elsewhere.

@@ -4,12 +4,14 @@ Triaging each file of a pull request from where the viewer last viewed it.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 
 import pytest
 
+from basstler.git.commands import GitCommandRunner
 from basstler.git.commit_range import CommitRange
 from basstler.github.pull_request_changes import (
     PullRequestChangesReader,
@@ -25,8 +27,17 @@ from basstler.review_triage.file_listing import (
 )
 from basstler.review_triage.outputs import ViewedMarking
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
-from basstler.review_triage.viewed_states import ViewedCheckpoints, ViewedFilesTriage
+from basstler.locations import ProjectLocation
+from basstler.review_triage.viewed_states import (
+    ClonedViewedCheckpoints,
+    NotesBranchViewedCheckpoints,
+    ViewedCheckpointFile,
+    ViewedCheckpoints,
+    ViewedFilesTriage,
+)
+from basstler.shell_configuration import PersonalNotesSetting
 
+from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import (
     SAMPLE_REPOSITORY,
@@ -147,7 +158,7 @@ def viewed_history(
         scratch_repository,
         CommitRange(git, git.commit_at("HEAD~2"), git.commit_at("HEAD")),
         git.commit_at("HEAD~1"),
-        ViewedCheckpoints(tmp_path / "checkpoints.json"),
+        ClonedViewedCheckpoints(tmp_path / "checkpoints.json"),
     )
 
 
@@ -270,3 +281,90 @@ def test_a_listing_at_another_head_is_refused(viewed_history):
     """
     with pytest.raises(PullRequestHeadMoved):
         viewed_history.triage(viewed_history.listing(viewed_history.checkpoint))
+
+
+# %% where the checkpoints are kept
+
+CHECKPOINTED_PULL_REQUEST = 7
+"""
+The number of the pull request whose checkpoints the tests below keep.
+"""
+
+
+@pytest.fixture
+def notes_branch_reached(scratch_repository: ScratchRepository) -> ScratchRepository:
+    """
+    :return: A clone whose personal-notes setting names a remote holding the branch.
+    """
+    scratch_repository.publish_notes_branch(
+        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: ""}
+    )
+    scratch_repository.run_git(
+        "config",
+        PersonalNotesSetting.REMOTE.git_config_key,
+        scratch_repository.notes_remote_path.as_posix(),
+    )
+    return scratch_repository
+
+
+def test_checkpoints_are_pushed_to_the_personal_notes_branch_where_a_remote_has_it(
+    notes_branch_reached: ScratchRepository,
+):
+    """
+    A file seen viewed is recorded on the notes branch the remote holds.
+    """
+    git = notes_branch_reached.git
+    head = git.commit_at("HEAD")
+    checkpoints = ViewedCheckpoints.for_pull_request(
+        git, SAMPLE_REPOSITORY, CHECKPOINTED_PULL_REQUEST
+    )
+
+    checkpoints.record(head, frozenset({VIEWED}))
+
+    assert isinstance(checkpoints, NotesBranchViewedCheckpoints)
+    pushed = GitCommandRunner(notes_branch_reached.notes_remote_path).file_at(
+        ScratchBranch.PERSONAL_NOTES, checkpoints.path
+    )
+    assert ViewedCheckpointFile.from_json(json.loads(pushed)) == ViewedCheckpointFile(
+        {VIEWED: head}
+    )
+
+
+def test_checkpoints_on_the_personal_notes_branch_are_read_by_a_later_run(
+    notes_branch_reached: ScratchRepository,
+):
+    """
+    A later run reads what an earlier one recorded from the notes branch, not the work
+    branch the clone has checked out.
+    """
+    git = notes_branch_reached.git
+    head = git.commit_at("HEAD")
+    ViewedCheckpoints.for_pull_request(
+        git, SAMPLE_REPOSITORY, CHECKPOINTED_PULL_REQUEST
+    ).record(head, frozenset({VIEWED}))
+
+    later = ViewedCheckpoints.for_pull_request(
+        git, SAMPLE_REPOSITORY, CHECKPOINTED_PULL_REQUEST
+    )
+
+    assert later.read() == {VIEWED: head}
+
+
+def test_checkpoints_are_kept_in_the_clone_where_no_remote_has_the_notes_branch(
+    scratch_repository: ScratchRepository,
+):
+    """
+    Without a reachable notes branch, the files seen viewed are kept in the clone.
+    """
+    scratch_repository.write(NEVER_VIEWED, "")
+    scratch_repository.commit_everything("a commit to record")
+    git = scratch_repository.git
+    head = git.commit_at("HEAD")
+    checkpoints = ViewedCheckpoints.for_pull_request(
+        git, SAMPLE_REPOSITORY, CHECKPOINTED_PULL_REQUEST
+    )
+
+    checkpoints.record(head, frozenset({VIEWED}))
+
+    assert isinstance(checkpoints, ClonedViewedCheckpoints)
+    assert checkpoints.read() == {VIEWED: head}

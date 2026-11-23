@@ -17,7 +17,7 @@ What separates the parts of a dotted name, and marks a relative one when it lead
 
 
 @dataclass(frozen=True, order=True)
-class Module:
+class PythonModule:
     """
     A module, a package or a subpackage, named by its dotted name, in its absolute form
     or relative to a root.
@@ -29,13 +29,15 @@ class Module:
     is one.
     """
 
-    root: Module | None = None
+    root: PythonModule | None = None
     """
     The package :attr:`parts` lie below; none for an absolute module.
     """
 
     @classmethod
-    def from_dotted_name(cls, dotted_name: str, root: Module | None = None) -> Self:
+    def from_dotted_name(
+        cls, dotted_name: str, root: PythonModule | None = None
+    ) -> Self:
         """
         :param dotted_name: A module's name without a leading dot; empty for the module
             without parts.
@@ -55,13 +57,13 @@ class Module:
         return SEPARATOR.join(self.parts)
 
     @property
-    def absolute(self) -> Module:
+    def absolute(self) -> PythonModule:
         """
         This module with its root's parts in front; itself when it has no root.
         """
         if self.root is None:
             return self
-        return Module((*self.root.absolute.parts, *self.parts))
+        return PythonModule((*self.root.absolute.parts, *self.parts))
 
     @property
     def path(self) -> Path:
@@ -78,14 +80,14 @@ class Module:
         """
         return type(self)(self.absolute.parts[:1])
 
-    def is_within(self, root: Module) -> bool:
+    def is_within(self, root: PythonModule) -> bool:
         """
         :param root: A package, or any module.
         :return: Whether this module is *root* or lies under it, comparing whole parts.
         """
         return self.absolute.parts[: len(root.absolute.parts)] == root.absolute.parts
 
-    def relative_to(self, root: Module) -> Self:
+    def relative_to(self, root: PythonModule) -> Self:
         """
         :param root: A package, or any module, that holds this module.
         :return: This module's name below *root*, which it keeps as its root.

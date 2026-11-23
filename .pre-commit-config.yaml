@@ -28,6 +28,15 @@ repos:
         language: unsupported
         pass_filenames: false
         always_run: true
+      - id: skills-build
+        name: Generate the plugin's hooks.json and check its skills against the playbook
+        description: >
+          Rewrites plugin/hooks/hooks.json from the playbook's hook definitions and fails
+          when plugin/skills and the playbook's skill definitions disagree.
+        entry: .venv/bin/python -m basstler skills build
+        language: unsupported
+        pass_filenames: false
+        always_run: true
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.3
     hooks:

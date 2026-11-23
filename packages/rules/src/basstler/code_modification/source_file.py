@@ -8,15 +8,15 @@ from dataclasses import dataclass
 
 import libcst
 
-from basstler.text_file import TextFile
+from basstler.python_source_file import PythonSourceFile
 
 # %% the file
 
 
 @dataclass(frozen=True)
-class PythonSourceFile(TextFile):
+class EditablePythonSourceFile(PythonSourceFile):
     """
-    A file holding a Python module's source.
+    A Python source file read as the syntax tree a code modification edits.
     """
 
     def parse(self) -> libcst.Module:

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import override
 
 from basstler.code_modification.positions import PositionedModule
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 
 # %% the check
@@ -34,5 +34,5 @@ class SyntaxTreeChecker(CodeRuleChecker, ABC):
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         yield from self.violations_of_module(
-            path, PositionedModule(PythonSourceFile(path).parse())
+            path, PositionedModule(EditablePythonSourceFile(path).parse())
         )

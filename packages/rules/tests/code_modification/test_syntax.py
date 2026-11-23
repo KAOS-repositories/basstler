@@ -10,7 +10,7 @@ from typing import override
 
 import libcst
 
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 from basstler.code_modification.syntax import (
     BodySyntax,
     CallSyntax,
@@ -29,7 +29,7 @@ def test_the_final_name_is_what_an_expression_refers_to_last():
     """
     A name, an attribute and a subscript each refer to a name; a call's result does not.
     """
-    module = PythonSourceFile(CodeModificationSnippet.CALLED_NAMES).parse()
+    module = EditablePythonSourceFile(CodeModificationSnippet.CALLED_NAMES).parse()
     calls = [
         node.value
         for statement in module.body
@@ -54,7 +54,7 @@ def test_literals_and_constant_names_are_constants():
     Literals and the names bound to constants are constants; a variable and a formatted
     string are not.
     """
-    module = PythonSourceFile(CodeModificationSnippet.EXPRESSIONS).parse()
+    module = EditablePythonSourceFile(CodeModificationSnippet.EXPRESSIONS).parse()
     statement = libcst.ensure_type(module.body[-1], libcst.SimpleStatementLine)
     expression = libcst.ensure_type(statement.body[0], libcst.Expr)
     elements = libcst.ensure_type(expression.value, libcst.Tuple).elements
@@ -95,13 +95,15 @@ def test_an_appended_argument_follows_the_layout_of_the_call():
     An argument is appended after the others, on a line of its own where the call puts
     each argument on one, keeping a trailing comma last.
     """
-    module = PythonSourceFile(CodeModificationSnippet.CALL_ARGUMENTS).parse()
+    module = EditablePythonSourceFile(CodeModificationSnippet.CALL_ARGUMENTS).parse()
 
     passed = module.visit(CheckPassing())
 
     assert (
         passed.code
-        == PythonSourceFile(CodeModificationSnippet.CALL_ARGUMENTS_WITH_CHECK).read()
+        == EditablePythonSourceFile(
+            CodeModificationSnippet.CALL_ARGUMENTS_WITH_CHECK
+        ).read()
     )
 
 

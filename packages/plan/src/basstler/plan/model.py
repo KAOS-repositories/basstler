@@ -205,8 +205,8 @@ class Prose:
         r"""
         A hyphen its author wrapped the line right after.
 
-        >>> Prose.wrapped_hyphen.sub("-", "plan-\nsite")
-        'plan-site'
+        >>> Prose.wrapped_hyphen.findall("plan-\nsite")
+        ['-\n']
         """
         return RegularExpression.sequence("-\n").compiled()
 

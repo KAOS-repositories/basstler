@@ -43,8 +43,8 @@ class LogFormatting(Enum):
     r"""
     The colour a test runner writes around its own output.
 
-    >>> LogFormatting.TERMINAL_ESCAPE.value.sub("", "\x1b[31;1mFAILED\x1b[0m")
-    'FAILED'
+    >>> LogFormatting.TERMINAL_ESCAPE.value.findall("\x1b[31;1mFAILED\x1b[0m")
+    ['\x1b[31;1m', '\x1b[0m']
     """
 
     TIMESTAMP = RegularExpression.sequence(
@@ -55,8 +55,8 @@ class LogFormatting(Enum):
     """
     The timestamp a runner writes in front of every line it records.
 
-    >>> LogFormatting.TIMESTAMP.value.sub("", "2026-11-23T00:11:26.1Z FAILED")
-    'FAILED'
+    >>> LogFormatting.TIMESTAMP.value.findall("2026-11-23T00:11:26.1Z FAILED")
+    ['2026-11-23T00:11:26.1Z ']
     """
 
     @classmethod

@@ -225,7 +225,7 @@ class EntryPointInvocation:
         ).zero_or_more()
         return RegularExpression.sequence(
             Separator.WHITESPACE.zero_or_more(),
-            ShellListOperator.COMMAND_SEPARATOR,
+            ShellListOperator.SEQUENTIAL,
             Separator.WHITESPACE.zero_or_more(),
             "echo",
             Separator.WHITESPACE.one_or_more(),

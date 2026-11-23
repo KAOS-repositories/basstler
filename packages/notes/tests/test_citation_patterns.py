@@ -18,10 +18,14 @@ from basstler.setup.steps import PersonalUpstream
 @pytest.mark.parametrize(
     ("text", "modules", "skills"),
     [
-        ("basstler.plan_manifest_tools", {"plan_manifest_tools"}, set()),
+        ("basstler.setup.gate", {"setup.gate"}, set()),
         ("basstler.plan.model.PlanDocument", {"plan.model"}, set()),
-        ("src/basstler/plan_size_limits.py", {"plan_size_limits"}, set()),
-        ('"basstler.sh" plan_manifest_tools --help', {"plan_manifest_tools"}, set()),
+        ("packages/plan/src/basstler/plan/size_limits.py", {"plan.size_limits"}, set()),
+        (
+            '"basstler.sh" setup.gate --skill add-plan-item',
+            {"setup.gate"},
+            set(),
+        ),
         (
             '"${BASSTLER_PLUGIN_ROOT}/hooks/basstler.sh" plan.item_mode',
             {"plan.item_mode"},

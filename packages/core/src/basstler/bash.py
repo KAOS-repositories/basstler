@@ -121,12 +121,12 @@ class ShellListOperator(StrEnum):
     The operators that run one command after another.
     """
 
-    AND_LIST = "&&"
+    AND = "&&"
     """
     Runs the next command only when the one before succeeded.
     """
 
-    COMMAND_SEPARATOR = ShellMetacharacter.COMMAND_SEPARATOR
+    SEQUENTIAL = ShellMetacharacter.COMMAND_SEPARATOR
     """
     Runs the next command after the one before, whatever its exit status.
     """

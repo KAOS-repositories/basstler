@@ -216,8 +216,8 @@ class CitedNames:
         """
         A Python name.
 
-        >>> CitedNames.identifier.compiled().match("plan_manifest_tools.py")[0]
-        'plan_manifest_tools'
+        >>> CitedNames.identifier.compiled().match("size_limits.py")[0]
+        'size_limits'
         """
         return RegularExpression.sequence(
             CharacterSet.any_of(
@@ -233,8 +233,8 @@ class CitedNames:
         A Python name in lower case, as a module is named.
 
         >>> pattern = CitedNames.module_name.compiled()
-        >>> pattern.match("plan_manifest_tools.PlanDocument")[0]
-        'plan_manifest_tools'
+        >>> pattern.match("model.PlanDocument")[0]
+        'model'
         """
         return RegularExpression.sequence(
             CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_"),

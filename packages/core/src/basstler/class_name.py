@@ -62,8 +62,8 @@ class HyphenatedClassName:
         The position before each capital letter but the first character, where a word
         starts.
 
-        >>> HyphenatedClassName.word_start.sub("-", "PlanItem")
-        'Plan-Item'
+        >>> HyphenatedClassName.word_start.split("PlanItem")
+        ['Plan', 'Item']
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(Anchor.TEXT_START),

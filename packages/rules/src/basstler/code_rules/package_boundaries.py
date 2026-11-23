@@ -236,8 +236,8 @@ class InstalledLibraries:
         """
         A run of the characters a distribution's name is spelled with between its words.
 
-        >>> InstalledLibraries.name_separators.sub("-", "typing_extensions.zope")
-        'typing-extensions-zope'
+        >>> InstalledLibraries.name_separators.findall("typing_extensions.zope")
+        ['_', '.']
         """
         return CharacterSet.any_of("-_.").one_or_more().compiled()
 

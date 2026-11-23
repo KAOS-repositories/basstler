@@ -58,6 +58,7 @@ from basstler_testing.constants.environment import (
     SearchPathVariable,
 )
 from basstler_testing.constants.paths import DatasetLocation, RepositoryLocation
+from basstler_testing.constants.patterns import DocumentGroup
 from basstler_testing.plugin_manifest import PluginManifestKey
 from basstler_testing.project_declaration import HatchVersionSource, ProjectDeclaration
 from basstler_testing.scratch_repository import ScratchRepository
@@ -123,11 +124,6 @@ class ContractGroup(StrEnum):
     The parts the contract's patterns read back.
     """
 
-    VARIABLE = "variable"
-    """
-    A shell variable's name.
-    """
-
     MODULE_PATH = "module_path"
     """
     The dotted path of a module of the package.
@@ -171,7 +167,7 @@ class ContractPattern:
             Anchor.LINE_START,
             CharacterSet.any_of(CharacterRange.ASCII_UPPERCASE_LETTER, "_")
             .one_or_more()
-            .captured_as(ContractGroup.VARIABLE),
+            .captured_as(DocumentGroup.VARIABLE),
             "=",
             DoubleQuoted(
                 RegularExpression.sequence(
@@ -240,7 +236,7 @@ class ContractPattern:
                     CharacterRange.ASCII_DIGIT,
                     "_",
                 ).zero_or_more(),
-            ).captured_as(ContractGroup.VARIABLE),
+            ).captured_as(DocumentGroup.VARIABLE),
             "}",
         ).compiled()
 

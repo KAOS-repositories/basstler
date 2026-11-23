@@ -26,7 +26,7 @@ from typing import Any
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.locations import PackageLocation, WorkspaceLocation
-from basstler.regular_expression import CharacterSet
+from basstler.regular_expression import CharacterSet, Separator
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -86,7 +86,7 @@ class PyprojectKey(StrEnum):
 class ConstraintStart(StrEnum):
     """
     The characters that end a distribution's name in a PEP 508 specifier, each
-    beginning what constrains it.
+    beginning what constrains it; a space may end it too.
     """
 
     LESS_THAN = "<"
@@ -122,11 +122,6 @@ class ConstraintStart(StrEnum):
     EXTRAS_START = "["
     """
     Begins the extras.
-    """
-
-    SPACE = " "
-    """
-    Separates the name from whatever follows it.
     """
 
 
@@ -213,7 +208,7 @@ class Dependency:
     """
 
     constraint_start: re.Pattern[str] = field(
-        default=CharacterSet.any_of(*ConstraintStart).compiled(),
+        default=CharacterSet.any_of(*ConstraintStart, Separator.SPACE).compiled(),
         repr=False,
         compare=False,
     )

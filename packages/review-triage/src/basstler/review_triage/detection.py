@@ -72,12 +72,15 @@ class RenameDetection(RenameSource):
         base: PythonSource, head: PythonSource, candidates: RenameCandidates
     ) -> None:
         """
-        Add each identifier the head version puts in place of another to *candidates*.
+        Add each identifier the head version puts in place of another to *candidates*,
+        none when either version is not valid Python.
 
         :param base: The file's base version.
         :param head: The file's head version.
         :param candidates: The substitutions found so far.
         """
+        if not (base.parses and head.parses):
+            return
         candidates.add_all(RenameDetection.file_candidates(base, head))
 
     @staticmethod

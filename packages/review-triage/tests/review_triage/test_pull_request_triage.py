@@ -22,7 +22,7 @@ from basstler.github.pull_request_changes import (
     PullRequestChangesReader,
     RestPullRequest,
 )
-from basstler.review_triage.comparison import MechanicalChange
+from basstler.review_triage.comparison import FileNeedingReview, MechanicalChange
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.exceptions import PullRequestHeadMoved
@@ -49,9 +49,11 @@ from .conftest import (
     OnePullRequestReader,
     RecordingWriter,
     RefusingWriter,
+    commit_trees,
+    pull_request_between,
     read_sample,
 )
-from .samples import DescriptionSample, PullRequestSample
+from .samples import DescriptionSample, FileSample, PullRequestSample
 
 INSTANT_RETRIES = RetryPolicy(first_delay=timedelta(0))
 """
@@ -131,6 +133,26 @@ def test_the_other_files_need_review(sample_changes: PullRequestChanges):
         PurePosixPath("added.py"),
         PurePosixPath("geometry.py"),
     }
+
+
+def test_a_module_that_does_not_parse_needs_review(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A module one version of which is not valid Python, such as one holding merge
+    conflict markers, needs review.
+    """
+    sample = FileSample.CONFLICT_MARKERS.change()
+    module = Path("point.py")
+    changes = pull_request_between(
+        commit_trees(
+            scratch_repository,
+            {module: sample.base_text},
+            {module: sample.head_text},
+        )
+    )
+    triage = PullRequestTriager().triage(changes)
+    assert triage.files_needing_review == (FileNeedingReview(changes.files[0]),)
 
 
 def test_a_rename_the_description_rejects_is_not_applied(

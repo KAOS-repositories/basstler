@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from basstler.review_triage.declaration import DescriptionDeclaration
 from basstler.review_triage.detection import MemberRenameDetection, RenameDetection
+from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import (
     MemberRename,
     Rename,
@@ -13,6 +14,8 @@ from basstler.review_triage.renames import (
     RenameDecisions,
     RenameMap,
 )
+
+from .samples import FileSample
 
 # %% combining sources
 
@@ -110,8 +113,8 @@ def substitutions(*pairs: tuple[str, str, int]) -> RenameCandidates:
 
 def test_a_stray_substitution_does_not_hide_the_dominant_one():
     """
-    An old name replaced once by another new name is still paired with the new name
-    that replaces it most often.
+    An old name replaced once by another new name is still paired with the new name that
+    replaces it most often.
     """
     candidates = substitutions(("Pose", "PoseRenamed", 3), ("Pose", "Line", 1))
     assert candidates.dominant_pairs(
@@ -149,6 +152,19 @@ def test_substitutions_seen_in_two_places_add_up():
     assert candidates == substitutions(
         ("Pose", "First", 3), ("Line", "Ray", 1), ("Pose", "Second", 1)
     )
+
+
+def test_a_file_that_does_not_parse_contributes_no_substitutions():
+    """
+    The diff of a file one version of which is not valid Python, such as one holding
+    merge conflict markers, is not searched for renamed identifiers.
+    """
+    change = FileSample.CONFLICT_MARKERS.change()
+    candidates = RenameCandidates()
+    RenameDetection.collect(
+        PythonSource(change.base_text), PythonSource(change.head_text), candidates
+    )
+    assert candidates.replacements == {}
 
 
 # %% applying renames

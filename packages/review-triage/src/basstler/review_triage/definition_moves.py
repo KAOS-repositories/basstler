@@ -53,7 +53,10 @@ class DefinitionMoveDetection(RenameSource):
         base = CommitModules(changes.commits.base_tree)
         head = CommitModules(changes.commits.head_tree)
         modules = [
-            change for change in changes.files if change.path.suffix == MODULE_SUFFIX
+            change
+            for change in changes.files
+            if change.path.suffix == MODULE_SUFFIX
+            and PythonSource.every_version_parses(change)
         ]
         gained: dict[str, list[str]] = {}
         for change in modules:
@@ -81,7 +84,9 @@ class DefinitionMoveDetection(RenameSource):
         modules = [
             change
             for change in changes.files
-            if change.path.suffix == MODULE_SUFFIX and change.head_text is not None
+            if change.path.suffix == MODULE_SUFFIX
+            and change.head_text is not None
+            and PythonSource.every_version_parses(change)
         ]
         sources: dict[str, list[FileVersions]] = {}
         targets: dict[str, list[FileVersions]] = {}

@@ -24,6 +24,7 @@ from basstler.review_triage.comparison import (
     PythonComparison,
 )
 from basstler.review_triage.definition_moves import DefinitionMoveComparison
+from basstler.review_triage.python_source import PythonSource
 
 # %% what a rule's fix changes
 
@@ -75,6 +76,7 @@ class RuleFixComparison(FileJudgment):
             or change.base_text is None
             or change.head_text is None
             or change.path.suffix not in PythonComparison.suffixes
+            or not PythonSource.every_version_parses(change)
         ):
             return kinds
         path = Path(change.path)

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
 from functools import cache, cached_property
 
+from basstler.git.commit_range import FileVersions
 from basstler.review_triage.name_scopes import STAR_IMPORT
 from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
 
@@ -566,6 +567,18 @@ class PythonSource:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", SyntaxWarning)
             return ast.parse(self.text)
+
+    @staticmethod
+    def every_version_parses(change: FileVersions) -> bool:
+        """
+        :param change: A changed file.
+        :return: Whether each version of it that exists is valid Python.
+        """
+        return all(
+            PythonSource.from_text(text).parses
+            for text in (change.base_text, change.head_text)
+            if text is not None
+        )
 
     @cached_property
     def parses(self) -> bool:

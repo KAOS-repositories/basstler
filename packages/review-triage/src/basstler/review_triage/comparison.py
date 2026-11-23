@@ -447,8 +447,10 @@ class PythonComparison(ContentComparison):
         :param head: The file's head version.
         :param context: What the judgment may consult about the pull request.
         :return: What the change consists of, ``None`` when it is not provably
-            mechanical.
+            mechanical, as for a version that is not valid Python.
         """
+        if not (base.parses and head.parses):
+            return None
         skips_module_documentation = TriageRule.MODULE_DOCUMENTATION in context.rules
         if skips_module_documentation:
             kinds = self.compared_changes(

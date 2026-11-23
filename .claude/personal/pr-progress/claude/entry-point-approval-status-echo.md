@@ -1,9 +1,14 @@
-### Plan
-- Review thread r4619570035 (named regex parts, cleanest design): resolved in c5bee013.
-### Done
-- Added `basstler.regular_expression` (StrEnum atoms, CharacterSet, composable RegularExpression); rewrote every pattern in src/ and tests/; added bash syntax enums and `basstler.yaml_syntax`.
-- Added the rules "patterns read as named parts" and "no pattern text" (HandWrittenPatternChecker). The user approved exempting `upstream_reviews/helper/fetch.py`.
-- Full suite at c5bee013: 3152 passed. 2 failures are the version-tag tests, which fail on a tagless clone without the change too. ruff, format, code-rules, agents-md: clean.
-- Pushed; description updated; labelled release:minor; replied inline and resolved the thread. PR stays a draft.
-### Next
-- CI on c5bee013 not read yet.
+Plan
+- PR 260: entry-point hook forms, patterns from named parts, review threads.
+
+Done
+- Literal text written as text in patterns; syntax enums removed; Wildcard enum.
+- Docstring examples are doctests run per distribution.
+- BasstlerWorkflowInput.BRANCH_OR_TAG unifies the input; entry-point citation fixed.
+- Pushed f7c5834b; PR description updated.
+
+Next
+- User submits the pending review; then post the drafted replies
+  (scratchpad pending_replies.md) and resolve the done threads.
+- Read CI on f7c5834b.
+- Decision open: keep the in-house builder (recommended) vs edify.

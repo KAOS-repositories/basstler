@@ -11,6 +11,7 @@ caller to perform rather than performed.
 from __future__ import annotations
 
 import urllib.parse
+from http import HTTPStatus
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from enum import Enum, StrEnum
 from typing import Any
 
 from basstler.github.client import GitHubClient, GitHubRestClient
+from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.issue import ClosingReason, IssueClosing, IssueComment
 from basstler.github.label import LabelReplacement, NewLabel, RepositoryLabel
 from basstler.github.pull_request import PullRequestDescription
@@ -159,6 +161,11 @@ class GitHubRepositoryPath(StrEnum):
     The repository's commits.
     """
 
+    ACTIONS_RUNS = "/actions/runs"
+    """
+    The repository's workflow runs.
+    """
+
 
 class CommitReport(StrEnum):
     """
@@ -204,7 +211,12 @@ class ListingParameter(StrEnum):
 
     BASE = "base"
     """
-    The branch the pull requests merge into.
+    The branch the listed pull requests merge into.
+    """
+
+    HEAD_SHA = "head_sha"
+    """
+    The commit the listed workflow runs ran on.
     """
 
 
@@ -368,13 +380,24 @@ class GitHubRepository(
         )
 
     def check_state(self, commit: str) -> CombinedCheckState:
-        runs = [
-            run
-            for page in self.client.get_pages(
-                self._listing(self._commit_report(commit, CommitReport.CHECK_RUNS), {})
-            )
-            for run in RestCheckRunPage.from_json(page).check_runs
-        ]
+        """
+        A token that may not read check runs - a fine-grained token, which has no checks
+        permission - reads the commit's workflow runs instead.
+        """
+        try:
+            runs = [
+                run
+                for page in self.client.get_pages(
+                    self._listing(
+                        self._commit_report(commit, CommitReport.CHECK_RUNS), {}
+                    )
+                )
+                for run in RestCheckRunPage.from_json(page).check_runs
+            ]
+        except GitHubRequestFailed as refusal:
+            if refusal.status != HTTPStatus.FORBIDDEN:
+                raise
+            return self._workflow_run_state(commit)
         statuses = [
             status
             for page in self.client.get_pages(
@@ -384,6 +407,25 @@ class GitHubRepository(
         ]
         checks = CheckStatus.over(runs + statuses)
         return CombinedCheckState.NOT_REPORTED if checks is None else checks.state
+
+    def _workflow_run_state(self, commit: str) -> CombinedCheckState:
+        """
+        :param commit: The commit the runs ran on.
+        :return: The verdict over the workflow runs on it, as the check runs would give
+            it; not reported when there are none or the token may not read them either.
+        """
+        try:
+            page = self.client.get(
+                self._listing(
+                    str(GitHubRepositoryPath.ACTIONS_RUNS),
+                    {ListingParameter.HEAD_SHA: commit},
+                )
+            )
+        except GitHubRequestFailed as refusal:
+            if refusal.status != HTTPStatus.FORBIDDEN:
+                raise
+            return CombinedCheckState.NOT_REPORTED
+        return WorkflowRunVerdict.over(page.get(WORKFLOW_RUNS_KEY, []))
 
     @staticmethod
     def _commit_report(commit: str, report: CommitReport) -> str:
@@ -462,3 +504,37 @@ class GitHubRepository(
     def close_pull_request(self, number: int) -> None:
         """:param number: The pull request to close, as completed."""
         self.client.send(IssueClosing(self.repository, number, ClosingReason.COMPLETED))
+
+
+WORKFLOW_RUNS_KEY = "workflow_runs"
+"""
+The key a workflow runs listing holds its runs under.
+"""
+
+
+class WorkflowRunVerdict:
+    """
+    The combined check state a commit's workflow runs amount to.
+    """
+
+    FAILED_CONCLUSIONS = frozenset(
+        {"failure", "timed_out", "cancelled", "startup_failure", "action_required"}
+    )
+    """
+    The conclusions that fail a run's checks.
+    """
+
+    @classmethod
+    def over(cls, runs: Sequence[Mapping[str, Any]]) -> CombinedCheckState:
+        """
+        :param runs: The workflow runs on one commit, as the REST listing gives them.
+        :return: Failure when one failed, pending while one runs, success once all
+            passed, not reported without runs.
+        """
+        if not runs:
+            return CombinedCheckState.NOT_REPORTED
+        if any(run.get("conclusion") in cls.FAILED_CONCLUSIONS for run in runs):
+            return CombinedCheckState.FAILURE
+        if any(run.get("status") != "completed" for run in runs):
+            return CombinedCheckState.PENDING
+        return CombinedCheckState.SUCCESS

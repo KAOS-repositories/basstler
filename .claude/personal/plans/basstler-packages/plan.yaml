@@ -191,4 +191,12 @@ items:
     from one index with a table of contents on every page. The existing docs/ pages (SETUP,
     plan-handover, review-triage, stack) become pages of it. Asked in review of PR 290. Docs
     only, so a patch release.
+
+- id: regular-expression-distribution
+  title: "basstler-regular-expression: the pattern builder installable on its own"
+  branch: null
+  track: package-split
+  depends_on: []
+  status: not started
+  recommended_model: sonnet
 landed_item_count: 8

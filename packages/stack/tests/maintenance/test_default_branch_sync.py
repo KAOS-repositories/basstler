@@ -18,6 +18,7 @@ from basstler.maintenance.default_branch_sync import (
     DefaultBranchSync,
 )
 from basstler.maintenance.fast_forward import FastForwardOutcome
+from basstler.maintenance.push_visibility import ReaderWithoutCredential
 from basstler.shell_configuration import FetchedBranchReference
 
 from basstler_testing.constants.notes import ScratchBranch
@@ -366,6 +367,20 @@ def test_publishes_a_public_upstream_base_to_a_fork_whatever_it_is(
 
     assert report.fork_fast_forward is FastForwardOutcome.PUSHED
     assert forked.fork_default_branch_tip() == upstream_tip
+
+
+def test_catches_the_base_up_but_not_the_fork_when_no_token_is_available(
+    forked: ForkedScratchRepository,
+):
+    fork_tip = forked.fork_default_branch_tip()
+    upstream_tip = forked.advance_upstream(1)
+
+    report = sync(forked, ReaderWithoutCredential())
+
+    assert report.outcome is BaseOutcome.FAST_FORWARDED
+    assert forked.local_default_branch_tip() == upstream_tip
+    assert report.fork_fast_forward is FastForwardOutcome.REFUSED_WIDER_VISIBILITY
+    assert forked.fork_default_branch_tip() == fork_tip
 
 
 # %% the session-start line

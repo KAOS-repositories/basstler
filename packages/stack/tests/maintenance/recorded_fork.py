@@ -38,6 +38,7 @@ from basstler_testing.script_runner import PythonModuleRunner
 from basstler_testing.maintenance.fork import (
     MAINTENANCE_MODULE,
     a_stack,
+    client_seeing_a_public_upstream,
     make_configuration,
 )
 from basstler_testing.fork_checkout import ForkCheckout
@@ -323,6 +324,7 @@ class AlreadyResolvedPass(MaintenancePass):
             git=checkout.git,
             board=checkout.project_root / RepositoryStateLocation.BOARD.name,
             resolved_stack=a_stack(checkout, pull_requests),
+            visibility_reader=client_seeing_a_public_upstream(),
         )
 
     def fresh_stack(self) -> Stack:

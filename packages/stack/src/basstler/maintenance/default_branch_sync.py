@@ -12,14 +12,17 @@ from pathlib import Path
 
 from basstler.exit_codes import CommandFailure
 from basstler.git.commands import GitCommandRunner
-from basstler.github.client import GitHubAttemptReader, GitHubRestClient
+from basstler.github.client import GitHubAttemptReader
 from basstler.github.repository import MalformedRepositoryError, Repository
 from basstler.maintenance.fast_forward import (
     FastForwardOutcome,
     ForkBaseFastForward,
     RefusedPushHandling,
 )
-from basstler.maintenance.push_visibility import PushVisibilityGuard
+from basstler.maintenance.push_visibility import (
+    PushVisibilityGuard,
+    ReaderWithoutCredential,
+)
 from basstler.stack.settings import Configuration
 
 FOLLOW_UP_ROW_INDENT = "    "
@@ -471,7 +474,11 @@ def main() -> int:
 
     :return: The process exit code, 0 whatever the outcome.
     """
-    print(DefaultBranchSync.catch_up_checkout(Path.cwd(), GitHubRestClient()).render())
+    print(
+        DefaultBranchSync.catch_up_checkout(
+            Path.cwd(), ReaderWithoutCredential.or_client_from_environment()
+        ).render()
+    )
     return 0
 
 

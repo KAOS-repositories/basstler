@@ -1,11 +1,11 @@
 ## Plan
-- Move each name that one distribution's source alone uses, enum members included, into that distribution's own locations/environment/exceptions module; shared names stay in core
+- Move each name that one distribution uses (source and tests) into that distribution's own locations/environment/exceptions module; shared names stay in core
 
 ## Done
-- Moves pushed at d052eb9e; ClaudeCodeVariable kept whole in core at e4883780 (a meta-package test reads it as a set)
-- Every distribution's tests pass in the sandbox (affected ones rerun at e4883780); ruff, code-rules check, new-crossings pass
-- PR #297 description records decisions, results and open questions
+- Merged main (#290) at 362ce59e and resolved conflicts; names main's core code or lower test environments use went back to core
+- CI-like per-distribution run passes (hub's 43 Playwright launch errors are sandbox-only); ruff, code-rules check, new-crossings pass
+- PR #297 description current
 
 ## Next
-- Read CI on #297
-- Owner to answer: test-only core names, and member names that repeat their class's subject
+- Read CI's pytest jobs on 362ce59e
+- Owner to answer: test-only names, removing WorkspaceLocation.LOCK, renames and shared bases (WorkflowFile)

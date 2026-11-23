@@ -18,7 +18,7 @@ from basstler.github.client import GitHubReader
 from basstler.github.repository import Repository
 from basstler.github.rest_models import RestResponse
 from basstler.json_model import JSONModel
-from basstler.upstream_reviews.environment import UpstreamReviewsClaudeCodeVariable
+from basstler.locations import ClaudeCodeVariable
 from basstler.upstream_reviews.clients import JobLogReader
 from basstler.upstream_reviews.exceptions import (
     HelperOutputIncomplete,
@@ -334,9 +334,9 @@ class SessionTranscript:
     @classmethod
     def current(cls) -> SessionTranscript:
         """:return: The transcript of the session running this."""
-        configured = UpstreamReviewsClaudeCodeVariable.CONFIGURATION_DIRECTORY.read()
+        configured = ClaudeCodeVariable.CONFIGURATION_DIRECTORY.read()
         return cls(
-            UpstreamReviewsClaudeCodeVariable.SESSION_IDENTIFIER.read() or "",
+            ClaudeCodeVariable.SESSION_IDENTIFIER.read() or "",
             Path(configured) if configured else Path.home() / ".claude",
         )
 

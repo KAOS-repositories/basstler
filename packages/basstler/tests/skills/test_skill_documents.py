@@ -22,8 +22,7 @@ from pathlib import Path
 import pytest
 
 from basstler.bash import Bash
-from basstler.locations import BasstlerVariable, PluginLocation
-from basstler.plan_site.environment import SiteClaudeCodeVariable
+from basstler.locations import BasstlerVariable, ClaudeCodeVariable, PluginLocation
 
 from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory
 
@@ -236,7 +235,7 @@ def test_every_shell_variable_a_skill_document_cites_is_configured(
     """
     cited = cited_shell_variables(document)
     substituted = (
-        {SiteClaudeCodeVariable.PLUGIN_ROOT}
+        {ClaudeCodeVariable.PLUGIN_ROOT}
         if document.name == SkillDocumentName.SKILL
         else set()
     )
@@ -277,7 +276,7 @@ def test_a_command_names_the_plugin_root_as_its_document_receives_it(
     unavailable = (
         BasstlerVariable.PLUGIN_ROOT
         if document.name == SkillDocumentName.SKILL
-        else SiteClaudeCodeVariable.PLUGIN_ROOT
+        else ClaudeCodeVariable.PLUGIN_ROOT
     )
 
     assert unavailable not in cited
@@ -309,7 +308,7 @@ def test_every_skill_links_how_to_run_commands_with_its_plugin_root(
         paragraph
         for paragraph in document.read_text(encoding="utf-8").split("\n\n")
         if f"${{{BasstlerVariable.PLUGIN_ROOT}}}" in paragraph
-        and f"${{{SiteClaudeCodeVariable.PLUGIN_ROOT}}}" in paragraph
+        and f"${{{ClaudeCodeVariable.PLUGIN_ROOT}}}" in paragraph
         and f"]({running_commands})" in paragraph
     ]
 

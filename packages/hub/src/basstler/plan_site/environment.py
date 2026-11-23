@@ -16,15 +16,3 @@ class SiteBasstlerVariable(EnvironmentVariable):
     """
     The interpreter whose environment holds this package, for running its modules.
     """
-
-
-class SiteClaudeCodeVariable(EnvironmentVariable):
-    """
-    The variables Claude Code sets that the plan site reads.
-    """
-
-    PLUGIN_ROOT = "CLAUDE_PLUGIN_ROOT"
-    """
-    The plugin's installation directory, which Claude Code also substitutes into a
-    plugin skill's own instructions when it loads them.
-    """

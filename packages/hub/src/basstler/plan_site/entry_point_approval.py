@@ -22,9 +22,8 @@ from basstler.class_property import classproperty
 from basstler.exit_codes import StackExitCode
 from basstler.github.repository_attachment import SessionTool
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import BasstlerVariable
+from basstler.locations import BasstlerVariable, ClaudeCodeVariable
 from basstler.plan_site.locations import SitePluginLocation
-from basstler.plan_site.environment import SiteClaudeCodeVariable
 from basstler.plan_site.attach_approval import AllowedAttach, AttachAnswer
 from basstler.plugin_root import PluginRoot
 
@@ -95,9 +94,7 @@ class EntryPointInvocation:
         """
         The plugin root as the skills write it, through either variable, as a pattern.
         """
-        variables = (
-            f"{BasstlerVariable.PLUGIN_ROOT}|{SiteClaudeCodeVariable.PLUGIN_ROOT}"
-        )
+        variables = f"{BasstlerVariable.PLUGIN_ROOT}|{ClaudeCodeVariable.PLUGIN_ROOT}"
         return rf"\$(?:\{{(?:{variables})\}}|{variables})"
 
     @classproperty

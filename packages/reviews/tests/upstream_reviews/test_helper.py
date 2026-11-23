@@ -23,7 +23,7 @@ from basstler.bash import Bash
 from basstler.github.rest_models import (
     RestPullRequestSummary,
 )
-from basstler.upstream_reviews.environment import UpstreamReviewsClaudeCodeVariable
+from basstler.locations import ClaudeCodeVariable
 from basstler.upstream_reviews.exceptions import (
     HelperOutputIncomplete,
     HelperOutputMissing,
@@ -502,10 +502,8 @@ def session(tmp_path, monkeypatch) -> Path:
     :return: The transcript file.
     """
     monkeypatch.setattr(UpstreamReadRequest, "location", tmp_path / "request.json")
-    monkeypatch.setenv(
-        UpstreamReviewsClaudeCodeVariable.CONFIGURATION_DIRECTORY, str(tmp_path)
-    )
-    monkeypatch.setenv(UpstreamReviewsClaudeCodeVariable.SESSION_IDENTIFIER, "session")
+    monkeypatch.setenv(ClaudeCodeVariable.CONFIGURATION_DIRECTORY, str(tmp_path))
+    monkeypatch.setenv(ClaudeCodeVariable.SESSION_IDENTIFIER, "session")
     transcript = tmp_path / "projects" / "-home-user" / "session.jsonl"
     transcript.parent.mkdir(parents=True)
     return transcript

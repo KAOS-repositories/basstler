@@ -5,7 +5,6 @@ commit.
 
 from __future__ import annotations
 
-import stat
 from pathlib import Path, PurePosixPath
 
 import pytest
@@ -40,9 +39,10 @@ def committed_tree(tmp_path: Path) -> CommitTree:
         written = tmp_path / path
         written.parent.mkdir(parents=True, exist_ok=True)
         written.write_bytes(file.content)
-        if file.is_executable:
-            written.chmod(written.stat().st_mode | stat.S_IXUSR)
     git.run("add", "--all")
+    for path, file in COMMITTED.items():
+        if file.is_executable:
+            git.run("update-index", "--chmod=+x", path.as_posix())
     git.run("commit", "--quiet", "-m", "Commit the files")
     return CommitTree(git, git.commit_at("HEAD"))
 

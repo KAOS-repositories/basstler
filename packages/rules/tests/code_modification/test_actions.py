@@ -178,7 +178,7 @@ def test_a_class_defined_in_a_private_module_is_imported_from_its_public_one(imp
     """
     applied = ImportInsertion(Future).apply(imports)
 
-    assert applied.module.code == (
+    assert applied.result.code == (
         TextFile(CodeModificationSnippet.IMPORTS_WITH_FUTURE).read()
     )
 

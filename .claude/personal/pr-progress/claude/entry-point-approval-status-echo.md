@@ -2,9 +2,8 @@ Plan
 - PR 260: entry-point hook forms, patterns from named parts, review threads.
 
 Done
-- Separator, EnclosedPattern, MarkupElement, CodeBlockLanguage; grouped enums as *Enum.
-- Pushed 15a55153; replied to 4 new threads, resolved 2.
+- All 31 threads replied and resolved; pushed 61fcb02f (real modules in examples, no sub, no duplicate names).
+- Plan item basstler-packages/regular-expression-distribution recorded for the follow-up.
 
 Next
-- Read CI on 15a55153.
-- Open: basstler.sh example module, sub in other doctests, Separator.TAB, regex as its own distribution, four answered questions.
+- Read CI on 61fcb02f when asked.

@@ -5,6 +5,8 @@ and undoing both exactly.
 
 from __future__ import annotations
 
+from concurrent.futures import Future
+
 import libcst
 import pytest
 
@@ -12,6 +14,7 @@ from basstler.code_modification.actions import (
     ActionPlan,
     ImportInsertion,
     NodeReplacement,
+    NodeReplacements,
 )
 from basstler.code_modification.exceptions import ActionTargetMissingError
 from basstler.code_modification.positions import PositionedModule
@@ -82,6 +85,53 @@ def test_a_replacement_whose_node_is_gone_raises(two_calls):
         replacement.apply(applied.result)
 
 
+# %% replacing several nodes at once
+
+
+def call_replacements(
+    module: PositionedModule, names: tuple[str, ...]
+) -> NodeReplacements:
+    """
+    :param module: A module whose calls are to be renamed.
+    :param names: The name each call's function gets, in the order of the calls.
+    :return: The replacements of those calls by calls of *names* with their arguments.
+    """
+    calls = [
+        (node, location)
+        for node, location in module.positions.items()
+        if isinstance(node, libcst.Call)
+    ]
+    return NodeReplacements(
+        tuple(
+            NodeReplacement(location, call, call.with_changes(func=libcst.Name(name)))
+            for (call, location), name in zip(calls, names, strict=True)
+        )
+    )
+
+
+def test_replacements_made_at_once_change_each_of_their_nodes(two_calls):
+    """
+    Both calls are replaced, and nothing else changes.
+    """
+    applied = call_replacements(two_calls, ("float", "int")).apply(two_calls.module)
+
+    assert (
+        applied.result.code
+        == TextFile(CodeModificationSnippet.TWO_CALLS_BOTH_RENAMED).read()
+    )
+
+
+def test_the_inverse_of_replacements_made_at_once_restores_the_module_exactly(
+    two_calls,
+):
+    """
+    Undoing the replacements gives back the source they were applied to.
+    """
+    applied = call_replacements(two_calls, ("float", "int")).apply(two_calls.module)
+
+    assert applied.inverse.apply(applied.result).result.code == two_calls.module.code
+
+
 # %% plans
 
 
@@ -118,6 +168,18 @@ def test_an_import_follows_the_last_import_of_the_module(imports):
 
     assert applied.result.code == (
         TextFile(CodeModificationSnippet.IMPORTS_WITH_TEXT_FILE).read()
+    )
+
+
+def test_a_class_defined_in_a_private_module_is_imported_from_its_public_one(imports):
+    """
+    A class is imported from the module that exports it, never from the private module
+    it is defined in.
+    """
+    applied = ImportInsertion(Future).apply(imports)
+
+    assert applied.result.code == (
+        TextFile(CodeModificationSnippet.IMPORTS_WITH_FUTURE).read()
     )
 
 

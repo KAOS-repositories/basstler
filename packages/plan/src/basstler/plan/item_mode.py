@@ -337,7 +337,7 @@ class MalformedModeSettingsError(ModeError):
     def suggest_correction(self) -> str:
         return (
             "Fix the file, or delete it to fall back to "
-            f"{PackageLocation.PLAN_ITEM_MODE_DEFAULTS}'s defaults."
+            f"{PackageLocation.PLAN_ITEM_MODE_DEFAULTS.as_posix()}'s defaults."
         )
 
 
@@ -358,9 +358,7 @@ class SettingsWriteRefusedError(ModeError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"{ProjectLocation.PERSONAL_PLAN_ITEM_MODES} was not written: {self.detail}"
-        )
+        return f"{ProjectLocation.PERSONAL_PLAN_ITEM_MODES.as_posix()} was not written: {self.detail}"
 
     def suggest_correction(self) -> str:
         return "Check the personal-notes branch is set up: run /setup-personal-notes."
@@ -585,9 +583,7 @@ class ModeResolution(Report):
             ReportKey.MODE: str(self.mode),
             ReportKey.SOURCE: str(self.source),
             ReportKey.SETTING_KEY: self.skill.setting_key,
-            ReportKey.PERSONAL_SETTING_PATH: str(
-                ProjectLocation.PERSONAL_PLAN_ITEM_MODES
-            ),
+            ReportKey.PERSONAL_SETTING_PATH: ProjectLocation.PERSONAL_PLAN_ITEM_MODES.as_posix(),
         }
 
 
@@ -661,9 +657,7 @@ class SettingsWriteReport(Report):
             ReportKey.EXIT_CODE: int(self.exit_code),
             ReportKey.SKILLS: [str(skill) for skill in self.skills],
             ReportKey.MODE: str(self.mode),
-            ReportKey.PERSONAL_SETTING_PATH: str(
-                ProjectLocation.PERSONAL_PLAN_ITEM_MODES
-            ),
+            ReportKey.PERSONAL_SETTING_PATH: ProjectLocation.PERSONAL_PLAN_ITEM_MODES.as_posix(),
         }
 
 
@@ -676,7 +670,7 @@ def render_settings(modes: dict[str, ExecutionMode]) -> str:
     """
     header = (
         "# Personal plan-item execution modes, layered over the committed defaults\n"
-        f"# at {PackageLocation.PLAN_ITEM_MODE_DEFAULTS}. Rewritten in full by plan/item_mode.py's\n"
+        f"# at {PackageLocation.PLAN_ITEM_MODE_DEFAULTS.as_posix()}. Rewritten in full by plan/item_mode.py's\n"
         "# set command, so anything other than the keys below is not preserved.\n"
     )
     body = "".join(

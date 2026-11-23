@@ -26,7 +26,7 @@ from basstler.code_rules.fixes import (
 from basstler.code_rules.rule_module import RuleModule
 
 from basstler_testing.constants.paths import CodeModificationSnippet
-from .fix_example import FixExample
+from basstler_testing.code_rules.fix_example import FixExample
 
 FIXABLE_CHECKERS = RuleModule(rules).fixable_checkers
 """
@@ -45,10 +45,9 @@ def fixed(example: FixExample) -> libcst.Module:
     """
     :return: The example's code breaking the rule, fixed.
     """
+    before = EditablePythonSourceFile(example.before)
     return (
-        SourceFixer((example.checker,))
-        .fix_module(EditablePythonSourceFile(example.before))
-        .result
+        SourceFixer((example.checker,)).fix_module(before.parse(), before.path).result
     )
 
 
@@ -79,7 +78,7 @@ def test_undoing_a_fix_restores_each_example_exactly(example):
     The inverse of a fix turns the fixed code back into the code it fixed.
     """
     before = EditablePythonSourceFile(example.before)
-    applied = SourceFixer((example.checker,)).fix_module(before)
+    applied = SourceFixer((example.checker,)).fix_module(before.parse(), before.path)
 
     assert applied.inverse.apply(applied.result).result.code == before.read()
 
@@ -138,7 +137,8 @@ def test_a_fix_leaving_its_rule_broken_raises():
     A round of fixes that removes no place stops with an error instead of repeating
     forever.
     """
+    source_file = EditablePythonSourceFile(CodeModificationSnippet.PRINT_CALL)
     with pytest.raises(FixDoesNotConvergeError):
         SourceFixer((PrintCallChecker(),)).fix_module(
-            EditablePythonSourceFile(CodeModificationSnippet.PRINT_CALL)
+            source_file.parse(), source_file.path
         )

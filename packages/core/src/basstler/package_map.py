@@ -25,6 +25,7 @@ from basstler.exceptions import (
 )
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import NamespacePackage, WorkspaceLocation
+from basstler.text_file import TextFile
 
 # %% layers and distributions
 
@@ -214,9 +215,7 @@ class DistributionDeclaration:
             it requires.
         """
         metadata = DistributionMetadata.from_json(
-            tomllib.loads(
-                (directory / WorkspaceLocation.METADATA).read_text(encoding="utf-8")
-            )
+            tomllib.loads(TextFile(directory / WorkspaceLocation.METADATA).read())
         )
         distribution = Distribution(metadata.project.name)
         source = directory / WorkspaceLocation.PACKAGE_SOURCE
@@ -495,7 +494,7 @@ class Workspace:
             sorted(
                 metadata.parent
                 for metadata in (self.root / WorkspaceLocation.PACKAGES).glob(
-                    f"*/{WorkspaceLocation.METADATA}"
+                    f"*/{WorkspaceLocation.METADATA.as_posix()}"
                 )
             )
         )

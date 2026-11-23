@@ -1,8 +1,8 @@
 # Review triage
 
 `basstler review-triage` sorts a pull request's files into those a reviewer has to
-read and those whose change is proven mechanical: imports, renames, formatting or a
-move. It reads the pull request from GitHub's REST API and its files from a git
+read and those whose change is proven mechanical: imports, renames, formatting, a
+move, or a code rule's fix. It reads the pull request from GitHub's REST API and its files from a git
 checkout holding both ends; a checkout lacking them fetches them first.
 
 ## In another repository's CI
@@ -24,6 +24,18 @@ basstler review-triage mark-viewed <pull request> --repository <owner>/<name>
 credential is configured (`GH_TOKEN`, or `gh auth login`). It uses GitHub's GraphQL
 API, which Claude Code cloud sessions cannot reach, so run it on your own machine.
 Both commands default `--repository` to the checkout's `origin`.
+
+By default both triage only what changed since your last submitted review of the pull
+request, the head commit GitHub recorded for it, and the whole change when you have
+not reviewed it. A credential GitHub names no account for, such as an Actions token,
+has no review, so CI triages the whole change. The report's first line says where the
+triage started. `--since <commit>`, `--last <count>` and `--from-merge-base` choose
+another start.
+
+A Python file counts as a rule's fix when recomputing the fixes of `basstler
+code-rules fix` on its base reproduces its head, layout aside. Only the rules its base
+breaks and its head no longer does are recomputed, and the report names each one, as
+`read and write text as utf 8` for the rule on UTF-8 text.
 
 A pre-commit hook is no place for it: a triage needs a pull request on GitHub.
 

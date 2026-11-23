@@ -62,16 +62,31 @@ class RuleModule:
         return sorted(sections, key=lambda section: section.title)
 
     @property
-    def checkers(self) -> tuple[CodeRuleChecker, ...]:
+    def rules(self) -> tuple[Section, ...]:
         """
-        The checker of every rule in :attr:`sections` and the sections nested in them.
+        Every rule in :attr:`sections` and the sections nested in them.
         """
         return tuple(
-            rule.checker
+            rule
             for top_level_section in self.sections
             for section in top_level_section.descendants
             for rule in section
-            if rule.checker is not None
+        )
+
+    @property
+    def checkers(self) -> tuple[CodeRuleChecker, ...]:
+        """
+        The checker of every rule in :attr:`rules` that has one.
+        """
+        return tuple(rule.checker for rule in self.rules if rule.checker is not None)
+
+    @property
+    def fixable_rules(self) -> tuple[Section, ...]:
+        """
+        The rules among :attr:`rules` whose checker has a fix.
+        """
+        return tuple(
+            rule for rule in self.rules if isinstance(rule.checker, FixableChecker)
         )
 
     @property

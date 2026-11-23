@@ -46,12 +46,8 @@ class TextFileFix(CodeFix[Specification]):
             "the platform ends lines in a line feed.",
         )
 
-    @classproperty
-    def required_import(cls) -> type:
-        """
-        :class:`~basstler.text_file.TextFile`.
-        """
-        return TextFile
+    def required_imports(self, specification: Specification) -> tuple[type, ...]:
+        return (TextFile,)
 
     def replacement(self, specification: Specification) -> libcst.Call:
         call = libcst.ensure_type(specification.node, libcst.Call)

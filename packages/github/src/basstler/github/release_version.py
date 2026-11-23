@@ -452,7 +452,7 @@ class PluginRelease:
             "subtree",
             "split",
             "--quiet",
-            f"--prefix={BasstlerRepositoryLocation.PLUGIN}",
+            f"--prefix={BasstlerRepositoryLocation.PLUGIN.as_posix()}",
             "HEAD",
         )
         manifest_path = BasstlerRepositoryLocation.PLUGIN_MANIFEST.path_in_plugin

@@ -91,7 +91,7 @@ def fix(paths: list[Path] | None = None) -> CodeRulesExitCode:
     """
     fixer = SourceFixer(ProjectCodeRules.of_project(Path.cwd()).fixable_checkers)
     fixed_sources = {
-        source_file: fixer.fix_module(source_file).result.code
+        source_file: fixer.fix_module(source_file.parse(), source_file.path).result.code
         for source_file in map(EditablePythonSourceFile, paths or [])
     }
     changed = {

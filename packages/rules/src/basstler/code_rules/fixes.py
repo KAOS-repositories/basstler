@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from types import ModuleType
 
 import libcst
 
@@ -20,6 +21,7 @@ from basstler.code_modification.actions import (
     AppliedAction,
     ImportInsertion,
     NodeReplacement,
+    NodeReplacements,
 )
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.source_file import EditablePythonSourceFile
@@ -80,12 +82,14 @@ class CodeFix[SpecificationType: Specification](ABC):
         How the fixed code behaves compared with the code it replaces.
         """
 
-    @classproperty
-    def required_import(cls) -> type | None:
+    def required_imports(
+        self, specification: SpecificationType
+    ) -> tuple[type | ModuleType, ...]:
         """
-        The class the replacement needs imported in the module, if any.
+        :param specification: A place breaking the fix's rule.
+        :return: The classes and modules its replacement needs imported in the module.
         """
-        return None
+        return ()
 
     @abstractmethod
     def replacement(self, specification: SpecificationType) -> libcst.CSTNode:
@@ -210,7 +214,7 @@ class FixablePlace:
     """
 
     @property
-    def action(self) -> Action[libcst.Module]:
+    def action(self) -> NodeReplacement:
         """
         The action making the fix's change at the place.
         """
@@ -234,29 +238,29 @@ class SourceFixer:
     """
 
     def fix_module(
-        self, source_file: EditablePythonSourceFile
+        self, module: libcst.Module, path: Path
     ) -> AppliedAction[libcst.Module]:
         """
-        :param source_file: The module to fix, which is left as it is.
+        :param module: The module to fix, which is left as it is.
+        :param path: The file *module* is the source of.
         :return: The module with every place the checkers report fixed, and the action
             restoring the module exactly.
         :raises FixDoesNotConvergeError: If a round of fixes leaves at least as many
             places breaking a rule as there were before it.
         """
         inverses: list[Action[libcst.Module]] = []
-        imports: list[type] = []
-        module = source_file.parse()
-        places = self.places(module, source_file.path)
+        imports: list[type | ModuleType] = []
+        places = self.places(module, path)
         while places:
             imports.extend(
-                place.fix.required_import
+                imported
                 for place in places
-                if place.fix.required_import is not None
+                for imported in place.fix.required_imports(place.specification)
             )
             applied = self.round_of_fixes(places).apply(module)
             module = applied.result
             inverses.append(applied.inverse)
-            remaining = self.places(module, source_file.path)
+            remaining = self.places(module, path)
             if len(remaining) >= len(places):
                 raise FixDoesNotConvergeError(
                     tuple(
@@ -285,12 +289,11 @@ class SourceFixer:
         ]
 
     @staticmethod
-    def round_of_fixes(places: list[FixablePlace]) -> ActionPlan[libcst.Module]:
+    def round_of_fixes(places: list[FixablePlace]) -> NodeReplacements:
         """
         :param places: Places breaking a rule, some perhaps inside others.
         :return: The fixes of every place that overlaps no place before it, outermost
-            first, applied from the end of the module towards its start so that each
-            leaves the location of the next unchanged.
+            first, made at once.
         """
         chosen: list[FixablePlace] = []
         for place in sorted(
@@ -306,4 +309,4 @@ class SourceFixer:
                 place.specification.overlaps(other.specification) for other in chosen
             ):
                 chosen.append(place)
-        return ActionPlan(tuple(place.action for place in reversed(chosen)))
+        return NodeReplacements(tuple(place.action for place in chosen))

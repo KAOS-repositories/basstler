@@ -5,8 +5,12 @@ composing them.
 
 from __future__ import annotations
 
+import importlib
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import takewhile
+from types import ModuleType
 
 import libcst
 from libcst.codemod import CodemodContext
@@ -72,7 +76,17 @@ class NodeReplacement(Action[libcst.Module]):
     """
 
     def apply(self, target: libcst.Module) -> AppliedAction[libcst.Module]:
-        positions = PositionedModule(target).positions
+        return NodeReplacements((self,)).apply(target)
+
+    def target_in(
+        self, positions: Mapping[libcst.CSTNode, CodeRange]
+    ) -> libcst.CSTNode:
+        """
+        :param positions: The code range of each node of a module.
+        :return: The node of that module the replacement replaces.
+        :raises ActionTargetMissingError: If the module lacks :attr:`original` at
+            :attr:`location`.
+        """
         original = next(
             (
                 node
@@ -83,20 +97,77 @@ class NodeReplacement(Action[libcst.Module]):
         )
         if original is None:
             raise ActionTargetMissingError(self.location, type(self.original).__name__)
-        replaced = libcst.ensure_type(
-            target.deep_replace(original, self.replacement), libcst.Module
+        return original
+
+
+@dataclass(frozen=True)
+class NodeReplacements(Action[libcst.Module]):
+    """
+    Makes replacements whose locations do not overlap, all in one pass over the module.
+    """
+
+    replacements: tuple[NodeReplacement, ...]
+    """
+    The replacements, each located in the module the action is applied to.
+    """
+
+    def apply(self, target: libcst.Module) -> AppliedAction[libcst.Module]:
+        positions = PositionedModule(target).positions
+        substitution = NodeSubstitution(
+            {
+                replacement.target_in(positions): replacement.replacement
+                for replacement in self.replacements
+            }
         )
-        replacement_location = PositionedModule(replaced).positions[self.replacement]
+        replaced = libcst.ensure_type(target.visit(substitution), libcst.Module)
+        replaced_positions = PositionedModule(replaced).positions
         return AppliedAction(
             replaced,
-            NodeReplacement(replacement_location, self.replacement, self.original),
+            NodeReplacements(
+                tuple(
+                    NodeReplacement(
+                        replaced_positions[replacement.replacement],
+                        replacement.replacement,
+                        replacement.original,
+                    )
+                    for replacement in self.replacements
+                )
+            ),
         )
+
+
+@dataclass
+class NodeSubstitution(libcst.CSTTransformer):
+    """
+    Puts a node in the place of each node of a module it is given one for.
+    """
+
+    substitutes: Mapping[libcst.CSTNode, libcst.CSTNode]
+    """
+    The node to put in the place of each node, which is identified by identity.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Initialise the transformer, which the dataclass's generated initialiser skips.
+        """
+        super().__init__()
+
+    def on_leave(
+        self, original_node: libcst.CSTNode, updated_node: libcst.CSTNode
+    ) -> libcst.CSTNode:
+        """
+        :param original_node: A node of the module visited.
+        :param updated_node: That node with its children substituted.
+        :return: The substitute of *original_node*, else *updated_node*.
+        """
+        return self.substitutes.get(original_node, updated_node)
 
 
 # %% imports
 
 
-class ModuleTransformation(Action, ABC):
+class ModuleTransformation(Action[libcst.Module], ABC):
     """
     Changes a whole module, which the action that restores the module undoes.
     """
@@ -108,8 +179,8 @@ class ModuleTransformation(Action, ABC):
         :return: The module with the change made.
         """
 
-    def apply(self, module: libcst.Module) -> AppliedAction:
-        return AppliedAction(self.transform(module), ModuleReplacement(module))
+    def apply(self, target: libcst.Module) -> AppliedAction[libcst.Module]:
+        return AppliedAction(self.transform(target), ModuleReplacement(target))
 
 
 @dataclass(frozen=True)
@@ -130,21 +201,42 @@ class ModuleReplacement(ModuleTransformation):
 @dataclass(frozen=True)
 class ImportInsertion(ModuleTransformation):
     """
-    Imports a class in a module, merged into an import of its module where there is one
-    and left out where the module imports the class already.
+    Imports a class or a module in a module, left out where the module imports it
+    already; a class is merged into an import of its module where there is one.
     """
 
-    imported: type
+    imported: type | ModuleType
     """
-    The class to import.
+    The class or module to import.
     """
 
     def transform(self, module: libcst.Module) -> libcst.Module:
         context = CodemodContext()
-        AddImportsVisitor.add_needed_import(
-            context, self.imported.__module__, self.imported.__name__
-        )
+        if isinstance(self.imported, ModuleType):
+            AddImportsVisitor.add_needed_import(context, self.imported.__name__)
+        else:
+            AddImportsVisitor.add_needed_import(
+                context, self.exporting_module(self.imported), self.imported.__name__
+            )
         return AddImportsVisitor(context).transform_module(module)
+
+    @staticmethod
+    def exporting_module(imported: type) -> str:
+        """
+        :param imported: A class to import.
+        :return: The public module above the private one *imported* is defined in, when
+            it exports *imported*; otherwise the module it is defined in.
+        """
+        components = imported.__module__.split(".")
+        public = list(
+            takewhile(lambda component: not component.startswith("_"), components)
+        )
+        if not public or len(public) == len(components):
+            return imported.__module__
+        public_module = importlib.import_module(".".join(public))
+        if public_module.__dict__.get(imported.__name__) is not imported:
+            return imported.__module__
+        return public_module.__name__
 
 
 # %% plans
@@ -169,3 +261,16 @@ class ActionPlan[Target](Action[Target]):
             target = applied.result
             inverses.append(applied.inverse)
         return AppliedAction(target, ActionPlan(tuple(reversed(inverses))))
+
+
+class PlanBuilder[Target](ABC):
+    """
+    Builds the action that changes a target, from the target itself.
+    """
+
+    @abstractmethod
+    def build(self, target: Target) -> Action[Target]:
+        """
+        :param target: What the action is to change.
+        :return: The action, to be applied to *target*.
+        """

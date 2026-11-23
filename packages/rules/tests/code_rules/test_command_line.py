@@ -17,7 +17,7 @@ from basstler.code_rules.instructions import AgentsInstructions
 from basstler.code_rules.locale_encoding import LocaleEncodingChecker
 
 from basstler_testing.constants.paths import DocstringSnippet, ProseSnippet
-from .fix_example import FixExample
+from basstler_testing.code_rules.fix_example import FixExample
 
 # %% checking
 

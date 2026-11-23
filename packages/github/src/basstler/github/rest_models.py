@@ -187,9 +187,15 @@ class RestReview(RestResponse, ValidatedJSONModel):
     The review's summary text.
     """
 
-    submitted_at: str | None
+    submitted_at: str | None = None
     """
     When the review was submitted, as an ISO 8601 timestamp.
+    """
+
+    commit: Annotated[str | None, Field(alias="commit_id")] = None
+    """
+    The head commit the review was submitted against, ``None`` where GitHub no longer
+    knows it.
     """
 
     @property

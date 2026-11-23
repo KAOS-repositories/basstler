@@ -30,9 +30,12 @@ raw-options = {root = "../.."}
 family = "basstler"
 dependencies = [
     "cyclopts>=5.3",
+    "libcst>=1.8",
     "pydantic>=2.11",
+    "pyyaml>=6",
     "basstler-core",
     "basstler-git",
+    "basstler-rules",
     "basstler-github",
 ]
 

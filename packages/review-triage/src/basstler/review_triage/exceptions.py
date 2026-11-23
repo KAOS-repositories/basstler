@@ -145,3 +145,29 @@ class PullRequestHeadMoved(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Run mark-viewed again to triage the new head commit."
+
+
+@dataclass
+class UnknownRecordedPlanError(DataclassException):
+    """
+    Raised when a commit trailer or an argument names a code modification plan the
+    triage does not know.
+    """
+
+    plan_name: str
+    """
+    The name given.
+    """
+
+    known_names: tuple[str, ...]
+    """
+    The names of the plans the triage can replay.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No code modification plan the triage replays is named {self.plan_name!r}."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"Name one of: {', '.join(self.known_names)}."

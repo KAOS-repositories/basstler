@@ -213,7 +213,7 @@ def commit_plan_change(
     git.run(
         "push",
         "--quiet",
-        str(Path(repository.clone_url_under(str(remote_root)))),
+        Path(repository.clone_url_under(str(remote_root))).as_posix(),
         f"HEAD:{PersonalNotesSetting.BRANCH.default}",
     )
 

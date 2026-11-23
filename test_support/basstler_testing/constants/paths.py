@@ -55,6 +55,11 @@ class RepositoryLocation(PathEnumeration):
     The shell entry points under test.
     """
 
+    REVIEW_TRIAGE_SCRIPT = ROOT / "scripts" / "review-triage.sh"
+    """
+    The script that triages a repository's pull requests without a checkout of basstler.
+    """
+
     WORKFLOWS = ROOT / ".github" / "workflows"
     """
     The repository's Actions workflows.
@@ -136,6 +141,11 @@ class DatasetLocation(PathEnumeration):
     )
     """
     A workflow that runs the package's own entry point.
+    """
+
+    NON_ASCII_TEXT = DIRECTORY / "git-commands" / "non-ascii-text.txt"
+    """
+    Text whose UTF-8 encoding the Windows locale encoding cannot decode.
     """
 
     BOOTSTRAP_PLAN = DIRECTORY / "bootstrap-plan.yaml"
@@ -400,6 +410,11 @@ class DatasetLocation(PathEnumeration):
     hook script.
     """
 
+    RECORDING_PYTHON_STUB = STUBS / "recording_python.sh"
+    """
+    An interpreter that runs nothing and records the arguments it is given.
+    """
+
     DISPATCH_CHECK_NEEDS_SETUP_STUB = STUBS / "dispatch_check_needs_setup.py"
     """
     A module standing in for :mod:`basstler.plan_site.dispatch_check`, reporting a
@@ -487,6 +502,20 @@ class DatasetLocation(PathEnumeration):
     REVIEW_TRIAGE = DIRECTORY / "review-triage"
     """
     The file versions, descriptions and pull request the review triage is tested on.
+    """
+
+    CLASS_HEADERS = DIRECTORY / "review-triage" / "class-headers"
+    """
+    A base class, two subclasses naming it on and after the line defining them, and a
+    class only mentioning it.
+    """
+
+    CONFLICTED_MODULE = (
+        DIRECTORY / "review-triage" / "conflicted-module" / "triangle.py.txt"
+    )
+    """
+    A subclass of the class header dataset's base class, left with a merge's conflict
+    markers.
     """
 
     UPSTREAM_REVIEW_RESPONSES = DIRECTORY / "upstream-review-responses"
@@ -920,6 +949,12 @@ class CodeModificationSnippet(PathEnumeration):
     :attr:`TWO_CALLS` with :func:`float` called in place of :func:`abs`.
     """
 
+    TWO_CALLS_BOTH_RENAMED = DIRECTORY / "two-calls-both-renamed.py"
+    """
+    :attr:`TWO_CALLS` with :func:`float` and :func:`int` called in place of
+    :func:`abs` and :func:`round`.
+    """
+
     BODY = DIRECTORY / "body.py.txt"
     """
     A module of a docstring, an assignment with a string below it, two statements on one
@@ -935,6 +970,12 @@ class CodeModificationSnippet(PathEnumeration):
     """
     :attr:`IMPORTS` with :class:`~basstler.text_file.TextFile` imported after
     :mod:`os`.
+    """
+
+    IMPORTS_WITH_FUTURE = DIRECTORY / "imports-with-future.py.txt"
+    """
+    :attr:`IMPORTS` with :class:`concurrent.futures.Future` imported from the public
+    module that exports it.
     """
 
     IMPORTS_OF_TEXT_FILE_MODULE = DIRECTORY / "imports-of-text-file-module.py.txt"
@@ -1160,6 +1201,47 @@ class LocaleEncodingSnippet(PathEnumeration):
     """
 
 
+class PosixPathTextSnippet(PathEnumeration):
+    """
+    Source files the check for paths turned into text other than as POSIX reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "posix-path-text"
+    """
+    The directory holding them.
+    """
+
+    OTHER_TEXT = DIRECTORY / "other-text.py"
+    """
+    Text that is no path, or a path of a type the module does not show, and paths
+    already written as POSIX text.
+    """
+
+
+class FileUriSnippet(PathEnumeration):
+    """
+    Source files the check for file URLs built by putting a path after ``file://``
+    reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "file-uri"
+    """
+    The directory holding them.
+    """
+
+    PATH_AFTER_SCHEME = DIRECTORY / "path-after-scheme.py"
+    """
+    Two file URLs built by putting a path after ``file://``, on lines 10 and 11.
+    """
+
+    OTHER_URLS = DIRECTORY / "other-urls.py"
+    """
+    A URL from :meth:`pathlib.PurePath.as_uri`, a web URL, a file URL with more text
+    after the path, a converted path after ``file://``, the bare scheme, and a file URL
+    concatenated with another string literal.
+    """
+
+
 class TreeRemovalSnippet(PathEnumeration):
     """
     Source files the check for directories removed with :func:`shutil.rmtree` reads.
@@ -1184,6 +1266,11 @@ class TreeRemovalSnippet(PathEnumeration):
     OTHER_RMTREE = DIRECTORY / "other-rmtree.py"
     """
     A function and a method named ``rmtree`` that are not :func:`shutil.rmtree`.
+    """
+
+    HANDLED_RMTREE = DIRECTORY / "handled-rmtree.py"
+    """
+    A call to :func:`shutil.rmtree` with an error handler, on line 17.
     """
 
 

@@ -14,6 +14,24 @@ basstler review-triage mark-viewed <number>   # mark the mechanical files viewed
 Run them in a checkout of the project. `--repository <owner>/<name>` names the pull
 request's repository when it is not the checkout's `origin`.
 
+### Recorded code modification plans
+
+A commit that applied a code modification plan says so in a trailer of its message,
+naming the plan and the basstler release that applied it:
+
+```text
+Code-Modification-Plan: workspace-packages basstler==3.25.2
+```
+
+The triage rebuilds that plan on the pull request's base, replays it, and judges each
+file the plan changed against the replayed tree instead. A file is mechanical only when
+the replay reproduces it, so a trailer on a commit edited by hand proves nothing. For a
+commit that predates the trailer, name the plan on the command line, as often as needed:
+
+```bash
+basstler review-triage report <number> --plan <commit>=workspace-packages
+```
+
 ## In a Claude Code session, automatically
 
 A session with the basstler plugin marks the mechanical files of the pull request its

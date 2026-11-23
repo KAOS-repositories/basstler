@@ -20,6 +20,8 @@ from basstler.code_modification.file_actions import (
     FileMove,
 )
 from basstler.code_modification.source_tree import SourceTree
+from basstler.git.commands import GitCommandRunner
+from basstler.git.commit_tree import CommitTree
 
 from basstler_testing.constants.paths import RelocationTree
 from basstler_testing.executable_stubs import NEEDS_EXECUTABLE_BIT
@@ -157,3 +159,31 @@ def test_a_deleted_executable_is_created_executable_again(tmp_path):
     applied = FileDeletion(script, b"").apply(tree)
 
     assert applied.inverse.apply(applied.result).result == tree
+
+
+# %% reading a tree from a commit
+
+
+def test_a_tree_read_from_a_commit_is_the_tree_committed(before, tmp_path):
+    """
+    Every file comes back with its content, and an executable one as executable.
+    """
+    script = Path("run.sh")
+    committed = before.with_files({script: b"echo run\n"}, executable=(script,))
+    committed.write(tmp_path, SourceTree({}))
+    git = GitCommandRunner(tmp_path)
+    git.run("init", "--quiet")
+    git.run("add", "--all")
+    git.run("update-index", "--chmod=+x", script.as_posix())
+    git.run(
+        "-c",
+        "user.name=Test Author",
+        "-c",
+        "user.email=author@example.com",
+        "commit",
+        "--quiet",
+        "-m",
+        "Commit the tree",
+    )
+
+    assert SourceTree.from_commit(CommitTree(git, git.commit_at("HEAD"))) == committed

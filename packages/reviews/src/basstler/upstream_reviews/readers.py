@@ -220,7 +220,10 @@ class UpstreamRestRoute(HasRepository):
         :param number: The pull request's number.
         :return: Its submitted reviews.
         """
-        return f"{self.pull_request(number)}/reviews?per_page={self.page_size}"
+        return (
+            f"{self.repository.pull_request_reviews_path(number)}"
+            f"?per_page={self.page_size}"
+        )
 
     def review_comments(self, number: int) -> str:
         """

@@ -10,6 +10,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from basstler.git.commit_tree import CommitTree
+
 # %% the tree
 
 
@@ -42,6 +44,19 @@ class SourceTree:
             frozenset(
                 path for path in paths if (root / path).stat().st_mode & stat.S_IXUSR
             ),
+        )
+
+    @classmethod
+    def from_commit(cls, tree: CommitTree) -> SourceTree:
+        """
+        :param tree: A commit's files.
+        :return: The tree of every file the commit holds.
+        :raises GitCommandFailed: If git cannot read the commit.
+        """
+        files = tree.committed_files
+        return cls(
+            {Path(path): file.content for path, file in files.items()},
+            frozenset(Path(path) for path, file in files.items() if file.is_executable),
         )
 
     @classmethod

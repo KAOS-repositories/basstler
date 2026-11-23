@@ -44,7 +44,7 @@ from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.github.path_answering_client import refusal
 from basstler_testing.scratch_repository import ScratchRepository
 
-from .samples import DescriptionSample, PullRequestSample
+from .samples import DescriptionSample, PullRequestSample, SampleTrees
 
 # %% stand-ins for GitHub
 
@@ -223,26 +223,39 @@ def old_name_renamed() -> RenameMap:
     return RenameMap((Rename("old_name", "new_name", RenameDetection()),))
 
 
-@pytest.fixture
-def sample_payload(scratch_repository: ScratchRepository) -> dict[str, Any]:
+def committed_payload(
+    scratch_repository: ScratchRepository, base: SampleTrees, head: SampleTrees
+) -> dict[str, Any]:
     """
-    Commit the sample pull request's base tree, then its head tree on top.
+    Commit a sample's base tree, then its head tree on top.
 
     :param scratch_repository: The repository to commit in.
-    :return: The pull request's payload, naming the two commits.
+    :param base: The sample's base tree.
+    :param head: The sample's head tree.
+    :return: The sample pull request's payload, naming the two commits.
     """
-    for path, text in PullRequestSample.BASE_TREE.files().items():
+    for path, text in base.files().items():
         scratch_repository.write(path, text)
     scratch_repository.commit_everything("base")
     base_commit = scratch_repository.git.commit_at("HEAD")
     scratch_repository.run_git("rm", "-r", "--quiet", ".")
-    for path, text in PullRequestSample.HEAD_TREE.files().items():
+    for path, text in head.files().items():
         scratch_repository.write(path, text)
     scratch_repository.commit_everything("head")
     payload = PullRequestSample.PAYLOAD.payload()
     payload["base"]["sha"] = base_commit
     payload["head"]["sha"] = scratch_repository.git.commit_at("HEAD")
     return payload
+
+
+@pytest.fixture
+def sample_payload(scratch_repository: ScratchRepository) -> dict[str, Any]:
+    """
+    :return: The sample pull request's payload, once its trees are committed.
+    """
+    return committed_payload(
+        scratch_repository, PullRequestSample.BASE_TREE, PullRequestSample.HEAD_TREE
+    )
 
 
 def read_sample(

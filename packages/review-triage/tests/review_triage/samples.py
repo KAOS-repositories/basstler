@@ -9,7 +9,9 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from basstler.class_property import classproperty
 from basstler.git.commit_range import FileVersions
+from basstler.text_file import TextFile
 
 from basstler_testing.constants.paths import DatasetLocation
 
@@ -75,7 +77,37 @@ class DescriptionSample(StrEnum):
 # %% the pull request
 
 
-class PullRequestSample(StrEnum):
+class SampleTrees(StrEnum):
+    """
+    The parts of a sample pull request kept in one directory, its two trees among them.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        """
+        The name of the directory holding the parts.
+        """
+        raise NotImplementedError
+
+    @property
+    def path(self) -> Path:
+        """
+        Where the part is.
+        """
+        return DatasetLocation.REVIEW_TRIAGE / self.directory_name / self
+
+    def files(self) -> dict[Path, str]:
+        """
+        :return: The content of each file of this tree, by its path in the tree.
+        """
+        return {
+            file.relative_to(self.path): TextFile(file).read()
+            for file in self.path.rglob("*")
+            if file.is_file()
+        }
+
+
+class PullRequestSample(SampleTrees):
     """
     The parts of the sample pull request: its two trees, its REST payload and its
     report.
@@ -86,25 +118,29 @@ class PullRequestSample(StrEnum):
     PAYLOAD = "pull-request.json"
     REPORT = "report.md"
 
-    @property
-    def path(self) -> Path:
-        """
-        Where the part is.
-        """
-        return DatasetLocation.REVIEW_TRIAGE / "pull-request" / self
-
-    def files(self) -> dict[Path, str]:
-        """
-        :return: The content of each file of this tree, by its path in the tree.
-        """
-        return {
-            file.relative_to(self.path): file.read_text(encoding="utf-8")
-            for file in self.path.rglob("*")
-            if file.is_file()
-        }
+    @classproperty
+    def directory_name(cls) -> str:
+        return "pull-request"
 
     def payload(self) -> dict[str, Any]:
         """
         :return: The REST payload, parsed.
         """
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        return json.loads(TextFile(self.path).read())
+
+
+# %% an import respelled to another module that still exists
+
+
+class ModuleNameKeptSample(SampleTrees):
+    """
+    A pull request respelling an import to another module binding another object of the
+    same name, while the module it imported from stays.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "module-name-kept"

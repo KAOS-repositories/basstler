@@ -37,9 +37,10 @@ from .conftest import (
     OnePullRequestReader,
     RecordingWriter,
     RefusingWriter,
+    committed_payload,
     read_sample,
 )
-from .samples import DescriptionSample, PullRequestSample
+from .samples import DescriptionSample, ModuleNameKeptSample, PullRequestSample
 
 # %% renames
 
@@ -74,6 +75,46 @@ def test_a_consistent_rename_gone_from_the_head_is_detected(
     assert RenameDetection().decisions(sample_changes) == RenameDecisions(
         (Rename("old_name", "new_name", RenameDetection()),)
     )
+
+
+@pytest.fixture
+def module_name_kept(scratch_repository: ScratchRepository) -> PullRequestChanges:
+    """
+    :return: The pull request respelling an import to another module, while the module
+        it imported from stays.
+    """
+    return read_sample(
+        scratch_repository,
+        committed_payload(
+            scratch_repository,
+            ModuleNameKeptSample.BASE_TREE,
+            ModuleNameKeptSample.HEAD_TREE,
+        ),
+        DescriptionSample.WITHOUT_DECLARATION,
+    )
+
+
+def test_a_module_name_kept_as_a_file_of_the_head_is_no_rename(
+    module_name_kept: PullRequestChanges,
+):
+    """
+    A module name the diff replaces is no rename while a file of the head still has it.
+    """
+    assert RenameDetection().decisions(module_name_kept) == RenameDecisions(())
+
+
+def test_an_import_respelled_to_another_module_that_still_exists_needs_review(
+    module_name_kept: PullRequestChanges,
+):
+    """
+    An import respelled to another module binding another object of the same name needs
+    review.
+    """
+    triage = PullRequestTriager().triage(module_name_kept)
+    assert {file.change.path for file in triage.files_needing_review} == {
+        PurePosixPath("caller.py"),
+        PurePosixPath("shapes/point.py"),
+    }
 
 
 # %% the verdicts

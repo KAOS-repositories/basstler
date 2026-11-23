@@ -1,12 +1,12 @@
 ## Plan
-- Move each name in locations/environment/exceptions that one distribution's source alone uses, members of shared enums included (owner chose member-level), into that distribution's own `locations`/`environment`/`exceptions` module
-- Names core or several distributions use stay in core
-- Rewrite the rule to "once, in its own package's locations"; regenerate AGENTS.md
-- Move the tests that cover moved names to the owning distribution
+- Move each name that one distribution's source alone uses, enum members included, into that distribution's own locations/environment/exceptions module; shared names stay in core
 
 ## Done
-- Bootstrap, draft PR #297, merged main at d529812a
-- Usage map: which distribution uses each name and member
+- Moves committed and pushed at d052eb9e (9 whole classes, 34 members, 15 exceptions; 14 new modules)
+- Naming rule rewritten, AGENTS.md regenerated; ruff, code-rules check and new-crossings pass
+- PR #297 description records decisions and open questions
 
 ## Next
-- Move the whole classes, then the members, distribution by distribution; run ruff and the suite
+- Read the per-distribution suite results and record them in the PR
+- Read CI on #297
+- Owner to answer: test-only core names, and member names that repeat their class's subject

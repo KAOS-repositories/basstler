@@ -84,8 +84,8 @@ items:
   track: sandbox
   depends_on:
   - cross-repository-goal-targets
-  notes: 'Found 2026-11-23 in business_consulting-notes'' Goal page workflow: with a token that reads
-    pull requests but not checks, GET .../commits/<sha>/check-runs answered 403 and goal path crashed
-    (GitHubRequestFailed). And when a notes repository could not be fetched (403), the target was reported
-    as ''no item of any plan'' rather than as an unreadable repository. Show CI as unreadable and name
-    the repository that could not be fetched.'
+  notes: 'Fine-grained tokens have no checks permission, so check-runs answers 403 and goal path crashed.
+    Built in the experiment at 8a5765da (#235): check_state reads the commit''s workflow runs (Actions:
+    read) on a 403, and reports not reported when those are refused too; business_consulting-notes'' Goal
+    page now shows #163''s CI. Next: when a notes repository cannot be fetched, name it instead of reporting
+    ''no item of any plan''.'

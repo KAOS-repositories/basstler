@@ -189,7 +189,9 @@ class MemberRenameDetection(RenameSource):
                 else:
                     renames.append(rename)
         renames.extend(
-            HierarchyCheck(MemberResolver(base_modules)).consistent(attributes)
+            HierarchyCheck(
+                MemberResolver(base_modules), MemberResolver(head_modules)
+            ).consistent(attributes)
         )
         return RenameDecisions(tuple(sorted(renames, key=lambda rename: rename.old)))
 
@@ -281,6 +283,11 @@ class HierarchyCheck:
     What the base commit's names refer to.
     """
 
+    head_resolver: MemberResolver
+    """
+    What the head commit's names refer to.
+    """
+
     subclasses: dict[
         ModuleMember, list[tuple[ModuleMember | None, ast.ClassDef]] | None
     ] = field(default_factory=dict)
@@ -312,7 +319,8 @@ class HierarchyCheck:
         :param rename: The rename of a class attribute.
         :param kept: The renames of class attributes kept so far.
         :return: Whether no ancestor or possible subclass of its class defines the new
-            name, and each that defines the old name renames it alike.
+            name, each that defines the old name renames it alike, and the class does
+            not inherit the old name in the head commit.
         """
         owner = rename.attribute.owner
         if owner not in self.subclasses:
@@ -323,6 +331,8 @@ class HierarchyCheck:
             subclasses is None
             or ancestors is None
             or self.resolver.defining_ancestors(owner, rename.new_name) != ()
+            or self.head_resolver.defining_ancestors(rename.new_owner, rename.old_name)
+            != ()
         ):
             return False
         for identity, definition in subclasses:

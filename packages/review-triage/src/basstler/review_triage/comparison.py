@@ -16,7 +16,11 @@ from basstler.git.commit_range import FileVersions
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER, CommitModules
 from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.moved_definitions import MovedDefinitions
-from basstler.review_triage.python_source import OwnerImports, PythonSource
+from basstler.review_triage.python_source import (
+    ImportBindings,
+    OwnerImports,
+    PythonSource,
+)
 from basstler.review_triage.renames import RenameDecisions, RenameMap
 from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
@@ -244,8 +248,8 @@ class JudgmentContext:
 
     owner_imports: OwnerImports = OwnerImports()
     """
-    The imports the file being judged gains and may lose for the attribute moves its
-    base version was renamed for.
+    The imports the file being judged gains and may lose for the moves its base
+    version was renamed for.
     """
 
     review_reasons: list[ReviewReason] = field(
@@ -265,6 +269,17 @@ class JudgmentContext:
     """
     The head commit's modules, as :attr:`base_modules`.
     """
+
+    def renamed_imports(self, base: PythonSource, head: PythonSource) -> ImportBindings:
+        """
+        :param base: The base version of the file being judged.
+        :param head: Its head version.
+        :return: The names the base version's imports bind once renamed, with the
+            imports it gains and may lose for its renames applied.
+        """
+        return self.owner_imports.applied_to(
+            base.imports(self.renames), head.import_bindings
+        )
 
     @staticmethod
     def package_of(
@@ -433,9 +448,7 @@ class PythonComparison(ContentComparison):
         if kinds is None or MechanicalChange.IMPORTS not in kinds:
             return kinds
         head_imports = head.import_bindings
-        base_imports = context.owner_imports.applied_to(
-            base.imports(context.renames), head_imports
-        )
+        base_imports = context.renamed_imports(base, head)
         if not (
             base_imports.binds_only_respellings(
                 head_imports, base.referenced_names(context.renames)
@@ -495,7 +508,9 @@ class PythonComparison(ContentComparison):
             return None
         kinds = set(code_kinds)
         if base.import_statements != head.import_statements:
-            if not base.imports(context.renames).agrees_with(head.import_bindings):
+            if not context.renamed_imports(base, head).agrees_with(
+                head.import_bindings
+            ):
                 return None
             kinds.add(MechanicalChange.IMPORTS)
         prose_pairs = [

@@ -269,6 +269,34 @@ class DefinitionMoveSample(SampleTrees):
         return "definition-move"
 
 
+class DefinitionMoveAgainstRenameSample(SampleTrees):
+    """
+    A pull request renaming a class in its module and adding a different class of the
+    old name to another module.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-against-rename"
+
+
+class DefinitionMoveAndRenameSample(SampleTrees):
+    """
+    A pull request moving a class to another module under a new name, and importing it
+    from there by that name.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-and-rename"
+
+
 class DefinitionMovePackageRootSample(SampleTrees):
     """
     A pull request moving a class into a new module of a package moved out of ``src/``,
@@ -509,3 +537,20 @@ RULE_SETTINGS = DatasetLocation.REVIEW_TRIAGE / "rules"
 """
 The checkouts, each holding a ``pyproject.toml``, the rule settings are read from.
 """
+
+
+class AttributeInheritedInHeadSample(SampleTrees):
+    """
+    A pull request dropping a method from a class that now inherits it, while the class
+    adds a method of another name.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        """
+        The directory holding the attribute-inherited-in-head sample.
+        """
+        return "attribute-inherited-in-head"

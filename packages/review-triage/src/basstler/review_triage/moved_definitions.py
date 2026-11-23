@@ -20,11 +20,6 @@ class MovedDefinition:
     A top-level definition that left one module for another.
     """
 
-    name: str
-    """
-    The name it is defined by in both modules.
-    """
-
     source_path: PurePosixPath
     """
     The file of the module it left, in the base commit.
@@ -54,6 +49,30 @@ class MovedDefinition:
     """
     Its dotted path in the module it moved into.
     """
+
+    @property
+    def old_name(self) -> str:
+        """
+        The name the module it left defines it by.
+        """
+        return self.old_path.rpartition(DOTTED_NAME_SEPARATOR)[2]
+
+    @property
+    def new_name(self) -> str:
+        """
+        The name the module it moved into defines it by.
+        """
+        return self.new_path.rpartition(DOTTED_NAME_SEPARATOR)[2]
+
+    def name_in(self, source_version: PythonSource) -> str:
+        """
+        :param source_version: A version of the module it left, its occurrences
+            possibly renamed already.
+        :return: The name that version defines it by.
+        """
+        if self.old_name in source_version.defined_names:
+            return self.old_name
+        return self.new_name
 
     @property
     def source_module(self) -> str:

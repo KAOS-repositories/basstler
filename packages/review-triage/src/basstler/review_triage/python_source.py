@@ -494,20 +494,20 @@ class ImportBindings:
 @dataclass(frozen=True)
 class OwnerImports:
     """
-    The imports a file's version renamed for attribute moves gains and may lose: the
-    new class of each moved attribute it reads, and an old class it reads nothing else
+    The imports a file's version renamed for moves gains and may lose: the new owner of
+    each moved attribute or definition it reads, and an old owner it reads nothing else
     of.
     """
 
     added: frozenset[ImportBinding] = frozenset()
     """
-    The bindings of the classes the moved attributes are read from instead.
+    The bindings reading the moved attributes and definitions from where they moved.
     """
 
     droppable: frozenset[ImportBinding] = frozenset()
     """
-    The bindings of the classes the moved attributes left that nothing else reads, in
-    the file or from it.
+    The bindings reading from where the moved attributes and definitions left, that
+    nothing else reads in the file or from it.
     """
 
     def applied_to(
@@ -522,9 +522,16 @@ class OwnerImports:
         kept = {
             binding
             for binding in bindings.bindings
-            if binding not in self.droppable or binding.bound_name in other.bound_names
+            if binding not in self.droppable or binding in other.bindings
         }
         return ImportBindings(frozenset(kept | (self.added & other.bindings)))
+
+    def __or__(self, other: OwnerImports) -> OwnerImports:
+        """
+        :param other: Other imports gained and lost.
+        :return: Those of both.
+        """
+        return OwnerImports(self.added | other.added, self.droppable | other.droppable)
 
 
 # %% a run of lines

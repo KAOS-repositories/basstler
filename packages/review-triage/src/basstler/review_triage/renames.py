@@ -137,11 +137,16 @@ class BindingRename(Rename, ABC):
 
     def is_repeated_in(self, renames: dict[str, Rename]) -> bool:
         """
-        :meth:`Rename.is_repeated_in`: whether the definition's old name is renamed to
-        its new name everywhere.
+        :meth:`Rename.is_repeated_in`: whether the definition stays where it is and its
+        old name is renamed to its new name everywhere.
         """
         word = renames.get(self.old_name)
-        return word is not None and word.new == self.new_name
+        return (
+            word is not None
+            and word.new == self.new_name
+            and self.old.rpartition(DOTTED_NAME_SEPARATOR)[0]
+            == self.new.rpartition(DOTTED_NAME_SEPARATOR)[0]
+        )
 
 
 @dataclass(frozen=True)
@@ -197,6 +202,16 @@ class AttributeRename(BindingRename):
     @property
     def definition(self) -> ClassAttribute:
         return self.attribute
+
+    @property
+    def new_owner(self) -> ModuleMember:
+        """
+        The attribute's class, as the head commit names it.
+        """
+        module, _, member_name = self.new.rpartition(DOTTED_NAME_SEPARATOR)[
+            0
+        ].rpartition(DOTTED_NAME_SEPARATOR)
+        return ModuleMember(module, member_name)
 
 
 @dataclass(frozen=True)

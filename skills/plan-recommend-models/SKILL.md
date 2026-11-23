@@ -4,7 +4,7 @@ description: Judge and set the recommended model (opus, sonnet or haiku) of plan
 allowed-tools: Bash, Read
 ---
 
-# Plan Recommend Models
+# Plan recommend models
 
 Run commands as [`running-commands.md`](../running-commands.md) says, with
 `${CLAUDE_PLUGIN_ROOT}` as the `${BASSTLER_PLUGIN_ROOT}` it and every linked document name.

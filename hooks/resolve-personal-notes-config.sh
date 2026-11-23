@@ -236,8 +236,8 @@ PERSONAL_GIT_IDENTITY_PATH=".claude/personal/git-identity"
 
 # CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY: where everyone but the notes repository's
 # owner records their identity, one file per GitHub login, so colleagues sharing a
-# notes branch each author as themselves. Mirrors ProjectLocation in
-# basstler.locations; git_identity_path picks the file that applies.
+# notes branch each author as themselves. Mirrors PersonalNotesProjectLocation in
+# basstler.personal_notes.locations; git_identity_path picks the file that applies.
 CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY=".claude/personal/git-identities"
 
 # format_git_identity: prints a name and email in the one form every message
@@ -357,7 +357,7 @@ PLAN_BRANCH_INDEX_PATH="${PLANS_DIR}/_generated/branch-index.tsv"
 PLAN_HUB_PATH="${PLANS_DIR}/_hub.yaml"
 # PLAN_SITE_DISPATCH_WORKFLOW_PATH: the notes branch's workflow that starts the plan
 # site's build on every push (see basstler.plan_site.publication). Mirrors
-# WorkflowLocation.PLAN_SITE_DISPATCH in basstler.locations.
+# SiteWorkflowLocation.PLAN_SITE_DISPATCH in basstler.plan_site.locations.
 PLAN_SITE_DISPATCH_WORKFLOW_PATH=".github/workflows/plan-site-dispatch.yml"
 
 # *_MODULE: every Python entry point in this system - defined once, here, so

@@ -40,7 +40,7 @@ A file of the sample's head that :func:`edited_beyond_the_plan` changes further.
 IMPORT_REWRITTEN = PurePosixPath("packages/core/tests/test_bash.py")
 """
 A test of the sample whose relative import of a shared helper the plan rewrites as an
-absolute one, which no rename the triage detects explains.
+absolute one, following the helper's module to where the sample moves it.
 """
 
 # %% recording a plan
@@ -167,14 +167,16 @@ def test_a_plan_named_on_the_command_line_is_replayed_too(
     }
 
 
-def test_without_a_record_the_rewritten_imports_need_review(
+def test_without_a_record_a_rewritten_import_following_a_module_move_is_mechanical(
     unrecorded_split: PullRequestChanges,
 ):
+    """
+    The relative import the plan rewrites resolves to the helper's old module, whose
+    detected move the absolute import follows, so no file needs review.
+    """
     triage = PullRequestTriager().triage(unrecorded_split)
 
-    assert {verdict.change.path for verdict in triage.files_needing_review} == {
-        IMPORT_REWRITTEN
-    }
+    assert triage.files_needing_review == ()
 
 
 def test_a_plan_recorded_before_the_triaged_commits_is_not_replayed(

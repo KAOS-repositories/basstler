@@ -33,6 +33,7 @@ from basstler.regular_expression import (
     CharacterSet,
     RegularExpression,
 )
+from basstler.slash_command import SlashCommand
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -67,11 +68,6 @@ class CitationSyntax(StrEnum):
     WORD_SEPARATOR = "-"
     """
     Joins the words of a skill's name.
-    """
-
-    COMMAND_PREFIX = "/"
-    """
-    Starts a slash command.
     """
 
 
@@ -355,7 +351,7 @@ class CitedNames:
                     CitationSyntax.MODULE_SEPARATOR,
                 )
             ),
-            CitationSyntax.COMMAND_PREFIX,
+            SlashCommand.PREFIX,
             RegularExpression.sequence(
                 CharacterRange.ASCII_LOWERCASE_LETTER,
                 CharacterSet.any_of(

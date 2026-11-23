@@ -2,10 +2,9 @@ Plan
 - PR 260: entry-point hook forms, patterns from named parts, review threads.
 
 Done
-- Patterns: Separator enum, EnclosedPattern wrappers, grouped enums as *Enum restored.
-- Docstring examples are doctests; BasstlerWorkflowInput unifies the input.
-- Pushed 36cc1abb; replied to 14 new threads, resolved 9.
+- Separator, EnclosedPattern, MarkupElement, CodeBlockLanguage; grouped enums as *Enum.
+- Pushed 15a55153; replied to 4 new threads, resolved 2.
 
 Next
-- Read CI on 36cc1abb.
-- Open: basstler.sh example module, sub in other doctests, Separator.TAB, three answered questions.
+- Read CI on 15a55153.
+- Open: basstler.sh example module, sub in other doctests, Separator.TAB, regex as its own distribution, four answered questions.

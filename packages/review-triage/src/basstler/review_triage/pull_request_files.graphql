@@ -5,6 +5,7 @@ query PullRequestFiles($pullRequestId: ID!, $after: String) {
       files(first: 100, after: $after) {
         nodes {
           path
+          viewerViewedState
         }
         pageInfo {
           hasNextPage

@@ -5,29 +5,28 @@ built-in outputs.
 
 from __future__ import annotations
 
-import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, replace
-from enum import StrEnum
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
-from typing import Annotated, Any
 
-from pydantic import Field
 
 from basstler.class_property import classproperty
-from basstler.github.client import GitHubResponse, GitHubWriter, RetryPolicy
+from basstler.github.client import GitHubWriter, RetryPolicy
 from basstler.github.exceptions import GraphQLErrorsReturned
-from basstler.github.graphql import GraphQLRequest, GraphQLResponse
-from basstler.github.review_models import PageInfo
-from basstler.json_model import ValidatedJSONModel
+from basstler.github.graphql import GraphQLRequest
 from basstler.locations import ReviewTriageLocation
 from basstler.progress import ProgressStep, ProgressUnit
 from basstler.render_common import TemplatePage
 from basstler.review_triage.declaration import TriageDeclaration
 from basstler.review_triage.exceptions import PullRequestHeadMoved
+from basstler.review_triage.file_listing import (
+    FileListing,
+    FileListingReader,
+    GraphQLAttempts,
+    ViewedFilesVariable,
+)
 from basstler.review_triage.triage import TriageOutcome
 from basstler.standard_streams import StandardStreamHandler
-from basstler.text_file import TextFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -86,118 +85,6 @@ class TriageSummary(MarkdownReport):
 
 
 # %% marking files viewed
-
-
-class ViewedFilesVariable(StrEnum):
-    """
-    The variables of the mutation marking files of a pull request viewed.
-    """
-
-    PULL_REQUEST = "pullRequestId"
-    """
-    What GitHub's GraphQL API identifies the pull request by.
-    """
-
-    PATH_PREFIX = "file"
-    """
-    What the variable holding each file's path, and the mutation marking it, is named
-    by, followed by the file's position in the request.
-    """
-
-
-class PullRequestVariables(ValidatedJSONModel):
-    """
-    The variables of a GraphQL document about one pull request.
-    """
-
-    pull_request_node_identifier: Annotated[
-        str, Field(alias=ViewedFilesVariable.PULL_REQUEST)
-    ]
-    """
-    What GitHub's GraphQL API identifies the pull request by.
-    """
-
-
-class FilesPageRequest(PullRequestVariables):
-    """
-    The variables of the query reading one page of a pull request's files.
-    """
-
-    cursor: Annotated[str | None, Field(alias="after")] = None
-    """
-    The cursor of the page before, ``None`` for the first page.
-    """
-
-
-class ListedFile(ValidatedJSONModel):
-    """
-    One file GitHub lists in a pull request.
-    """
-
-    path: PurePosixPath
-    """
-    The file's path in the pull request's head commit.
-    """
-
-
-class ListedFilesPage(ValidatedJSONModel):
-    """
-    One page of the files GitHub lists in a pull request.
-    """
-
-    files: Annotated[tuple[ListedFile, ...], Field(alias="nodes")]
-    """
-    The files on this page.
-    """
-
-    page_info: Annotated[PageInfo, Field(alias="pageInfo")]
-    """
-    Whether another page follows, and the cursor to request it with.
-    """
-
-
-class ListedPullRequest(ValidatedJSONModel):
-    """
-    A pull request as GitHub lists its files, at its head commit now.
-    """
-
-    head_commit: Annotated[str, Field(alias="headRefOid")]
-    """
-    The commit its head branch points at.
-    """
-
-    files: ListedFilesPage
-    """
-    One page of the files it changes.
-    """
-
-
-class ListedFilesAnswer(ValidatedJSONModel):
-    """
-    The result of the query reading one page of a pull request's files.
-    """
-
-    pull_request: Annotated[ListedPullRequest, Field(alias="node")]
-    """
-    The pull request the query names.
-    """
-
-
-@dataclass(frozen=True)
-class AttemptedRequest:
-    """
-    GitHub's answer to a GraphQL request, or what it refused the request with.
-    """
-
-    result: Any = None
-    """
-    What the request returned, ``None`` when it was refused.
-    """
-
-    refusals: tuple[str, ...] = ()
-    """
-    What GitHub refused the request with, empty when it answered.
-    """
 
 
 @dataclass(frozen=True)
@@ -269,6 +156,13 @@ class ViewedMarking(TriageOutput):
         if refusals:
             raise GraphQLErrorsReturned(refusals)
 
+    @property
+    def attempts(self) -> GraphQLAttempts:
+        """
+        How each request is sent.
+        """
+        return GraphQLAttempts(self.github, self.retry_policy)
+
     def refusals(self, outcome: TriageOutcome) -> tuple[str, ...]:
         """
         Mark the mechanical files GitHub lists viewed, stopping at the first refusal.
@@ -277,78 +171,33 @@ class ViewedMarking(TriageOutput):
         :return: What GitHub refused with, empty once every listed file is marked.
         :raises PullRequestHeadMoved: If its head commit is no longer the triaged one.
         """
-        listing = self.listed_paths(outcome)
-        if listing.refusals:
-            return listing.refusals
+        listed = FileListingReader(self.attempts).read(
+            outcome.pull_request.node_identifier
+        )
+        if listed.refusals:
+            return listed.refusals
+        listing: FileListing = listed.result
+        if listing.head_commit != outcome.pull_request.head.commit:
+            raise PullRequestHeadMoved(
+                outcome.pull_request.number,
+                outcome.pull_request.head.commit,
+                listing.head_commit,
+            )
         mechanical = [file.change.path for file in outcome.mechanical_files]
-        unlisted = [path for path in mechanical if path not in listing.result]
+        unlisted = [path for path in mechanical if path not in listing.viewed_states]
         if unlisted:
             logger.warning(
                 "Not marked viewed, as GitHub does not list them in pull request "
                 f"{outcome.pull_request.number}: {', '.join(map(str, unlisted))}"
             )
-        paths = tuple(path for path in mechanical if path in listing.result)
+        paths = tuple(path for path in mechanical if path in listing.viewed_states)
         with ProgressStep.MARKING_VIEWED.bar(len(paths), ProgressUnit.FILE) as progress:
             for start in range(0, len(paths), self.files_per_request):
                 batch = paths[start : start + self.files_per_request]
-                marking = self.attempt(
+                marking = self.attempts.attempt(
                     ViewedFiles(outcome.pull_request.node_identifier, batch).request()
                 )
                 if marking.refusals:
                     return marking.refusals
                 progress.update(len(batch))
         return ()
-
-    def listed_paths(self, outcome: TriageOutcome) -> AttemptedRequest:
-        """
-        :param outcome: A triaged pull request.
-        :return: The paths of every file GitHub lists in it, as a frozen set.
-        :raises PullRequestHeadMoved: If its head commit is no longer the triaged one.
-        """
-        document = TextFile(ReviewTriageLocation.PULL_REQUEST_FILES).read()
-        request = FilesPageRequest(outcome.pull_request.node_identifier)
-        paths: set[PurePosixPath] = set()
-        while True:
-            page = self.attempt(GraphQLRequest(document, request.to_json()))
-            if page.refusals:
-                return page
-            answer = ListedFilesAnswer.from_json(page.result).pull_request
-            if answer.head_commit != outcome.pull_request.head.commit:
-                raise PullRequestHeadMoved(
-                    outcome.pull_request.number,
-                    outcome.pull_request.head.commit,
-                    answer.head_commit,
-                )
-            paths.update(file.path for file in answer.files.files)
-            if not answer.files.page_info.has_next_page:
-                return AttemptedRequest(frozenset(paths))
-            request = replace(request, cursor=answer.files.page_info.end_cursor)
-
-    def attempt(self, request: GraphQLRequest) -> AttemptedRequest:
-        """
-        :param request: The request to send.
-        :return: Its result, or what GitHub refused it with.
-        """
-        response = self.send_retrying(request)
-        if response.failure is not None:
-            return AttemptedRequest(refusals=(response.failure.error_message(),))
-        answer = GraphQLResponse.from_json(response.body)
-        if answer.errors:
-            return AttemptedRequest(
-                refusals=tuple(error.message for error in answer.errors)
-            )
-        return AttemptedRequest(answer.data or {})
-
-    def send_retrying(self, request: GraphQLRequest) -> GitHubResponse:
-        """
-        :param request: The request to send.
-        :return: GitHub's last answer, the request sent again as :attr:`retry_policy`
-            says while GitHub answers with a server error.
-        """
-        response = self.github.attempt_send(request)
-        for delay in self.retry_policy.delays():
-            if not response.is_server_error:
-                break
-            time.sleep(delay.total_seconds())
-            response = self.github.attempt_send(request)
-        return response

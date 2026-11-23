@@ -994,12 +994,11 @@ class PythonSource:
     def without(self, spans: tuple[LineSpan, ...]) -> PythonSource:
         """
         :param spans: Lines of the file.
-        :return: The file with those lines left out.
+        :return: The file with those lines emptied, every other line keeping its number.
         """
         removed = {line for span in spans for line in range(span.first, span.last + 1)}
         kept = [
-            text
+            "" if number in removed else text
             for number, text in enumerate(self.text.splitlines(), start=1)
-            if number not in removed
         ]
         return PythonSource.from_text("\n".join(kept) + "\n", self.package)

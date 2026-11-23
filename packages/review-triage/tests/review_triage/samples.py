@@ -30,6 +30,7 @@ class FileSample(StrEnum):
     DOCSTRING_REFLOWED = "docstring-reflowed"
     DOCSTRING_REWORDED = "docstring-reworded"
     DOCUMENTATION_IMPORT_MOVED = "documentation-import-moved"
+    DOCUMENTED_RECEIVER_BINDS_DIFFERENTLY = "documented-receiver-binds-differently"
     DOCUMENTATION_REFLOWED = "documentation-reflowed"
     DOCUMENTATION_RENAMED = "documentation-renamed"
     IDENTIFIER_RENAMED = "identifier-renamed"
@@ -89,6 +90,14 @@ class FileSample(StrEnum):
             base_text=TextFile(base).read(),
             head_text=TextFile(head).read(),
         )
+
+    def head_line(self, code: str) -> int:
+        """
+        :param code: A line of the head version, without its indentation.
+        :return: The number of the first line of the head version reading so.
+        """
+        lines = [line.strip() for line in self.change().head_text.splitlines()]
+        return lines.index(code) + 1
 
     def base_definitions(self) -> DefinitionIndex:
         """

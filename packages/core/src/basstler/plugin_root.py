@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from basstler.exceptions import PluginRootNotADirectoryError, PluginRootUnsetError
-from basstler.locations import BasstlerVariable, PluginLocation, PluginSkillLocation
+from basstler.locations import BasstlerVariable, PluginFile
 
 # %% the plugin root
 
@@ -44,7 +44,7 @@ class PluginRoot:
             raise PluginRootNotADirectoryError(directory)
         return cls(directory)
 
-    def path_of(self, location: PluginLocation | PluginSkillLocation) -> Path:
+    def path_of(self, location: PluginFile) -> Path:
         """
         :param location: A file of the plugin.
         :return: That file in this plugin.

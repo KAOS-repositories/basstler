@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from types import TracebackType
 
 from basstler.directory_tree import DirectoryTree
-from basstler.exceptions import (
+from basstler.personal_notes.exceptions import (
     NotesBranchMissingError,
     NotesPushRejectedError,
     UnsafeNotesPathError,

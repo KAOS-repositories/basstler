@@ -21,8 +21,10 @@ from basstler.locations import (
     PackageLocation,
     PluginLocation,
     ProjectLocation,
-    WorkflowLocation,
 )
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
+from basstler.setup.locations import SetupPluginLocation
+from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.personal_notes import access
 from basstler.plan_site import build_start, dispatch_check, publication
 from basstler.plan_site.dispatch_check import UNVERIFIED_PREFIX
@@ -73,7 +75,7 @@ def check_setup_repository(scratch_repository: ScratchRepository) -> ScratchRepo
     """
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-        PluginLocation.SETUP_CHECK_SCRIPT.name,
+        SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
     )
     scratch_repository.install_package()
 
@@ -84,7 +86,7 @@ def check_setup_repository(scratch_repository: ScratchRepository) -> ScratchRepo
     scratch_repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "my notes\n",
-            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            PersonalNotesProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
         }
     )
     scratch_repository.resolve_notes_remote_to()
@@ -119,7 +121,7 @@ def run_check_setup(
     )
     return SetupReport.from_completed_process(
         repository.run_hook_script(
-            PluginLocation.SETUP_CHECK_SCRIPT.name,
+            SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
             *arguments,
             *only_arguments,
             **environment_overrides,
@@ -236,7 +238,7 @@ def test_a_listed_repository_without_the_dispatch_workflow_names_the_site_it_is_
 ):
     site_url = "https://an-owner.github.io/plans/"
     check_setup_repository.update_notes_branch_file(
-        ProjectLocation.PLAN_HUB, f"{HubFileKey.SITE_URL}: {site_url}\n"
+        SiteProjectLocation.PLAN_HUB, f"{HubFileKey.SITE_URL}: {site_url}\n"
     )
 
     report = run_check_setup(check_setup_repository)
@@ -251,7 +253,7 @@ def test_a_dispatch_workflow_whose_runs_cannot_be_read_is_not_verified(
     check_setup_repository: ScratchRepository,
 ):
     check_setup_repository.update_notes_branch_file(
-        WorkflowLocation.PLAN_SITE_DISPATCH, "name: Plan site dispatch\n"
+        SiteWorkflowLocation.PLAN_SITE_DISPATCH, "name: Plan site dispatch\n"
     )
 
     report = run_check_setup(check_setup_repository)
@@ -320,7 +322,7 @@ def with_build_start_stub(
     :return: The same repository.
     """
     repository.update_notes_branch_file(
-        ProjectLocation.PLAN_HUB,
+        SiteProjectLocation.PLAN_HUB,
         f"{HubFileKey.SITE_URL}: https://an-owner.github.io/plans/\n",
     )
     repository.replace_package_module(build_start, stub)
@@ -420,7 +422,7 @@ def with_dispatch_check_stub(
     :return: The same repository.
     """
     repository.update_notes_branch_file(
-        WorkflowLocation.PLAN_SITE_DISPATCH, "name: Plan site dispatch\n"
+        SiteWorkflowLocation.PLAN_SITE_DISPATCH, "name: Plan site dispatch\n"
     )
     repository.replace_package_module(dispatch_check, stub)
     return repository
@@ -499,7 +501,7 @@ def test_the_dispatch_workflow_path_matches_the_shell_configuration(
 ):
     assert (
         check_setup_repository.configuration_value("PLAN_SITE_DISPATCH_WORKFLOW_PATH")
-        == Path(WorkflowLocation.PLAN_SITE_DISPATCH).as_posix()
+        == Path(SiteWorkflowLocation.PLAN_SITE_DISPATCH).as_posix()
     )
 
 
@@ -596,7 +598,9 @@ def test_reports_a_recorded_identity_that_matches_this_clone(
 def test_reports_a_notes_branch_that_records_no_identity(
     check_setup_repository: ScratchRepository,
 ):
-    check_setup_repository.remove_from_notes_branch(ProjectLocation.GIT_IDENTITY)
+    check_setup_repository.remove_from_notes_branch(
+        PersonalNotesProjectLocation.GIT_IDENTITY
+    )
 
     report = run_check_setup(check_setup_repository)
     assert report.exit_code is SetupCheckExitCode.SETUP_INCOMPLETE
@@ -884,7 +888,7 @@ def run_check_setup_outside(
         removed_variable_prefixes=tuple(ScrubbedEnvironmentPrefix),
         script_path=check_setup_repository.plugin_root
         / PluginLocation.HOOKS.value.name
-        / PluginLocation.SETUP_CHECK_SCRIPT.name,
+        / SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
     )
     return runner.run(
         **{ConfigurationVariable.HOME: str(check_setup_repository.basstler_home)}
@@ -959,7 +963,7 @@ def test_every_documented_check_can_be_requested(
 
 def test_an_unknown_check_is_a_usage_error(check_setup_repository: ScratchRepository):
     result = check_setup_repository.run_hook_script(
-        PluginLocation.SETUP_CHECK_SCRIPT.name, OnlyFlag.ONLY, "no_such_check"
+        SetupPluginLocation.SETUP_CHECK_SCRIPT.name, OnlyFlag.ONLY, "no_such_check"
     )
 
     assert result.returncode == SetupCheckExitCode.USAGE

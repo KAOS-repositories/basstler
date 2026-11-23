@@ -28,7 +28,7 @@ from basstler.github.pull_request_changes import (
 )
 from basstler.github.repository import Repository
 from basstler.github.review_models import PageInfo
-from basstler.locations import ReviewTriageLocation
+from basstler.review_triage.locations import ReviewTriageLocation
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.outputs import (
     FilesPageRequest,

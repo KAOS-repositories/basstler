@@ -23,6 +23,7 @@ from basstler.github.repository import Repository
 from basstler.github.run_listing import RunListing
 from basstler.github.states import CheckOutcome
 from basstler.locations import ClaudeCodeVariable, ProjectLocation
+from basstler.plan_site.locations import SiteProjectLocation
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.plan_site import dispatch_check
 from basstler.plan_site.dispatch_check import (
@@ -539,7 +540,9 @@ def test_every_repository_the_registry_s_hub_lists_is_published(
     RemoteBranch(
         Remote(GitCommandRunner(fork_checkout.project_root), RemoteName.ORIGIN),
         NOTES_BRANCH,
-    ).write({ProjectLocation.PLAN_HUB.as_posix(): own_copy.to_text()}, "List the hub")
+    ).write(
+        {SiteProjectLocation.PLAN_HUB.as_posix(): own_copy.to_text()}, "List the hub"
+    )
     registry_copy = PlanHub(
         registry=OTHER_REPOSITORY.full_name,
         repositories=[OTHER_REPOSITORY.full_name, NOTES_REPOSITORY.full_name],
@@ -547,7 +550,7 @@ def test_every_repository_the_registry_s_hub_lists_is_published(
     publish_notes(
         tmp_path,
         OTHER_REPOSITORY,
-        {Path(ProjectLocation.PLAN_HUB.name): registry_copy.to_text()},
+        {Path(SiteProjectLocation.PLAN_HUB.name): registry_copy.to_text()},
     )
 
     assert PlanHub.published_repositories(

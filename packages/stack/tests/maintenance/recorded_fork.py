@@ -20,7 +20,8 @@ from basstler.github.pull_request_record import (
     PullRequestField,
 )
 from basstler.github.repository_access import ForkPullRequests
-from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
+from basstler.locations import ClaudeCodeVariable
+from basstler.stack.locations import StackStateLocation
 from basstler.maintenance.commands import (
     MaintenanceCommand,
     MaintenancePass,
@@ -321,7 +322,7 @@ class AlreadyResolvedPass(MaintenancePass):
         return cls(
             configuration=make_configuration(),
             git=checkout.git,
-            board=checkout.project_root / RepositoryStateLocation.BOARD.name,
+            board=checkout.project_root / StackStateLocation.BOARD.name,
             resolved_stack=a_stack(checkout, pull_requests),
         )
 

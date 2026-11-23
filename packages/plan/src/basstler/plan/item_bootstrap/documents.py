@@ -16,7 +16,8 @@ import yaml
 
 from basstler.bash import Bash
 from basstler.github.repository import Repository
-from basstler.locations import PluginLocation, ProjectLocation
+from basstler.locations import ProjectLocation
+from basstler.plan.locations import PlanPluginLocation
 from basstler.plan.dependencies import PlanDirectory
 from basstler.plan.item_bootstrap.exceptions import (
     NotesBranchUnavailableError,
@@ -361,7 +362,7 @@ class PlanSaveScript:
             saved = subprocess.run(
                 Bash.locate(os.environ).command(
                     PluginRoot.locate(os.environ).path_of(
-                        PluginLocation.PLAN_SAVING_SCRIPT
+                        PlanPluginLocation.PLAN_SAVING_SCRIPT
                     ),
                     self.plan_identifier,
                     PlanSavingOption.MANIFEST,

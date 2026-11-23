@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from basstler.locations import PackageLocation
+from basstler.github.locations import GitHubPackageLocation
 from basstler.text_file import TextFile
 
 # %% the query documents
@@ -34,4 +34,4 @@ class GraphQLDocument(StrEnum):
 
     def read(self) -> str:
         """:return: The document's text."""
-        return TextFile(PackageLocation.QUERIES / f"{self}.graphql").read()
+        return TextFile(GitHubPackageLocation.QUERIES / f"{self}.graphql").read()

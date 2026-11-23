@@ -16,7 +16,8 @@ import rustworkx
 from basstler.class_property import classproperty
 from basstler.git.commands import GitCommandRunner
 from basstler.github.repository import Repository
-from basstler.locations import PlanHandoverLocation, ProjectLocation
+from basstler.locations import ProjectLocation
+from basstler.plan.locations import PlanProjectLocation, PlanHandoverLocation
 from basstler.personal_notes.branch import NotesBranchWriter, NotesFileChanges
 from basstler.personal_notes.progress_notes import ProgressNotesFile
 from basstler.plan.dependencies import DependencyReference
@@ -341,7 +342,7 @@ class PlanHandover:
             plans = tuple(plan.detached_from_plans(left_out_plans) for plan in plans)
         checkout = ProjectCheckout(project_root)
         held_paths = set(
-            checkout.notes_branch_paths(ProjectLocation.PULL_REQUEST_PROGRESS)
+            checkout.notes_branch_paths(PlanProjectLocation.PULL_REQUEST_PROGRESS)
         )
         branches = [
             item.branch for plan in plans for item in plan.manifest.items if item.branch
@@ -349,7 +350,7 @@ class PlanHandover:
         progress_notes = {}
         for branch in branches:
             path = PurePosixPath(
-                ProjectLocation.PULL_REQUEST_PROGRESS
+                PlanProjectLocation.PULL_REQUEST_PROGRESS
             ) / cls.progress_note_path(branch)
             if path not in held_paths:
                 continue
@@ -490,7 +491,7 @@ class PlanHandover:
             )
         store = RepositoryRulesStore.from_project_root(project_root)
         changes = {
-            PurePosixPath(ProjectLocation.PULL_REQUEST_PROGRESS)
+            PurePosixPath(PlanProjectLocation.PULL_REQUEST_PROGRESS)
             / self.progress_note_path(branch): note
             for branch, note in self.progress_notes.items()
         }
@@ -547,7 +548,7 @@ class PlanHandover:
         }
         changes.update(
             {
-                PurePosixPath(ProjectLocation.PULL_REQUEST_PROGRESS)
+                PurePosixPath(PlanProjectLocation.PULL_REQUEST_PROGRESS)
                 / self.progress_note_path(branch): None
                 for branch in self.progress_notes
             }

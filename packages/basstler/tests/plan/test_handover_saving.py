@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from basstler.locations import PlanHandoverLocation, ProjectLocation
+from basstler.locations import ProjectLocation
+from basstler.plan.locations import PlanProjectLocation, PlanHandoverLocation
 from basstler.plan import handover_command
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.exceptions import (
@@ -107,7 +108,7 @@ def test_an_import_saves_every_plan_progress_note_and_rule_onto_the_notes_branch
     assert {
         branch: TextFile(
             checkout
-            / ProjectLocation.PULL_REQUEST_PROGRESS
+            / PlanProjectLocation.PULL_REQUEST_PROGRESS
             / PlanHandover.progress_note_path(branch)
         ).read()
         for branch in dataset_handover.progress_notes
@@ -168,8 +169,10 @@ def test_removing_handed_over_plans_leaves_only_what_they_do_not_carry(
         == []
     )
     assert [
-        path.relative_to(checkout / ProjectLocation.PULL_REQUEST_PROGRESS).as_posix()
-        for path in (checkout / ProjectLocation.PULL_REQUEST_PROGRESS).rglob("*")
+        path.relative_to(
+            checkout / PlanProjectLocation.PULL_REQUEST_PROGRESS
+        ).as_posix()
+        for path in (checkout / PlanProjectLocation.PULL_REQUEST_PROGRESS).rglob("*")
         if path.is_file()
     ] == [PlanHandover.progress_note_path(UNRELATED_BRANCH).as_posix()]
 

@@ -13,7 +13,7 @@ from basstler.git.remote_branch import RemoteBranch
 from basstler.github import token_form
 from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository import HasRepository, Repository
-from basstler.locations import ProjectLocation, WorkflowLocation
+from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.workflows import (
     GitHubCommandLineOption,
@@ -80,10 +80,12 @@ class SiteRepository(HasRepository):
         :return: The site repository its dispatch workflow starts the build in, else the
             one serving the site its hub file names, ``None`` when it records neither.
         """
-        dispatch_text = notes_branch.read_latest(WorkflowLocation.PLAN_SITE_DISPATCH)
+        dispatch_text = notes_branch.read_latest(
+            SiteWorkflowLocation.PLAN_SITE_DISPATCH
+        )
         if dispatch_text is not None:
             return cls.from_dispatch_workflow(dispatch_text)
-        hub = PlanHub.from_yaml(notes_branch.read_latest(ProjectLocation.PLAN_HUB))
+        hub = PlanHub.from_yaml(notes_branch.read_latest(SiteProjectLocation.PLAN_HUB))
         if hub is None or hub.site_url is None:
             return None
         return cls.from_site_url(hub.site_url)

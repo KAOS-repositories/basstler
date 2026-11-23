@@ -18,7 +18,8 @@ import yaml
 from pydantic import Field
 
 from basstler.class_property import classproperty
-from basstler.locations import PackageLocation, ProjectLocation
+from basstler.locations import PackageLocation
+from basstler.github.locations import GitHubProjectLocation
 from basstler.text_file import TextFile
 
 # %% vocabulary
@@ -482,7 +483,7 @@ class Workflow:
         """
         :return: Every workflow GitHub runs from this checkout, in file name order.
         """
-        directory = PackageLocation.SOURCE_TREE / ProjectLocation.WORKFLOWS
+        directory = PackageLocation.SOURCE_TREE / GitHubProjectLocation.WORKFLOWS
         return tuple(cls.at(path) for path in sorted(directory.glob("*.yml")))
 
     @classproperty
@@ -490,7 +491,7 @@ class Workflow:
         """
         How a job names a reusable workflow of its own repository.
         """
-        return f"./{ProjectLocation.WORKFLOWS.value.as_posix()}/"
+        return f"./{GitHubProjectLocation.WORKFLOWS.value.as_posix()}/"
 
     @property
     def file_name(self) -> str:

@@ -28,7 +28,7 @@ from basstler.github.pull_request_record import (
 from basstler.github.repository import Repository
 from basstler.github.repository_access import PullRequestReader
 from basstler.github.states import CombinedCheckState
-from basstler.locations import RepositoryStateLocation
+from basstler.stack.locations import StackStateLocation
 from basstler.maintenance.commands import BoardCommand, MaintenancePass
 from basstler.stack.model import PullRequest
 
@@ -128,7 +128,7 @@ def test_the_written_board_parses_back_into_the_records_it_was_built_from(
             ),
         ]
     )
-    destination = tmp_path / RepositoryStateLocation.BOARD.name
+    destination = tmp_path / StackStateLocation.BOARD.name
 
     export.write(destination)
 
@@ -197,14 +197,14 @@ def test_every_worktree_of_a_repository_shares_one_board_outside_its_work_trees(
     fork_checkout.git.run("worktree", "add", "--quiet", "--detach", str(worktree))
 
     from_the_checkout = fork_checkout.git.repository_state_path(
-        RepositoryStateLocation.BOARD
+        StackStateLocation.BOARD
     )
     from_the_worktree = GitCommandRunner(worktree).repository_state_path(
-        RepositoryStateLocation.BOARD
+        StackStateLocation.BOARD
     )
 
     assert from_the_checkout == fork_checkout.project_root / ".git" / (
-        RepositoryStateLocation.BOARD
+        StackStateLocation.BOARD
     )
     assert from_the_worktree == from_the_checkout
 
@@ -385,7 +385,7 @@ def a_pass_over(
     return PassOverListedRepositories(
         configuration=make_configuration(),
         git=fork_checkout.git,
-        board=fork_checkout.project_root / RepositoryStateLocation.BOARD.name,
+        board=fork_checkout.project_root / StackStateLocation.BOARD.name,
         listed_fork=ListedRepository(
             {HeadCommit.CHECKED: CombinedCheckState.FAILURE},
             records=(

@@ -15,6 +15,7 @@ from basstler.github.repository import Repository
 from basstler.github.repository_attachment import SessionTool
 import basstler.plan_site.attach_approval
 from basstler.locations import BasstlerVariable, PluginLocation
+from basstler.plan_site.locations import SitePluginLocation
 from basstler.plan_site.attach_approval import (
     AttachAnswer,
     AttachArguments,
@@ -152,6 +153,6 @@ def test_the_plugin_runs_the_hook_before_the_attach_tool_and_nothing_else():
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
+        f"{SitePluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
         f"{basstler.plan_site.attach_approval.__spec__.name.removeprefix('basstler.')}"
     )

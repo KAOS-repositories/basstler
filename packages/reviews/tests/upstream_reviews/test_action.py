@@ -22,7 +22,7 @@ import basstler.upstream_reviews.action.__main__
 import basstler.upstream_reviews.action.read
 import basstler.upstream_reviews.action.run
 from basstler.git.remote_branch import RemoteBranch
-from basstler.environment import GitVariable
+from basstler.git.environment import GitVariable
 from basstler.git.commands import GitCommandRunner
 from basstler.github.remote import GitHubRemote
 from basstler.github.workflows import TriggerEvent

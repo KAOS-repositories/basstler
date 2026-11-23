@@ -22,7 +22,7 @@ from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.github.basstler_project import BasstlerProject
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import BasstlerRepositoryLocation
+from basstler.github.locations import BasstlerRepositoryLocation
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 

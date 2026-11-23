@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 
 from basstler.locations import PluginLocation, ProjectLocation
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
+from basstler.setup.locations import SetupPluginLocation
 
 from basstler_testing.constants.paths import PersonalNotesPath
 from basstler_testing.scratch_repository import SCRATCH_IDENTITY, ScratchRepository
@@ -33,14 +35,16 @@ def notes_saving_repository(scratch_repository: ScratchRepository) -> ScratchRep
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
         PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
-        PluginLocation.SESSION_START_SCRIPT.name,
+        SetupPluginLocation.SESSION_START_SCRIPT.name,
         PluginLocation.SESSION_RULES.name,
         PluginLocation.PERSONAL_NOTES_SAVING_SCRIPT.name,
     )
     scratch_repository.write("README.md", "scratch repo\n")
     scratch_repository.commit_everything("initial commit")
     scratch_repository.publish_notes_branch(
-        {ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
+        {
+            PersonalNotesProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()
+        }
     )
     scratch_repository.resolve_notes_remote_to()
     return scratch_repository
@@ -58,7 +62,7 @@ def test_first_notes_are_saved_without_the_sections_the_session_start_generated(
     the session rules and the pull request progress stay out of them.
     """
     session_start = notes_saving_repository.run_hook_script(
-        PluginLocation.SESSION_START_SCRIPT.name
+        SetupPluginLocation.SESSION_START_SCRIPT.name
     )
     assert session_start.returncode == 0, session_start.stderr
     local_instructions = (

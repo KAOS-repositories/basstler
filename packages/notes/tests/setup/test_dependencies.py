@@ -13,6 +13,7 @@ from importlib.metadata import distributions
 import pytest
 
 from basstler.locations import PackageLocation
+from basstler.setup.locations import SetupPackageLocation
 from basstler.setup import dependencies
 from basstler.setup.dependencies import (
     Dependency,
@@ -36,7 +37,7 @@ def test_a_declaration_naming_no_dependencies_is_read_as_needing_none(tmp_path):
     Distinct from unreadable: a package that declares nothing needs nothing, so the
     caller installs nothing rather than being told it could not check.
     """
-    declaration = tmp_path / PackageLocation.META_PACKAGE_METADATA.name
+    declaration = tmp_path / SetupPackageLocation.META_PACKAGE_METADATA.name
     declaration.write_text(
         f'[{PyprojectKey.PROJECT}]\n{PyprojectKey.NAME} = "nothing"\n', encoding="utf-8"
     )
@@ -145,7 +146,7 @@ def test_an_absent_declaration_raises_rather_than_declaring_nothing(tmp_path):
     caller that nothing is missing.
     """
     absent = DependencyDeclaration(
-        tmp_path / PackageLocation.META_PACKAGE_METADATA.value.name
+        tmp_path / SetupPackageLocation.META_PACKAGE_METADATA.value.name
     )
 
     with pytest.raises(UnreadableDependencyDeclarationError):
@@ -157,7 +158,7 @@ def test_a_declaration_that_is_not_toml_raises_naming_itself(tmp_path):
     A declaration that will not parse is reported as the file it is, so a caller can say
     which file to fix.
     """
-    malformed = tmp_path / PackageLocation.META_PACKAGE_METADATA.value.name
+    malformed = tmp_path / SetupPackageLocation.META_PACKAGE_METADATA.value.name
     malformed.write_text("this is not toml\n", encoding="utf-8")
 
     with pytest.raises(MalformedDependencyDeclarationError) as raised:

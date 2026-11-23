@@ -26,6 +26,7 @@ from basstler.directory_tree import DirectoryTree
 from basstler.bash import Bash
 from basstler.git.commands import GitCommandRunner
 from basstler.locations import PackageLocation, PluginLocation
+from basstler.setup.locations import SetupPackageLocation
 from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import ShellConfigurationFunction
 
@@ -269,8 +270,11 @@ class ScratchRepository:
         The scratch checkout's ``basstler`` distribution metadata, which a checkout's
         requirements are read from.
         """
-        return self.checkout_root / PackageLocation.META_PACKAGE_METADATA.relative_to(
-            PackageLocation.SOURCE_TREE
+        return (
+            self.checkout_root
+            / SetupPackageLocation.META_PACKAGE_METADATA.relative_to(
+                PackageLocation.SOURCE_TREE
+            )
         )
 
     def detach_plugin_from_checkout(self) -> None:

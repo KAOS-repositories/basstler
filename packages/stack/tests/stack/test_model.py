@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from basstler.github.states import CombinedCheckState
-from basstler.locations import RepositoryStateLocation
+from basstler.stack.locations import StackStateLocation
 from basstler.stack.exceptions import BaseBranchScopeError
 from basstler.stack.model import (
     BoardKey,
@@ -411,7 +411,7 @@ def test_the_board_reads_the_check_state_back_as_its_verdict(
     tmp_path: Path, state: CombinedCheckState
 ):
     written = a_ready_branch_whose_checks_reached(state)
-    board = tmp_path / RepositoryStateLocation.BOARD.name
+    board = tmp_path / StackStateLocation.BOARD.name
     board.write_text(
         json.dumps({BoardKey.PULL_REQUESTS: [asdict(written)]}), encoding="utf-8"
     )

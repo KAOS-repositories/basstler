@@ -31,7 +31,9 @@ from basstler.github.release_version import (
 )
 from basstler.github.workflows import ActivityType, Trigger, TriggerEvent, WorkflowKey
 from basstler.github.workflows import Workflow as DeclaredWorkflow
-from basstler.locations import BasstlerRepositoryLocation, PathEnumeration
+from basstler.locations import PathEnumeration
+from basstler.github.environment import GitHubActionsOutputVariable
+from basstler.github.locations import BasstlerRepositoryLocation
 
 from basstler_testing.constants.environment import SearchPathVariable
 from basstler_testing.constants.paths import RepositoryLocation
@@ -542,7 +544,7 @@ def run_release_step(
                 ]
             ),
             GitHubActionsVariable.STEP_SUMMARY: str(files.summary),
-            GitHubActionsVariable.OUTPUT: str(files.output),
+            GitHubActionsOutputVariable.OUTPUT: str(files.output),
             GitHubActionsVariable.RUNNER_TEMPORARY_DIRECTORY: str(files.directory),
             ReleaseWorkflowVariable.RELEASE_BRANCH: release_branch(),
             ReleaseWorkflowVariable.PLUGIN_RELEASE_BRANCH: plugin_release_branch(),

@@ -64,10 +64,10 @@ from basstler.exceptions import DataclassException
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.locations import (
     ClaudeCodeVariable,
-    PackageLocation,
     PluginLocation,
     ProjectLocation,
 )
+from basstler.plan.locations import PlanPackageLocation, PlanProjectLocation
 from basstler.plugin_root import PluginRoot
 from basstler.shell_configuration import (
     FetchedBranchReference,
@@ -337,7 +337,7 @@ class MalformedModeSettingsError(ModeError):
     def suggest_correction(self) -> str:
         return (
             "Fix the file, or delete it to fall back to "
-            f"{PackageLocation.PLAN_ITEM_MODE_DEFAULTS}'s defaults."
+            f"{PlanPackageLocation.PLAN_ITEM_MODE_DEFAULTS}'s defaults."
         )
 
 
@@ -358,9 +358,7 @@ class SettingsWriteRefusedError(ModeError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"{ProjectLocation.PERSONAL_PLAN_ITEM_MODES} was not written: {self.detail}"
-        )
+        return f"{PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES} was not written: {self.detail}"
 
     def suggest_correction(self) -> str:
         return "Check the personal-notes branch is set up: run /setup-personal-notes."
@@ -379,8 +377,8 @@ def committed_defaults() -> dict[str, ExecutionMode]:
     :return: Every skill's default, keyed by its setting key.
     """
     shipped = SettingsFile(
-        path=PackageLocation.PLAN_ITEM_MODE_DEFAULTS.value,
-        origin=PackageLocation.PLAN_ITEM_MODE_DEFAULTS,
+        path=PlanPackageLocation.PLAN_ITEM_MODE_DEFAULTS.value,
+        origin=PlanPackageLocation.PLAN_ITEM_MODE_DEFAULTS,
     )
     raw = shipped.read()
     missing = [
@@ -413,7 +411,7 @@ def personal_settings(project_root: Path) -> dict[str, Any]:
             "git",
             "show",
             FetchedBranchReference.PERSONAL_NOTES.file_at(
-                ProjectLocation.PERSONAL_PLAN_ITEM_MODES
+                PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES
             ),
         ],
         cwd=project_root,
@@ -426,7 +424,7 @@ def personal_settings(project_root: Path) -> dict[str, Any]:
         scratch_file = Path(scratch_directory) / "personal-plan-item-modes.toml"
         TextFile(scratch_file).write(shown.stdout)
         return SettingsFile(
-            path=scratch_file, origin=ProjectLocation.PERSONAL_PLAN_ITEM_MODES
+            path=scratch_file, origin=PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES
         ).read()
 
 
@@ -586,7 +584,7 @@ class ModeResolution(Report):
             ReportKey.SOURCE: str(self.source),
             ReportKey.SETTING_KEY: self.skill.setting_key,
             ReportKey.PERSONAL_SETTING_PATH: str(
-                ProjectLocation.PERSONAL_PLAN_ITEM_MODES
+                PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES
             ),
         }
 
@@ -662,7 +660,7 @@ class SettingsWriteReport(Report):
             ReportKey.SKILLS: [str(skill) for skill in self.skills],
             ReportKey.MODE: str(self.mode),
             ReportKey.PERSONAL_SETTING_PATH: str(
-                ProjectLocation.PERSONAL_PLAN_ITEM_MODES
+                PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES
             ),
         }
 
@@ -676,7 +674,7 @@ def render_settings(modes: dict[str, ExecutionMode]) -> str:
     """
     header = (
         "# Personal plan-item execution modes, layered over the committed defaults\n"
-        f"# at {PackageLocation.PLAN_ITEM_MODE_DEFAULTS}. Rewritten in full by plan/item_mode.py's\n"
+        f"# at {PlanPackageLocation.PLAN_ITEM_MODE_DEFAULTS}. Rewritten in full by plan/item_mode.py's\n"
         "# set command, so anything other than the keys below is not preserved.\n"
     )
     body = "".join(
@@ -732,7 +730,7 @@ def write_mode(
                 "--source",
                 str(scratch_file),
                 "--destination",
-                ProjectLocation.PERSONAL_PLAN_ITEM_MODES,
+                PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES,
                 "--message",
                 f"Set {pinned} to {mode}",
             ),

@@ -9,7 +9,7 @@ from enum import StrEnum
 import pytest
 
 from basstler.github.repository import Repository
-from basstler.locations import PlanHandoverLocation
+from basstler.plan.locations import PlanHandoverLocation
 from basstler.plan.handover import HandoverPlan, PlanHandover
 from basstler.plan.model import PlanDocument, PlanManifest
 

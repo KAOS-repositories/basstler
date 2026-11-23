@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from basstler.locations import PluginLocation
+from basstler.setup.locations import SetupPluginLocation
 from basstler.maintenance.default_branch_sync import (
     BaseOutcome,
     DefaultBranchReport,
@@ -299,13 +300,13 @@ def test_session_start_reports_the_catching_up_and_still_starts(
     repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
         PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
-        PluginLocation.SESSION_START_SCRIPT.name,
+        SetupPluginLocation.SESSION_START_SCRIPT.name,
     )
     repository.install_package()
     repository.install_package_environment()
     upstream_tip = forked.advance_upstream(2)
 
-    result = repository.run_hook_script(PluginLocation.SESSION_START_SCRIPT.name)
+    result = repository.run_hook_script(SetupPluginLocation.SESSION_START_SCRIPT.name)
 
     assert result.returncode == 0, result.stderr
     assert forked.local_default_branch_tip() == upstream_tip

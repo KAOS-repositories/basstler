@@ -14,7 +14,7 @@ from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository import HasRepository, NewTokenPage, Repository
 from basstler.github.user_steps import UserStep
 from basstler.github.web_form import PrefilledForm, UrlQueryParameter
-from basstler.locations import GitHubTemplate
+from basstler.github.locations import GitHubTemplate
 from basstler.render_common import TemplatePage
 
 # %% the form's parameters

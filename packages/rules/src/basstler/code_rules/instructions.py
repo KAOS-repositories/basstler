@@ -14,7 +14,7 @@ from basstler.code_rules import rules
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.rule import Section
 from basstler.code_rules.rule_module import RuleModule
-from basstler.locations import InstructionsTemplate, ProjectLocation
+from basstler.code_rules.locations import CodeRulesProjectLocation, InstructionsTemplate
 from basstler.render_common import create_template_environment
 from basstler.text_file import TextFile
 
@@ -48,7 +48,7 @@ class AgentsInstructions:
         """
         The path of the repository's ``AGENTS.md``.
         """
-        return self.repository_root / ProjectLocation.AGENTS_INSTRUCTIONS
+        return self.repository_root / CodeRulesProjectLocation.AGENTS_INSTRUCTIONS
 
     @property
     def text(self) -> str:

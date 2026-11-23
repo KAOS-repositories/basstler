@@ -17,10 +17,11 @@ from enum import StrEnum
 from pathlib import Path, PurePath, PurePosixPath
 
 from basstler.class_property import classproperty
-from basstler.environment import GitVariable
+from basstler.git.environment import GitVariable
 from basstler.exceptions import ExternalCallFailed, UnresolvableReferenceError
 from basstler.exit_codes import CommandFailure, StackExitCode
-from basstler.locations import CommitScratchFile, RepositoryStateLocation
+from basstler.locations import RepositoryStateLocation
+from basstler.git.locations import CommitScratchFile
 from basstler.text_file import TextFile
 
 # %% running git

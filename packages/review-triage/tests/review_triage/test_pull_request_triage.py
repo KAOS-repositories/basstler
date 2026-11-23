@@ -20,7 +20,7 @@ from basstler.github.pull_request_changes import (
     PullRequestChangesReader,
     RestPullRequest,
 )
-from basstler.locations import ReviewTriageLocation
+from basstler.review_triage.locations import ReviewTriageLocation
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.detection import RenameDetection

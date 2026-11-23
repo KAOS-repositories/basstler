@@ -1,0 +1,30 @@
+"""
+The files and directories the personal notes name.
+"""
+
+from __future__ import annotations
+
+from basstler.locations import PathEnumeration, ProjectLocation
+
+
+class PersonalNotesProjectLocation(PathEnumeration):
+    """
+    The git identities the personal-notes branch keeps, relative to its root.
+    """
+
+    GIT_IDENTITY = ProjectLocation.PERSONAL_NOTES / "git-identity"
+    """
+    The git identity of the notes repository's owner, which a clone with none of its own
+    is given.
+
+    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
+    CONTRIBUTOR_GIT_IDENTITIES = ProjectLocation.PERSONAL_NOTES / "git-identities"
+    """
+    The git identities of everyone else who shares the notes branch, one file per GitHub
+    login.
+
+    Mirrors ``CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY`` in ``resolve-personal-notes-
+    config.sh``.
+    """

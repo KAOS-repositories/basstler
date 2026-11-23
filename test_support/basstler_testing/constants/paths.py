@@ -8,6 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from basstler.locations import PackageLocation, PathEnumeration, ProjectLocation
+from basstler.plan.locations import PlanProjectLocation
 
 
 class RepositoryLocation(PathEnumeration):
@@ -375,7 +376,7 @@ class DatasetLocation(PathEnumeration):
     """
     A plan handover: two plans, one depending on the other's item, the progress notes
     of their items' branches and the repository's rules, laid out as
-    :class:`basstler.locations.PlanHandoverLocation` names them.
+    :class:`basstler.plan.locations.PlanHandoverLocation` names them.
     """
 
     UNRELATED_PROGRESS_NOTE = DIRECTORY / "handover-notes" / "unrelated-branch.md"
@@ -756,7 +757,7 @@ class PersonalNotesPath(PathEnumeration):
     and writes its own permission grants into.
     """
 
-    BRANCH_INDEX = ProjectLocation.PLAN_BRANCH_INDEX
+    BRANCH_INDEX = PlanProjectLocation.PLAN_BRANCH_INDEX
     """
     The generated reverse index mapping an item's branch to the plan tracking it.
     """

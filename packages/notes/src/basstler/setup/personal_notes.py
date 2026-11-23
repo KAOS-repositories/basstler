@@ -36,11 +36,8 @@ from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository_access import GitHubRepository
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.tooling_labels import GitHubLabel
-from basstler.locations import (
-    ClaudeCodeVariable,
-    PluginLocation,
-    PluginSkillLocation,
-)
+from basstler.locations import ClaudeCodeVariable, PluginLocation
+from basstler.setup.locations import SetupPluginLocation, PluginSkillLocation
 from basstler.plugin_root import PluginRoot
 from basstler.setup.exceptions import ForeignNotesRemoteError, HookScriptFailedError
 from basstler.setup.report import (
@@ -278,7 +275,7 @@ class PersonalNotesSetup:
         self.create_notes_branch(initial_report)
         self.seed_notes(initial_report)
         self.record_identity()
-        self.run_hook_script(PluginLocation.SESSION_START_SCRIPT)
+        self.run_hook_script(SetupPluginLocation.SESSION_START_SCRIPT)
         self.check_labels()
         final_check = self.run_check_setup()
         logger.info(
@@ -383,7 +380,7 @@ class PersonalNotesSetup:
         if self.request.identity is None:
             return
         self.run_hook_script(
-            PluginLocation.GIT_IDENTITY_SAVING_SCRIPT,
+            SetupPluginLocation.GIT_IDENTITY_SAVING_SCRIPT,
             "--name",
             self.request.identity.name,
             "--email",

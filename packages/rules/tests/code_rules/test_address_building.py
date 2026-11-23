@@ -6,7 +6,7 @@ repository's by hand.
 from __future__ import annotations
 
 from basstler.code_rules.address_building import HandBuiltAddressChecker
-from basstler.locations import PackageLocation
+from basstler.code_rules.locations import CodeRulesPackageLocation
 
 from basstler_testing.constants.paths import AddressSnippet
 
@@ -35,7 +35,7 @@ def test_an_address_the_class_builds_is_not_reported():
 
 
 def test_the_module_building_the_addresses_is_not_reported():
-    assert reported_lines(PackageLocation.GITHUB_REPOSITORY_MODULE) == []
+    assert reported_lines(CodeRulesPackageLocation.GITHUB_REPOSITORY_MODULE) == []
 
 
 def test_a_source_outside_the_package_is_not_reported():

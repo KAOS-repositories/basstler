@@ -31,12 +31,9 @@ from basstler.github.repository_access import (
     GitHubRepository,
 )
 from basstler.github.tooling_labels import GitHubLabel
-from basstler.locations import (
-    ClaudeCodeVariable,
-    PluginLocation,
-    PluginSkillLocation,
-    ProjectLocation,
-)
+from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
+from basstler.setup.locations import SetupPluginLocation, PluginSkillLocation
 from basstler.plugin_root import PluginRoot
 from basstler.setup.exceptions import CheckSetupFailedError, ForeignNotesRemoteError
 from basstler.setup.personal_notes import (
@@ -68,11 +65,11 @@ from basstler_testing.scratch_repository import (
 
 SCRIPTS_UNDER_TEST = (
     PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-    PluginLocation.SETUP_CHECK_SCRIPT.name,
+    SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
     PluginLocation.PERSONAL_NOTES_BRANCH_CREATION_SCRIPT.name,
     PluginLocation.PERSONAL_NOTES_WRITER_SCRIPT.name,
-    PluginLocation.GIT_IDENTITY_SAVING_SCRIPT.name,
-    PluginLocation.SESSION_START_SCRIPT.name,
+    SetupPluginLocation.GIT_IDENTITY_SAVING_SCRIPT.name,
+    SetupPluginLocation.SESSION_START_SCRIPT.name,
     PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
 )
 """
@@ -225,7 +222,7 @@ def check_setup_report(repository: ScratchRepository) -> SetupReport:
     :return: What check-setup.sh reports there now.
     """
     return SetupReport.from_completed_process(
-        repository.run_hook_script(PluginLocation.SETUP_CHECK_SCRIPT.name)
+        repository.run_hook_script(SetupPluginLocation.SETUP_CHECK_SCRIPT.name)
     )
 
 
@@ -332,16 +329,16 @@ def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     )
     setup.run()
     scripts_before_the_sync = [
-        PluginLocation.SETUP_CHECK_SCRIPT,
+        SetupPluginLocation.SETUP_CHECK_SCRIPT,
         PluginLocation.PERSONAL_NOTES_BRANCH_CREATION_SCRIPT,
-        PluginLocation.SESSION_START_SCRIPT,
+        SetupPluginLocation.SESSION_START_SCRIPT,
     ]
     # session start's base-branch sync reads the stack configuration through
     # ``bash -c``, which runs in the configured bash too
     assert call_log.read_text(encoding="utf-8").splitlines() == [
         *(str(setup.plugin_root.path_of(script)) for script in scripts_before_the_sync),
         "-c",
-        str(setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT)),
+        str(setup.plugin_root.path_of(SetupPluginLocation.SETUP_CHECK_SCRIPT)),
     ]
 
 
@@ -423,7 +420,9 @@ def test_records_the_git_identity_it_is_given(
     setup_for(setup_repository, *identity_arguments(SCRATCH_IDENTITY)).run()
 
     checkout = setup_repository.clone_notes_branch(tmp_path / "notes")
-    recorded = GitIdentity.from_git_config_file(checkout / ProjectLocation.GIT_IDENTITY)
+    recorded = GitIdentity.from_git_config_file(
+        checkout / PersonalNotesProjectLocation.GIT_IDENTITY
+    )
     assert recorded == SCRATCH_IDENTITY
 
 
@@ -457,7 +456,7 @@ def test_stops_with_check_setup_failed_when_check_setup_sh_reports_nothing(
     )
     shutil.copy(
         DatasetLocation.FAILING_CHECK_SETUP_STUB,
-        setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT),
+        setup.plugin_root.path_of(SetupPluginLocation.SETUP_CHECK_SCRIPT),
     )
 
     with pytest.raises(CheckSetupFailedError) as refusal:
@@ -485,7 +484,7 @@ def test_a_failed_first_check_leaves_the_clone_s_git_config_unchanged(
     )
     shutil.copy(
         DatasetLocation.FAILING_CHECK_SETUP_STUB,
-        setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT),
+        setup.plugin_root.path_of(SetupPluginLocation.SETUP_CHECK_SCRIPT),
     )
 
     with pytest.raises(CheckSetupFailedError):

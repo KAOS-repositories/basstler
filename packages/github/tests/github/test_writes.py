@@ -24,7 +24,7 @@ from basstler.github.file_proposal import NewBranch
 from basstler.github.fork_sync import ForkFastForward
 from basstler.github.repository import Repository
 from basstler.github.workflow_run import WorkflowDispatch
-from basstler.locations import WorkflowLocation
+from basstler.plan_site.locations import SiteWorkflowLocation
 
 # %% the writes and the bodies GitHub reads from them
 
@@ -96,7 +96,7 @@ WRITTEN_BODIES: list[tuple[GitHubWrite, dict[str, Any]]] = [
     ),
     (PullRequestDescription(REPOSITORY, 1, "a description"), {"body": "a description"}),
     (
-        WorkflowDispatch(REPOSITORY, WorkflowLocation.PLAN_SITE, "main"),
+        WorkflowDispatch(REPOSITORY, SiteWorkflowLocation.PLAN_SITE, "main"),
         {"ref": "main"},
     ),
 ]

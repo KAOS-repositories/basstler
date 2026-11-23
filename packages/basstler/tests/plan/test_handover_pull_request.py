@@ -19,7 +19,7 @@ from basstler.github.pull_request import NewPullRequest, PullRequestDescription
 from basstler.git.branch import Branch
 from basstler.github.repository import Repository
 from basstler.github.repository_access import ListingParameter
-from basstler.locations import PlanHandoverLocation
+from basstler.plan.locations import PlanHandoverLocation
 from basstler.plan.exceptions import HandoverPullRequestNotChosenError
 from basstler.plan.dependencies import DependencyReference
 from basstler.plan.handover import HandoverPlan, PlanHandover

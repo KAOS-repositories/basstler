@@ -69,11 +69,11 @@ def test_a_file_on_the_fetched_branch_is_named_with_slashes_from_a_windows_path(
     Git names a file in a tree with ``/`` on every platform, so a path Windows built
     with ``\\`` names no file.
     """
-    windows_path = PureWindowsPath(*ProjectLocation.PERSONAL_PLAN_ITEM_MODES.parts)
+    windows_path = PureWindowsPath(*ProjectLocation.PERSONAL_STACK_CONFIGURATION.parts)
 
     assert FetchedBranchReference.PERSONAL_NOTES.file_at(windows_path) == (
         f"{FetchedBranchReference.PERSONAL_NOTES}:"
-        f"{ProjectLocation.PERSONAL_PLAN_ITEM_MODES.as_posix()}"
+        f"{ProjectLocation.PERSONAL_STACK_CONFIGURATION.as_posix()}"
     )
 
 

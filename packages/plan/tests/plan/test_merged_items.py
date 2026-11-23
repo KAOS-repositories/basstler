@@ -22,6 +22,7 @@ from basstler.github.pull_request_source import (
 from basstler.github.pull_request_state import PullRequestRecord, PullRequestState
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.locations import ProjectLocation
+from basstler.plan.locations import PlanProjectLocation
 from basstler.plan.merged_items.every_plan import (
     MergedItemsInEveryPlan,
     MergedItemsLine,
@@ -198,8 +199,8 @@ def notes_root_holding(plan: LandedItemsPlan, root: Path) -> Path:
     )
     manifest_path.parent.mkdir(parents=True)
     plan.manifest.write(manifest_path)
-    (root / ProjectLocation.PLAN_BRANCH_INDEX).parent.mkdir(parents=True)
-    (root / ProjectLocation.PLAN_BRANCH_INDEX).write_text("", encoding="utf-8")
+    (root / PlanProjectLocation.PLAN_BRANCH_INDEX).parent.mkdir(parents=True)
+    (root / PlanProjectLocation.PLAN_BRANCH_INDEX).write_text("", encoding="utf-8")
     return manifest_path
 
 
@@ -270,7 +271,7 @@ def test_every_plan_regenerates_the_branch_index(plan: LandedItemsPlan, tmp_path
 
     MergedItemsInEveryPlan(source).apply(tmp_path)
 
-    assert (tmp_path / ProjectLocation.PLAN_BRANCH_INDEX).read_text(
+    assert (tmp_path / PlanProjectLocation.PLAN_BRANCH_INDEX).read_text(
         encoding="utf-8"
     ) == (f"{queued_branch}\t{plan.manifest.identifier}\n")
 
@@ -290,7 +291,7 @@ def test_every_plan_leaves_the_branch_index_alone_when_nothing_landed(
         }
     )
     unlanded.write(manifest_path)
-    index = tmp_path / ProjectLocation.PLAN_BRANCH_INDEX
+    index = tmp_path / PlanProjectLocation.PLAN_BRANCH_INDEX
     index.write_text("some-branch\tsome-plan\n", encoding="utf-8")
 
     MergedItemsInEveryPlan(RecordedPullRequestSource()).apply(tmp_path)

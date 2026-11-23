@@ -12,7 +12,7 @@ from basstler.github.client import GitHubAttemptClient
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.workflow_run import WorkflowDispatch
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import WorkflowLocation
+from basstler.review_triage.locations import ReviewTriageWorkflowLocation
 from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.review_triage.exceptions import (
@@ -118,7 +118,7 @@ class MarkViewedRequest:
         dispatch = client.attempt_send(
             MarkViewedDispatch(
                 self.workflow_repository,
-                WorkflowLocation.MARK_VIEWED,
+                ReviewTriageWorkflowLocation.MARK_VIEWED,
                 details.resource.default_branch.name,
                 MarkViewedInputs.from_pull_request(self.pull_request),
             )
@@ -132,7 +132,9 @@ class MarkViewedRequest:
         """
         The page listing the workflow's runs.
         """
-        return self.workflow_repository.workflow_page_url(WorkflowLocation.MARK_VIEWED)
+        return self.workflow_repository.workflow_page_url(
+            ReviewTriageWorkflowLocation.MARK_VIEWED
+        )
 
 
 # %% marking by whichever route works

@@ -18,7 +18,7 @@ from basstler.github.exceptions import GraphQLErrorsReturned
 from basstler.github.graphql import GraphQLRequest, GraphQLResponse
 from basstler.github.review_models import PageInfo
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import ReviewTriageLocation
+from basstler.review_triage.locations import ReviewTriageLocation
 from basstler.render_common import TemplatePage
 from basstler.review_triage.declaration import TriageDeclaration
 from basstler.review_triage.exceptions import PullRequestHeadMoved

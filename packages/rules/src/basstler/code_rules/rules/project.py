@@ -49,8 +49,11 @@ class PackageAndPluginRules(Section):
     )
 
     NAME_FILES_AND_VARIABLES_ONCE = (
-        f"Name every file and directory once, in {CodeReference(locations).path}; "
-        f"every environment variable once, in {CodeReference(environment).path}"
+        "Name every file and directory once, in the `locations` module of the "
+        "distribution whose code alone names it, or in "
+        f"{CodeReference(locations).path} when several distributions name it; every "
+        "environment variable once, in that distribution's `environment` module, or in "
+        f"{CodeReference(environment).path} when several read it"
     )
 
     ONLY_DECLARED_DEPENDENCIES = (

@@ -15,6 +15,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.pull_request_source import PullRequestSource
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
+from basstler.plan.locations import PlanProjectLocation
 from basstler.personal_notes.branch import (
     NotesBranchWriter,
     NotesEdit,
@@ -135,7 +136,7 @@ class MergedItemsInEveryPlan(NotesEdit):
                 for identifier in sorted(recorded.landed_identifiers)
             )
             self.save_without_landed_items(manifest_path.parent)
-        index = root / ProjectLocation.PLAN_BRANCH_INDEX
+        index = root / PlanProjectLocation.PLAN_BRANCH_INDEX
         index.parent.mkdir(parents=True, exist_ok=True)
         TextFile(index).write(
             BranchIndex(root, ProjectLocation.PLANS, PlanDocument.MANIFEST).render()

@@ -14,6 +14,7 @@ import subprocess
 import pytest
 
 from basstler.locations import PluginLocation, ProjectLocation, RepositoryStateLocation
+from basstler.setup.locations import SetupPluginLocation
 
 from ..bash_path import BashPath
 from basstler_testing.constants.notes import ScratchBranch
@@ -44,7 +45,7 @@ def settings_repository(scratch_repository: ScratchRepository) -> ScratchReposit
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
         PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
-        PluginLocation.SESSION_START_SCRIPT.name,
+        SetupPluginLocation.SESSION_START_SCRIPT.name,
         PluginLocation.PERSONAL_SETTINGS_SAVING_SCRIPT.name,
         PluginLocation.PERSONAL_NOTES_WRITER_SCRIPT.name,
     )
@@ -112,7 +113,9 @@ def test_writes_the_branch_settings_when_the_project_has_none(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, PERSONAL_SETTINGS
     )
 
-    result = run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    result = run_hook(
+        settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name
+    )
 
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == PERSONAL_SETTINGS
@@ -125,7 +128,9 @@ def test_writes_the_branch_settings_when_the_project_has_none(
 def test_writes_no_settings_when_the_branch_has_none(
     settings_repository: ScratchRepository,
 ):
-    result = run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    result = run_hook(
+        settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name
+    )
 
     assert result.returncode == 0, result.stderr
     assert not (
@@ -143,12 +148,14 @@ def test_updates_settings_untouched_since_the_last_sync(
     settings_repository.update_notes_branch_file(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, PERSONAL_SETTINGS
     )
-    run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    run_hook(settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name)
     settings_repository.update_notes_branch_file(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, UPDATED_PERSONAL_SETTINGS
     )
 
-    result = run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    result = run_hook(
+        settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name
+    )
 
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == UPDATED_PERSONAL_SETTINGS
@@ -160,13 +167,15 @@ def test_keeps_settings_edited_since_the_last_sync(
     settings_repository.update_notes_branch_file(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, PERSONAL_SETTINGS
     )
-    run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    run_hook(settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name)
     settings_repository.write(PersonalNotesPath.LOCAL_SETTINGS, LOCALLY_EDITED_SETTINGS)
     settings_repository.update_notes_branch_file(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, UPDATED_PERSONAL_SETTINGS
     )
 
-    result = run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    result = run_hook(
+        settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name
+    )
 
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == LOCALLY_EDITED_SETTINGS
@@ -184,7 +193,9 @@ def test_keeps_settings_that_were_never_synced(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, PERSONAL_SETTINGS
     )
 
-    result = run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    result = run_hook(
+        settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name
+    )
 
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == LOCALLY_EDITED_SETTINGS
@@ -213,7 +224,9 @@ def test_saved_settings_are_no_longer_treated_as_local_edits(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, UPDATED_PERSONAL_SETTINGS
     )
 
-    result = run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    result = run_hook(
+        settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name
+    )
 
     assert result.returncode == 0, result.stderr
     assert local_settings_of(settings_repository) == UPDATED_PERSONAL_SETTINGS
@@ -244,7 +257,9 @@ def test_records_the_settings_stamp_in_the_git_directory(
         PersonalNotesPath.SETTINGS_ON_NOTES_BRANCH, PERSONAL_SETTINGS
     )
 
-    result = run_hook(settings_repository, PluginLocation.SESSION_START_SCRIPT.name)
+    result = run_hook(
+        settings_repository, SetupPluginLocation.SESSION_START_SCRIPT.name
+    )
 
     assert result.returncode == 0, result.stderr
     stamp = settings_repository.git.repository_state_path(

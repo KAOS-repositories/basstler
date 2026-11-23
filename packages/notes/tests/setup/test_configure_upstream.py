@@ -20,6 +20,8 @@ import pytest
 import basstler.setup.steps
 from basstler.github.stack_configuration import StackSetting
 from basstler.locations import PluginLocation, ProjectLocation
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
+from basstler.setup.locations import SetupPluginLocation
 from basstler.setup.report import CheckResult, CheckStatus, SetupCheck, SetupReport
 from basstler.setup.steps import SetupCommand, SetupCommandOption
 from basstler_testing.scratch_repository import SCRATCH_IDENTITY, ScratchRepository
@@ -30,7 +32,7 @@ SETUP_STEPS_MODULE = basstler.setup.steps.__name__
 BASH_ENTRY_POINTS = (
     PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.value.name,
     PluginLocation.PERSONAL_NOTES_WRITER_SCRIPT.value.name,
-    PluginLocation.SETUP_CHECK_SCRIPT.value.name,
+    SetupPluginLocation.SETUP_CHECK_SCRIPT.value.name,
 )
 """
 The shell scripts the step drives and the check runs as.
@@ -140,7 +142,7 @@ def upstream_row(
     :return: What the check reported for that row.
     """
     finished = repository.run_hook_script(
-        PluginLocation.SETUP_CHECK_SCRIPT.value.name, *arguments
+        SetupPluginLocation.SETUP_CHECK_SCRIPT.value.name, *arguments
     )
     return SetupReport.from_completed_process(finished).results[row]
 
@@ -310,7 +312,7 @@ def test_the_recorded_identity_is_read_after_the_action_check_fetched_its_branch
     upstream_repository: ScratchRepository,
 ):
     upstream_repository.update_notes_branch_file(
-        ProjectLocation.GIT_IDENTITY, SCRATCH_IDENTITY.as_git_config_file()
+        PersonalNotesProjectLocation.GIT_IDENTITY, SCRATCH_IDENTITY.as_git_config_file()
     )
     configure_upstream(upstream_repository, UpstreamSample.UPSTREAM)
     install_action(upstream_repository, "v0.0.1")

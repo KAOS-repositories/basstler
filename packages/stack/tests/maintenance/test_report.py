@@ -15,7 +15,7 @@ import pytest
 from basstler.exceptions import UnresolvableReferenceError
 from basstler.exit_codes import StackExitCode
 from basstler.github.repository import Repository
-from basstler.locations import RepositoryStateLocation
+from basstler.stack.locations import StackStateLocation
 from basstler.maintenance.board import BoardExport
 from basstler.maintenance.commands import (
     BoardCommand,
@@ -152,7 +152,7 @@ def test_loading_the_stack_still_refreshes_the_fork_s_own_branches(
                 PullRequestHeadRepository.ANOTHER_CONTRIBUTORS_FORK.value
             )
         )
-    ).write(fork_checkout.project_root / RepositoryStateLocation.BOARD.name)
+    ).write(fork_checkout.project_root / StackStateLocation.BOARD.name)
     monkeypatch.setattr(Configuration, "load", make_configuration)
     monkeypatch.chdir(fork_checkout.project_root)
 
@@ -214,7 +214,7 @@ def test_loading_the_stack_fetches_a_base_no_open_pull_request_has_as_its_head(
                 head_repository=PullRequestHeadRepository.FORK.value.full_name,
             ),
         )
-    ).write(fork_checkout.project_root / RepositoryStateLocation.BOARD.name)
+    ).write(fork_checkout.project_root / StackStateLocation.BOARD.name)
     monkeypatch.setattr(Configuration, "load", make_configuration)
     monkeypatch.chdir(fork_checkout.project_root)
 
@@ -240,7 +240,7 @@ def test_loading_the_stack_names_a_base_the_fork_does_not_have(
                 head_repository=PullRequestHeadRepository.FORK.value.full_name,
             ),
         )
-    ).write(fork_checkout.project_root / RepositoryStateLocation.BOARD.name)
+    ).write(fork_checkout.project_root / StackStateLocation.BOARD.name)
     monkeypatch.setattr(Configuration, "load", make_configuration)
     monkeypatch.chdir(fork_checkout.project_root)
 

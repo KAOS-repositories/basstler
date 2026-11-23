@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from basstler.class_property import classproperty
-from basstler.exceptions import (
+from basstler.github.exceptions import (
     BudgetFileExists,
     BudgetViolation,
     JobTimeoutOverCeiling,
@@ -37,7 +37,8 @@ from basstler.exceptions import (
     UncountableJobs,
 )
 from basstler.github.workflows import ActivityType, Job, TriggerEvent, Workflow
-from basstler.locations import PackageLocation, ProjectLocation
+from basstler.locations import PackageLocation
+from basstler.github.locations import GitHubProjectLocation
 from basstler.render_common import create_template_environment
 from basstler.text_file import TextFile
 
@@ -323,7 +324,7 @@ class ActionsBudget:
         :return: The repository's own budget, or basstler's defaults when the repository
             has no budget file.
         """
-        path = PackageLocation.SOURCE_TREE / ProjectLocation.ACTIONS_BUDGET
+        path = PackageLocation.SOURCE_TREE / GitHubProjectLocation.ACTIONS_BUDGET
         if not path.exists():
             return cls()
         return cls.from_file(path)
@@ -421,7 +422,7 @@ def main() -> None:
     argparse.ArgumentParser(description=main.__doc__).parse_args()
     ActionsBudget.baseline_for(
         Workflow.every_workflow_in_the_repository(), WorkflowLimits()
-    ).write(PackageLocation.SOURCE_TREE / ProjectLocation.ACTIONS_BUDGET)
+    ).write(PackageLocation.SOURCE_TREE / GitHubProjectLocation.ACTIONS_BUDGET)
 
 
 if __name__ == "__main__":

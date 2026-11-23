@@ -22,7 +22,7 @@ from basstler.code_rules.package_boundaries import (
 from basstler.code_rules.rule_module import RuleModule
 from basstler.exit_codes import ExitCode
 from basstler.git.commands import GitCommandRunner
-from basstler.locations import ProjectLocation
+from basstler.code_rules.locations import CodeRulesProjectLocation
 from basstler.standard_streams import StandardStreamHandler
 
 logger = StandardStreamHandler.logger_for(__name__)
@@ -151,10 +151,10 @@ def generate_agents_instructions(*, verify: bool = False) -> CodeRulesExitCode:
     if verify:
         logger.error(
             "%s is out of date; run `%s`.",
-            ProjectLocation.AGENTS_INSTRUCTIONS,
+            CodeRulesProjectLocation.AGENTS_INSTRUCTIONS,
             CodeRulesCommand.AGENTS_MD.invocation,
         )
         return CodeRulesExitCode.CHANGES_NEEDED
     instructions.write()
-    logger.info("Wrote %s", ProjectLocation.AGENTS_INSTRUCTIONS)
+    logger.info("Wrote %s", CodeRulesProjectLocation.AGENTS_INSTRUCTIONS)
     return CodeRulesExitCode.CHANGES_NEEDED

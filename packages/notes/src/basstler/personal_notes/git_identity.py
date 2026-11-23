@@ -1,9 +1,9 @@
 """
 Print where on the personal-notes branch this session's git identity is recorded.
 
-The notes repository's owner keeps the identity at :attr:`ProjectLocation.GIT_IDENTITY`.
+The notes repository's owner keeps the identity at :attr:`PersonalNotesProjectLocation.GIT_IDENTITY`.
 Everyone else who shares the notes branch, a collaborator of a team repository, keeps
-one of their own below :attr:`ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES`, named after
+one of their own below :attr:`PersonalNotesProjectLocation.CONTRIBUTOR_GIT_IDENTITIES`, named after
 their GitHub login, so each authors their commits as themselves.
 
 Usage:
@@ -25,7 +25,8 @@ from basstler.github.client import GitHubAttemptClient, GitHubRestClient
 from basstler.github.pull_request_record import AccountField
 from basstler.github.repository import Repository
 from basstler.github.repository_access import GitHubPath
-from basstler.locations import ClaudeCodeVariable, ProjectLocation
+from basstler.locations import ClaudeCodeVariable
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.standard_streams import StandardStreamHandler
 
@@ -100,8 +101,11 @@ class GitIdentityRecord:
         The identity file's path on the notes branch, ``/``-separated on every platform.
         """
         if self.is_owner:
-            return PurePosixPath(ProjectLocation.GIT_IDENTITY)
-        return PurePosixPath(ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES) / self.login
+            return PurePosixPath(PersonalNotesProjectLocation.GIT_IDENTITY)
+        return (
+            PurePosixPath(PersonalNotesProjectLocation.CONTRIBUTOR_GIT_IDENTITIES)
+            / self.login
+        )
 
 
 # %% the command line

@@ -33,8 +33,16 @@ from basstler.locations import (
     PackageLocation,
     PluginLocation,
     ProjectLocation,
-    WorkflowLocation,
 )
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
+from basstler.setup.locations import SetupPluginLocation
+from basstler.plan.locations import PlanPluginLocation
+from basstler.plan_site.locations import (
+    SiteWorkflowLocation,
+    SiteProjectLocation,
+    SitePluginLocation,
+)
+from basstler.plan_site.environment import SiteBasstlerVariable
 from basstler.personal_notes import access
 from basstler.plan.merged_items import __main__ as merged_items_command
 from basstler.plan.merged_items.every_plan import (
@@ -218,10 +226,10 @@ def session_start_repository(
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
         PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
-        PluginLocation.SESSION_START_SCRIPT.name,
+        SetupPluginLocation.SESSION_START_SCRIPT.name,
         PluginLocation.SESSION_RULES.name,
-        PluginLocation.SETUP_CHECK_SCRIPT.name,
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
     )
     scratch_repository.install_package()
     scratch_repository.replace_package_module(
@@ -248,7 +256,7 @@ def run_session_start(
     :return: The finished subprocess.
     """
     return repository.run_hook_script(
-        PluginLocation.SESSION_START_SCRIPT.name, **(environment or {})
+        SetupPluginLocation.SESSION_START_SCRIPT.name, **(environment or {})
     )
 
 
@@ -275,7 +283,7 @@ def publish_and_run(
     repository.publish_notes_branch(
         {
             ProjectLocation.PERSONAL_NOTES_DOCUMENT: "personal notes\n",
-            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+            PersonalNotesProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
             **(notes_branch_files or {}),
         }
     )
@@ -334,7 +342,9 @@ def test_a_session_with_no_personal_notes_still_loads_the_session_rules(
     The session rules do not depend on the user having written any notes.
     """
     session_start_repository.publish_notes_branch(
-        {ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()}
+        {
+            PersonalNotesProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file()
+        }
     )
     result = run_session_start(session_start_repository)
     assert result.returncode == 0, result.stderr
@@ -990,7 +1000,7 @@ def test_names_every_check_that_needs_setup(
     detail = next(
         row.split("\t")[2]
         for row in session_start_repository.run_hook_script(
-            PluginLocation.SETUP_CHECK_SCRIPT.name
+            SetupPluginLocation.SETUP_CHECK_SCRIPT.name
         ).stdout.splitlines()
         if row.split("\t")[0] == failing_check
     )
@@ -1005,7 +1015,7 @@ def test_names_every_check_that_could_not_be_verified(
 ):
     result = publish_and_run(
         session_start_repository,
-        {WorkflowLocation.PLAN_SITE_DISPATCH: "name: Plan site dispatch\n"},
+        {SiteWorkflowLocation.PLAN_SITE_DISPATCH: "name: Plan site dispatch\n"},
     )
 
     unverified_check, detail = next(
@@ -1013,7 +1023,7 @@ def test_names_every_check_that_could_not_be_verified(
         for check, status, detail in (
             row.split("\t")
             for row in session_start_repository.run_hook_script(
-                PluginLocation.SETUP_CHECK_SCRIPT.name
+                SetupPluginLocation.SETUP_CHECK_SCRIPT.name
             ).stdout.splitlines()
         )
         if status == CheckStatus.UNVERIFIED
@@ -1608,7 +1618,7 @@ def test_a_hook_of_an_older_release_reinstalls_the_package_at_that_release(
         session_start_repository, tagged_release_repository
     )
     session_start_repository.install_hook_scripts(
-        PluginLocation.ENTRY_POINT_SCRIPT.name
+        SitePluginLocation.ENTRY_POINT_SCRIPT.name
     )
 
     call_log = ready_package(
@@ -1648,7 +1658,7 @@ def ready_package_of_an_older_plugin(
     :return: The invocations ``uv`` received, in order.
     """
     install_latest_release_for_another_plugin(repository, release_repository)
-    repository.install_hook_scripts(PluginLocation.ENTRY_POINT_SCRIPT.name)
+    repository.install_hook_scripts(SitePluginLocation.ENTRY_POINT_SCRIPT.name)
     call_log = ready_package(
         repository, release_repository, stub_bin, tmp_path, **stub_environment
     )
@@ -1890,7 +1900,7 @@ def test_tells_the_session_which_interpreter_runs_the_package(
     exported = subprocess.run(
         Bash.locate(os.environ).command(
             "-c",
-            f'source "$0" && printf "%s" "${{{BasstlerVariable.PYTHON}}}"',
+            f'source "$0" && printf "%s" "${{{SiteBasstlerVariable.PYTHON}}}"',
             environment_file,
         ),
         capture_output=True,
@@ -2257,7 +2267,7 @@ def test_links_a_tracked_branch_to_its_plan_on_the_site(
                 {ScratchBranch.WORK: PLAN_IDENTIFIER}
             ),
             MANIFEST_PATH: PLAN_MANIFEST,
-            ProjectLocation.PLAN_HUB: HUB_FILE,
+            SiteProjectLocation.PLAN_HUB: HUB_FILE,
         },
     )
 
@@ -2283,7 +2293,7 @@ def test_links_the_plan_under_the_notes_repository_the_site_lists(
                 {ScratchBranch.WORK: PLAN_IDENTIFIER}
             ),
             MANIFEST_PATH: PLAN_MANIFEST,
-            ProjectLocation.PLAN_HUB: HUB_FILE,
+            SiteProjectLocation.PLAN_HUB: HUB_FILE,
         },
     )
 
@@ -2309,7 +2319,7 @@ def publish_hub_and_run(
     :return: The finished session-start.sh process.
     """
     return publish_and_run(
-        repository, {ProjectLocation.PLAN_HUB: HUB_FILE}, environment
+        repository, {SiteProjectLocation.PLAN_HUB: HUB_FILE}, environment
     )
 
 

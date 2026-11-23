@@ -49,7 +49,10 @@ from basstler.github.user_steps import (
     UserStep,
 )
 from basstler.github.workflows import Workflow
-from basstler.locations import ReviewTriageLocation, WorkflowLocation
+from basstler.review_triage.locations import (
+    ReviewTriageWorkflowLocation,
+    ReviewTriageLocation,
+)
 from basstler.render_common import TemplatePage
 from basstler.review_triage.exceptions import MarkViewedWorkflowRefused
 from basstler.review_triage.viewed_request import ReviewTriageSecret
@@ -171,11 +174,11 @@ class MarkViewedSetup(TemplatePage):
         if self.workflow_repository == BasstlerProject.repository:
             return (
                 f"{Workflow.local_reference_prefix}"
-                f"{WorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.name}"
+                f"{ReviewTriageWorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.name}"
             )
         return (
             f"{BasstlerProject.repository.full_name}/"
-            f"{WorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.as_posix()}@{self.branch_or_tag}"
+            f"{ReviewTriageWorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.as_posix()}@{self.branch_or_tag}"
         )
 
     def run(self, client: GitHubAttemptClient) -> str:
@@ -199,7 +202,8 @@ class MarkViewedSetup(TemplatePage):
             self.enable_workflow(client, details)
         self.check_secret(client, details)
         return self.render_template(
-            setup=self, workflow_location=WorkflowLocation.MARK_VIEWED.as_posix()
+            setup=self,
+            workflow_location=ReviewTriageWorkflowLocation.MARK_VIEWED.as_posix(),
         )
 
     # %% the workflow file
@@ -217,7 +221,7 @@ class MarkViewedSetup(TemplatePage):
         :return: Whether its default branch holds the workflow, in any version.
         """
         description = (
-            f"the {WorkflowLocation.MARK_VIEWED.name} workflow on "
+            f"the {ReviewTriageWorkflowLocation.MARK_VIEWED.name} workflow on "
             f"{self.workflow_repository.full_name}'s {details.default_branch.name}"
         )
         installed = (
@@ -313,7 +317,7 @@ class MarkViewedSetup(TemplatePage):
         """
         return FileCommit(
             branch,
-            WorkflowLocation.MARK_VIEWED.as_posix(),
+            ReviewTriageWorkflowLocation.MARK_VIEWED.as_posix(),
             self.caller_workflow,
             "Mark pull requests' mechanical files viewed from Actions",
         )
@@ -359,7 +363,7 @@ class MarkViewedSetup(TemplatePage):
         :param details: The workflow repository.
         :param outcome: What proposing the workflow came to.
         """
-        change = f"adding {WorkflowLocation.MARK_VIEWED.name}"
+        change = f"adding {ReviewTriageWorkflowLocation.MARK_VIEWED.name}"
         if outcome.form_url:
             self.steps.append(
                 SetupStep(
@@ -461,9 +465,11 @@ class MarkViewedSetup(TemplatePage):
         :param client: Reads and writes the workflow repository.
         :param details: The workflow repository.
         """
-        description = f"the {WorkflowLocation.MARK_VIEWED.name} workflow enabled"
+        description = (
+            f"the {ReviewTriageWorkflowLocation.MARK_VIEWED.name} workflow enabled"
+        )
         listed = WorkflowRead(
-            self.workflow_repository, WorkflowLocation.MARK_VIEWED
+            self.workflow_repository, ReviewTriageWorkflowLocation.MARK_VIEWED
         ).attempt(client)
         if listed.resource is None:
             self.steps.append(
@@ -481,7 +487,9 @@ class MarkViewedSetup(TemplatePage):
             client,
             details,
             description,
-            WorkflowEnabling(self.workflow_repository, WorkflowLocation.MARK_VIEWED),
+            WorkflowEnabling(
+                self.workflow_repository, ReviewTriageWorkflowLocation.MARK_VIEWED
+            ),
             "it is disabled",
         )
 

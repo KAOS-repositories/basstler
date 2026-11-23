@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from basstler.class_property import classproperty
 from basstler.github.pull_request_state import LivePullRequests
 from basstler.github.repository import Repository
-from basstler.locations import SiteTemplate
+from basstler.plan_site.locations import SiteTemplate
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
 from basstler.plan.model import ItemStatus
 from basstler.plan.model_alias import ModelAlias

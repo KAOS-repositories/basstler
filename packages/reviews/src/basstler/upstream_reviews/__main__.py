@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 from basstler.environment import GitHubActionsVariable
+from basstler.upstream_reviews.environment import UpstreamReviewsGitHubActionsVariable
 from basstler.github.exceptions import GraphQLErrorsReturned, UpstreamReadError
 from basstler.github.repository import Repository
 from basstler.github.stack_configuration import (
@@ -88,7 +89,7 @@ def _parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--fork-owner",
-        default=GitHubActionsVariable.REPOSITORY_OWNER.read() or "",
+        default=UpstreamReviewsGitHubActionsVariable.REPOSITORY_OWNER.read() or "",
         help="the owner whose branches to claim, defaulting to the runner's own",
     )
     parser.add_argument(

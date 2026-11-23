@@ -16,6 +16,7 @@ import pytest
 
 from basstler.document_references import PACKAGE_NAME, CitedNames
 from basstler.locations import PluginLocation
+from basstler.plan.locations import PlanPluginLocation
 
 from basstler_testing.constants.paths import (
     PersonalNotesPath,
@@ -89,7 +90,7 @@ def test_the_starter_notes_do_not_name_the_package_or_its_local_file(name: str):
 @pytest.mark.parametrize(
     "script",
     [
-        PluginLocation.PLAN_SAVING_SCRIPT,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT,
         PluginLocation.PULL_REQUEST_PROGRESS_SAVING_SCRIPT,
     ],
 )

@@ -54,7 +54,7 @@ from basstler.stack.commit_move import (
     ProposedCommitMove,
 )
 from basstler.github.repository_option import RepositoryOption
-from basstler.locations import RepositoryStateLocation
+from basstler.stack.locations import StackStateLocation
 from basstler.stack.label_write import LabelWrite
 from basstler.stack.merge_probe import MergeProbe
 from basstler.stack.model import Stack
@@ -169,9 +169,7 @@ def derived_stack() -> Stack:
     :raises CommandFailure: If the board is missing or unreadable.
     """
     return Stack.load(
-        GitCommandRunner(Path.cwd()).repository_state_path(
-            RepositoryStateLocation.BOARD
-        )
+        GitCommandRunner(Path.cwd()).repository_state_path(StackStateLocation.BOARD)
     )
 
 

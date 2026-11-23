@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 from basstler.locations import PluginLocation
+from basstler.plan.locations import PlanPluginLocation
 from basstler.plan.model import PlanDocument, PlanManifest
 
 from basstler_testing.constants.paths import DatasetLocation
@@ -35,7 +36,7 @@ def repository_publishing(
     """
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
     )
     scratch_repository.install_package()
     scratch_repository.write("README.md", "scratch repo\n")

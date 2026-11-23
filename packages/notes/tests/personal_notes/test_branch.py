@@ -11,7 +11,7 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
-from basstler.exceptions import (
+from basstler.personal_notes.exceptions import (
     NotesBranchMissingError,
     NotesPushRejectedError,
     UnsafeNotesPathError,

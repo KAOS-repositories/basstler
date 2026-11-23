@@ -28,8 +28,9 @@ from basstler.locations import (
     ClaudeCodeVariable,
     PackageLocation,
     PluginLocation,
-    ProjectLocation,
 )
+from basstler.plan.locations import PlanProjectLocation
+from basstler.plan_site.locations import SiteProjectLocation
 from basstler.package_layout import (
     PackageModule,
     command_line_entry_points,
@@ -407,18 +408,18 @@ def test_the_shell_fetches_the_notes_branch_where_the_package_reads_it():
 
 def test_the_shell_keeps_progress_notes_where_the_package_reads_them():
     """
-    :attr:`ProjectLocation.PULL_REQUEST_PROGRESS` mirrors ``PR_PROGRESS_DIRECTORY``.
+    :attr:`PlanProjectLocation.PULL_REQUEST_PROGRESS` mirrors ``PR_PROGRESS_DIRECTORY``.
     """
     assert (
         configuration_value(ConfigurationVariable.PULL_REQUEST_PROGRESS_DIRECTORY)
-        == ProjectLocation.PULL_REQUEST_PROGRESS.as_posix()
+        == PlanProjectLocation.PULL_REQUEST_PROGRESS.as_posix()
     )
 
 
 @pytest.mark.parametrize(
     "argument",
     [
-        f"{FetchedBranchReference.PERSONAL_NOTES}:{ProjectLocation.PLAN_HUB.as_posix()}",
+        f"{FetchedBranchReference.PERSONAL_NOTES}:{SiteProjectLocation.PLAN_HUB.as_posix()}",
         f"+refs/heads/{PersonalNotesSetting.BRANCH.default}:"
         f"{FetchedBranchReference.PERSONAL_NOTES}",
     ],

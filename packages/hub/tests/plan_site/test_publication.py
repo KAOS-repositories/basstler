@@ -57,7 +57,8 @@ from basstler.github.token_form import CreateToken, StoreToken, TokenStep
 from basstler.github.run_listing import ListedRun, RunListing
 from basstler.github.states import CheckOutcome
 from basstler.github.workflows import TriggerEvent, Workflow
-from basstler.locations import ProjectLocation, WorkflowLocation
+from basstler.locations import ProjectLocation
+from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.plan.model import PlanDocument
 from basstler.plan_site import token_storage
 from basstler.plan_site.build_start import CodeFence, SiteAccess
@@ -302,7 +303,7 @@ class Publishing:
     def hub_on(self, repository: Repository) -> PlanHub | None:
         """:return: The hub file on *repository*'s notes branch."""
         return PlanHub.from_yaml(
-            self.file(repository, NOTES_BRANCH, ProjectLocation.PLAN_HUB.as_posix())
+            self.file(repository, NOTES_BRANCH, SiteProjectLocation.PLAN_HUB.as_posix())
         )
 
     def runs(
@@ -722,7 +723,7 @@ def test_the_site_workflow_calls_basstler_s_build_at_its_branch_or_tag():
     job = WorkflowFile.from_yaml(workflow.text).jobs[PlanSiteJob.BUILD]
 
     assert job.called_workflow == (
-        f"{BasstlerSource.REPOSITORY}/{WorkflowLocation.PLAN_SITE_BUILD.as_posix()}"
+        f"{BasstlerSource.REPOSITORY}/{SiteWorkflowLocation.PLAN_SITE_BUILD.as_posix()}"
         f"@{BRANCH_OR_TAG}"
     )
 
@@ -817,7 +818,7 @@ def test_without_a_dispatch_workflow_the_hub_s_site_is_the_recorded_one(
     site = SiteRepository(Repository("an-owner", "a-board"))
     hub = PlanHub(registry="an-owner/a-project", site_url=site.site_url)
     notes_branch = notes_branch_of(fork_checkout)
-    notes_branch.write({ProjectLocation.PLAN_HUB.as_posix(): hub.to_text()}, "List")
+    notes_branch.write({SiteProjectLocation.PLAN_HUB.as_posix(): hub.to_text()}, "List")
 
     assert SiteRepository.recorded_on(notes_branch) == site
 

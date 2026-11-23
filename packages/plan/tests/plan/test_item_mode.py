@@ -18,7 +18,8 @@ from pathlib import Path
 import pytest
 
 import basstler.plan.item_mode
-from basstler.locations import PackageLocation, PluginLocation, ProjectLocation
+from basstler.locations import PluginLocation, ProjectLocation
+from basstler.plan.locations import PlanPackageLocation, PlanProjectLocation
 from basstler.plan.item_mode import (
     CommandLineOption,
     ExecutionMode,
@@ -117,7 +118,7 @@ def published_settings(repository: ScratchRepository, tmp_path: Path) -> dict[st
     """
     checkout = repository.clone_notes_branch(tmp_path / "published")
     return tomllib.loads(
-        (checkout / ProjectLocation.PERSONAL_PLAN_ITEM_MODES).read_text(
+        (checkout / PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES).read_text(
             encoding="utf-8"
         )
     )
@@ -149,7 +150,7 @@ def test_the_report_names_where_a_personal_setting_would_go(
     """
     report = resolve(mode_repository, PlanItemSkill.KICKOFF)
     assert report[ReportKey.PERSONAL_SETTING_PATH] == str(
-        ProjectLocation.PERSONAL_PLAN_ITEM_MODES
+        PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES
     )
 
 
@@ -183,7 +184,7 @@ def test_a_personal_setting_overrides_the_committed_default(
     Pinning one skill's mode changes that skill and leaves the other on the default.
     """
     mode_repository.update_notes_branch_file(
-        ProjectLocation.PERSONAL_PLAN_ITEM_MODES,
+        PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES,
         f'{PlanItemSkill.KICKOFF.setting_key} = "{ExecutionMode.PLAN}"\n',
     )
 
@@ -203,7 +204,7 @@ def test_the_invocation_argument_beats_the_personal_setting(
     A mode asked for on the command line wins, so one run can depart from the setting.
     """
     mode_repository.update_notes_branch_file(
-        ProjectLocation.PERSONAL_PLAN_ITEM_MODES,
+        PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES,
         f'{PlanItemSkill.KICKOFF.setting_key} = "{ExecutionMode.PLAN}"\n',
     )
 
@@ -228,7 +229,7 @@ def test_a_mode_the_enum_does_not_name_is_refused_in_the_personal_file(
     setting having worked.
     """
     mode_repository.update_notes_branch_file(
-        ProjectLocation.PERSONAL_PLAN_ITEM_MODES,
+        PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES,
         f'{PlanItemSkill.KICKOFF.setting_key} = "atuo"\n',
     )
 
@@ -268,7 +269,7 @@ def test_a_personal_settings_file_that_will_not_parse_is_refused(
     Broken syntax is reported rather than read as an absent setting.
     """
     mode_repository.update_notes_branch_file(
-        ProjectLocation.PERSONAL_PLAN_ITEM_MODES, "kickoff_mode = \n"
+        PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES, "kickoff_mode = \n"
     )
 
     finished = run_mode(
@@ -335,7 +336,7 @@ def test_setting_one_mode_preserves_the_other(
     Writing one key must not clobber the key the user was not changing.
     """
     mode_repository.update_notes_branch_file(
-        ProjectLocation.PERSONAL_PLAN_ITEM_MODES,
+        PlanProjectLocation.PERSONAL_PLAN_ITEM_MODES,
         f'{PlanItemSkill.KICKOFF.setting_key} = "{ExecutionMode.PLAN}"\n',
     )
 
@@ -454,6 +455,6 @@ def test_every_skill_names_a_key_the_committed_defaults_define():
     gaining a skill the other has never heard of.
     """
     defaults = tomllib.loads(
-        PackageLocation.PLAN_ITEM_MODE_DEFAULTS.value.read_text(encoding="utf-8")
+        PlanPackageLocation.PLAN_ITEM_MODE_DEFAULTS.value.read_text(encoding="utf-8")
     )
     assert set(defaults) == {skill.setting_key for skill in PlanItemSkill}

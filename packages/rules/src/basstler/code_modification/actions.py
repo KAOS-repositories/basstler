@@ -5,9 +5,12 @@ composing them.
 
 from __future__ import annotations
 
+import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import takewhile
+from types import ModuleType
 
 import libcst
 from libcst.codemod import CodemodContext
@@ -198,21 +201,42 @@ class ModuleReplacement(ModuleTransformation):
 @dataclass(frozen=True)
 class ImportInsertion(ModuleTransformation):
     """
-    Imports a class in a module, merged into an import of its module where there is one
-    and left out where the module imports the class already.
+    Imports a class or a module in a module, left out where the module imports it
+    already; a class is merged into an import of its module where there is one.
     """
 
-    imported: type
+    imported: type | ModuleType
     """
-    The class to import.
+    The class or module to import.
     """
 
     def transform(self, module: libcst.Module) -> libcst.Module:
         context = CodemodContext()
-        AddImportsVisitor.add_needed_import(
-            context, self.imported.__module__, self.imported.__name__
-        )
+        if isinstance(self.imported, ModuleType):
+            AddImportsVisitor.add_needed_import(context, self.imported.__name__)
+        else:
+            AddImportsVisitor.add_needed_import(
+                context, self.exporting_module(self.imported), self.imported.__name__
+            )
         return AddImportsVisitor(context).transform_module(module)
+
+    @staticmethod
+    def exporting_module(imported: type) -> str:
+        """
+        :param imported: A class to import.
+        :return: The public module above the private one *imported* is defined in, when
+            it exports *imported*; otherwise the module it is defined in.
+        """
+        components = imported.__module__.split(".")
+        public = list(
+            takewhile(lambda component: not component.startswith("_"), components)
+        )
+        if not public or len(public) == len(components):
+            return imported.__module__
+        public_module = importlib.import_module(".".join(public))
+        if public_module.__dict__.get(imported.__name__) is not imported:
+            return imported.__module__
+        return public_module.__name__
 
 
 # %% plans

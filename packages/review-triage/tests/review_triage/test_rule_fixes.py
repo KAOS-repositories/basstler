@@ -123,6 +123,62 @@ def test_the_fixes_of_two_rules_in_one_file_are_mechanical():
     )
 
 
+PORTABILITY_RULES = rules.project.PortabilityRules
+"""
+The rules whose fixes the samples below make.
+"""
+
+
+@pytest.mark.parametrize(
+    ("sample", "fixed_rules", "layout"),
+    [
+        (
+            FileSample.BASH_AND_UTF_8_FIXES,
+            (PORTABILITY_RULES.START_BASH_THROUGH_ITS_LOCATOR,),
+            MechanicalChange.IMPORTS,
+        ),
+        (
+            FileSample.POSIX_PATH_AND_UTF_8_FIXES,
+            (PORTABILITY_RULES.WRITE_PATHS_AS_POSIX_TEXT,),
+            MechanicalChange.FORMATTING,
+        ),
+        (
+            FileSample.BASH_POSIX_PATH_AND_UTF_8_FIXES,
+            (
+                PORTABILITY_RULES.START_BASH_THROUGH_ITS_LOCATOR,
+                PORTABILITY_RULES.WRITE_PATHS_AS_POSIX_TEXT,
+            ),
+            MechanicalChange.IMPORTS,
+        ),
+        (
+            FileSample.FILE_URI_AND_UTF_8_FIXES,
+            (PORTABILITY_RULES.BUILD_FILE_URLS_WITH_AS_URI,),
+            MechanicalChange.FORMATTING,
+        ),
+    ],
+    ids=lambda value: value.value if isinstance(value, FileSample) else "",
+)
+def test_hand_made_portability_fixes_with_the_utf_8_fix_are_mechanical(
+    sample: FileSample, fixed_rules: tuple[Section, ...], layout: MechanicalChange
+):
+    """
+    A file whose portability edits were made by hand, as on a pull request making the
+    suite pass on Windows, is those rules' fixes and the UTF-8 fix, laid out as
+    *layout* says: its imports sorted where a fix added one, otherwise reformatted.
+    """
+    change = sample.change()
+    assert triaged(change) == MechanicalFile(
+        change,
+        frozenset(
+            {
+                UTF_8_RULE_FIX,
+                layout,
+                *(RuleFixChange[rule.name] for rule in fixed_rules),
+            }
+        ),
+    )
+
+
 # %% what else the head may differ by
 
 

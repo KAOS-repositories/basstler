@@ -101,13 +101,14 @@ class MissingUpstreamRepositoryError(CommandFailure, LookupError):
     def __str__(self) -> str:
         """:return: Where to name the upstream, and how."""
         alternative = (
-            f", or to {self.personal_file} on your personal-notes branch"
+            f", or to {self.personal_file.as_posix()} on your personal-notes branch"
             if self.personal_file
             else ""
         )
         return (
             f"no {StackSetting.UPSTREAM_REPOSITORY} is configured - add "
-            f'{StackSetting.UPSTREAM_REPOSITORY} = "<owner>/<name>" to {self.project_file}'
+            f'{StackSetting.UPSTREAM_REPOSITORY} = "<owner>/<name>" to '
+            f"{self.project_file.as_posix()}"
             f"{alternative}"
         )
 

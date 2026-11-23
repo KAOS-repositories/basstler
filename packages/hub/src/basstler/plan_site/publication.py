@@ -224,7 +224,7 @@ class PlanSitePublication:
         Why a fork gets no merge workflow.
         """
         return (
-            f"{WorkflowLocation.PLAN_SITE_MERGE}, because the repository is a fork and "
+            f"{WorkflowLocation.PLAN_SITE_MERGE.as_posix()}, because the repository is a fork and "
             "its default branch has to stay as its upstream's; merges show at the next "
             "push to the notes branch"
         )

@@ -8,13 +8,12 @@ from __future__ import annotations
 from pathlib import Path
 
 
+from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.source_file import PythonSourceFile
-from basstler.code_rules.bash_by_name import BashByNameChecker
+from basstler.code_rules.bash_by_name import BashByNameChecker, BashEnvironment
 from basstler.code_rules.checker import CodeRulesCheck
-from basstler.code_rules.commands import CodeRulesCommand
-from basstler.code_rules.fixes import SourceFixer
 
-from basstler_testing.constants.paths import BashByNameSnippet
+from basstler_testing.constants.paths import BashByNameSnippet, RuleFixExample, RuleFixExampleFile
 
 # %% helpers
 
@@ -50,28 +49,38 @@ def test_the_located_bash_and_a_tuple_of_names_are_not_reported():
     assert violation_lines(BashByNameSnippet.LOCATED_BASH) == []
 
 
-# %% where no environment is in scope
+# %% the environment bash is located in
 
 
-def test_a_command_with_no_environment_in_scope_is_reported_without_a_fix():
+def located_environments(path: Path) -> list[BashEnvironment]:
     """
-    The report says why the fix leaves the command.
+    :return: The environment the fix locates bash in, for each command line in *path*.
     """
-    violation = next(BashByNameChecker().violations(BashByNameSnippet.SUBPROCESS_CALL))
-    assert violation.description.endswith(
-        f"`{CodeRulesCommand.FIX.invocation}` leaves it"
-    )
+    module = PositionedModule(PythonSourceFile(path).parse())
+    return [
+        command.environment
+        for command in BashByNameChecker().specifications_of_module(module)
+    ]
 
 
-def test_the_fix_leaves_a_command_with_no_environment_in_scope_as_it_is():
+def test_a_command_with_no_environment_in_scope_locates_bash_in_the_process():
     """
-    Fixing changes nothing where there is no environment to locate bash in.
+    Outside a function with an environment parameter, bash is located in the process's
+    environment.
     """
-    source_file = PythonSourceFile(BashByNameSnippet.SUBPROCESS_CALL)
-    fixed = SourceFixer((BashByNameChecker(),)).fix_module(
-        source_file.parse(), source_file.path
-    )
-    assert fixed.result.code == source_file.read()
+    assert located_environments(BashByNameSnippet.SUBPROCESS_CALL) == [
+        BashEnvironment.PROCESS_ENVIRONMENT
+    ]
+
+
+def test_a_command_with_an_environment_parameter_locates_bash_in_it():
+    """
+    In a function with an environment parameter, bash is located in that environment.
+    """
+    example = RuleFixExample.DIRECTORY / BashByNameChecker.__name__ / "subprocess-call"
+    assert located_environments(example / RuleFixExampleFile.BEFORE) == [
+        BashEnvironment.ENVIRONMENT_PARAMETER
+    ]
 
 
 # %% this repository

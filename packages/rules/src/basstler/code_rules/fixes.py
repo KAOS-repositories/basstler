@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from types import ModuleType
 
 import libcst
 
@@ -81,12 +82,14 @@ class CodeFix[SpecificationType: Specification](ABC):
         How the fixed code behaves compared with the code it replaces.
         """
 
-    @classproperty
-    def required_import(cls) -> type | None:
+    def required_imports(
+        self, specification: SpecificationType
+    ) -> tuple[type | ModuleType, ...]:
         """
-        The class the replacement needs imported in the module, if any.
+        :param specification: A place breaking the fix's rule.
+        :return: The classes and modules its replacement needs imported in the module.
         """
-        return None
+        return ()
 
     @abstractmethod
     def replacement(self, specification: SpecificationType) -> libcst.CSTNode:
@@ -246,13 +249,13 @@ class SourceFixer:
             places breaking a rule as there were before it.
         """
         inverses: list[Action[libcst.Module]] = []
-        imports: list[type] = []
+        imports: list[type | ModuleType] = []
         places = self.places(module, path)
         while places:
             imports.extend(
-                place.fix.required_import
+                imported
                 for place in places
-                if place.fix.required_import is not None
+                for imported in place.fix.required_imports(place.specification)
             )
             applied = self.round_of_fixes(places).apply(module)
             module = applied.result

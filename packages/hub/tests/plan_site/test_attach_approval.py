@@ -152,6 +152,6 @@ def test_the_plugin_runs_the_hook_before_the_attach_tool_and_nothing_else():
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{PluginLocation.ENTRY_POINT_SCRIPT} "
+        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
         f"{basstler.plan_site.attach_approval.__spec__.name.removeprefix('basstler.')}"
     )

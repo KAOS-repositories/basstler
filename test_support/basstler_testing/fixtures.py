@@ -65,7 +65,7 @@ def package_environment_of_the_suite(
         has none.
     """
     monkeypatch.setenv(ConfigurationVariable.HOME, str(tmp_path / "basstler-home"))
-    search_path = [str(Path(sys.executable).parent)]
+    search_path = [Path(sys.executable).parent.as_posix()]
     if python3_directory is not None:
         search_path.append(str(python3_directory))
     monkeypatch.setenv(

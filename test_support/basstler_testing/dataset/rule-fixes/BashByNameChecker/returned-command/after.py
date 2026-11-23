@@ -12,4 +12,4 @@ def command(arguments: list[str], environment: Mapping[str, str]) -> tuple[str, 
     """
     :return: bash, running *arguments*.
     """
-    return Bash.locate(environment).command(*arguments)
+    return tuple(Bash.locate(environment).command(*arguments))

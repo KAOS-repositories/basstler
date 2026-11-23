@@ -614,18 +614,19 @@ class FileTriager:
     def triage(self, change: FileVersions) -> FileVerdict:
         """
         :param change: A file the pull request changes.
-        :return: Whether a reviewer has to read it.
+        :return: Whether a reviewer has to read it, with the reasons of the judgment
+            that renamed its members when that judgment gave any.
         """
+        member_renamed_context = replace(self.context, review_reasons=[])
         context = replace(self.context, review_reasons=[])
-        kinds = self.member_renamed_changes(change)
+        kinds = self.member_renamed_changes(change, member_renamed_context)
         if kinds is None:
             kinds = self.judged_changes(change, context)
         if change.previous_path is not None and kinds is not None:
             kinds |= {MechanicalChange.MOVE}
         if not kinds:
-            return FileNeedingReview(
-                change, tuple(dict.fromkeys(context.review_reasons))
-            )
+            reasons = member_renamed_context.review_reasons or context.review_reasons
+            return FileNeedingReview(change, tuple(dict.fromkeys(reasons)))
         return MechanicalFile(change, kinds)
 
     def triage_each(self, changes: tuple[FileVersions, ...]) -> tuple[FileVerdict, ...]:
@@ -636,16 +637,18 @@ class FileTriager:
         return tuple(self.triage(change) for change in changes)
 
     def member_renamed_changes(
-        self, change: FileVersions
+        self, change: FileVersions, context: JudgmentContext
     ) -> frozenset[ChangeKind] | None:
         """
         :param change: A file the pull request changes.
+        :param context: What the judgments may consult, collecting this file's reasons
+            for review.
         :return: What its content change consists of once the occurrences in its code,
             or in a Markdown file's python code blocks, proven to refer to a renamed
             member are renamed in its base version, ``None`` when none is or the
             change is not then provably mechanical.
         """
-        renamer = self.context.member_renamer
+        renamer = context.member_renamer
         if renamer is None or change.base_text is None or change.head_text is None:
             return None
         if change.path.suffix == FileSuffix.MARKDOWN:
@@ -659,10 +662,9 @@ class FileTriager:
         kinds = self.judged_changes(
             replace(change, base_text=renamed.text),
             replace(
-                self.context,
+                context,
                 optional_prose_renames=renamed.prose_renames,
                 owner_imports=renamed.owner_imports,
-                review_reasons=[],
             ),
         )
         return None if kinds is None else kinds | {MechanicalChange.RENAME}

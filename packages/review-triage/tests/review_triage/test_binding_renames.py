@@ -12,6 +12,10 @@ import pytest
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.detection import MemberRenameDetection
+from basstler.review_triage.keyword_arguments import (
+    UnprovenBinding,
+    UnprovenKeywordCall,
+)
 from basstler.review_triage.renames import MemberRename, RenameDecisions
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
@@ -130,3 +134,28 @@ def test_an_old_name_not_bound_to_the_renamed_class_needs_review(
     assert path in {
         file.change.path for file in binding_rename_triage.files_needing_review
     }
+
+
+def test_a_renamed_file_needing_review_names_the_change_left_after_the_rename(
+    binding_rename_triage: TriageOutcome,
+):
+    """
+    A file renaming the class and changing a call to a function from outside the
+    repository gives the call as its reason for review.
+    """
+    (verdict,) = (
+        file
+        for file in binding_rename_triage.files_needing_review
+        if file.change.path == PurePosixPath("app/shifted.py")
+    )
+    assert verdict.reasons == (
+        UnprovenKeywordCall(
+            verdict.change.head_text.splitlines().index(
+                "    return shift(Pose3Dimensional(), offset=1.0)"
+            )
+            + 1,
+            "shift",
+            UnprovenBinding.NO_DEFINITION,
+            (),
+        ),
+    )

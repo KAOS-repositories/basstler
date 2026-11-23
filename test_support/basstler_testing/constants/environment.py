@@ -220,6 +220,22 @@ class RecordingPythonStubVariable(StrEnum):
     """
 
 
+class RecordingUvStubVariable(StrEnum):
+    """
+    The variables ``dataset/stubs/recording_uv.sh`` reads.
+    """
+
+    CALL_LOG = "STUB_UV_CALL_LOG"
+    """
+    The file every argument the stub is given is recorded in, one per line.
+    """
+
+    PYTHON = "STUB_UV_PYTHON"
+    """
+    The interpreter a sync puts into the project environment.
+    """
+
+
 class ReviewTriageScriptVariable(StrEnum):
     """
     The variables ``scripts/review-triage.sh`` reads.
@@ -233,6 +249,11 @@ class ReviewTriageScriptVariable(StrEnum):
     REFERENCE = "BASSTLER_REF"
     """
     The basstler branch, tag or commit the script runs.
+    """
+
+    SOURCE_REPOSITORY = "BASSTLER_REPOSITORY"
+    """
+    The repository the script installs basstler from.
     """
 
 

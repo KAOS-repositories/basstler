@@ -3,8 +3,8 @@
 # triage: which files a reviewer has to read, and which change only mechanically.
 #
 # Runs from any directory and needs only git, bash and either uv or Python 3.12+. The first
-# run installs basstler into its own environment and keeps a clone of the repository to
-# fetch the pull requests into; later runs reuse both.
+# run installs basstler from a clone of its workspace into its own environment and keeps
+# a clone of the repository to fetch the pull requests into; later runs reuse all three.
 #
 # Usage:
 #   review-triage.sh <pull request URL> [--mark-viewed] [--verbose] [-- <option>...]
@@ -32,11 +32,13 @@
 # Environment:
 #   GH_TOKEN or GITHUB_TOKEN  the GitHub credential; `gh auth token` when neither is set
 #   BASSTLER_REF              the basstler branch, tag or commit to run (default: main)
+#   BASSTLER_REPOSITORY       the basstler repository to install it from, such as a fork
+#                             (default: KAOS-repositories/basstler on GitHub)
 #   BASSTLER_HOME             where the environment and clones are kept
 #                             (default: ~/.cache/basstler-review-triage)
 set -euo pipefail
 
-readonly basstler_repository="https://github.com/KAOS-repositories/basstler"
+readonly basstler_repository="${BASSTLER_REPOSITORY:-https://github.com/KAOS-repositories/basstler}"
 readonly minimum_python="3.12"
 
 fail() {
@@ -94,6 +96,7 @@ command -v git >/dev/null || fail "git is not installed"
 home="${BASSTLER_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/basstler-review-triage}"
 reference="${BASSTLER_REF:-main}"
 environment="$home/environment"
+source_clone="$home/basstler"
 clone="$home/repositories/$repository"
 
 # %% basstler's environment
@@ -118,8 +121,18 @@ system_python() {
     fail "neither uv nor Python $minimum_python or later is installed"
 }
 
+# A Windows uv reads a path from its environment as Windows writes it.
+native_path() {
+    if command -v cygpath >/dev/null; then
+        cygpath --windows "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+# The workspace's distributions are installed together, so each finds the others.
 install_basstler() {
-    local commit stamp package python
+    local commit stamp python
     commit="$reference"
     if [[ ! "$reference" =~ ^[0-9a-f]{40}$ ]]; then
         commit="$(git ls-remote "$basstler_repository" "$reference" | head -n 1 | cut -f 1)"
@@ -132,16 +145,17 @@ install_basstler() {
     if [[ -n "$verbose" ]]; then
         printf 'review-triage: installing basstler %s (%s)\n' "$reference" "${commit:0:12}" >&2
     fi
-    package="basstler @ git+$basstler_repository@$commit"
     mkdir -p "$home"
+    [[ -d "$source_clone/.git" ]] || git init --quiet "$source_clone"
+    git -C "$source_clone" fetch --quiet --depth 1 "$basstler_repository" "$commit"
+    git -C "$source_clone" checkout --quiet --force --detach FETCH_HEAD
     if command -v uv >/dev/null; then
-        [[ -d "$environment" ]] || uv venv --quiet --python ">=$minimum_python" "$environment"
-        uv pip install --quiet --python "$(environment_python)" --reinstall-package basstler "$package"
+        UV_PROJECT_ENVIRONMENT="$(native_path "$environment")" uv sync --quiet --frozen \
+            --package basstler --no-dev --no-editable --project "$source_clone"
     else
         python="$(system_python)"
         [[ -d "$environment" ]] || "$python" -m venv "$environment"
-        "$(environment_python)" -m pip install --quiet --upgrade --force-reinstall --no-deps "$package"
-        "$(environment_python)" -m pip install --quiet "$package"
+        "$(environment_python)" -m pip install --quiet --upgrade "$source_clone"/packages/*
     fi
     printf '%s\n' "$commit" >"$stamp"
 }

@@ -347,6 +347,9 @@ def test_basstler_is_installed_from_a_clone_of_its_workspace(
 def test_the_clone_installed_from_holds_the_commit_asked_for(
     basstler_source: BasstlerSource, tmp_path: Path
 ):
+    """
+    The workspace is checked out at the commit installed, beside the environment.
+    """
     home = tmp_path / "home"
 
     basstler_source.run(home, tmp_path / "python-calls.log")
@@ -357,6 +360,9 @@ def test_the_clone_installed_from_holds_the_commit_asked_for(
 def test_a_second_run_at_the_same_commit_installs_nothing(
     basstler_source: BasstlerSource, tmp_path: Path
 ):
+    """
+    The environment is installed once per commit and reused by every later run.
+    """
     home = tmp_path / "home"
     call_log = tmp_path / "python-calls.log"
     basstler_source.run(home, call_log)

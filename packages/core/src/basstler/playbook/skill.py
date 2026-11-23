@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from basstler.class_property import classproperty
@@ -19,15 +20,22 @@ from basstler.render_common import create_template_environment
 from basstler.session_tool import SessionTool
 from basstler.text_file import TextFile
 
-FRONTMATTER_DELIMITER = "---\n"
-"""
-The line above and below a Markdown file's YAML frontmatter.
-"""
 
-HEADING_MARKER = "# "
-"""
-What starts a Markdown document's title line.
-"""
+class MarkdownMarkup(StrEnum):
+    """
+    The Markdown markup that sets a ``SKILL.md``'s generated part apart from its body.
+    """
+
+    FRONTMATTER_DELIMITER = "---\n"
+    """
+    The line above and below the file's YAML frontmatter.
+    """
+
+    TITLE_MARKER = "# "
+    """
+    What starts the file's title line.
+    """
+
 
 # %% skills
 
@@ -127,7 +135,7 @@ class SkillInstructions(GeneratedFile):
         template = create_template_environment().get_template(
             InstructionsTemplate.SKILL.name
         )
-        return template.render(skill=self.skill, body=self.body)
+        return template.render(skill=self.skill, markup=MarkdownMarkup, body=self.body)
 
     @property
     def body(self) -> str:
@@ -136,9 +144,9 @@ class SkillInstructions(GeneratedFile):
         title, either of which it may lack.
         """
         text = TextFile(self.path).read()
-        if text.startswith(FRONTMATTER_DELIMITER):
-            text = text.split(FRONTMATTER_DELIMITER, 2)[2]
+        if text.startswith(MarkdownMarkup.FRONTMATTER_DELIMITER):
+            text = text.split(MarkdownMarkup.FRONTMATTER_DELIMITER, 2)[2]
         text = text.lstrip("\n")
-        if text.startswith(HEADING_MARKER):
+        if text.startswith(MarkdownMarkup.TITLE_MARKER):
             text = text.partition("\n")[2]
         return text.lstrip("\n")

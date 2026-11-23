@@ -1,13 +1,13 @@
-Branch tracks the tip of the review-triage stack (#299 -> #300 -> ... -> #308 -> #309).
+Branch tracks the tip of the review-triage stack (#299 -> ... -> #309), plus follow-ups.
 
 Plan
-- One branch with every review-triage feature for the mark-viewed command; prove #297 and cram2 PR 1019 mostly mechanical, no false positives.
+- One branch with every review-triage feature for mark-viewed; #297 and cram2 1019 mostly mechanical, no false positives.
 
 Done
-- #299-#308 as before; #309 per-reviewer workflow (port of #262); Windows test fixes on #299/#300 (executable bit, path compare).
-- claude/practical-hawking-nf0g3o = review-triage-reviewer-workflow = fab1e874; tests, ruff, code-rules pass locally.
-- cram2 1019: 111 of 464 need review; of the 97 with no reason, 25 are added files, the rest real edits; only a re-exported import respelling (1 file) is a candidate pattern.
+- #299-#309 as before. #310 (bug, off main): a module name a head file keeps no longer counts as renamed.
+- Pyrefly fallback (port of #240) committed 05ba7a87 on review-triage-pyrefly-receivers; review-triage tests green.
+- Re-exported import proof on review-triage-reexported-imports (39d536be); viewed checkpoints in notes on review-triage-viewed-checkpoints-in-notes (32c91416).
 
 Next
-- CI of #299-#309 and the Windows run at fab1e874 not yet read green.
-- Viewed-state checkpoints in personal notes; #241 split moves and #240 (Pyrefly) not integrated.
+- Read basstler-package suite results for the int and ckpt branches, then push both and the Pyrefly branch as stacked draft PRs on #309.
+- CI of #299-#310 and the Windows run not yet read green; update claude/practical-hawking-nf0g3o after.

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import posixpath
+import re
 import subprocess
 from enum import StrEnum
 from pathlib import Path
@@ -21,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from basstler.bash import Bash
+from basstler.class_property import classproperty
 from basstler.locations import PluginLocation, ProjectLocation
 from basstler.regular_expression import (
     CharacterClass,
@@ -35,7 +37,7 @@ from basstler_testing.constants.paths import (
     SkillDirectory,
     SkillFile,
 )
-from basstler_testing.constants.patterns import markdown_link_target
+from basstler_testing.constants.patterns import MarkdownLinkPattern
 
 
 class PlaceholderGroup(StrEnum):
@@ -112,57 +114,71 @@ def staleness_document() -> str:
     ).read_text(encoding="utf-8")
 
 
-HEADING_LINK_PREFIX = "#"
-"""
-What a link to a heading on the same page starts with.
-"""
+class DocumentSyntax(StrEnum):
+    """
+    The symbols the staleness document's links and placeholders are written with.
+    """
 
-RELATIVE_LINK_TARGET = markdown_link_target(
-    HEADING_LINK_PREFIX, CharacterClass.WHITESPACE
-).compiled()
-"""
-A Markdown link to a file, capturing its target.
-"""
+    HEADING_LINK_PREFIX = "#"
+    """
+    Starts a link to a heading on the same page.
+    """
 
-PLACEHOLDER_START = "<"
-"""
-Opens a placeholder a reader fills in.
-"""
+    PLACEHOLDER_START = "<"
+    """
+    Opens a placeholder a reader fills in.
+    """
 
-PLACEHOLDER_END = ">"
-"""
-Closes a placeholder a reader fills in.
-"""
+    PLACEHOLDER_END = ">"
+    """
+    Closes a placeholder a reader fills in.
+    """
 
-LOWERCASE_HYPHENATED_WORDS = CharacterSet.any_of(
-    CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT, "-"
-)
-"""
-A character of a name in lower case, words joined by hyphens.
-"""
 
-PLACEHOLDER = RegularExpression.sequence(
-    PLACEHOLDER_START,
-    CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
-    .one_or_more()
-    .captured_as(PlaceholderGroup.NAME),
-    PLACEHOLDER_END,
-).compiled()
-"""
-A placeholder such as ``<plan-id>``, capturing its name.
-"""
+class DocumentPattern:
+    """
+    The patterns that read the staleness document.
+    """
 
-NAMED_PLAN_DIRECTORY = RegularExpression.sequence(
-    ProjectLocation.PLANS.name,
-    posixpath.sep,
-    RegularExpression.negative_lookahead(PLACEHOLDER_START),
-    CharacterRange.ASCII_LOWERCASE_LETTER,
-    LOWERCASE_HYPHENATED_WORDS.zero_or_more(),
-    posixpath.sep,
-).compiled()
-"""
-A plan's directory named by an actual plan rather than a placeholder.
-"""
+    @classproperty
+    def relative_link_target(cls) -> re.Pattern[str]:
+        """
+        A Markdown link to a file, capturing its target, as ``](../rule.md)``.
+        """
+        return MarkdownLinkPattern.target(
+            DocumentSyntax.HEADING_LINK_PREFIX, CharacterClass.WHITESPACE
+        ).compiled()
+
+    @classproperty
+    def placeholder(cls) -> re.Pattern[str]:
+        """
+        A placeholder such as ``<plan-id>``, capturing its name.
+        """
+        return RegularExpression.sequence(
+            DocumentSyntax.PLACEHOLDER_START,
+            CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
+            .one_or_more()
+            .captured_as(PlaceholderGroup.NAME),
+            DocumentSyntax.PLACEHOLDER_END,
+        ).compiled()
+
+    @classproperty
+    def named_plan_directory(cls) -> re.Pattern[str]:
+        """
+        A plan's directory named by an actual plan rather than a placeholder, as
+        ``plans/some-plan/``.
+        """
+        lowercase_hyphenated_words = CharacterSet.any_of(
+            CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT, "-"
+        )
+        return RegularExpression.sequence(
+            ProjectLocation.PLANS.name,
+            posixpath.sep,
+            RegularExpression.negative_lookahead(DocumentSyntax.PLACEHOLDER_START),
+            CharacterRange.ASCII_LOWERCASE_LETTER,
+            lowercase_hyphenated_words.zero_or_more(),
+            posixpath.sep,
+        ).compiled()
 
 
 def linked_documents(skill: Path) -> set[Path]:
@@ -172,7 +188,9 @@ def linked_documents(skill: Path) -> set[Path]:
     """
     return {
         (skill.parent / target).resolve()
-        for target in RELATIVE_LINK_TARGET.findall(skill.read_text(encoding="utf-8"))
+        for target in DocumentPattern.relative_link_target.findall(
+            skill.read_text(encoding="utf-8")
+        )
     }
 
 
@@ -227,7 +245,7 @@ def test_the_rule_names_no_plan_of_its_own():
     The document is generic: it shows a plan's directory only through a placeholder.
     """
     document = staleness_document()
-    placeholders = set(PLACEHOLDER.findall(document))
+    placeholders = set(DocumentPattern.placeholder.findall(document))
 
     assert "plan-id" in placeholders
-    assert NAMED_PLAN_DIRECTORY.search(document) is None
+    assert DocumentPattern.named_plan_directory.search(document) is None

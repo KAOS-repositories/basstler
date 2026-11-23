@@ -218,7 +218,8 @@ EXTRA_MARKER = RegularExpression.sequence(
     "==",
 ).compiled()
 """
-The environment marker of a requirement that only an extra brings in.
+The environment marker of a requirement that only an extra brings in, as ``extra ==
+'email'``.
 """
 
 

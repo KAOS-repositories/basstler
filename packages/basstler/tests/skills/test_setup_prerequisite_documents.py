@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from basstler.class_property import classproperty
 from basstler.locations import PackageLocation
 from basstler.regular_expression import (
     Anchor,
@@ -233,23 +234,38 @@ def test_the_sweep_reads_the_skill_documents_rather_than_nothing() -> None:
 
 # %% each skill gates on its own checks
 
-COMMAND_SEPARATOR = " "
-"""
-Separates the words of a command line.
-"""
 
-GATE_COMMAND = RegularExpression.sequence(
-    gate.__name__.removeprefix(f"{PackageLocation.DIRECTORY.name}."),
-    COMMAND_SEPARATOR,
-    GateOption.SKILL,
-    COMMAND_SEPARATOR,
-    CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
-    .one_or_more()
-    .captured_as(GateGroup.SKILL),
-).compiled()
-"""
-How a document runs a skill's setup gate, naming the skill.
-"""
+class CommandLineSyntax(StrEnum):
+    """
+    The symbols a command line is written with.
+    """
+
+    WORD_SEPARATOR = " "
+    """
+    Separates the words of a command line.
+    """
+
+
+class GateCommand:
+    """
+    How a document runs a skill's setup gate.
+    """
+
+    @classproperty
+    def pattern(cls) -> re.Pattern[str]:
+        """
+        The command running the gate, capturing the skill it names, as
+        ``setup.gate --skill plan-create``.
+        """
+        return RegularExpression.sequence(
+            gate.__name__.removeprefix(f"{PackageLocation.DIRECTORY.name}."),
+            CommandLineSyntax.WORD_SEPARATOR,
+            GateOption.SKILL,
+            CommandLineSyntax.WORD_SEPARATOR,
+            CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
+            .one_or_more()
+            .captured_as(GateGroup.SKILL),
+        ).compiled()
 
 
 def gated_skill_names() -> list[str]:
@@ -260,7 +276,7 @@ def gated_skill_names() -> list[str]:
     return [
         match[GateGroup.SKILL]
         for document in skill_documents()
-        for match in GATE_COMMAND.finditer(document.text)
+        for match in GateCommand.pattern.finditer(document.text)
     ]
 
 

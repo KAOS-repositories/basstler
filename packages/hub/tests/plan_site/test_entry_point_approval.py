@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
@@ -102,16 +103,22 @@ def test_an_expanded_path_to_this_plugin_is_allowed(
 
 # %% a directory change before it and a reported exit status after it
 
-STATUS_REPORT = 'echo "setup gate exit status: $?"'
-"""
-The exit status report the skills append to the setup gate.
-"""
+
+class SkillCommandSuffix(StrEnum):
+    """
+    What the skills append to a command they run.
+    """
+
+    STATUS_REPORT = 'echo "setup gate exit status: $?"'
+    """
+    The exit status report the skills append to the setup gate.
+    """
 
 
 @pytest.mark.parametrize(
     "command",
     [
-        f'"{ENTRY_POINT}" setup.gate --skill plan-item-kickoff; {STATUS_REPORT}',
+        f'"{ENTRY_POINT}" setup.gate --skill plan-item-kickoff; {SkillCommandSuffix.STATUS_REPORT}',
         f'cd /home/user/project; "{ENTRY_POINT}" maintenance',
         f'cd /home/user/project && "{ENTRY_POINT}" maintenance',
         f'cd /home/user/project; "{ENTRY_POINT}" maintenance; echo "exit $?"',

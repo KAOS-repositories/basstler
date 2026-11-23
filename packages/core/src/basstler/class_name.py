@@ -37,7 +37,7 @@ class HyphenatedClassName:
     def word_start(cls) -> re.Pattern[str]:
         """
         The position before each capital letter but the first character, where a word
-        starts.
+        starts, as before the ``I`` of ``PlanItem``.
         """
         return RegularExpression.sequence(
             RegularExpression.negative_lookbehind(Anchor.TEXT_START),

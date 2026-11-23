@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import posixpath
+import re
 import subprocess
 from dataclasses import dataclass
 from enum import StrEnum
@@ -22,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from basstler.bash import Bash, ShellExpansionCharacter, ShellQuote, ShellToken
+from basstler.class_property import classproperty
 from basstler.locations import (
     BasstlerVariable,
     ClaudeCodeVariable,
@@ -42,15 +44,9 @@ from basstler.yaml_syntax import YamlSyntax
 
 from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory
 from basstler_testing.constants.patterns import (
-    BRACED_SHELL_VARIABLE,
-    SHELL_NAME,
-    markdown_link_target,
+    MarkdownLinkPattern,
+    ShellPattern,
 )
-
-LINK_TARGET = markdown_link_target().compiled()
-"""
-Matches the target of a markdown link, whatever it points at.
-"""
 
 # %% reading the documents
 
@@ -63,7 +59,7 @@ def linked_files(instructions: str) -> set[str]:
     """
     return {
         target
-        for target in LINK_TARGET.findall(instructions)
+        for target in SkillDocumentPattern.link_target.findall(instructions)
         if "://" not in target and not target.startswith("#")
     }
 
@@ -73,7 +69,9 @@ def cited_shell_variables(document: Path) -> set[str]:
     :param document: A skill document.
     :return: The name of every shell variable the document references in braces.
     """
-    return set(BRACED_SHELL_VARIABLE.findall(document.read_text(encoding="utf-8")))
+    return set(
+        ShellPattern.braced_variable.findall(document.read_text(encoding="utf-8"))
+    )
 
 
 class SkillDocumentName(StrEnum):
@@ -125,27 +123,143 @@ class BashBlockGroup(StrEnum):
     """
 
 
-BASH_BLOCK = RegularExpression.sequence(
-    Anchor.LINE_START,
-    RegularExpression.sequence(FencedBlock.INDENT)
-    .zero_or_more()
-    .captured_as(BashBlockGroup.INDENTATION),
-    FencedBlock.FENCE,
-    FencedBlock.BASH,
-    LINE_BREAK,
-    ANY_CHARACTER.zero_or_more(shortest=True).captured_as(BashBlockGroup.COMMANDS),
-    Anchor.LINE_START,
-    RegularExpression.backreference(BashBlockGroup.INDENTATION),
-    FencedBlock.FENCE,
-).compiled()
-"""
-Matches a fenced bash block, indented or not, capturing its commands.
-"""
+class DocumentSyntax(StrEnum):
+    """
+    The symbols the skill documents are read by.
+    """
 
-SHELL_WORD = SHELL_NAME.compiled()
-"""
-Matches every word that could name a shell function.
-"""
+    HOME_DIRECTORY = "~"
+    """
+    Starts a path under the home directory.
+    """
+
+    SYSTEM_TEMPORARY_DIRECTORY = "/tmp/"
+    """
+    The system's temporary directory, as a path prefix.
+    """
+
+    FRONT_MATTER_FENCE = "---"
+    """
+    Opens and closes a document's YAML front matter.
+    """
+
+    DESCRIPTION_KEY = "description"
+    """
+    The front matter key holding a skill's description, which it is read back under.
+    """
+
+
+class SkillDocumentPattern:
+    """
+    The patterns that read a skill document.
+    """
+
+    @classproperty
+    def link_target(cls) -> re.Pattern[str]:
+        """
+        The target of a markdown link, whatever it points at, as ``](../rules.md)``.
+        """
+        return MarkdownLinkPattern.target().compiled()
+
+    @classproperty
+    def shell_word(cls) -> re.Pattern[str]:
+        """
+        Every word that could name a shell function.
+        """
+        return ShellPattern.variable_name.compiled()
+
+    @classproperty
+    def bash_block(cls) -> re.Pattern[str]:
+        """
+        A fenced bash block, indented or not, capturing its commands.
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            RegularExpression.literal(FencedBlock.INDENT)
+            .zero_or_more()
+            .captured_as(BashBlockGroup.INDENTATION),
+            FencedBlock.FENCE,
+            FencedBlock.BASH,
+            LINE_BREAK,
+            ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
+                BashBlockGroup.COMMANDS
+            ),
+            Anchor.LINE_START,
+            RegularExpression.backreference(BashBlockGroup.INDENTATION),
+            FencedBlock.FENCE,
+        ).compiled()
+
+    @classproperty
+    def bare_interpreter_run(cls) -> re.Pattern[str]:
+        """
+        A module of the package run with whatever ``python``/``python3`` the path finds,
+        which in a session is not the package's own environment, as
+        ``python3 -m basstler``.
+        """
+        return RegularExpression.sequence(
+            RegularExpression.negative_lookbehind(
+                CharacterSet.any_of(
+                    CharacterClass.WORD_CHARACTER,
+                    posixpath.sep,
+                    ShellExpansionCharacter.PARAMETER_EXPANSION,
+                    ShellQuote.DOUBLE_QUOTE,
+                    ShellToken.BRACED_PARAMETER_START,
+                    ShellToken.BRACED_PARAMETER_END,
+                    "-",
+                )
+            ),
+            InterpreterRun.PYTHON,
+            RegularExpression.literal(InterpreterRun.MAJOR_VERSION).optional(),
+            InterpreterRun.MODULE_FLAG,
+            PackageLocation.DIRECTORY.name,
+            Anchor.WORD_BOUNDARY,
+        ).compiled()
+
+    @classproperty
+    def system_temporary_path(cls) -> re.Pattern[str]:
+        """
+        A path under the system's temporary directory, which the ``Artifact`` tool
+        refuses to publish from, as ``/tmp/plan.html``.
+        """
+        return RegularExpression.sequence(
+            RegularExpression.negative_lookbehind(
+                CharacterSet.any_of(
+                    CharacterClass.WORD_CHARACTER,
+                    ".",
+                    DocumentSyntax.HOME_DIRECTORY,
+                    "-",
+                )
+            ),
+            DocumentSyntax.SYSTEM_TEMPORARY_DIRECTORY,
+        ).compiled()
+
+    @classproperty
+    def skill_description(cls) -> re.Pattern[str]:
+        """
+        A skill's front matter up to its description, capturing the description.
+        """
+        return RegularExpression.sequence(
+            Anchor.TEXT_START,
+            DocumentSyntax.FRONT_MATTER_FENCE,
+            LINE_BREAK,
+            RegularExpression.sequence(
+                ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(), LINE_BREAK
+            ).zero_or_more(shortest=True),
+            DocumentSyntax.DESCRIPTION_KEY,
+            YamlSyntax.MAPPING_VALUE,
+            YamlSyntax.INDICATOR_SEPARATOR,
+            ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().captured_as(
+                DocumentSyntax.DESCRIPTION_KEY
+            ),
+            LINE_BREAK,
+        ).compiled()
+
+    @classproperty
+    def angle_bracket(cls) -> re.Pattern[str]:
+        """
+        A character claude.ai strips from a skill's description as part of an XML tag.
+        """
+        return CharacterSet.any_of(HtmlSyntax.TAG_START, HtmlSyntax.TAG_END).compiled()
 
 
 def bash_blocks(document: Path) -> list[str]:
@@ -155,7 +269,9 @@ def bash_blocks(document: Path) -> list[str]:
     """
     return [
         match[BashBlockGroup.COMMANDS]
-        for match in BASH_BLOCK.finditer(document.read_text(encoding="utf-8"))
+        for match in SkillDocumentPattern.bash_block.finditer(
+            document.read_text(encoding="utf-8")
+        )
     ]
 
 
@@ -239,9 +355,9 @@ class ShellConfiguration:
         :return: Every variable and function of the configuration they use, apart from
             the plugin root the session's environment sets.
         """
-        variables = set(BRACED_SHELL_VARIABLE.findall(commands))
+        variables = set(ShellPattern.braced_variable.findall(commands))
         used = (variables & self.variables.keys()) | (
-            set(SHELL_WORD.findall(commands)) & self.functions
+            set(SkillDocumentPattern.shell_word.findall(commands)) & self.functions
         )
         return used - {BasstlerVariable.PLUGIN_ROOT}
 
@@ -337,7 +453,7 @@ def test_a_command_names_the_plugin_root_as_its_document_receives_it(
     cited = {
         variable
         for commands in bash_blocks(document)
-        for variable in BRACED_SHELL_VARIABLE.findall(commands)
+        for variable in ShellPattern.braced_variable.findall(commands)
     }
     unavailable = (
         BasstlerVariable.PLUGIN_ROOT
@@ -427,102 +543,35 @@ class InterpreterRun(StrEnum):
     """
 
 
-BARE_INTERPRETER_RUN = RegularExpression.sequence(
-    RegularExpression.negative_lookbehind(
-        CharacterSet.any_of(
-            CharacterClass.WORD_CHARACTER,
-            posixpath.sep,
-            ShellExpansionCharacter.PARAMETER_EXPANSION,
-            ShellQuote.DOUBLE_QUOTE,
-            ShellToken.BRACED_PARAMETER_START,
-            ShellToken.BRACED_PARAMETER_END,
-            "-",
-        )
-    ),
-    InterpreterRun.PYTHON,
-    RegularExpression.literal(InterpreterRun.MAJOR_VERSION).optional(),
-    InterpreterRun.MODULE_FLAG,
-    PackageLocation.DIRECTORY.name,
-    Anchor.WORD_BOUNDARY,
-).compiled()
-"""
-A module of the package run with whatever ``python``/``python3`` the path finds, which
-in a session is not the package's own environment.
-"""
-
-
 @pytest.mark.parametrize("document", skill_documents(), ids=document_identifier)
 def test_no_skill_document_runs_the_package_with_a_bare_interpreter(document: Path):
     """
     Each skill links the shared rules for running commands and says what plugin root they name.
     """
-    assert BARE_INTERPRETER_RUN.findall(document.read_text(encoding="utf-8")) == []
+    assert (
+        SkillDocumentPattern.bare_interpreter_run.findall(
+            document.read_text(encoding="utf-8")
+        )
+        == []
+    )
 
 
 # %% where a skill writes its files
-
-HOME_DIRECTORY = "~"
-"""
-What a path under the home directory starts with.
-"""
-
-SYSTEM_TEMPORARY_DIRECTORY = "/tmp/"
-"""
-The system's temporary directory, as a path prefix.
-"""
-
-SYSTEM_TEMPORARY_PATH = RegularExpression.sequence(
-    RegularExpression.negative_lookbehind(
-        CharacterSet.any_of(CharacterClass.WORD_CHARACTER, ".", HOME_DIRECTORY, "-")
-    ),
-    SYSTEM_TEMPORARY_DIRECTORY,
-).compiled()
-"""
-A path under the system's temporary directory, which the ``Artifact`` tool refuses to
-publish from.
-"""
 
 
 @pytest.mark.parametrize("document", skill_documents(), ids=document_identifier)
 def test_no_skill_document_writes_under_the_system_temporary_directory(
     document: Path,
 ):
-    assert SYSTEM_TEMPORARY_PATH.findall(document.read_text(encoding="utf-8")) == []
+    assert (
+        SkillDocumentPattern.system_temporary_path.findall(
+            document.read_text(encoding="utf-8")
+        )
+        == []
+    )
 
 
 # %% the description claude.ai stores
-
-FRONT_MATTER_FENCE = "---"
-"""
-Opens and closes a document's YAML front matter.
-"""
-
-DESCRIPTION_KEY = "description"
-"""
-The front matter key holding a skill's description, which it is read back under.
-"""
-
-SKILL_DESCRIPTION = RegularExpression.sequence(
-    Anchor.TEXT_START,
-    FRONT_MATTER_FENCE,
-    LINE_BREAK,
-    RegularExpression.sequence(
-        ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(), LINE_BREAK
-    ).zero_or_more(shortest=True),
-    DESCRIPTION_KEY,
-    YamlSyntax.MAPPING_VALUE,
-    YamlSyntax.INDICATOR_SEPARATOR,
-    ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().captured_as(DESCRIPTION_KEY),
-    LINE_BREAK,
-).compiled()
-"""
-Matches a skill's front matter up to its description, capturing the description.
-"""
-
-ANGLE_BRACKET = CharacterSet.any_of(HtmlSyntax.TAG_START, HtmlSyntax.TAG_END).compiled()
-"""
-Matches a character claude.ai strips from a skill's description as part of an XML tag.
-"""
 
 
 @pytest.mark.parametrize(
@@ -539,6 +588,13 @@ def test_no_skill_description_holds_an_angle_bracket(document: Path) -> None:
     claude.ai warns about a description that holds an XML tag and stores it with its
     angle brackets removed, so a placeholder such as ``<plan-id>`` loses its markers.
     """
-    description = SKILL_DESCRIPTION.match(document.read_text(encoding="utf-8"))
+    description = SkillDocumentPattern.skill_description.match(
+        document.read_text(encoding="utf-8")
+    )
 
-    assert ANGLE_BRACKET.findall(description[DESCRIPTION_KEY]) == []
+    assert (
+        SkillDocumentPattern.angle_bracket.findall(
+            description[DocumentSyntax.DESCRIPTION_KEY]
+        )
+        == []
+    )

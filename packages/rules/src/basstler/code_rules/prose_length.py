@@ -168,7 +168,7 @@ class SourceProse:
     @classproperty
     def tool_directive(cls) -> re.Pattern[str]:
         """
-        A comment addressed to a tool rather than a reader, such as ``# noqa``.
+        A comment addressed to a tool rather than a reader, as ``# noqa: E501``.
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,

@@ -300,7 +300,8 @@ class HelperChunk:
     def pattern(cls, request_identifier: str) -> re.Pattern[str]:
         """
         :param request_identifier: The request's identifier.
-        :return: What one chunk looks like, wherever it is quoted.
+        :return: What one chunk looks like, wherever it is quoted, as
+            ``BASSTLER-UPSTREAM-REVIEWS-<request>-1-3:QUJD``.
         """
         return RegularExpression.sequence(
             cls.marker(request_identifier),

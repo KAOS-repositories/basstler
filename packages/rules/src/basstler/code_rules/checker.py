@@ -172,7 +172,8 @@ class StagedLines:
     @classproperty
     def diff_header(cls) -> re.Pattern[str]:
         """
-        A file's header, or a changed block's, in a diff without context lines.
+        A file's header, or a changed block's, in a diff without context lines, as
+        ``diff --git a/old.py b/new.py`` or ``@@ -3 +7,4 @@``.
         """
         file_header = RegularExpression.sequence(
             Anchor.LINE_START,

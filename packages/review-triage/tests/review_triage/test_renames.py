@@ -4,6 +4,8 @@ Combining the renames of several sources and applying them to identifiers and pr
 
 from __future__ import annotations
 
+import pytest
+
 from basstler.review_triage.declaration import DescriptionDeclaration
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
@@ -82,3 +84,26 @@ def test_renames_swapping_two_identifiers_apply_together():
         )
     )
     assert renames.renamed_prose("first then second") == "second then first"
+
+
+# %% the old identifiers found in prose
+
+
+@pytest.mark.parametrize(
+    ("prose", "renamed"),
+    [
+        ("calls old_name here", "calls new_name here"),
+        ("old_name, old_name.", "new_name, new_name."),
+        ("(old_name)", "(new_name)"),
+        ("old_names and bold_name", "old_names and bold_name"),
+        ("an other and old_name", "an renamed_other and new_name"),
+        ("nothing to rename", "nothing to rename"),
+    ],
+)
+def test_an_old_identifier_is_replaced_only_where_it_is_a_whole_word(
+    prose: str, renamed: str
+):
+    """
+    Each prose is listed beside the text it becomes.
+    """
+    assert RenameMap((DETECTED, OTHER)).renamed_prose(prose) == renamed

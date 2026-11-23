@@ -111,7 +111,8 @@ class SymbolicReferenceListing(StrEnum):
     @staticmethod
     def default_branch_line() -> re.Pattern[str]:
         """
-        :return: The line naming the branch a remote's ``HEAD`` points at.
+        :return: The line naming the branch a remote's ``HEAD`` points at, as
+            ``ref: refs/heads/main<tab>HEAD``.
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,

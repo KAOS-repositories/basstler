@@ -174,7 +174,8 @@ class ActionInstallation:
     @classproperty
     def branch_or_tag_line(cls) -> re.Pattern[str]:
         """
-        The line of an installed workflow naming the basstler branch or tag it runs.
+        The line of an installed workflow naming the basstler branch or tag it runs, as
+        ``basstler_branch_or_tag: v4.2.2``.
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,

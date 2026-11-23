@@ -5,12 +5,14 @@ draft state, and an override of its failed checks, show in the browser.
 
 from __future__ import annotations
 
+import re
 from http import HTTPStatus
 from pathlib import Path
 
 import pytest
 from playwright.sync_api import Page, expect
 
+from basstler.class_property import classproperty
 from basstler.github.pull_request_record import PullRequestField
 from basstler.github.states import CombinedCheckState
 from basstler.github.pull_request_state import (
@@ -31,15 +33,26 @@ from .test_live_states import answers_with, open_first_plan_page, open_item_card
 
 # %% what a link attribute holds
 
-LINK_PRESENT = ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().compiled()
-"""
-An attribute value that holds something, which a button with a link has.
-"""
 
-ANY_LINK = ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().compiled()
-"""
-Any attribute value at all, which only a button without the attribute lacks.
-"""
+class LinkAttribute:
+    """
+    The values an attribute holding a link may have, as the page tests expect them.
+    """
+
+    @classproperty
+    def present(cls) -> re.Pattern[str]:
+        """
+        An attribute value that holds something, which a button with a link has.
+        """
+        return ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().compiled()
+
+    @classproperty
+    def any_value(cls) -> re.Pattern[str]:
+        """
+        Any attribute value at all, which only a button without the attribute lacks.
+        """
+        return ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().compiled()
+
 
 # %% a plan in a fork
 
@@ -73,8 +86,8 @@ def a_fork_source(
     pull_request_source: RecordedPullRequestSource,
 ) -> RecordedPullRequestSource:
     """
-    The first plan's pull request source, whose repository is a fork and whose open
-    pull request is stacked on the fork's default branch.
+    The first plan's pull request source, whose repository is a fork and whose open pull
+    request is stacked on the fork's default branch.
     """
     pull_request_source.fork_lineages[PLAN_REPOSITORY] = LINEAGE
     pull_request_source.records[OPEN_PULL_REQUEST] = PullRequestRecord(
@@ -102,7 +115,7 @@ def test_a_pull_request_marked_ready_since_the_build_enables_its_button(
 
     button = open_item_card(browser_page).locator(CONTRIBUTE)
     expect(button).not_to_have_class("promote-button promote-button-disabled")
-    expect(button).to_have_attribute("href", LINK_PRESENT)
+    expect(button).to_have_attribute("href", LinkAttribute.present)
     expect(open_item_card(browser_page).locator(PROMOTION_REASON)).to_have_text("")
 
 
@@ -188,7 +201,7 @@ def test_overriding_failed_checks_enables_the_button(
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LINK_PRESENT)
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LinkAttribute.present)
     expect(card.locator(PROMOTION_REASON)).to_have_text("")
 
 
@@ -207,7 +220,9 @@ def test_withdrawing_the_override_disables_the_button_again(
     card.locator(CHECKS_OVERRIDE).check()
     card.locator(CHECKS_OVERRIDE).uncheck()
 
-    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", ANY_LINK)
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute(
+        "href", LinkAttribute.any_value
+    )
     expect(card.locator(PROMOTION_REASON)).to_have_text(
         PromotionBlocker.CHECKS_FAILED.value
     )
@@ -230,7 +245,9 @@ def test_overriding_failed_checks_leaves_every_other_blocker(
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", ANY_LINK)
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute(
+        "href", LinkAttribute.any_value
+    )
     expect(card.locator(PROMOTION_REASON)).to_have_text(PromotionBlocker.WITHHELD.value)
 
 
@@ -267,4 +284,4 @@ def test_overriding_failed_checks_works_when_github_refuses_the_recheck(
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LINK_PRESENT)
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LinkAttribute.present)

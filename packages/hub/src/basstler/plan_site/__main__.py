@@ -118,7 +118,8 @@ class SiteDigest:
     @classproperty
     def build_time_pattern(cls) -> re.Pattern[bytes]:
         """
-        The element a plan page shows the build time in.
+        The element a plan page shows the build time in, as
+        ``<time data-refreshed-at ...>12:00</time>``.
         """
         return RegularExpression.sequence(
             HtmlSyntax.TAG_START,

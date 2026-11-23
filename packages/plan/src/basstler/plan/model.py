@@ -545,7 +545,8 @@ class ManifestKey(KeySpecification, Enum):
     @property
     def pattern(self) -> re.Pattern[str]:
         """
-        Matches this key wherever it already appears in an item block.
+        Matches this key wherever it already appears in an item block, as
+        ``    branch: claude/work`` for ``branch``.
         """
         return RegularExpression.sequence(
             Anchor.LINE_START,

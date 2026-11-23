@@ -67,10 +67,10 @@ class LogFormatting(Enum):
         CharacterSet.any_of(
             CharacterRange.ASCII_DIGIT, LogSyntax.PARAMETER_SEPARATOR
         ).zero_or_more(),
-        CharacterSet.any_of(CharacterRange.ASCII_LETTER),
+        CharacterRange.ASCII_LETTER,
     ).compiled()
     """
-    The colour a test runner writes around its own output.
+    The colour a test runner writes around its own output, as ``ESC[31;1m``.
     """
 
     TIMESTAMP = RegularExpression.sequence(
@@ -80,7 +80,8 @@ class LogFormatting(Enum):
         LogSyntax.TIMESTAMP_SEPARATOR,
     ).compiled()
     """
-    The timestamp a runner writes in front of every line it records.
+    The timestamp a runner writes in front of every line it records, as
+    ``2026-11-23T00:11:26Z ``.
     """
 
     @classmethod
@@ -153,7 +154,8 @@ class FailedJob:
     @classproperty
     def link_pattern(cls) -> re.Pattern[str]:
         """
-        Where a check's own output link carries the job that produced it.
+        Where a check's own output link carries the job that produced it, as
+        ``/actions/runs/123/job/456``.
         """
         digits = CharacterSet.any_of(CharacterRange.ASCII_DIGIT).one_or_more()
         return RegularExpression.sequence(

@@ -357,9 +357,7 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
 # %% the distributions' metadata
 
 REQUIREMENT_NAME = RegularExpression.sequence(
-    CharacterSet.any_of(
-        CharacterRange.ASCII_ALPHANUMERIC,
-    ),
+    CharacterRange.ASCII_ALPHANUMERIC,
     CharacterSet.any_of(
         CharacterRange.ASCII_ALPHANUMERIC,
         ".",
@@ -368,7 +366,8 @@ REQUIREMENT_NAME = RegularExpression.sequence(
     ).zero_or_more(),
 ).compiled()
 """
-The distribution name a requirement specifier starts with.
+The distribution name a requirement specifier starts with, as ``pydantic`` in
+``pydantic>=2``.
 """
 
 

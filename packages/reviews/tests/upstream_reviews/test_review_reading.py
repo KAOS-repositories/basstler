@@ -13,6 +13,8 @@ Filesystem only: no network, no credentials, no scratch repository.
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from basstler.slash_command import SlashCommand
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
@@ -47,10 +49,15 @@ def promotion_label() -> str:
     return CommittedStackConfiguration().values()[StackSetting.IN_REVIEW_LABEL]
 
 
-NAME_KEY = "name"
-"""
-The front matter key holding a skill's name, which it is read back under.
-"""
+class FrontMatterKey(StrEnum):
+    """
+    The keys of a skill's front matter.
+    """
+
+    NAME = "name"
+    """
+    Holds the skill's name, which it is read back under.
+    """
 
 
 def upstream_reviews_invocation() -> str:
@@ -63,17 +70,19 @@ def upstream_reviews_invocation() -> str:
     name = (
         RegularExpression.sequence(
             Anchor.LINE_START,
-            NAME_KEY,
+            FrontMatterKey.NAME,
             YamlSyntax.MAPPING_VALUE,
             CharacterClass.WHITESPACE.zero_or_more(),
-            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(NAME_KEY),
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+                FrontMatterKey.NAME
+            ),
             CharacterClass.WHITESPACE.zero_or_more(),
             Anchor.LINE_END,
         )
         .compiled()
         .search(frontmatter)
     )
-    return f"{SlashCommand.PREFIX}{name[NAME_KEY]}"
+    return f"{SlashCommand.PREFIX}{name[FrontMatterKey.NAME]}"
 
 
 # %% the resolve skill's upstream read

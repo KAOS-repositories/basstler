@@ -12,8 +12,11 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+import re
+
 import pytest
 
+from basstler.class_property import classproperty
 from basstler.document_references import PACKAGE_NAME, CitedNames
 from basstler.slash_command import SlashCommand
 from basstler.github.constants import MarkdownSyntax
@@ -60,22 +63,32 @@ class SectionGroup(StrEnum):
     """
 
 
-SECOND_LEVEL_HEADING_PREFIX = (
-    MarkdownSyntax.HEADING_MARKER * 2 + MarkdownSyntax.HEADING_SEPARATOR
-)
-"""
-What a second-level Markdown heading starts with.
-"""
+class SectionHeading:
+    """
+    How a document's second-level sections are headed.
+    """
 
-SECTION_HEADING = RegularExpression.sequence(
-    Anchor.LINE_START,
-    SECOND_LEVEL_HEADING_PREFIX,
-    ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(SectionGroup.TITLE),
-    Anchor.LINE_END,
-).compiled()
-"""
-Matches a second-level markdown heading, capturing its title.
-"""
+    @classproperty
+    def prefix(cls) -> str:
+        """
+        What a second-level Markdown heading starts with, as ``## ``.
+        """
+        return MarkdownSyntax.HEADING_MARKER * 2 + MarkdownSyntax.HEADING_SEPARATOR
+
+    @classproperty
+    def pattern(cls) -> re.Pattern[str]:
+        """
+        A second-level Markdown heading, capturing its title, as ``## Notes``.
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            cls.prefix,
+            ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(
+                SectionGroup.TITLE
+            ),
+            Anchor.LINE_END,
+        ).compiled()
+
 
 HOOK_SCRIPT_NAMES = sorted(
     script.name for script in RepositoryLocation.HOOKS.glob("*.sh")
@@ -150,7 +163,7 @@ def test_the_starter_notes_carry_no_section_of_the_pull_request_rules():
     sessions that run no skill acting on pull requests.
     """
     assert (
-        set(SECTION_HEADING.findall(STARTER_NOTES))
-        & set(SECTION_HEADING.findall(PULL_REQUEST_RULES))
+        set(SectionHeading.pattern.findall(STARTER_NOTES))
+        & set(SectionHeading.pattern.findall(PULL_REQUEST_RULES))
         == set()
     )

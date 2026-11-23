@@ -104,7 +104,8 @@ class Section(AgentRule, Enum):
     def title(cls) -> str:
         """
         The text of the section's heading: the words of the topic in sentence case,
-        keeping acronyms such as ``CI`` in capitals.
+        keeping acronyms such as ``CI`` in capitals, as ``CI pipeline`` for
+        ``CIPipelineRules``.
         """
         acronym = RegularExpression.sequence(
             CharacterRange.ASCII_UPPERCASE_LETTER.one_or_more(),

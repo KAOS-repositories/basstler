@@ -61,7 +61,8 @@ class ManifestLinePattern(Enum):
         YamlSyntax.MAPPING_VALUE,
     ).compiled()
     """
-    Matches the first line of an item block, which is always its ``id``.
+    Matches the first line of an item block, which is always its ``id``, as
+    ``  - id: first-item``.
     """
 
     SEQUENCE_ENTRY = RegularExpression.sequence(
@@ -72,7 +73,7 @@ class ManifestLinePattern(Enum):
     ).compiled()
     """
     Matches one entry of a block sequence, which YAML lets sit either indented under its
-    key or flush with it.
+    key or flush with it, as ``    - one blocker``.
     """
 
     TOP_LEVEL_KEY = RegularExpression.sequence(
@@ -80,8 +81,8 @@ class ManifestLinePattern(Enum):
         CharacterSet.any_except(CharacterClass.WHITESPACE, YamlSyntax.SEQUENCE_ENTRY),
     ).compiled()
     """
-    Matches a top-level ``plan.yaml`` key, which is where the last item block ends. A
-    sequence entry flush with its key starts with ``-`` and is not one.
+    Matches a top-level ``plan.yaml`` key such as ``items:``, which is where the last
+    item block ends. A sequence entry flush with its key starts with ``-`` and is not one.
     """
 
     BLOCK_VALUE = RegularExpression.sequence(
@@ -93,7 +94,8 @@ class ManifestLinePattern(Enum):
         YamlSyntax.MAPPING_VALUE,
     ).compiled()
     """
-    Matches a key whose value may run over the following lines, derived from
+    Matches a key whose value may run over the following lines, as ``    notes: >``,
+    derived from
     :meth:`ManifestKey.block_styled` rather than listing those keys a second time.
     """
 

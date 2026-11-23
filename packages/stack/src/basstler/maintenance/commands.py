@@ -309,7 +309,9 @@ class FastForwardCommand(MaintenanceCommand):
         :param arguments: The parsed command line.
         :return: The process exit code."""
         report = MaintenanceReport(
-            fast_forward=fast_forward(maintenance.configuration, maintenance.git)
+            fast_forward=fast_forward(
+                maintenance.configuration, maintenance.git, GitHubRestClient()
+            )
         )
         report.print_summary()
         return report.exit_code
@@ -562,7 +564,9 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
         """
         stack = maintenance.fresh_stack().scoped_to(stacked_on)
         fork = maintenance.fork()
-        fast_forward_report = fast_forward(stack.configuration, maintenance.git)
+        fast_forward_report = fast_forward(
+            stack.configuration, maintenance.git, GitHubRestClient()
+        )
         restacked = restack(stack, maintenance.git, fork)
         promoted = promote(stack, fork, summaries)
         labels_cleared = clear_spent_promotion_labels(stack, fork)

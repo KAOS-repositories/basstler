@@ -39,6 +39,7 @@ from basstler_testing.maintenance.fork import (
     a_board_entry,
     a_parent_and_child,
     a_stack,
+    client_seeing_a_public_upstream,
     make_configuration,
     the_board,
 )
@@ -60,7 +61,9 @@ def test_the_fork_base_is_fast_forwarded_to_the_upstream(fork_checkout: ForkChec
     )
     fork_checkout.run_git("fetch", "--quiet", RemoteName.ORIGIN)
 
-    report = fast_forward(make_configuration(), fork_checkout.git)
+    report = fast_forward(
+        make_configuration(), fork_checkout.git, client_seeing_a_public_upstream()
+    )
 
     assert report.outcome == FastForwardOutcome.PUSHED
     assert fork_checkout.published_commit(RemoteName.ORIGIN, UPSTREAM_BASE) == advanced
@@ -84,7 +87,9 @@ def test_the_fork_base_is_fast_forwarded_from_an_upstream_with_no_remote(
         make_configuration(), upstream_location=fork_checkout.upstream_path.as_uri()
     )
 
-    report = fast_forward(configuration, fork_checkout.git)
+    report = fast_forward(
+        configuration, fork_checkout.git, client_seeing_a_public_upstream()
+    )
 
     assert report.outcome == FastForwardOutcome.PUSHED
     assert fork_checkout.published_commit(RemoteName.ORIGIN, UPSTREAM_BASE) == advanced
@@ -93,7 +98,9 @@ def test_the_fork_base_is_fast_forwarded_from_an_upstream_with_no_remote(
 def test_a_fork_base_already_level_with_the_upstream_is_left_alone(
     fork_checkout: ForkCheckout,
 ):
-    report = fast_forward(make_configuration(), fork_checkout.git)
+    report = fast_forward(
+        make_configuration(), fork_checkout.git, client_seeing_a_public_upstream()
+    )
 
     assert report.outcome == FastForwardOutcome.ALREADY_CURRENT
 
@@ -117,7 +124,9 @@ def test_a_non_fast_forward_is_refused_and_the_fork_base_is_untouched(
     fork_checkout.run_git("fetch", "--quiet", RemoteName.UPSTREAM)
     before = fork_checkout.published_commit(RemoteName.ORIGIN, UPSTREAM_BASE)
 
-    report = fast_forward(make_configuration(), fork_checkout.git)
+    report = fast_forward(
+        make_configuration(), fork_checkout.git, client_seeing_a_public_upstream()
+    )
 
     assert report.outcome == FastForwardOutcome.REFUSED_NOT_FAST_FORWARD
     assert fork_checkout.published_commit(RemoteName.ORIGIN, UPSTREAM_BASE) == before
@@ -134,7 +143,9 @@ def test_a_refused_push_of_the_fork_base_stops_the_pass(fork_checkout: ForkCheck
     )
 
     with pytest.raises(GitCommandFailed):
-        fast_forward(make_configuration(), fork_checkout.git)
+        fast_forward(
+            make_configuration(), fork_checkout.git, client_seeing_a_public_upstream()
+        )
 
 
 # %% restack

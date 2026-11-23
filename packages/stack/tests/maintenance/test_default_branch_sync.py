@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from basstler.github.client import GitHubAttemptReader
 from basstler.locations import PluginLocation
 from basstler.maintenance.default_branch_sync import (
     BaseOutcome,
@@ -20,14 +21,18 @@ from basstler.maintenance.fast_forward import FastForwardOutcome
 from basstler.shell_configuration import FetchedBranchReference
 
 from basstler_testing.constants.notes import ScratchBranch
+from basstler_testing.github.path_answering_client import PathAnsweringClient
+from basstler_testing.github.visibility_client import visibility_client
 from basstler_testing.hooks.session_start_summary import SummaryLine, summary_value
 from basstler_testing.scratch_repository import ScratchRepository
 from .forked_scratch_repository import (
     DEFAULT_BRANCH,
     FORK_REMOTE,
+    FORK_REPOSITORY,
     SESSION_BRANCH,
     SHARED_FILE,
     UPSTREAM_REMOTE,
+    UPSTREAM_REPOSITORY,
     ForkedScratchRepository,
 )
 
@@ -46,12 +51,19 @@ def forked(
     return ForkedScratchRepository.laid_out_in(scratch_repository)
 
 
-def sync(forked: ForkedScratchRepository) -> DefaultBranchReport:
+def sync(
+    forked: ForkedScratchRepository, github: GitHubAttemptReader | None = None
+) -> DefaultBranchReport:
     """
     :param forked: The clone to catch up.
+    :param github: What says which repositories are private, by default one that says
+        the upstream is public.
     :return: What the pass reported.
     """
-    return DefaultBranchSync.catch_up_checkout(forked.repository.project_root)
+    return DefaultBranchSync.catch_up_checkout(
+        forked.repository.project_root,
+        github or visibility_client(public=[UPSTREAM_REPOSITORY]),
+    )
 
 
 # %% catching up
@@ -287,6 +299,73 @@ def test_reports_a_clone_with_nothing_to_catch_up_with(
     assert report.outcome is BaseOutcome.NOT_SYNCED
     assert report.reason in report.render()
     assert report.reason != ""
+
+
+# %% never publishing the base more widely than the upstream
+
+
+def a_private_upstream_with(fork: PathAnsweringClient) -> PathAnsweringClient:
+    """
+    :param fork: A client that answers for the fork only.
+    :return: The client with the upstream answered as private beside the fork.
+    """
+    return PathAnsweringClient(
+        answers={
+            **fork.answers,
+            **visibility_client(private=[UPSTREAM_REPOSITORY]).answers,
+        }
+    )
+
+
+def test_refuses_to_publish_a_private_upstream_base_to_a_public_fork(
+    forked: ForkedScratchRepository,
+):
+    fork_tip = forked.fork_default_branch_tip()
+    upstream_tip = forked.advance_upstream(1)
+
+    report = sync(
+        forked, a_private_upstream_with(visibility_client(public=[FORK_REPOSITORY]))
+    )
+
+    assert report.fork_fast_forward is FastForwardOutcome.REFUSED_WIDER_VISIBILITY
+    assert forked.fork_default_branch_tip() == fork_tip
+    assert forked.local_default_branch_tip() == upstream_tip
+
+
+def test_refuses_to_publish_a_private_upstream_base_to_a_fork_it_cannot_read(
+    forked: ForkedScratchRepository,
+):
+    fork_tip = forked.fork_default_branch_tip()
+    forked.advance_upstream(1)
+
+    report = sync(forked, a_private_upstream_with(visibility_client()))
+
+    assert report.fork_fast_forward is FastForwardOutcome.REFUSED_WIDER_VISIBILITY
+    assert forked.fork_default_branch_tip() == fork_tip
+
+
+def test_publishes_a_private_upstream_base_to_a_private_fork(
+    forked: ForkedScratchRepository,
+):
+    upstream_tip = forked.advance_upstream(1)
+
+    report = sync(
+        forked, a_private_upstream_with(visibility_client(private=[FORK_REPOSITORY]))
+    )
+
+    assert report.fork_fast_forward is FastForwardOutcome.PUSHED
+    assert forked.fork_default_branch_tip() == upstream_tip
+
+
+def test_publishes_a_public_upstream_base_to_a_fork_whatever_it_is(
+    forked: ForkedScratchRepository,
+):
+    upstream_tip = forked.advance_upstream(1)
+
+    report = sync(forked, visibility_client(public=[UPSTREAM_REPOSITORY]))
+
+    assert report.fork_fast_forward is FastForwardOutcome.PUSHED
+    assert forked.fork_default_branch_tip() == upstream_tip
 
 
 # %% the session-start line

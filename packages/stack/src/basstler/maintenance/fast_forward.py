@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from basstler.git.commands import GitCommandRunner, ProposedPush
+from basstler.github.client import GitHubAttemptReader
+from basstler.maintenance.push_visibility import PushVisibilityGuard
 from basstler.stack.settings import Configuration
 
 
@@ -38,6 +40,11 @@ class FastForwardOutcome(StrEnum):
     PUSH_REFUSED = "push-refused"
     """
     The fork rejected the push, so it is still behind the upstream.
+    """
+
+    REFUSED_WIDER_VISIBILITY = "refused-wider-visibility"
+    """
+    The fork is not known to be as private as the upstream, so nothing was pushed.
     """
 
 
@@ -114,6 +121,11 @@ class ForkBaseFastForward:
     The base branch, by the name the upstream and the fork share.
     """
 
+    visibility: PushVisibilityGuard
+    """
+    Stops the push when it would publish the upstream's commits more widely.
+    """
+
     refused_push: RefusedPushHandling
     """
     What the fork rejecting the push does to the caller.
@@ -156,6 +168,13 @@ class ForkBaseFastForward:
                     f"resolve this by hand rather than forcing"
                 ),
             )
+        if (wider_visibility := self.visibility.refusal()) is not None:
+            return self.report(
+                FastForwardOutcome.REFUSED_WIDER_VISIBILITY,
+                upstream_reference,
+                fork_commit,
+                explanation=wider_visibility,
+            )
         pushed = self.git.push(
             ProposedPush(
                 remote=self.fork_remote,
@@ -196,7 +215,7 @@ class ForkBaseFastForward:
 
 
 def fast_forward(
-    configuration: Configuration, git: GitCommandRunner
+    configuration: Configuration, git: GitCommandRunner, github: GitHubAttemptReader
 ) -> FastForwardReport:
     """
     Fetch the upstream's base, then move the fork's copy of it onto the upstream's tip.
@@ -207,6 +226,7 @@ def fast_forward(
 
     :param configuration: The resolved configuration.
     :param git: The runner to execute through.
+    :param github: How the repositories' visibility is read.
     :return: What was done.
     :raises GitCommandFailed: If the fork rejects the push.
     """
@@ -219,5 +239,10 @@ def fast_forward(
         git,
         configuration.fork_remote,
         configuration.upstream_base,
+        PushVisibilityGuard(
+            github,
+            configuration.upstream_repository or configuration.fork_repository,
+            configuration.fork_repository,
+        ),
         RefusedPushHandling.RAISED,
     ).onto(f"{configuration.upstream_remote}/{configuration.upstream_base}")

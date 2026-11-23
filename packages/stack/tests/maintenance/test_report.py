@@ -49,6 +49,7 @@ from basstler_testing.maintenance.fork import (
     a_stack,
     an_api_record,
     an_export,
+    client_seeing_a_public_upstream,
     make_configuration,
     the_board,
 )
@@ -72,7 +73,9 @@ def test_the_report_serialises_every_command_s_outcome(fork_checkout: ForkChecko
 
     report = MaintenanceReport.of_pass(
         stack,
-        fast_forward(make_configuration(), fork_checkout.git),
+        fast_forward(
+            make_configuration(), fork_checkout.git, client_seeing_a_public_upstream()
+        ),
         restack(stack, fork_checkout.git, RecordingPullRequests()),
     )
     document = json.loads(report.as_json())

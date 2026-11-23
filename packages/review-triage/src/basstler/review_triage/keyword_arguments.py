@@ -562,6 +562,7 @@ class KeywordArgumentComparison(PythonComparison):
             imports=NameScope.from_imports(base.renamed_tree(context.renames)),
             file_definitions=DefinitionIndex(SourceDefinitions((base.text,))),
             module=base,
+            revealed_receivers=context.revealed_receivers,
         )
         if not matcher.matches(base_tree, head.code_tree(RenameMap())):
             return None

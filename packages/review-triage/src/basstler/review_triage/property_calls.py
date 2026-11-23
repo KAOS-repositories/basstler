@@ -194,7 +194,7 @@ class PropertyCall(Finding):
         ]
         if decorated:
             return self.reason(UnprovenReplacement.DECORATED_METHOD, decorated)
-        unreproduced = self.unreproduced(properties, methods, renames)
+        unreproduced = self.unreproduced(properties, methods, readers, renames)
         if not unreproduced:
             return None
         if base_target.known_by_name_only(readers.base):
@@ -205,26 +205,29 @@ class PropertyCall(Finding):
     def unreproduced(
         properties: list[ReachableDefinition],
         methods: list[ReachableDefinition],
+        readers: CommitReaders,
         renames: RenameMap,
     ) -> list[ReachableDefinition]:
         """
         :param properties: The properties the base commit's read may reach.
         :param methods: The methods the head commit's call may reach.
+        :param readers: The readers of both commits.
         :param renames: The renames the pull request makes throughout.
         :return: The properties no method reproduces under its renamed name, or, when
             there are none, the methods reproducing no property.
         """
         renamed_properties = {
             (
-                renames.renamed_identifier(found.qualified_name),
-                found.definition.undecorated_code(renames),
+                renames.renamed_identifier(renamed.qualified_name),
+                renamed.bare_code(renames),
             ): found
             for found in properties
+            if (renamed := readers.renamed_base_definition(found.definition))
         }
         method_codes = {
             (
                 found.qualified_name,
-                found.definition.undecorated_code(RenameMap()),
+                found.definition.bare_code(RenameMap()),
             ): found
             for found in methods
         }

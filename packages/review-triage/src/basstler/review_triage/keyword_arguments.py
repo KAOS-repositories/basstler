@@ -568,6 +568,7 @@ class KeywordArgumentComparison(PythonComparison):
         readers = CommitReaders(
             SignatureReader(context.base_definitions, self.decorators),
             SignatureReader(context.head_definitions, self.decorators),
+            context.member_renamer,
         )
         renames = context.renames
         readers.base.definitions.load(

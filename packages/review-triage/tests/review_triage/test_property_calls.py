@@ -5,6 +5,10 @@ commits.
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
+
+import pytest
+
 from basstler.review_triage.comparison import (
     FileTriager,
     FileVerdict,
@@ -20,8 +24,11 @@ from basstler.review_triage.property_calls import (
     UnprovenReplacement,
 )
 from basstler.review_triage.renames import RenameMap
+from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
-from .samples import FileSample
+from basstler_testing.scratch_repository import ScratchRepository
+from .conftest import committed_pull_request
+from .samples import FileSample, PropertyBindingRenameSample
 
 # %% verdicts
 
@@ -173,4 +180,61 @@ def test_a_call_reaching_only_abstract_methods_is_the_reason_for_review(
             "return pose.to_transform()",
             "return pose.to_transform().entries",
         )
+    )
+
+
+# %% properties of classes renamed in their module
+
+
+@pytest.fixture
+def property_binding_rename_triage(
+    scratch_repository: ScratchRepository,
+) -> TriageOutcome:
+    """
+    :return: The sample renaming the classes whose properties become methods, triaged.
+    """
+    return PullRequestTriager().triage(
+        committed_pull_request(
+            scratch_repository,
+            PropertyBindingRenameSample.BASE_TREE,
+            PropertyBindingRenameSample.HEAD_TREE,
+        )
+    )
+
+
+def test_a_property_of_a_renamed_class_reproduced_under_its_renames_is_mechanical(
+    property_binding_rename_triage: TriageOutcome,
+):
+    """
+    A method reproduces the property of a class its module renames once the names its
+    body proves bound to renamed members are renamed, whatever its docstring.
+    """
+    assert {
+        file.change.path: file.kinds
+        for file in property_binding_rename_triage.mechanical_files
+    }[PurePosixPath("app/placement.py")] == frozenset(
+        {PropertyCallChange.PROPERTIES_CALLED, MechanicalChange.RENAME}
+    )
+
+
+def test_a_property_naming_an_unrelated_class_of_a_renamed_name_needs_review(
+    property_binding_rename_triage: TriageOutcome,
+):
+    """
+    A property building an unrelated class of the renamed class's old name is not
+    reproduced by a method building the renamed class.
+    """
+    (verdict,) = (
+        file
+        for file in property_binding_rename_triage.files_needing_review
+        if file.change.path == PurePosixPath("app/planar_placement.py")
+    )
+    assert verdict.reasons == (
+        UnprovenPropertyCall(
+            verdict.change.head_text.splitlines().index("    return pose.transform()")
+            + 1,
+            "transform",
+            UnprovenReplacement.NOT_REPRODUCED,
+            ("PlanarPose.transform",),
+        ),
     )

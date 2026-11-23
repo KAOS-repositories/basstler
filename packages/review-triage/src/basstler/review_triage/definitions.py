@@ -210,15 +210,17 @@ class FunctionDefinition:
             return self.name
         return f"{self.owner}{DOTTED_NAME_SEPARATOR}{self.name}"
 
-    def undecorated_code(self, renames: RenameMap) -> str:
+    def bare_code(self, renames: RenameMap) -> str:
         """
         :param renames: The renames to apply first.
-        :return: The definition without its decorators, as :meth:`PythonSource.code`
-            gives a file's code.
+        :return: The definition without its decorators and its docstring, as
+            :meth:`PythonSource.code` gives a file's code.
         """
-        undecorated = copy.copy(self.node)
-        undecorated.decorator_list = []
-        return PythonSource.from_text(ast.unparse(undecorated)).code(renames)
+        bare = copy.copy(self.node)
+        bare.decorator_list = []
+        if ast.get_docstring(self.node, clean=False) is not None and len(bare.body) > 1:
+            bare.body = bare.body[1:]
+        return PythonSource.from_text(ast.unparse(bare)).code(renames)
 
 
 @dataclass(frozen=True, slots=True)
@@ -781,6 +783,24 @@ class DefinitionIndex:
             )
         for file in files:
             yield from self.by_file[file]
+
+    def file_defining(self, definition: FunctionDefinition) -> str | None:
+        """
+        :param definition: A function or method read from one of this commit's files.
+        :return: The key of that file, ``None`` when no file read so far holds it.
+        """
+        return next(
+            (
+                key
+                for key, found in self.by_file.items()
+                if any(
+                    isinstance(candidate, FunctionDefinition)
+                    and candidate.node is definition.node
+                    for candidate in found
+                )
+            ),
+            None,
+        )
 
     def load(self, names: frozenset[str]) -> None:
         """

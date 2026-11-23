@@ -476,6 +476,21 @@ class BindingRenameSample(SampleTrees):
         return "binding-rename"
 
 
+class PropertyBindingRenameSample(SampleTrees):
+    """
+    A pull request renaming module classes and turning their properties into methods:
+    one reproducing its property under the renames, one whose body names an unrelated
+    class of the renamed class's old name.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "property-read-renamed-by-binding"
+
+
 class AttributeRenameSample(SampleTrees):
     """
     A pull request renaming methods and attributes of classes, with the same names on

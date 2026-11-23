@@ -13,7 +13,8 @@ from functools import cached_property
 from basstler.class_property import classproperty
 from basstler.review_triage.calls import CallScope
 from basstler.review_triage.comparison import ChangeKind, ReviewReason
-from basstler.review_triage.definitions import DefinitionIndex
+from basstler.review_triage.definitions import DefinitionIndex, FunctionDefinition
+from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.name_scopes import SCOPED_FIELDS, NameScope
 from basstler.review_triage.python_source import ImportBindings, PythonSource
 from basstler.review_triage.renames import RenameMap
@@ -37,6 +38,24 @@ class CommitReaders:
     """
     Reads the head commit's signatures.
     """
+
+    member_renamer: MemberRenamer | None = None
+    """
+    Renames the base commit's proven occurrences of the module members the pull request
+    renames; ``None`` when it renames none.
+    """
+
+    def renamed_base_definition(
+        self, definition: FunctionDefinition
+    ) -> FunctionDefinition:
+        """
+        :param definition: A function or method :attr:`base` read.
+        :return: It as :meth:`MemberRenamer.renamed_definition` reads it, itself when
+            the pull request renames no module member.
+        """
+        if self.member_renamer is None:
+            return definition
+        return self.member_renamer.renamed_definition(definition, self.base.definitions)
 
 
 # %% findings

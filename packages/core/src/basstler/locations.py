@@ -411,6 +411,11 @@ class InstructionsTemplate(PathEnumeration):
     The content of ``AGENTS.md``: rules under the headings of their sections.
     """
 
+    SKILL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "skill.md.jinja")
+    """
+    The content of a skill's ``SKILL.md``: its frontmatter and title above its body.
+    """
+
 
 class PlanHandoverLocation(PathEnumeration):
     """
@@ -542,6 +547,11 @@ class PluginLocation(PathEnumeration):
     The helper that creates the personal-notes branch where it does not exist yet.
     """
 
+    HOOK_REGISTRATIONS = HOOKS / "hooks.json"
+    """
+    The hooks the plugin registers with Claude Code, generated from the playbook.
+    """
+
     ENTRY_POINT_SCRIPT = HOOKS / "basstler.sh"
     """
     Runs one module of the package once the package is ready to run, saying in one
@@ -654,6 +664,17 @@ class PluginSkillLocation(PathEnumeration):
     """
 
 
+class SkillLocation(PathEnumeration):
+    """
+    The files every skill carries, relative to the skill's own directory.
+    """
+
+    INSTRUCTIONS = Path("SKILL.md")
+    """
+    The instructions Claude Code loads the skill from.
+    """
+
+
 class ProjectLocation(PathEnumeration):
     """
     The files this package reads, runs or writes in a project, relative to its root.
@@ -758,6 +779,11 @@ class ProjectLocation(PathEnumeration):
     AGENTS_INSTRUCTIONS = Path("AGENTS.md")
     """
     The instructions agents read, generated from :mod:`basstler.code_rules.rules`.
+    """
+
+    PLAYBOOK = Path("basstler_playbook.py")
+    """
+    The module declaring the project's own playbook, where it has one.
     """
 
 

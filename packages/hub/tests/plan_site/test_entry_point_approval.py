@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 import basstler.plan_site.entry_point_approval
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import BuiltInTool
 from basstler.locations import BasstlerVariable, PluginLocation
 from basstler.maintenance.commands import FastForwardCommand, RestackCommand
 from basstler.plan_site.attach_approval import AttachAnswer, PermissionDecision
@@ -42,7 +42,7 @@ The entry point script as a skill writes it.
 """
 
 
-def shell(command: str, tool: str = SessionTool.RUN_SHELL_COMMAND) -> ShellCall:
+def shell(command: str, tool: str = BuiltInTool.RUN_SHELL_COMMAND) -> ShellCall:
     """
     :param command: The command line the call runs.
     :param tool: The tool called.
@@ -248,7 +248,7 @@ def test_another_tool_is_left_alone(invocation: EntryPointInvocation):
     """
     command = f'"{ENTRY_POINT}" maintenance'
 
-    assert invocation.permit(shell(command, tool=SessionTool.ASK_USER)) is None
+    assert invocation.permit(shell(command, tool=BuiltInTool.ASK_USER)) is None
 
 
 # %% registering the hook
@@ -271,7 +271,7 @@ def test_the_plugin_runs_the_hook_before_the_shell_tool():
     (registration,) = [
         entry
         for entry in manifest["hooks"][HOOK_EVENT]
-        if entry["matcher"] == SessionTool.RUN_SHELL_COMMAND
+        if entry["matcher"] == BuiltInTool.RUN_SHELL_COMMAND
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(

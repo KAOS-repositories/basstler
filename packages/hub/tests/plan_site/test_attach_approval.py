@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from basstler.github.repository import Repository
-from basstler.github.repository_attachment import SessionTool
+from basstler.session_tool import BuiltInTool, CloudSessionTool
 import basstler.plan_site.attach_approval
 from basstler.locations import BasstlerVariable, PluginLocation
 from basstler.plan_site.attach_approval import (
@@ -42,7 +42,7 @@ A user whose plan site and notes live in separate repositories.
 
 
 def attach(
-    repository: Repository, tool: str = SessionTool.ATTACH_REPOSITORY
+    repository: Repository, tool: str = CloudSessionTool.ATTACH_REPOSITORY
 ) -> ToolCall:
     """
     :param repository: The repository the call asks to attach.
@@ -118,7 +118,7 @@ def test_another_tool_is_left_alone():
     """
     Only the attach tool is allowed, whatever its input names.
     """
-    assert PLANS.permit(attach(SITE, tool=SessionTool.ASK_USER)) is None
+    assert PLANS.permit(attach(SITE, tool=BuiltInTool.ASK_USER)) is None
 
 
 def test_a_user_with_no_recorded_repositories_is_never_allowed_anything():
@@ -148,7 +148,7 @@ def test_the_plugin_runs_the_hook_before_the_attach_tool_and_nothing_else():
     (registration,) = [
         entry
         for entry in manifest["hooks"][HOOK_EVENT]
-        if entry["matcher"] == SessionTool.ATTACH_REPOSITORY
+        if entry["matcher"] == CloudSessionTool.ATTACH_REPOSITORY
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(

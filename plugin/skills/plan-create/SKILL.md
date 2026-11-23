@@ -4,7 +4,7 @@ description: Create a multi-PR plan on the personal-notes branch, or migrate a r
 allowed-tools: Bash, Read, Write, Grep, Glob, AskUserQuestion, Skill, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__issue_write, mcp__github__create_pull_request, mcp__claude-code-remote__subscribe_pr_activity
 ---
 
-# Plan Create
+# Plan create
 
 Run commands as [`running-commands.md`](../running-commands.md) says, with
 `${CLAUDE_PLUGIN_ROOT}` as the `${BASSTLER_PLUGIN_ROOT}` it and every linked document name.

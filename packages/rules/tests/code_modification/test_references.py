@@ -14,7 +14,7 @@ from basstler.class_property import classproperty
 from basstler.code_modification.patterns import CodePattern
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.references import ReferenceTo
-from basstler.code_modification.source_file import PythonSourceFile
+from basstler.code_modification.source_file import EditablePythonSourceFile
 
 from basstler_testing.constants.paths import TreeRemovalSnippet
 
@@ -47,7 +47,7 @@ def sources_found(pattern: type[CodePattern], snippet: TreeRemovalSnippet) -> li
     """
     :return: The source text of each node of *snippet* that has the shape of *pattern*.
     """
-    positioned = PositionedModule(PythonSourceFile(snippet).parse())
+    positioned = PositionedModule(EditablePythonSourceFile(snippet).parse())
     return [
         libcst.Module([]).code_for_node(occurrence.node)
         for occurrence in pattern.found_in(positioned)

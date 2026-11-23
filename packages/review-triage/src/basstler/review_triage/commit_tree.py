@@ -12,6 +12,7 @@ from pathlib import PurePosixPath
 
 from basstler.git.commands import GitCommandResult
 from basstler.git.commit_tree import CommitTree, GitGrepExitCode
+from basstler.locations import PythonProjectDeclaration, PythonProjectLocation
 from basstler.review_triage.definitions import DefinitionSearch
 from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR
 
@@ -136,10 +137,16 @@ class CommitModules(DefinitionSearch):
     def module_path(self, path: PurePosixPath) -> str:
         """
         :param path: A module's file.
-        :return: The dotted path the module is imported by, through every enclosing
-            directory that is a package.
+        :return: The dotted path the module is imported by: from the sources directory
+            of the innermost project of the ``src`` layout holding it, namespace
+            packages included, else through every enclosing directory that is a
+            package.
         """
         components = [] if path.name == PACKAGE_INITIALIZER else [path.stem]
+        sources = self.sources_directory(path)
+        if sources is not None:
+            packages = path.parent.relative_to(sources).parts
+            return DOTTED_NAME_SEPARATOR.join((*packages, *components))
         package = path.parent
         while package != PurePosixPath(".") and self.tree.holds(
             package / PACKAGE_INITIALIZER
@@ -147,6 +154,20 @@ class CommitModules(DefinitionSearch):
             components.insert(0, package.name)
             package = package.parent
         return DOTTED_NAME_SEPARATOR.join(components)
+
+    def sources_directory(self, path: PurePosixPath) -> PurePosixPath | None:
+        """
+        :param path: A file of the commit.
+        :return: The innermost directory above it that is the sources directory of a
+            project of the ``src`` layout, ``None`` when there is none.
+        """
+        for directory in path.parents:
+            if directory.name == PythonProjectLocation.SOURCES.name and any(
+                self.tree.holds(directory.parent / declaration)
+                for declaration in PythonProjectDeclaration
+            ):
+                return directory
+        return None
 
     def package(self, path: PurePosixPath) -> tuple[str, ...]:
         """

@@ -193,6 +193,40 @@ class WorkspaceLocation(PathEnumeration):
     """
 
 
+class PythonProjectDeclaration(PathEnumeration):
+    """
+    A file any Python project may declare itself in, relative to the project's
+    directory; any one of them makes the directory a project's.
+    """
+
+    PYPROJECT = Path("pyproject.toml")
+    """
+    The project metadata modern build backends read.
+    """
+
+    SETUP_SCRIPT = Path("setup.py")
+    """
+    The script a setuptools project declares itself in.
+    """
+
+    SETUP_CONFIGURATION = Path("setup.cfg")
+    """
+    The configuration a setuptools project declares itself in.
+    """
+
+
+class PythonProjectLocation(PathEnumeration):
+    """
+    Where any Python project keeps its parts, relative to the project's directory.
+    """
+
+    SOURCES = Path("src")
+    """
+    The directory a project of the ``src`` layout keeps its importable packages in,
+    itself put on the import path.
+    """
+
+
 class SinglePackageLocation(PathEnumeration):
     """
     Where the package kept its modules and tests before the workspace split it into a

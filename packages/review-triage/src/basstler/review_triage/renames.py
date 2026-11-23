@@ -76,6 +76,13 @@ class ModuleMember:
     The name the module binds.
     """
 
+    @property
+    def dotted_path(self) -> str:
+        """
+        The dotted path the name is imported by.
+        """
+        return f"{self.module}{DOTTED_NAME_SEPARATOR}{self.member_name}"
+
 
 @dataclass(frozen=True)
 class ClassAttribute:
@@ -190,6 +197,41 @@ class AttributeRename(BindingRename):
     @property
     def definition(self) -> ClassAttribute:
         return self.attribute
+
+
+@dataclass(frozen=True)
+class AttributeMove(BindingRename):
+    """
+    A class attribute moved, under its own name, into another module's top-level
+    class: what reads it from its old class reads it from the new one instead.
+    """
+
+    attribute: ClassAttribute = field(kw_only=True)
+    """
+    The attribute moved, as the base commit names it.
+    """
+
+    new_owner: ModuleMember = field(kw_only=True)
+    """
+    The class it moved into, as the head commit names it.
+    """
+
+    @property
+    def definition(self) -> ClassAttribute:
+        return self.attribute
+
+    @property
+    def prose_rename(self) -> Rename:
+        """
+        The attribute read from its class's name, as prose writes it, before and after
+        the move.
+        """
+        name = self.attribute.attribute_name
+        return Rename(
+            f"{self.attribute.owner.member_name}.{name}",
+            f"{self.new_owner.member_name}.{name}",
+            self.found_by,
+        )
 
 
 @dataclass(frozen=True)

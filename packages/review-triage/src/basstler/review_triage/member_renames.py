@@ -29,13 +29,25 @@ from basstler.review_triage.referents import (
     ModuleNames,
     Referent,
 )
+from basstler.review_triage.python_source import (
+    ImportBinding,
+    OwnerImports,
+    PythonSource,
+)
 from basstler.review_triage.renames import (
+    AttributeMove,
     BindingRename,
     ClassAttribute,
     ModuleMember,
     Rename,
+    RenameDecisions,
     RenameMap,
 )
+
+DUNDER_ALL = "__all__"
+"""
+The name a module lists the names it exports in.
+"""
 
 DEFINITION_KEYWORDS = re.compile(r"(?:async\s+)?(?:def|class)\s+")
 """
@@ -195,9 +207,19 @@ class OccurrenceSearch(ast.NodeVisitor):
     methods of :attr:`class_bodies`.
     """
 
+    moves: dict[str, tuple[AttributeMove, ...]] = field(default_factory=dict)
+    """
+    The attribute moves searched for, by the attribute's name.
+    """
+
     edits: list[TextEdit] = field(default_factory=list)
     """
     The occurrences found, each with its new name.
+    """
+
+    applied_moves: set[AttributeMove] = field(default_factory=set)
+    """
+    The attribute moves an occurrence of which was found.
     """
 
     def search(self) -> list[TextEdit]:
@@ -333,11 +355,40 @@ class OccurrenceSearch(ast.NodeVisitor):
             from that definition's module, its class, an instance of the class as a
             method receives it, or ``super()`` in a method of a subclass.
         """
+        move = self.move_read_by(node)
+        if move is not None:
+            self.edits.append(
+                TextEdit(
+                    self.positions.node_offset(
+                        node.value.lineno, node.value.col_offset
+                    ),
+                    self.positions.node_offset(
+                        node.value.end_lineno, node.value.end_col_offset
+                    ),
+                    move.new_owner.member_name,
+                )
+            )
+            self.applied_moves.add(move)
+            return
         self.visit(node.value)
         if node.attr not in self.renames:
             return
         end = self.positions.node_offset(node.end_lineno, node.end_col_offset)
         self.record(node.attr, end - len(node.attr), self.attribute_referent(node))
+
+    def move_read_by(self, node: ast.Attribute) -> AttributeMove | None:
+        """
+        :param node: An attribute.
+        :return: The move of the attribute it reads, when it reads it from the old class
+            itself by a chain of names, ``None`` otherwise.
+        """
+        if not isinstance(node.value, ast.Name | ast.Attribute):
+            return None
+        moves = self.moves.get(node.attr, ())
+        if not moves:
+            return None
+        owner = self.expression_referent(node.value)
+        return next((move for move in moves if move.attribute.owner == owner), None)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         """
@@ -474,6 +525,11 @@ class RenamedBase:
     occurrence of which in its code is proven to refer to one renamed member.
     """
 
+    owner_imports: OwnerImports = OwnerImports()
+    """
+    The imports its renamed code gains and may lose for the attribute moves applied.
+    """
+
 
 @dataclass(frozen=True)
 class MemberRenamer:
@@ -539,18 +595,87 @@ class MemberRenamer:
         tokens = tuple(tokenize.generate_tokens(io.StringIO(code).readline))
         used_names = {token.string for token in tokens if token.type == tokenize.NAME}
         renames: dict[str, tuple[BindingRename, ...]] = {}
+        moves: dict[str, tuple[AttributeMove, ...]] = {}
         for rename in mentioned:
-            if rename.new_name not in used_names:
-                old = rename.old_name
+            old = rename.old_name
+            if isinstance(rename, AttributeMove):
+                if self.can_read_new_owner(rename, names, used_names):
+                    moves[old] = (*moves.get(old, ()), rename)
+            elif rename.new_name not in used_names:
                 renames[old] = (*renames.get(old, ()), rename)
-        if not renames:
+        if not renames and not moves:
             return RenamedBase(text)
         positions = SourcePositions(code)
-        edits = OccurrenceSearch(self.resolver, names, renames, positions).search()
+        search = OccurrenceSearch(self.resolver, names, renames, positions, moves=moves)
+        edits = search.search()
+        prose_renames = self.prose_renames(tokens, positions, edits, renames)
         return RenamedBase(
             self.edited(text, edits),
-            self.prose_renames(tokens, positions, edits, renames),
+            RenameMap.from_decisions(
+                [
+                    RenameDecisions(prose_renames.renames),
+                    RenameDecisions(
+                        tuple(move.prose_rename for move in search.applied_moves)
+                    ),
+                ]
+            ),
+            self.owner_imports(
+                names, self.edited(code, edits), is_package, search.applied_moves
+            ),
         )
+
+    def can_read_new_owner(
+        self, move: AttributeMove, names: ModuleNames, used_names: set[str]
+    ) -> bool:
+        """
+        :param move: An attribute move a file's code mentions.
+        :param names: The file.
+        :param used_names: The names its code uses.
+        :return: Whether its code can name the new class by its own name: the name
+            unused, or bound to that class already.
+        """
+        new_name = move.new_owner.member_name
+        return new_name not in used_names or (
+            self.resolver.top_level_referent(names, new_name) == move.new_owner
+        )
+
+    def owner_imports(
+        self,
+        names: ModuleNames,
+        renamed_code: str,
+        is_package: bool,
+        moves: set[AttributeMove],
+    ) -> OwnerImports:
+        """
+        :param names: A file's base version.
+        :param renamed_code: Its code once the attribute moves are applied.
+        :param is_package: Whether it is a package initializer.
+        :param moves: The attribute moves applied to it.
+        :return: The new classes its renamed code reads, and the imports of the old
+            classes it no longer reads that no other module may read from it either;
+            none of those for a package initializer, a module listing ``__all__`` or
+            one of unknown dotted path.
+        """
+        bindings = names.source.import_bindings.bindings
+        added = frozenset(
+            ImportBinding(move.new_owner.member_name, move.new_owner.dotted_path)
+            for move in moves
+            if move.new_owner.member_name not in names.scope.bindings
+        )
+        if is_package or not names.module or DUNDER_ALL in names.scope.bindings:
+            return OwnerImports(added)
+        still_read = PythonSource.from_text(renamed_code).referenced_names(RenameMap())
+        old_owners = {move.attribute.owner.dotted_path for move in moves}
+        droppable = frozenset(
+            binding
+            for binding in bindings
+            if binding.source in old_owners
+            and binding.bound_name not in still_read
+            and not self.resolver.is_imported_elsewhere(
+                ModuleMember(names.module, binding.bound_name)
+            )
+        )
+        return OwnerImports(added, droppable)
 
     @staticmethod
     def prose_renames(

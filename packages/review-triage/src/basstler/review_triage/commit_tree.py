@@ -43,6 +43,11 @@ IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 Matches a Python name.
 """
 
+FILE_KEY_SEPARATOR = ":"
+"""
+What separates the commit from the file's path in the key a file is read by.
+"""
+
 FILE_NAME_TERMINATOR = "\0"
 """
 What ``git grep --null`` ends the file name of each line it prints with.
@@ -191,7 +196,7 @@ class CommitModules(DefinitionSearch):
         for path in sorted(self.tree.file_paths):
             if path.suffix == MODULE_SUFFIX:
                 files.setdefault(self.module_path(path), []).append(
-                    f"{self.tree.commit}:{path}"
+                    f"{self.tree.commit}{FILE_KEY_SEPARATOR}{path}"
                 )
         return {module: tuple(keys) for module, keys in files.items()}
 
@@ -215,7 +220,7 @@ class CommitModules(DefinitionSearch):
         )
         files: dict[str, dict[str, None]] = {}
         for line in self.listed_lines(search):
-            file, definition = line.rsplit(":", 1)
+            file, definition = line.rsplit(FILE_KEY_SEPARATOR, 1)
             files.setdefault(definition.split()[-1], {})[file] = None
         return {name: tuple(listed) for name, listed in files.items()}
 
@@ -276,6 +281,25 @@ class CommitModules(DefinitionSearch):
                 (*self.files_by_base.get(name, ()), *self.files_with_unlisted_bases)
             )
         )
+
+    def files_naming(self, word: str) -> tuple[str, ...]:
+        """
+        :param word: A Python name.
+        :return: The key of every Python file of the commit naming it as a whole word.
+        :raises GitCommandFailed: If the search itself fails.
+        """
+        search = self.tree.git.attempt(
+            "grep",
+            "--files-with-matches",
+            "--word-regexp",
+            "--fixed-strings",
+            "-e",
+            word,
+            self.tree.commit,
+            "--",
+            *PYTHON_FILE_PATTERNS,
+        )
+        return self.listed_lines(search)
 
     def texts_of(self, files: tuple[str, ...]) -> dict[str, str]:
         return self.tree.git.object_texts(files)

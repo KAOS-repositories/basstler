@@ -14,7 +14,11 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import PurePosixPath
 
-from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER, CommitModules
+from basstler.review_triage.commit_tree import (
+    FILE_KEY_SEPARATOR,
+    PACKAGE_INITIALIZER,
+    CommitModules,
+)
 from basstler.review_triage.name_scopes import (
     AssignedValue,
     DeclaredType,
@@ -459,6 +463,25 @@ class MemberResolver:
             return self.attribute_owner(value, attribute_name)
         return None
 
+    def is_imported_elsewhere(self, member: ModuleMember) -> bool:
+        """
+        :param member: A name a module of the commit binds at its top level.
+        :return: Whether another Python file of the commit imports that name from the
+            module, or may: one that does not parse counts as one that does.
+        """
+        for key in self.modules.files_naming(member.member_name):
+            path = PurePosixPath(key.partition(FILE_KEY_SEPARATOR)[2])
+            if self.modules.module_path(path) == member.module:
+                continue
+            source = PythonSource.from_text(
+                self.modules.texts_of((key,))[key], self.modules.package(path)
+            )
+            if not source.parses or member.dotted_path in {
+                binding.source for binding in source.import_bindings.bindings
+            }:
+                return True
+        return False
+
     # %%% classes
 
     def class_definition(self, member: ModuleMember) -> ast.ClassDef | None:
@@ -677,7 +700,7 @@ class MemberResolver:
         """
         if node not in tree.body:
             return None
-        path = key.partition(":")[2]
+        path = key.partition(FILE_KEY_SEPARATOR)[2]
         module = self.modules.module_path(PurePosixPath(path))
         member = ModuleMember(module, node.name)
         return member if self.class_definition(member) is not None else None

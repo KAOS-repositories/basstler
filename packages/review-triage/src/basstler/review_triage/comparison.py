@@ -16,7 +16,7 @@ from basstler.git.commit_range import FileVersions
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER, CommitModules
 from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.moved_definitions import MovedDefinitions
-from basstler.review_triage.python_source import PythonSource
+from basstler.review_triage.python_source import OwnerImports, PythonSource
 from basstler.review_triage.renames import RenameDecisions, RenameMap
 from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
@@ -242,6 +242,12 @@ class JudgmentContext:
     and the comments on their own.
     """
 
+    owner_imports: OwnerImports = OwnerImports()
+    """
+    The imports the file being judged gains and may lose for the attribute moves its
+    base version was renamed for.
+    """
+
     review_reasons: list[ReviewReason] = field(
         default_factory=list, compare=False, hash=False, repr=False, kw_only=True
     )
@@ -426,8 +432,10 @@ class PythonComparison(ContentComparison):
         kinds = self.source_changes(base, head, context)
         if kinds is None or MechanicalChange.IMPORTS not in kinds:
             return kinds
-        base_imports = base.imports(context.renames)
         head_imports = head.import_bindings
+        base_imports = context.owner_imports.applied_to(
+            base.imports(context.renames), head_imports
+        )
         if not (
             base_imports.binds_only_respellings(
                 head_imports, base.referenced_names(context.renames)
@@ -631,6 +639,7 @@ class FileTriager:
             replace(
                 self.context,
                 optional_prose_renames=renamed.prose_renames,
+                owner_imports=renamed.owner_imports,
                 review_reasons=[],
             ),
         )

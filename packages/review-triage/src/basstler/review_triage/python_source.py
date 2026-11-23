@@ -491,6 +491,42 @@ class ImportBindings:
         )
 
 
+@dataclass(frozen=True)
+class OwnerImports:
+    """
+    The imports a file's version renamed for attribute moves gains and may lose: the
+    new class of each moved attribute it reads, and an old class it reads nothing else
+    of.
+    """
+
+    added: frozenset[ImportBinding] = frozenset()
+    """
+    The bindings of the classes the moved attributes are read from instead.
+    """
+
+    droppable: frozenset[ImportBinding] = frozenset()
+    """
+    The bindings of the classes the moved attributes left that nothing else reads, in
+    the file or from it.
+    """
+
+    def applied_to(
+        self, bindings: ImportBindings, other: ImportBindings
+    ) -> ImportBindings:
+        """
+        :param bindings: The bindings of the renamed version.
+        :param other: The bindings of the version it is compared with.
+        :return: *bindings* with each added binding *other* binds too, and without each
+            droppable one *other* does not bind.
+        """
+        kept = {
+            binding
+            for binding in bindings.bindings
+            if binding not in self.droppable or binding.bound_name in other.bound_names
+        }
+        return ImportBindings(frozenset(kept | (self.added & other.bindings)))
+
+
 # %% a run of lines
 
 

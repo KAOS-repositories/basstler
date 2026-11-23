@@ -4,7 +4,7 @@ description: Pin whether kickoff and resolve implement directly (auto), present 
 allowed-tools: Bash, Read
 ---
 
-# Plan Item Mode
+# Plan item mode
 
 Run commands as [`running-commands.md`](../running-commands.md) says, with
 `${CLAUDE_PLUGIN_ROOT}` as the `${BASSTLER_PLUGIN_ROOT}` it and every linked document name.

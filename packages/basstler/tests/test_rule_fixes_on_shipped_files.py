@@ -18,6 +18,8 @@ def test_a_checker_that_skips_a_file_fixes_nothing_in_it():
     """
     source_file = EditablePythonSourceFile(PackageLocation.UPSTREAM_REVIEWS_FETCH)
 
-    fixed = SourceFixer((TextFileChecker(),)).fix_module(source_file)
+    fixed = SourceFixer((TextFileChecker(),)).fix_module(
+        source_file.parse(), source_file.path
+    )
 
     assert fixed.result.code == source_file.read()

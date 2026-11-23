@@ -15,7 +15,7 @@ import re
 import pytest
 
 from basstler.document_references import PACKAGE_NAME, CitedNames
-from basstler.locations import PluginLocation
+from basstler.locations import PluginLocation, PluginFile
 from basstler.plan.locations import PlanPluginLocation
 
 from basstler_testing.constants.paths import (
@@ -95,7 +95,7 @@ def test_the_starter_notes_do_not_name_the_package_or_its_local_file(name: str):
     ],
 )
 def test_the_session_rules_carry_the_instruction_that_names_each_script(
-    script: PluginLocation,
+    script: PluginFile,
 ):
     rules = (RepositoryLocation.PLUGIN / PluginLocation.SESSION_RULES).read_text(
         encoding="utf-8"

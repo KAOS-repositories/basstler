@@ -120,9 +120,15 @@ class GitHubCredentialVariable(CredentialOrigin, EnvironmentVariable):
         return None if variable is None else variable.read()
 
 
-class GitHubActionsVariable(EnvironmentVariable):
+class GitHubActionsRunnerVariable(EnvironmentVariable):
     """
-    The variables a GitHub Actions runner sets for the steps it runs.
+    An environment variable a GitHub Actions runner sets for the steps it runs.
+    """
+
+
+class GitHubActionsVariable(GitHubActionsRunnerVariable):
+    """
+    The runner's variables several distributions read.
     """
 
     STEP_SUMMARY = "GITHUB_STEP_SUMMARY"

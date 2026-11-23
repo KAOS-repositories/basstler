@@ -4,13 +4,12 @@ The environment variables the GitHub client reads.
 
 from __future__ import annotations
 
-from basstler.environment import EnvironmentVariable
+from basstler.environment import GitHubActionsRunnerVariable
 
 
-class GitHubActionsOutputVariable(EnvironmentVariable):
+class GitHubActionsOutputVariable(GitHubActionsRunnerVariable):
     """
-    The variable a GitHub Actions runner sets that names the file a step's outputs go
-    to.
+    The runner's variable naming the file a step's outputs go to.
     """
 
     OUTPUT = "GITHUB_OUTPUT"

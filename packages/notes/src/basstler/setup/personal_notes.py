@@ -36,7 +36,7 @@ from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository_access import GitHubRepository
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.tooling_labels import GitHubLabel
-from basstler.locations import ClaudeCodeVariable, PluginLocation
+from basstler.locations import ClaudeCodeVariable, PluginLocation, PluginFile
 from basstler.setup.locations import SetupPluginLocation, SetupPluginSkillLocation
 from basstler.plugin_root import PluginRoot
 from basstler.setup.exceptions import ForeignNotesRemoteError, HookScriptFailedError
@@ -427,7 +427,7 @@ class PersonalNotesSetup:
             environment |= setting.variables(environment)
         return SetupCheckScript(self.project_root, environment, self.plugin_root).run()
 
-    def run_hook_script(self, script: PluginLocation, *arguments: str) -> None:
+    def run_hook_script(self, script: PluginFile, *arguments: str) -> None:
         """
         Run one hook script, its output going to this process's own.
 

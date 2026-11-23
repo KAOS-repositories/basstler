@@ -175,11 +175,11 @@ class MarkViewedSetup(TemplatePage):
         if self.workflow_repository == BasstlerProject.repository:
             return (
                 f"{Workflow.local_reference_prefix}"
-                f"{ReviewTriageWorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.name}"
+                f"{ReviewTriageWorkflowLocation.REUSABLE_MARK_VIEWED.name}"
             )
         return (
             f"{BasstlerProject.repository.full_name}/"
-            f"{ReviewTriageWorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.as_posix()}@{self.branch_or_tag}"
+            f"{ReviewTriageWorkflowLocation.REUSABLE_MARK_VIEWED.as_posix()}@{self.branch_or_tag}"
         )
 
     def run(self, client: GitHubAttemptClient) -> str:

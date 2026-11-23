@@ -8,9 +8,11 @@ from pathlib import Path
 
 from basstler.locations import (
     INSTALLED_PACKAGE,
+    PackageFile,
     PathEnumeration,
     PluginFile,
     PluginLocation,
+    ProjectFile,
     ProjectLocation,
     ShippedPath,
 )
@@ -68,9 +70,9 @@ class PlanHandoverLocation(PathEnumeration):
     """
 
 
-class PlanPackageLocation(PathEnumeration):
+class PlanPackageLocation(PackageFile):
     """
-    The files the plan distribution ships, as absolute paths.
+    The files the plan distribution ships.
     """
 
     PLAN_ITEM_MODE_DEFAULTS = INSTALLED_PACKAGE.shipped(
@@ -81,9 +83,9 @@ class PlanPackageLocation(PathEnumeration):
     """
 
 
-class PlanProjectLocation(PathEnumeration):
+class PlanProjectLocation(ProjectFile):
     """
-    The files of plans and their items on the personal-notes branch, relative to its root.
+    The files of plans and their items on the personal-notes branch.
     """
 
     PULL_REQUEST_PROGRESS = ProjectLocation.PERSONAL_NOTES / "pr-progress"

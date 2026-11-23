@@ -8,9 +8,12 @@ from pathlib import Path
 
 from basstler.locations import (
     INSTALLED_PACKAGE,
-    PathEnumeration,
-    ShippedPath,
+    BasstlerRepositoryFile,
     BasstlerRepositoryLocation,
+    PackageFile,
+    PathEnumeration,
+    ProjectFile,
+    ShippedPath,
 )
 
 
@@ -27,9 +30,9 @@ class GitHubTemplate(PathEnumeration):
     """
 
 
-class GitHubPackageLocation(PathEnumeration):
+class GitHubPackageLocation(PackageFile):
     """
-    The files the github distribution ships, as absolute paths.
+    The files the github distribution ships.
     """
 
     QUERIES = INSTALLED_PACKAGE.shipped(Path("github") / "queries")
@@ -38,14 +41,9 @@ class GitHubPackageLocation(PathEnumeration):
     """
 
 
-class GitHubProjectLocation(PathEnumeration):
+class GitHubProjectLocation(ProjectFile):
     """
-    The files the GitHub client reads in a project, relative to its root.
-    """
-
-    WORKFLOWS = Path(".github") / "workflows"
-    """
-    Where GitHub reads a repository's workflows from - the top level only.
+    The files the GitHub client reads in a project.
     """
 
     ACTIONS_BUDGET = Path(".github") / "actions_budget.py"
@@ -54,9 +52,9 @@ class GitHubProjectLocation(PathEnumeration):
     """
 
 
-class ReleaseRepositoryLocation(PathEnumeration):
+class ReleaseRepositoryLocation(BasstlerRepositoryFile):
     """
-    The files of basstler's own repository a release reads, relative to its root.
+    The files of basstler's own repository a release reads.
     """
 
     PLUGIN_MANIFEST = (

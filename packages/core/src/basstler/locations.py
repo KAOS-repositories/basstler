@@ -148,10 +148,17 @@ class WorkspaceLocation(PathEnumeration):
     """
 
 
-class PackageLocation(PathEnumeration):
+class PackageFile(PathEnumeration):
     """
-    The core distribution's own directory, the files the distributions ship, and the
-    checkout they are imported from, as absolute paths.
+    A file of the installed package or of the checkout it is imported from, as an absolute
+    path.
+    """
+
+
+class PackageLocation(PackageFile):
+    """
+    The core distribution's own directory, the checkout it is imported from, and the
+    files several distributions read.
     """
 
     DIRECTORY = Path(__file__).parent
@@ -195,10 +202,16 @@ class PackageLocation(PathEnumeration):
     """
 
 
-class RepositoryStateLocation(PathEnumeration):
+class RepositoryStateFile(PathEnumeration):
     """
     Scratch state kept per repository, relative to its common git directory, which every
     worktree of the repository shares and no checkout or install of the package holds.
+    """
+
+
+class RepositoryStateLocation(RepositoryStateFile):
+    """
+    The scratch state several distributions keep, and the directory all of it lives in.
     """
 
     DIRECTORY = Path("basstler")
@@ -220,9 +233,15 @@ class RepositoryStateLocation(PathEnumeration):
     """
 
 
-class BasstlerVariable(EnvironmentVariable):
+class BasstlerShellVariable(EnvironmentVariable):
     """
-    The environment variables this package's own shell configuration sets.
+    An environment variable this package's own shell configuration sets.
+    """
+
+
+class BasstlerVariable(BasstlerShellVariable):
+    """
+    The variables of this package's own shell configuration several distributions read.
     """
 
     PLUGIN_ROOT = "BASSTLER_PLUGIN_ROOT"
@@ -239,8 +258,7 @@ class BasstlerVariable(EnvironmentVariable):
 
 class PluginFile(PathEnumeration):
     """
-    Files of the plugin, relative to the plugin's root; each distribution names the ones
-    it runs.
+    A file of the plugin, relative to the plugin's root.
     """
 
 
@@ -328,9 +346,15 @@ class PluginLocation(PluginFile):
         return f"${BasstlerVariable.PLUGIN_ROOT}/{self}"
 
 
-class BasstlerRepositoryLocation(PathEnumeration):
+class BasstlerRepositoryFile(PathEnumeration):
     """
-    The directories of basstler's own repository a release reads, relative to its root.
+    A file or directory of basstler's own repository, relative to its root.
+    """
+
+
+class BasstlerRepositoryLocation(BasstlerRepositoryFile):
+    """
+    The directories of basstler's own repository several distributions read.
     """
 
     PLUGIN = Path("plugin")
@@ -350,9 +374,15 @@ class PluginSkillLocation(PluginFile):
     """
 
 
-class InstructionsTemplate(PathEnumeration):
+class InstructionsTemplateFile(PathEnumeration):
     """
-    The templates the agent instruction files are rendered from.
+    A template an agent instruction file is rendered from.
+    """
+
+
+class InstructionsTemplate(InstructionsTemplateFile):
+    """
+    The template of every skill's ``SKILL.md``.
     """
 
     SKILL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "skill.md.jinja")
@@ -372,12 +402,18 @@ class SkillLocation(PathEnumeration):
     """
 
 
-class ProjectLocation(PathEnumeration):
+class ProjectFile(PathEnumeration):
     """
-    The files this package reads, runs or writes in a project, relative to its root.
+    A file in a project, relative to its root.
 
-    Those on the personal-notes branch are relative to that branch's root, which is the
+    One on the personal-notes branch is relative to that branch's root, which is the
     same tree.
+    """
+
+
+class ProjectLocation(ProjectFile):
+    """
+    The files several distributions read, run or write in a project.
     """
 
     CLAUDE_CODE_DIRECTORY = Path(".claude")
@@ -440,10 +476,16 @@ class ProjectLocation(PathEnumeration):
     """
 
 
-class WorkflowLocation(PathEnumeration):
+class ActionsWorkflowFile(PathEnumeration):
     """
-    The GitHub Actions workflows basstler runs or starts, relative to the root of the
-    branch that holds each.
+    A GitHub Actions workflow basstler runs or starts, relative to the root of the branch
+    that holds it.
+    """
+
+
+class WorkflowLocation(ActionsWorkflowFile):
+    """
+    The workflows several distributions name, and the directory GitHub reads them from.
     """
 
     DIRECTORY = Path(".github") / "workflows"
@@ -453,7 +495,7 @@ class WorkflowLocation(PathEnumeration):
 
     MARK_VIEWED = DIRECTORY / "mark-viewed.yml"
     """
-    The workflow on the user's repository that calls :attr:`~basstler.review_triage.locations.ReviewTriageWorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED`
+    The workflow on the user's repository that calls :attr:`~basstler.review_triage.locations.ReviewTriageWorkflowLocation.REUSABLE_MARK_VIEWED`
     with the user's own token.
     """
 

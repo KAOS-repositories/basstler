@@ -20,7 +20,7 @@ from basstler.github.actions_secret import ActionsSecret
 from basstler.github.repository import Repository
 from basstler.github.workflows import ActivityType, TriggerEvent
 from basstler.json_model import JSONModel
-from basstler.locations import WorkflowLocation
+from basstler.locations import ActionsWorkflowFile, WorkflowLocation
 from basstler.plan_site.locations import SiteWorkflowLocation
 from basstler.plan_site.exceptions import PlanSiteTokenNotEnteredError
 from basstler.render_common import create_template_environment
@@ -346,7 +346,7 @@ class PlanSiteWorkflow(ABC):
 
     @classproperty
     @abstractmethod
-    def location(cls) -> WorkflowLocation:
+    def location(cls) -> ActionsWorkflowFile:
         """
         Where the workflow is written, relative to its branch's root.
         """
@@ -388,7 +388,7 @@ class SiteWorkflow(PlanSiteWorkflow):
     """
 
     @classproperty
-    def location(cls) -> WorkflowLocation:
+    def location(cls) -> ActionsWorkflowFile:
         return WorkflowLocation.PLAN_SITE
 
     @classproperty
@@ -447,7 +447,7 @@ class DispatchWorkflow(PlanSiteWorkflow):
     """
 
     @classproperty
-    def location(cls) -> WorkflowLocation:
+    def location(cls) -> ActionsWorkflowFile:
         return SiteWorkflowLocation.PLAN_SITE_DISPATCH
 
     @classproperty
@@ -484,7 +484,7 @@ class MergeWorkflow(PlanSiteWorkflow):
     """
 
     @classproperty
-    def location(cls) -> WorkflowLocation:
+    def location(cls) -> ActionsWorkflowFile:
         return SiteWorkflowLocation.PLAN_SITE_MERGE
 
     @classproperty

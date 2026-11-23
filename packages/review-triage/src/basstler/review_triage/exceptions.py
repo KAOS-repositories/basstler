@@ -28,7 +28,7 @@ class MarkingRoutes:
         """
         return BasstlerProject.repository.file_url(
             BasstlerProject.default_branch,
-            ReviewTriageRepositoryLocation.REVIEW_TRIAGE_README.as_posix(),
+            ReviewTriageRepositoryLocation.README.as_posix(),
         )
 
     @classproperty

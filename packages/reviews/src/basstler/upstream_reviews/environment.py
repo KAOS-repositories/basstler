@@ -4,12 +4,12 @@ The environment variables the upstream review reader reads.
 
 from __future__ import annotations
 
-from basstler.environment import EnvironmentVariable
+from basstler.environment import GitHubActionsRunnerVariable
 
 
-class UpstreamReviewsGitHubActionsVariable(EnvironmentVariable):
+class UpstreamReviewsGitHubActionsVariable(GitHubActionsRunnerVariable):
     """
-    The variables a GitHub Actions runner sets that the upstream review Action reads.
+    The runner's variables the upstream review Action reads.
     """
 
     REPOSITORY_OWNER = "GITHUB_REPOSITORY_OWNER"

@@ -7,8 +7,10 @@ from __future__ import annotations
 from basstler.locations import (
     INSTALLED_PACKAGE,
     PathEnumeration,
+    ProjectFile,
     ProjectLocation,
     ShippedPath,
+    ActionsWorkflowFile,
     WorkflowLocation,
 )
 
@@ -81,9 +83,9 @@ class SiteTemplate(PathEnumeration):
     """
 
 
-class SiteWorkflowLocation(PathEnumeration):
+class SiteWorkflowLocation(ActionsWorkflowFile):
     """
-    The GitHub Actions workflows that build the plan site, relative to the root of the branch that holds each.
+    The workflows that build the plan site.
     """
 
     PLAN_SITE_BUILD = WorkflowLocation.DIRECTORY / "plan-site-build.yml"
@@ -103,9 +105,9 @@ class SiteWorkflowLocation(PathEnumeration):
     """
 
 
-class SiteProjectLocation(PathEnumeration):
+class SiteProjectLocation(ProjectFile):
     """
-    The plan site's files on the personal-notes branch, relative to its root.
+    The plan site's files on the personal-notes branch.
     """
 
     PLAN_HUB = ProjectLocation.PLANS / "_hub.yaml"

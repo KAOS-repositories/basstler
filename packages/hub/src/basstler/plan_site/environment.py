@@ -4,12 +4,12 @@ The environment variables the plan site reads.
 
 from __future__ import annotations
 
-from basstler.environment import EnvironmentVariable
+from basstler.locations import BasstlerShellVariable
 
 
-class SiteBasstlerVariable(EnvironmentVariable):
+class SiteBasstlerVariable(BasstlerShellVariable):
     """
-    The variables this package's own shell configuration sets that the plan site reads.
+    The shell configuration's variables the plan site reads.
     """
 
     PYTHON = "BASSTLER_PYTHON"

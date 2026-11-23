@@ -19,8 +19,8 @@ from basstler.github.states import CheckOutcome
 from basstler.github.web_page import WebPage
 from basstler.github.workflow_run import WorkflowRun
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import WorkflowLocation
 from basstler.standard_streams import StandardStreamHandler
+from basstler.locations import ActionsWorkflowFile
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -98,7 +98,7 @@ class RunListing(ValidatedJSONModel):
         """
         return next((run for run in self.workflow_runs if run.commit == commit), None)
 
-    def select(self, workflow: WorkflowLocation) -> RunListing:
+    def select(self, workflow: ActionsWorkflowFile) -> RunListing:
         """
         :param workflow: The workflow.
         :return: The listing of its runs alone.
@@ -114,7 +114,7 @@ class RunListing(ValidatedJSONModel):
         """
         return sum(run.outcome is outcome for run in self.workflow_runs)
 
-    def latest(self, workflow: WorkflowLocation) -> ListedRun | None:
+    def latest(self, workflow: ActionsWorkflowFile) -> ListedRun | None:
         """
         :param workflow: The workflow.
         :return: Its latest run, ``None`` when the listing holds none.
@@ -124,7 +124,7 @@ class RunListing(ValidatedJSONModel):
             None,
         )
 
-    def latest_success(self, workflow: WorkflowLocation) -> ListedRun | None:
+    def latest_success(self, workflow: ActionsWorkflowFile) -> ListedRun | None:
         """
         :param workflow: The workflow.
         :return: Its latest run that succeeded, ``None`` when the listing holds none.
@@ -139,7 +139,7 @@ class RunListing(ValidatedJSONModel):
             None,
         )
 
-    def succeeded(self, workflow: WorkflowLocation) -> bool:
+    def succeeded(self, workflow: ActionsWorkflowFile) -> bool:
         """
         :param workflow: The workflow.
         :return: Whether its latest run succeeded.

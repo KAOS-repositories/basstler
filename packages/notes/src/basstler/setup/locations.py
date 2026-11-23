@@ -4,12 +4,7 @@ The files and directories the personal-notes setup names.
 
 from __future__ import annotations
 
-
-from basstler.locations import (
-    PluginFile,
-    PluginLocation,
-    PluginSkillLocation,
-)
+from basstler.locations import PluginFile, PluginLocation, PluginSkillLocation
 
 
 class SetupPluginLocation(PluginFile):

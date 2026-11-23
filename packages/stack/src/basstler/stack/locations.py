@@ -4,12 +4,12 @@ The files and directories stack maintenance names.
 
 from __future__ import annotations
 
-from basstler.locations import PathEnumeration, RepositoryStateLocation
+from basstler.locations import RepositoryStateFile, RepositoryStateLocation
 
 
-class StackStateLocation(PathEnumeration):
+class StackStateLocation(RepositoryStateFile):
     """
-    Stack maintenance's scratch state, relative to a repository's common git directory.
+    Stack maintenance's scratch state.
     """
 
     BOARD = RepositoryStateLocation.DIRECTORY / "board.json"

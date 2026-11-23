@@ -6,10 +6,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from basstler.locations import INSTALLED_PACKAGE, PathEnumeration, ShippedPath
+from basstler.locations import (
+    INSTALLED_PACKAGE,
+    InstructionsTemplateFile,
+    PackageFile,
+    ProjectFile,
+    ShippedPath,
+)
 
 
-class CodeRulesInstructionsTemplate(PathEnumeration):
+class CodeRulesInstructionsTemplate(InstructionsTemplateFile):
     """
     The template ``AGENTS.md`` is rendered from.
     """
@@ -20,9 +26,9 @@ class CodeRulesInstructionsTemplate(PathEnumeration):
     """
 
 
-class CodeRulesPackageLocation(PathEnumeration):
+class CodeRulesPackageLocation(PackageFile):
     """
-    The files of the installed package the code rules read, as absolute paths.
+    The files of the installed package the code rules read.
     """
 
     GITHUB_REPOSITORY_MODULE = INSTALLED_PACKAGE.shipped(
@@ -34,9 +40,9 @@ class CodeRulesPackageLocation(PathEnumeration):
     """
 
 
-class CodeRulesProjectLocation(PathEnumeration):
+class CodeRulesProjectLocation(ProjectFile):
     """
-    The files the code rules write in a project, relative to its root.
+    The files the code rules write in a project.
     """
 
     AGENTS_INSTRUCTIONS = Path("AGENTS.md")

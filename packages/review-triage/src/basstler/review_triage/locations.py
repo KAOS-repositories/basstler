@@ -8,9 +8,12 @@ from pathlib import Path
 
 from basstler.locations import (
     INSTALLED_PACKAGE,
+    BasstlerRepositoryFile,
     PathEnumeration,
+    RepositoryStateFile,
     RepositoryStateLocation,
     ShippedPath,
+    ActionsWorkflowFile,
     WorkflowLocation,
 )
 
@@ -58,9 +61,9 @@ class ReviewTriageLocation(PathEnumeration):
     """
 
 
-class ReviewTriageStateLocation(PathEnumeration):
+class ReviewTriageStateLocation(RepositoryStateFile):
     """
-    The review triage's scratch state, relative to a repository's common git directory.
+    The review triage's scratch state.
     """
 
     VIEWED_MARKING_STAMP = RepositoryStateLocation.DIRECTORY / "viewed-marked-head"
@@ -70,25 +73,23 @@ class ReviewTriageStateLocation(PathEnumeration):
     """
 
 
-class ReviewTriageWorkflowLocation(PathEnumeration):
+class ReviewTriageWorkflowLocation(ActionsWorkflowFile):
     """
-    The GitHub Actions workflows that mark a pull request's files viewed, relative to the root of the branch that holds each.
+    The workflows that mark a pull request's files viewed.
     """
 
-    REVIEW_TRIAGE_MARK_VIEWED = (
-        WorkflowLocation.DIRECTORY / "review-triage-mark-viewed.yml"
-    )
+    REUSABLE_MARK_VIEWED = WorkflowLocation.DIRECTORY / "review-triage-mark-viewed.yml"
     """
     basstler's reusable workflow that marks a pull request's mechanical files viewed.
     """
 
 
-class ReviewTriageRepositoryLocation(PathEnumeration):
+class ReviewTriageRepositoryLocation(BasstlerRepositoryFile):
     """
-    The files of basstler's own repository the review triage names, relative to its root.
+    The files of basstler's own repository the review triage names.
     """
 
-    REVIEW_TRIAGE_README = Path("docs") / "review-triage" / "README.md"
+    README = Path("docs") / "review-triage" / "README.md"
     """
     How to use the review triage and set up marking files viewed.
     """

@@ -67,7 +67,7 @@ ROW_REFERENCE = RegularExpression.sequence(
     .captured_as(RowReferenceGroup.WORD),
     CODE_QUOTE,
     ROW,
-    RegularExpression.sequence(PLURAL_ENDING).optional(),
+    RegularExpression.literal(PLURAL_ENDING).optional(),
     Anchor.WORD_BOUNDARY,
 ).compiled()
 """

@@ -159,8 +159,7 @@ class EntryPointInvocation:
         """
         drive = RegularExpression.sequence(
             CharacterSet.any_of(
-                CharacterRange.ASCII_UPPERCASE_LETTER,
-                CharacterRange.ASCII_LOWERCASE_LETTER,
+                CharacterRange.ASCII_LETTER,
             ),
             WindowsPathSyntax.DRIVE_SEPARATOR,
         ).optional()
@@ -173,7 +172,7 @@ class EntryPointInvocation:
         """
         The entry point script below the plugin root, optionally double-quoted.
         """
-        double_quote = RegularExpression.sequence(ShellQuote.DOUBLE_QUOTE).optional()
+        double_quote = RegularExpression.literal(ShellQuote.DOUBLE_QUOTE).optional()
         return RegularExpression.sequence(
             double_quote,
             RegularExpression.either(cls.plugin_root_variable, cls.plugin_root_path),

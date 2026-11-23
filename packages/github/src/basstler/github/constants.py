@@ -96,9 +96,7 @@ class DescriptionPattern(Enum):
     SESSION_LINK = RegularExpression.sequence(
         ClaudeCodeSessionLink.URL_PREFIX,
         CharacterSet.any_of(
-            CharacterRange.ASCII_UPPERCASE_LETTER,
-            CharacterRange.ASCII_LOWERCASE_LETTER,
-            CharacterRange.ASCII_DIGIT,
+            CharacterRange.ASCII_ALPHANUMERIC,
             "_-",
         ).one_or_more(),
     ).compiled()
@@ -109,7 +107,7 @@ class DescriptionPattern(Enum):
 
     HEADING = RegularExpression.sequence(
         Anchor.LINE_START,
-        RegularExpression.sequence(MarkdownSyntax.HEADING_MARKER).repeated(
+        RegularExpression.literal(MarkdownSyntax.HEADING_MARKER).repeated(
             1, HeadingLevel.DEEPEST
         ),
         MarkdownSyntax.HEADING_SEPARATOR,

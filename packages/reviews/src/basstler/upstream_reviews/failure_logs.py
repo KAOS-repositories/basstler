@@ -67,9 +67,7 @@ class LogFormatting(Enum):
         CharacterSet.any_of(
             CharacterRange.ASCII_DIGIT, LogSyntax.PARAMETER_SEPARATOR
         ).zero_or_more(),
-        CharacterSet.any_of(
-            CharacterRange.ASCII_UPPERCASE_LETTER, CharacterRange.ASCII_LOWERCASE_LETTER
-        ),
+        CharacterSet.any_of(CharacterRange.ASCII_LETTER),
     ).compiled()
     """
     The colour a test runner writes around its own output.

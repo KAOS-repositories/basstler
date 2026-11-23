@@ -440,7 +440,7 @@ BARE_INTERPRETER_RUN = RegularExpression.sequence(
         )
     ),
     InterpreterRun.PYTHON,
-    RegularExpression.sequence(InterpreterRun.MAJOR_VERSION).optional(),
+    RegularExpression.literal(InterpreterRun.MAJOR_VERSION).optional(),
     InterpreterRun.MODULE_FLAG,
     PackageLocation.DIRECTORY.name,
     Anchor.WORD_BOUNDARY,

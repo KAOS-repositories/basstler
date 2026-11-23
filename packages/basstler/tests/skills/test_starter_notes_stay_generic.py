@@ -106,7 +106,7 @@ def test_the_starter_notes_invoke_no_skill_of_the_plugin(skill_name: str):
     name_boundary = CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "-")
     skill_mention = RegularExpression.sequence(
         RegularExpression.negative_lookbehind(name_boundary),
-        RegularExpression.sequence(SlashCommand.PREFIX).optional(),
+        RegularExpression.literal(SlashCommand.PREFIX).optional(),
         skill_name,
         RegularExpression.negative_lookahead(name_boundary),
     )

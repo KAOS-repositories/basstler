@@ -160,6 +160,16 @@ class CharacterRange(PatternPart, StrEnum):
     A digit from zero to nine.
     """
 
+    ASCII_LETTER = "A-Za-z"
+    """
+    An English letter in either case.
+    """
+
+    ASCII_ALPHANUMERIC = "A-Za-z0-9"
+    """
+    An English letter in either case, or a digit.
+    """
+
     def __str__(self) -> str:
         """
         :return: The range as a set of its own.
@@ -245,6 +255,14 @@ class RegularExpression(PatternPart):
         :return: The pattern matching each part right after the one before.
         """
         return cls("".join(cls.source_of(piece) for piece in pieces))
+
+    @classmethod
+    def literal(cls, text: str) -> RegularExpression:
+        """
+        :param text: Text that matches only itself.
+        :return: The part matching it, which can be repeated or made optional.
+        """
+        return cls(re.escape(text))
 
     @classmethod
     def either(cls, *alternatives: PatternPiece) -> RegularExpression:

@@ -358,14 +358,10 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
 
 REQUIREMENT_NAME = RegularExpression.sequence(
     CharacterSet.any_of(
-        CharacterRange.ASCII_UPPERCASE_LETTER,
-        CharacterRange.ASCII_LOWERCASE_LETTER,
-        CharacterRange.ASCII_DIGIT,
+        CharacterRange.ASCII_ALPHANUMERIC,
     ),
     CharacterSet.any_of(
-        CharacterRange.ASCII_UPPERCASE_LETTER,
-        CharacterRange.ASCII_LOWERCASE_LETTER,
-        CharacterRange.ASCII_DIGIT,
+        CharacterRange.ASCII_ALPHANUMERIC,
         ".",
         "_",
         "-",

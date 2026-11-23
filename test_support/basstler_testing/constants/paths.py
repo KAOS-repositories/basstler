@@ -803,6 +803,22 @@ class PatternSnippet(PathEnumeration):
     A pattern built from a named part, annotated with the pattern type of ``re``.
     """
 
+    ALIASED_MODULE = DIRECTORY / "aliased-module.py"
+    """
+    A pattern text passed to a function of ``re``, through the module's other name.
+    """
+
+    ALIASED_FUNCTION = DIRECTORY / "function-imported-under-another-name.py"
+    """
+    A pattern compiled by a function imported from ``re`` under another name.
+    """
+
+    SAME_NAMES = DIRECTORY / "functions-of-the-same-names.py"
+    """
+    Functions named as the ones of ``re``, and the builtin ``compile``, none of which
+    take a pattern.
+    """
+
 
 class ProseSnippet(PathEnumeration):
     """

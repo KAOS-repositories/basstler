@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+import pytest
+
 from basstler.regular_expression import (
     ANY_CHARACTER,
     ANY_CHARACTER_EXCEPT_LINE_BREAK,
@@ -56,6 +58,18 @@ def test_text_matches_only_itself():
     pattern = RegularExpression.sequence(ExampleWord.VERSION).compiled()
     assert pattern.fullmatch(ExampleWord.VERSION) is not None
     assert pattern.fullmatch("1x0") is None
+
+
+def test_a_literal_matches_only_its_text_and_takes_a_repeat():
+    """
+    A literal is a single piece of text that can be repeated or made optional.
+    """
+    pattern = RegularExpression.literal(ExampleWord.OPTIONAL_MARK).optional().compiled()
+
+    assert [
+        pattern.fullmatch(text) is not None
+        for text in ("", ExampleWord.OPTIONAL_MARK, "a")
+    ] == [True, True, False]
 
 
 def test_a_sequence_matches_its_parts_one_after_another():
@@ -275,6 +289,44 @@ def test_any_character_includes_a_line_break_and_the_other_wildcard_does_not():
         wildcard.compiled().fullmatch("\n") is not None
         for wildcard in (ANY_CHARACTER, ANY_CHARACTER_EXCEPT_LINE_BREAK)
     ] == [True, False]
+
+
+@pytest.mark.parametrize(
+    ("letters_and_digits", "text", "matches"),
+    [
+        (CharacterRange.ASCII_LETTER, "a", True),
+        (CharacterRange.ASCII_LETTER, "Q", True),
+        (CharacterRange.ASCII_LETTER, "7", False),
+        (CharacterRange.ASCII_LETTER, "_", False),
+        (CharacterRange.ASCII_ALPHANUMERIC, "a", True),
+        (CharacterRange.ASCII_ALPHANUMERIC, "Q", True),
+        (CharacterRange.ASCII_ALPHANUMERIC, "7", True),
+        (CharacterRange.ASCII_ALPHANUMERIC, "_", False),
+    ],
+)
+def test_a_range_of_letters_or_of_letters_and_digits_matches_one_of_them(
+    letters_and_digits: CharacterRange, text: str, matches: bool
+):
+    """
+    Each input is listed beside whether the range matches it.
+    """
+    pattern = RegularExpression.sequence(letters_and_digits).compiled()
+
+    assert (pattern.fullmatch(text) is not None) is matches
+
+
+def test_a_range_of_letters_and_digits_joins_a_set_beside_other_characters():
+    """
+    A set lists the range together with characters of its own.
+    """
+    pattern = CharacterSet.any_of(CharacterRange.ASCII_ALPHANUMERIC, "_").compiled()
+
+    assert [pattern.fullmatch(text) is not None for text in ("a", "7", "_", "-")] == [
+        True,
+        True,
+        True,
+        False,
+    ]
 
 
 # %% anchors

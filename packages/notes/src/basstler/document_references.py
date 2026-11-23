@@ -240,8 +240,7 @@ class CitedNames:
         """
         return RegularExpression.sequence(
             CharacterSet.any_of(
-                CharacterRange.ASCII_UPPERCASE_LETTER,
-                CharacterRange.ASCII_LOWERCASE_LETTER,
+                CharacterRange.ASCII_LETTER,
                 "_",
             ),
             CharacterClass.WORD_CHARACTER.zero_or_more(),
@@ -324,7 +323,7 @@ class CitedNames:
         return RegularExpression.sequence(
             Anchor.WORD_BOUNDARY,
             PluginLocation.ENTRY_POINT_SCRIPT.name,
-            RegularExpression.sequence(ShellQuote.DOUBLE_QUOTE).optional(),
+            RegularExpression.literal(ShellQuote.DOUBLE_QUOTE).optional(),
             CharacterClass.WHITESPACE.one_or_more(),
             RegularExpression.sequence(
                 cls.module_name,

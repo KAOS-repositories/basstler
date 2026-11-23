@@ -5,53 +5,78 @@ regular expression text.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from basstler.code_rules.pattern_building import HandWrittenPatternChecker
 from basstler.locations import PackageLocation
+from basstler.text_file import TextFile
 
 from basstler_testing.constants.paths import PatternSnippet
 
 # %% finding them
 
 
-def reported_lines(path) -> list[int]:
+def reported_code(path: Path) -> list[str]:
     """
-    :return: The first line of each hand-written pattern in *path*.
+    :return: The source text of each line in *path* the checker reports, so a result
+        reads as the code it found.
     """
+    lines = TextFile(path).read().splitlines()
     return [
-        violation.first_line
+        lines[violation.first_line - 1].strip()
         for violation in HandWrittenPatternChecker().violations(path)
     ]
 
 
-def test_a_pattern_written_as_text_is_reported():
+@pytest.mark.parametrize(
+    ("snippet", "reported"),
+    [
+        (
+            PatternSnippet.HAND_WRITTEN,
+            ['DIGITS = re.compile(r"\\d+")', 'return findall(r"\\w+", text)'],
+        ),
+        (
+            PatternSnippet.ALIASED_MODULE,
+            ['return regular_expressions.search(r"[0-9]+", text)'],
+        ),
+        (PatternSnippet.ALIASED_FUNCTION, ['WORDS = build_pattern(r"\\w+")']),
+        (PatternSnippet.FROM_NAMED_PARTS, []),
+        (PatternSnippet.SAME_NAMES, []),
+    ],
+    ids=[
+        "pattern text through re and through a function imported from it",
+        "pattern text through the module under another name",
+        "pattern text through a function under another name",
+        "a pattern built from named parts",
+        "functions that only share a name, and the builtin compile",
+    ],
+)
+def test_a_pattern_written_as_text_is_reported_however_re_is_imported(
+    snippet: Path, reported: list[str]
+):
     """
-    Both a call off ``re`` and an import of one of its pattern functions are reported.
+    Each snippet is listed beside the code of it the checker reports.
     """
-    imported_by_name_line, compiled_line = 8, 10
-    assert reported_lines(PatternSnippet.HAND_WRITTEN) == [
-        imported_by_name_line,
-        compiled_line,
-    ]
+    assert reported_code(snippet) == reported
 
 
-def test_a_pattern_built_from_named_parts_is_not_reported():
+@pytest.mark.parametrize(
+    ("allowed_module", "why"),
+    [
+        (PackageLocation.REGULAR_EXPRESSION_MODULE, "it turns named parts into text"),
+        (
+            PackageLocation.UPSTREAM_REVIEWS_FETCH,
+            "it can import nothing of the package",
+        ),
+    ],
+)
+def test_the_modules_that_must_compile_pattern_text_are_not_reported(
+    allowed_module: Path, why: str
+):
     """
-    Building from named parts, and annotating with ``re``'s types, is the rule's own
-    way.
+    The module building every pattern, and the helper program that compiles a pattern
+    the package built, are the rule's two exemptions.
     """
-    assert reported_lines(PatternSnippet.FROM_NAMED_PARTS) == []
-
-
-def test_the_module_building_the_patterns_is_not_reported():
-    """
-    The one module that turns named parts into pattern text compiles them.
-    """
-    assert reported_lines(PackageLocation.REGULAR_EXPRESSION_MODULE) == []
-
-
-def test_the_program_importing_nothing_of_the_package_is_not_reported():
-    """
-    The helper's program cannot import the parts, and compiles a pattern the package
-    built.
-    """
-    assert reported_lines(PackageLocation.UPSTREAM_REVIEWS_FETCH) == []
+    assert reported_code(allowed_module) == [], why

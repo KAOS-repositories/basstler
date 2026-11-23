@@ -180,7 +180,7 @@ class SkillDocument:
                 RegularExpression.either(*VerbEnding).optional(),
                 CharacterClass.WHITESPACE.one_or_more(),
                 to_run.optional(),
-                RegularExpression.sequence(InstructionWord.CODE_QUOTE).optional(),
+                RegularExpression.literal(InstructionWord.CODE_QUOTE).optional(),
                 SkillCommand.SETUP_PERSONAL_NOTES,
             )
             .case_insensitive()

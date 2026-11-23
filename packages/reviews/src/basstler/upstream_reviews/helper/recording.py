@@ -310,9 +310,7 @@ class HelperChunk:
             CharacterClass.DIGIT.one_or_more().captured_as(ChunkGroup.COUNT),
             ChunkSyntax.TEXT_SEPARATOR,
             CharacterSet.any_of(
-                CharacterRange.ASCII_UPPERCASE_LETTER,
-                CharacterRange.ASCII_LOWERCASE_LETTER,
-                CharacterRange.ASCII_DIGIT,
+                CharacterRange.ASCII_ALPHANUMERIC,
                 ChunkSyntax.BASE64_PUNCTUATION,
             )
             .one_or_more()

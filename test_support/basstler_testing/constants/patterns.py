@@ -37,14 +37,11 @@ class DocumentGroup(StrEnum):
 
 SHELL_NAME = RegularExpression.sequence(
     CharacterSet.any_of(
-        CharacterRange.ASCII_UPPERCASE_LETTER,
-        CharacterRange.ASCII_LOWERCASE_LETTER,
+        CharacterRange.ASCII_LETTER,
         "_",
     ),
     CharacterSet.any_of(
-        CharacterRange.ASCII_UPPERCASE_LETTER,
-        CharacterRange.ASCII_LOWERCASE_LETTER,
-        CharacterRange.ASCII_DIGIT,
+        CharacterRange.ASCII_ALPHANUMERIC,
         "_",
     ).zero_or_more(),
 )

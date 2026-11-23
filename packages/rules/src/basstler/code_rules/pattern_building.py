@@ -5,7 +5,6 @@ pattern from named parts.
 
 from __future__ import annotations
 
-import ast
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -13,9 +12,15 @@ from enum import StrEnum
 from pathlib import Path
 from typing import override
 
-from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from libcst import matchers
+
+from basstler.class_property import classproperty
+from basstler.code_modification.patterns import CodePattern
+from basstler.code_modification.positions import PositionedModule
+from basstler.code_modification.references import ReferenceTo
+from basstler.code_rules.checker import CodeRuleViolation
+from basstler.code_rules.syntax_tree_checker import SyntaxTreeChecker
 from basstler.locations import PackageLocation
-from basstler.text_file import TextFile
 
 # %% what reads pattern text
 
@@ -79,10 +84,27 @@ class PatternFunction(StrEnum):
 # %% the checker
 
 
-@dataclass(frozen=True)
-class HandWrittenPatternChecker(CodeRuleChecker):
+class PatternTextCall(CodePattern):
     """
-    Reports every use of a :class:`PatternFunction` outside the modules allowed one.
+    A call of a :class:`PatternFunction`, whichever way the file imports :mod:`re`.
+    """
+
+    @classproperty
+    def matcher(cls) -> matchers.Call:
+        return matchers.Call(
+            func=matchers.OneOf(
+                *(
+                    ReferenceTo(f"{re.__name__}.{function}").matcher
+                    for function in PatternFunction
+                )
+            )
+        )
+
+
+@dataclass(frozen=True)
+class HandWrittenPatternChecker(SyntaxTreeChecker):
+    """
+    Reports every call of a :class:`PatternFunction` outside the modules allowed one.
     """
 
     allowed_modules: tuple[Path, ...] = (
@@ -95,34 +117,16 @@ class HandWrittenPatternChecker(CodeRuleChecker):
     """
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        if path.resolve() in {module.resolve() for module in self.allowed_modules}:
+    def violations_of_module(
+        self, path: Path, module: PositionedModule
+    ) -> Iterator[CodeRuleViolation]:
+        if path.resolve() in {allowed.resolve() for allowed in self.allowed_modules}:
             return
-        for node in ast.walk(ast.parse(TextFile(path).read())):
-            if self.reads_pattern_text(node):
-                yield CodeRuleViolation(
-                    path,
-                    node.lineno,
-                    node.end_lineno or node.lineno,
-                    "a pattern written as regular expression text; build it from "
-                    "named parts with basstler.regular_expression",
-                )
-
-    @staticmethod
-    def reads_pattern_text(node: ast.AST) -> bool:
-        """
-        :param node: A node of a module's syntax tree.
-        :return: Whether it reads a :class:`PatternFunction` off :mod:`re`, or imports
-            one from it.
-        """
-        functions = set(PatternFunction)
-        if isinstance(node, ast.ImportFrom):
-            return node.module == re.__name__ and any(
-                alias.name in functions for alias in node.names
+        for occurrence in PatternTextCall.found_in(module):
+            yield CodeRuleViolation(
+                path,
+                occurrence.location.start.line,
+                occurrence.location.end.line,
+                "a pattern written as regular expression text; build it from "
+                "named parts with basstler.regular_expression",
             )
-        return (
-            isinstance(node, ast.Attribute)
-            and isinstance(node.value, ast.Name)
-            and node.value.id == re.__name__
-            and node.attr in functions
-        )

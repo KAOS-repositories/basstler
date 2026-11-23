@@ -279,4 +279,4 @@ class BlockScalarStyle(StrEnum):
         """
         if self is BlockScalarStyle.LITERAL:
             return Prose.paragraph_break
-        return RegularExpression.sequence(LINE_BREAK).one_or_more().compiled()
+        return RegularExpression.literal(LINE_BREAK).one_or_more().compiled()

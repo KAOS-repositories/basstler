@@ -426,7 +426,14 @@ class RenameMap:
         """
         return next(
             (rename.old for rename in self.renames if rename.new == identifier),
-            identifier,
+            next(
+                (
+                    rename.old_name
+                    for rename in self.binding_renames
+                    if rename.new_name == identifier
+                ),
+                identifier,
+            ),
         )
 
     @cached_property

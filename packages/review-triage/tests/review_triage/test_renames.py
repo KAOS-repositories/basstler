@@ -237,6 +237,14 @@ def test_an_original_identifier_is_found_from_its_replacement():
     assert RenameMap((DETECTED,)).original_identifier(DETECTED.new) == DETECTED.old
 
 
+def test_an_original_identifier_is_found_from_a_renamed_member():
+    """
+    The name the base commit gave a renamed module member is found from the name the
+    head commit gives it.
+    """
+    assert RenameMap((MEMBER,)).original_identifier(MEMBER.new_name) == MEMBER.old_name
+
+
 # %% file paths
 
 MOVED_FILE = Rename(

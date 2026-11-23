@@ -51,6 +51,20 @@ class FileSample(StrEnum):
     KEYWORD_ONLY_PARAMETERS = "keyword-only-parameters"
     MODULE_DOCUMENTATION_AND_CODE_CHANGED = "module-documentation-and-code-changed"
     MODULE_DOCUMENTATION_REWORDED = "module-documentation-reworded"
+    PROPERTY_READ_AS_ABSTRACT_METHOD_OF_A_SHARED_CLASS_NAME = (
+        "property-read-as-abstract-method-of-a-shared-class-name"
+    )
+    PROPERTY_READ_AS_ABSTRACT_INTERFACE_METHOD = (
+        "property-read-as-abstract-interface-method"
+    )
+    PROPERTY_READ_AS_METHOD_CALL = "property-read-as-method-call"
+    PROPERTY_READ_AS_METHOD_CALL_UNPROVEN = "property-read-as-method-call-unproven"
+    PROPERTY_READ_AS_UNENFORCED_ABSTRACT_METHOD = (
+        "property-read-as-unenforced-abstract-method"
+    )
+    PROPERTY_READ_AS_UNIMPLEMENTED_ABSTRACT_METHOD = (
+        "property-read-as-unimplemented-abstract-method"
+    )
     RECEIVER_BINDS_DIFFERENTLY = "receiver-binds-differently"
     RECEIVER_OVERRIDES_INCOMPATIBLE = "receiver-overrides-incompatible"
     RECEIVER_REBOUND_OUT_OF_ORDER = "receiver-rebound-out-of-order"
@@ -104,9 +118,24 @@ class FileSample(StrEnum):
         :return: What the base version and the sample's ``other_*.py`` files define, as
             the base commit's definitions.
         """
+        return self.commit_definitions("base.*", "other_*.py")
+
+    def head_definitions(self) -> DefinitionIndex:
+        """
+        :return: What the head version and the sample's ``head_other_*.py`` files
+            define, as the head commit's definitions.
+        """
+        return self.commit_definitions("head.*", "head_other_*.py")
+
+    def commit_definitions(self, version: str, others: str) -> DefinitionIndex:
+        """
+        :param version: The pattern of the file of one version of the sample.
+        :param others: The pattern of the further files of that version's commit.
+        :return: What those files define.
+        """
         files = [
-            next(self.directory.glob("base.*")),
-            *sorted(self.directory.glob("other_*.py")),
+            next(self.directory.glob(version)),
+            *sorted(self.directory.glob(others)),
         ]
         return DefinitionIndex(
             SourceDefinitions(tuple(TextFile(file).read() for file in files))

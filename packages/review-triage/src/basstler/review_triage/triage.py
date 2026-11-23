@@ -251,6 +251,7 @@ class PullRequestTriager:
             )
             progress.update()
         base_modules = CommitModules(changes.commits.base_tree)
+        head_modules = CommitModules(changes.commits.head_tree)
         return JudgmentContext(
             renames,
             DefinitionIndex(base_modules),
@@ -258,6 +259,7 @@ class PullRequestTriager:
             substitution_renames,
             self.rules,
             MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
+            head_definitions=DefinitionIndex(head_modules),
             base_modules=base_modules,
-            head_modules=CommitModules(changes.commits.head_tree),
+            head_modules=head_modules,
         )

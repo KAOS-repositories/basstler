@@ -157,6 +157,22 @@ def test_a_call_not_shown_to_bind_as_before_is_the_reason_for_review(
     assert triaged(sample, RenameMap()).reasons == (unproven,)
 
 
+def test_the_reason_for_review_names_the_line_below_the_module_documentation():
+    """
+    The line a reason names counts the lines of the module's documentation, which the
+    comparison leaves out.
+    """
+    sample = FileSample.DOCUMENTED_RECEIVER_BINDS_DIFFERENTLY
+    assert triaged(sample, RenameMap()).reasons == (
+        UnprovenKeywordCall(
+            sample.head_line("plotter.plot(file_name=3)"),
+            "plot",
+            UnprovenBinding.BINDS_DIFFERENTLY,
+            ("GoalPlotter.plot",),
+        ),
+    )
+
+
 def test_the_explanation_names_the_definitions_binding_otherwise():
     """
     The explanation of a call not shown to bind as before lists the definitions that

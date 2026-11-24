@@ -15,12 +15,17 @@ report in its summary. The job needs only `contents: read` and
 ## On your own machine
 
 ```bash
-uvx basstler@latest review-triage mark-viewed <pull request> --repository <owner>/<name>
+curl -fsSL https://raw.githubusercontent.com/KAOS-repositories/basstler/main/scripts/review-triage.sh | bash -s -- <owner>/<name> <pull request number> --mark-viewed
 ```
 
-This runs the latest release from PyPI without installing it; use `report` in place of
-`mark-viewed` to only print the triage. Without `uv`, `pip install basstler` and drop
-the `uvx` and `@latest`.
+The first run installs basstler into an environment of its own; it needs only git,
+bash and either `uv` or Python 3.12+, and on Windows runs in Git Bash. Leave out
+`--mark-viewed` to only print the triage, and the number to triage every open pull
+request. To run an unmerged basstler branch, put its name in place of `main` in the
+URL and set `BASSTLER_REF` to it. Without the script,
+`uvx basstler@latest review-triage mark-viewed <pull request> --repository <owner>/<name>`
+runs the latest release from PyPI; use `report` in place of `mark-viewed` to only
+print the triage.
 
 `mark-viewed` marks the mechanical files viewed for the account whose GitHub
 credential is configured (`GH_TOKEN`, or `gh auth login`). It uses GitHub's GraphQL

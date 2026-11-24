@@ -80,6 +80,11 @@ class TriageOutcome:
     The commit its changes were triaged from, and why.
     """
 
+    viewed_files: frozenset[PurePosixPath] = frozenset()
+    """
+    The files left out of the triage because the viewer viewed them as they are.
+    """
+
     @property
     def mechanical_files(self) -> tuple[MechanicalFile, ...]:
         """

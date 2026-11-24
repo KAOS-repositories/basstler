@@ -322,6 +322,21 @@ class AttributeMoveSample(SampleTrees):
         return "attribute-move"
 
 
+class ViewedStateSample(SampleTrees):
+    """
+    A pull request of two commits whose files the viewer viewed, never viewed, or viewed
+    at its first commit before the second changed them.
+    """
+
+    BASE_TREE = "base"
+    CHECKPOINT_TREE = "checkpoint"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "viewed-state"
+
+
 class DefinitionMoveSameModulePathSample(SampleTrees):
     """
     A pull request moving a module's function into a module of the same dotted path that

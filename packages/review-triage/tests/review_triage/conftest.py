@@ -39,8 +39,9 @@ from basstler.github.repository import Repository
 from basstler.github.review_models import PageInfo
 from basstler.locations import ReviewTriageLocation
 from basstler.review_triage.detection import RenameDetection
-from basstler.review_triage.outputs import (
+from basstler.review_triage.file_listing import (
     FilesPageRequest,
+    FileViewedState,
     ListedFile,
     ListedFilesAnswer,
     ListedFilesPage,
@@ -163,6 +164,12 @@ class FileListingWriter(GitHubWriter):
     The paths on each page of the listing, first page first.
     """
 
+    viewed_states: dict[PurePosixPath, FileViewedState] = field(default_factory=dict)
+    """
+    Each file the account asking has viewed, or viewed before it changed, by its path;
+    every other file is unviewed.
+    """
+
     sent: list[GraphQLRequest] = field(default_factory=list)
     """
     Every request sent, oldest first.
@@ -197,7 +204,10 @@ class FileListingWriter(GitHubWriter):
         index = int(cursor) if cursor else 0
         next_page = index + 1
         page = ListedFilesPage(
-            tuple(ListedFile(path) for path in self.pages[index]),
+            tuple(
+                ListedFile(path, self.viewed_states.get(path, FileViewedState.UNVIEWED))
+                for path in self.pages[index]
+            ),
             PageInfo(next_page < len(self.pages), str(next_page)),
         )
         answer = ListedFilesAnswer(ListedPullRequest(self.head_commit, page))

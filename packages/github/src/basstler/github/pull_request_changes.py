@@ -144,6 +144,11 @@ class StartReason(StrEnum):
     The commit is the head the viewer's last submitted review was made against.
     """
 
+    VIEWED_FILES = "where you last viewed each file"
+    """
+    Each file is read from the head the viewer last viewed it at, else the merge base.
+    """
+
 
 @dataclass(frozen=True)
 class StartCommit:

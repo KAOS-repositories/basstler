@@ -10,7 +10,6 @@ from cyclopts import CycloptsError
 from basstler.github.pull_request_changes import (
     CommitStart,
     LastCommitsStart,
-    LastReviewStart,
     MergeBaseStart,
 )
 from basstler.review_triage.command_line import (
@@ -20,6 +19,7 @@ from basstler.review_triage.command_line import (
 )
 from basstler.review_triage.declaration import TriageDeclaration
 from basstler.review_triage.recorded_plans import PlanRecord, RecordedPlan
+from basstler.review_triage.viewed_states import ViewedStateStart
 
 # %% the start chosen
 
@@ -30,12 +30,16 @@ from basstler.review_triage.recorded_plans import PlanRecord, RecordedPlan
         ("abc123", None, False, CommitStart("abc123")),
         (None, 3, False, LastCommitsStart(3)),
         (None, None, True, MergeBaseStart()),
-        (None, None, False, LastReviewStart()),
+        (None, None, False, ViewedStateStart()),
     ],
 )
 def test_the_options_choose_where_the_triage_starts(
     since, last, from_merge_base, start
 ):
+    """
+    Each option starts the triage where it says; without one, each file starts from
+    where the viewer last viewed it.
+    """
     publication = TriagePublication.from_arguments(
         7, None, TriageDeclaration(), since, last, from_merge_base=from_merge_base
     )

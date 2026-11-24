@@ -31,12 +31,20 @@ credential is configured (`GH_TOKEN`, or `gh auth login`). It uses GitHub's Grap
 API, which Claude Code cloud sessions cannot reach, so run it on your own machine.
 Both commands default `--repository` to the checkout's `origin`.
 
-By default both triage only what changed since your last submitted review of the pull
-request, the head commit GitHub recorded for it, and the whole change when you have
-not reviewed it. A credential GitHub names no account for, such as an Actions token,
-has no review, so CI triages the whole change. The report's first line says where the
-triage started. `--since <commit>`, `--last <count>` and `--from-merge-base` choose
-another start.
+By default both triage each file from where you last viewed it, by the viewed state
+GitHub keeps for your account:
+
+- a file you viewed as it is now is left out, neither judged nor marked again;
+- a file you viewed before a later commit changed it is judged from the head it was
+  viewed at, when this clone saw it viewed there or marked it, else from the merge base;
+- any other file is judged from the merge base.
+
+Each run records, in the clone, the head commit the files are seen viewed or marked
+at. Where GitHub's GraphQL API refuses the listing, as in a cloud session, the triage
+starts from your last submitted review instead, and the whole change without one. A
+credential GitHub names no account for, such as an Actions token, has viewed nothing,
+so CI triages the whole change. The report's first line says where the triage started.
+`--since <commit>`, `--last <count>` and `--from-merge-base` choose another start.
 
 A Python file counts as a rule's fix when recomputing the fixes of `basstler
 code-rules fix` on its base reproduces its head, layout aside. Only the rules its base

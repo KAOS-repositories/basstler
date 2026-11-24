@@ -34,9 +34,9 @@ from basstler.review_triage.outputs import (
     MarkdownReport,
     TriageSummary,
     ViewedFiles,
-    ViewedFilesVariable,
     ViewedMarking,
 )
+from basstler.review_triage.file_listing import ViewedFilesVariable
 from basstler.review_triage.renames import Rename, RenameDecisions, RenameMap
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 

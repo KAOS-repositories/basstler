@@ -49,7 +49,7 @@ from basstler.review_triage.file_listing import (
     ViewedFilesVariable,
 )
 from basstler.review_triage.renames import Rename, RenameMap
-from basstler.review_triage.triage import TriageOutcome
+from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from basstler_testing.constants.paths import DatasetLocation
 from basstler_testing.github.path_answering_client import refusal
@@ -446,3 +446,11 @@ def sample_changes(
     return read_sample(
         scratch_repository, sample_payload, DescriptionSample.WITHOUT_DECLARATION
     )
+
+
+@pytest.fixture
+def sample_triage(sample_changes: PullRequestChanges) -> TriageOutcome:
+    """
+    :return: The sample pull request, triaged.
+    """
+    return PullRequestTriager().triage(sample_changes)

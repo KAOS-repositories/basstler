@@ -159,14 +159,26 @@ class ViewedMarking(TriageOutput):
     """
 
     def publish(self, outcome: TriageOutcome) -> None:
-        refusals = self.refusals(outcome)
+        refusals = self.mark(outcome)
         if refusals:
             raise GraphQLErrorsReturned(refusals)
-        if self.checkpoints is not None:
-            self.checkpoints.record(
-                outcome.pull_request.head.commit,
-                frozenset(file.change.path for file in outcome.mechanical_files),
-            )
+
+    def mark(self, outcome: TriageOutcome) -> tuple[str, ...]:
+        """
+        Mark the mechanical files viewed, then record them in :attr:`checkpoints` as
+        viewed at the head unless GitHub refused.
+
+        :param outcome: The triaged pull request.
+        :return: What GitHub refused with, empty once every listed file is marked.
+        """
+        refusals = self.refusals(outcome)
+        if refusals or self.checkpoints is None:
+            return refusals
+        self.checkpoints.record(
+            outcome.pull_request.head.commit,
+            frozenset(file.change.path for file in outcome.mechanical_files),
+        )
+        return ()
 
     @property
     def attempts(self) -> GraphQLAttempts:

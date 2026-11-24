@@ -95,3 +95,20 @@ def test_the_plan_option_is_repeatable(command):
     )
 
     assert bound.kwargs["plan"] == arguments
+
+
+@pytest.mark.parametrize(
+    "options", [("--since", "abc123"), ("--last", "2"), ("--from-merge-base",)]
+)
+def test_marking_the_reviews_takes_no_start_since_each_starts_where_last_viewed(
+    options,
+):
+    """
+    Every pull request is marked from where the account last viewed each file.
+    """
+    with pytest.raises(CycloptsError):
+        review_triage_app.parse_args(
+            [ReviewTriageCommand.MARK_VIEWED_IN_REVIEWS, *options],
+            exit_on_error=False,
+            print_error=False,
+        )

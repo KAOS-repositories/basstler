@@ -42,6 +42,32 @@ set that route up as in [route 2](#route-2-from-a-repositorys-actions-from-anywh
 A push made outside a session is not marked until the next one, or until you run
 `mark-viewed`.
 
+## For every reviewer, from their own repository
+
+The workflow above marks files for one account only, the token's owner. On a team, each
+reviewer marks their own: a scheduled workflow in a repository *they* own, such as their
+notes repository, holding their own token, marks every open pull request on the team's
+repository that asks them for a review or that they reviewed. Each file is judged from
+where they last viewed it, so after a push only what changed since they last looked
+stays to read. In a checkout of their own repository, each reviewer runs:
+
+```bash
+basstler review-triage set-up-mark-viewed --repository <team-owner>/<name> \
+    --in-reviews-schedule "17 7-19 * * 1-5"
+```
+
+The schedule is a cron expression in UTC; the one above runs hourly on weekday working
+hours. Each run costs Actions minutes on the reviewer's repository, so pick one that
+fits its budget. It lists the steps left as above. The token is created for the team
+repository's owner, with *Pull requests: write* and *Contents: read*, and stored on the
+reviewer's own repository, so no reviewer's token sits where others can reach it.
+
+The same marking runs once, from your own computer, with:
+
+```bash
+basstler review-triage mark-viewed-in-reviews --repository <team-owner>/<name>
+```
+
 ## Marking files viewed: pick a route
 
 "Viewed" is kept for each GitHub account, and only GitHub's GraphQL API sets it.

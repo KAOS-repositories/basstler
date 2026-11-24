@@ -19,6 +19,7 @@ from basstler.review_triage.triage import PullRequestTriager
 from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
 from .samples import (
+    DefinitionMoveNamespacePackageSample,
     DefinitionMovePackageRootSample,
     DefinitionMoveSameModulePathSample,
     SECTIONED_BOARD,
@@ -285,6 +286,56 @@ def test_relative_imports_following_a_moved_definition_are_mechanical(
         DefinitionMovePackageRootSample.HEAD_TREE,
     )
     assert PullRequestTriager().triage(changes).files_needing_review == ()
+
+
+def test_a_definition_moved_within_a_namespace_package_is_a_rename_of_its_path(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A class moved between two projects sharing a namespace package is renamed by its
+    dotted path below the namespace package, as it is imported.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DefinitionMoveNamespacePackageSample.BASE_TREE,
+        DefinitionMoveNamespacePackageSample.HEAD_TREE,
+    )
+    detection = DefinitionMoveDetection()
+    assert detection.decisions(changes) == RenameDecisions(
+        (
+            Rename(
+                "tool.locations.CommitScratchFile",
+                "tool.git.locations.CommitScratchFile",
+                detection,
+            ),
+        )
+    )
+
+
+def test_the_imports_following_a_move_within_a_namespace_package_are_mechanical(
+    scratch_repository: ScratchRepository,
+):
+    """
+    Each module of the move, and the module importing the class from its new place, is
+    mechanical.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DefinitionMoveNamespacePackageSample.BASE_TREE,
+        DefinitionMoveNamespacePackageSample.HEAD_TREE,
+    )
+    triage = PullRequestTriager().triage(changes)
+    assert {file.change.path: file.kinds for file in triage.mechanical_files} == {
+        PurePosixPath("core/src/tool/locations.py"): frozenset(
+            {MechanicalChange.DEFINITIONS_MOVED_OUT}
+        ),
+        PurePosixPath("git/src/tool/git/locations.py"): frozenset(
+            {MechanicalChange.DEFINITIONS_MOVED_IN}
+        ),
+        PurePosixPath("git/src/tool/git/commands.py"): frozenset(
+            {MechanicalChange.IMPORTS}
+        ),
+    }
 
 
 def test_a_definition_moved_between_files_of_one_dotted_path_is_mechanical(

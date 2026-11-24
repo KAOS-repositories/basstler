@@ -283,6 +283,20 @@ class DefinitionMovePackageRootSample(SampleTrees):
         return "definition-move-package-root"
 
 
+class DefinitionMoveNamespacePackageSample(SampleTrees):
+    """
+    A pull request moving a class between two projects of the ``src`` layout that share
+    a namespace package, which has no initializer, and importing it from its new module.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-namespace-package"
+
+
 class DefinitionMoveSameModulePathSample(SampleTrees):
     """
     A pull request moving a module's function into a module of the same dotted path that

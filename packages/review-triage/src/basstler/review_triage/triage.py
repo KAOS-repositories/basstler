@@ -38,6 +38,7 @@ from basstler.review_triage.definition_moves import (
 )
 from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.markdown import MarkdownComparison
+from basstler.review_triage.member_moves import AttributeMoveDetection
 from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.referents import MemberResolver
 from basstler.review_triage.module_moves import ModuleMoveDetection
@@ -108,6 +109,7 @@ class PullRequestTriager:
         MemberRenameDetection(),
         ModuleMoveDetection(),
         DefinitionMoveDetection(),
+        AttributeMoveDetection(),
         FileMoveDetection(),
         DescriptionDeclaration(),
     )

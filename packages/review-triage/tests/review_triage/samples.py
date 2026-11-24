@@ -297,6 +297,31 @@ class DefinitionMoveNamespacePackageSample(SampleTrees):
         return "definition-move-namespace-package"
 
 
+class AttributeMoveSample(SampleTrees):
+    """
+    A pull request moving an enumeration member into a class of a module it adds, and
+    reading the member from there; its variants each change the class it moves into.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    OTHER_VALUE = "variants/other_value.py"
+    OTHER_BASE = "variants/other_base.py"
+    ADDED_METHOD = "variants/added_method.py"
+    RE_EXPORTING_USER = "variants/re_exporting_user.py"
+    LOCATIONS_WITH_METHOD_BASE = "variants/locations_with_method_base.py"
+    LOCATIONS_WITH_METHOD_HEAD = "variants/locations_with_method_head.py"
+    UNMOVED_FILE_NAME_READER = "variants/unmoved_file_name_reader.py"
+    MOVED_FILE_NAME_READER_BASE = "variants/moved_file_name_reader_base.py"
+    MOVED_FILE_NAME_READER_HEAD = "variants/moved_file_name_reader_head.py"
+    OTHER_LOSER_BASE = "variants/other_loser_base.py"
+    OTHER_LOSER_HEAD = "variants/other_loser_head.py"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "attribute-move"
+
+
 class DefinitionMoveSameModulePathSample(SampleTrees):
     """
     A pull request moving a module's function into a module of the same dotted path that

@@ -5,6 +5,7 @@ Triaging each file of a pull request from where the viewer last viewed it.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
@@ -28,6 +29,7 @@ from basstler.review_triage.file_listing import (
 from basstler.review_triage.outputs import ViewedMarking
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 from basstler.locations import ProjectLocation
+from basstler.personal_notes.contribution import SetupPersonalNotesSkill
 from basstler.review_triage.viewed_states import (
     ClonedViewedCheckpoints,
     NotesBranchViewedCheckpoints,
@@ -368,3 +370,23 @@ def test_checkpoints_are_kept_in_the_clone_where_no_remote_has_the_notes_branch(
 
     assert isinstance(checkpoints, ClonedViewedCheckpoints)
     assert checkpoints.read() == {VIEWED: head}
+
+
+def test_keeping_checkpoints_in_the_clone_offers_the_notes_setup(
+    scratch_repository: ScratchRepository, caplog: pytest.LogCaptureFixture
+):
+    """
+    Without a reachable notes branch, the run says how to set one up.
+    """
+    ViewedCheckpoints.for_pull_request(
+        scratch_repository.git, SAMPLE_REPOSITORY, CHECKPOINTED_PULL_REQUEST
+    )
+
+    warnings = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.WARNING
+    ]
+    assert [
+        f"/{SetupPersonalNotesSkill.skill_name}" in message for message in warnings
+    ] == [True]

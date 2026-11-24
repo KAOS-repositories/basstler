@@ -31,6 +31,7 @@ from basstler.personal_notes.branch import (
     PersonalNotesBranch,
     PersonalNotesLocation,
 )
+from basstler.personal_notes.contribution import SetupPersonalNotesSkill
 from basstler.review_triage.comparison import FileVerdict
 from basstler.review_triage.exceptions import PullRequestHeadMoved
 from basstler.review_triage.file_listing import (
@@ -96,9 +97,11 @@ class ViewedCheckpoints(ABC):
             PersonalNotesLocation.resolve(git.working_directory, os.environ), git
         )
         if notes_branch.fetch_if_present() is None:
-            logger.info(
-                "Keeping the files seen viewed in this clone, as no remote has the "
-                f"personal-notes branch {notes_branch.location.branch}"
+            logger.warning(
+                "Keeping the files seen viewed in this clone only, as no remote has the "
+                f"personal-notes branch {notes_branch.location.branch}; run "
+                f"/{SetupPersonalNotesSkill.skill_name} to keep them for every clone "
+                "and session"
             )
             directory = git.repository_state_path(
                 RepositoryStateLocation.VIEWED_CHECKPOINTS

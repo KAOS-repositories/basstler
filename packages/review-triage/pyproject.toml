@@ -37,6 +37,7 @@ dependencies = [
     "basstler-git",
     "basstler-rules",
     "basstler-github",
+    "basstler-notes",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -30,11 +30,12 @@ GitHub keeps for your account:
 
 - a file you viewed as it is now is left out, neither judged nor marked again;
 - a file you viewed before a later commit changed it is judged from the head it was
-  viewed at, when this clone saw it viewed there or marked it, else from the merge base;
+  viewed at, when a run saw it viewed there or marked it, else from the merge base;
 - any other file is judged from the merge base.
 
-Each run records, in the clone, the head commit the files are seen viewed or marked
-at. Where GitHub's GraphQL API refuses the listing, as in a cloud session, the triage
+Each run records the head commit the files are seen viewed or marked at on your
+personal-notes branch, so every clone and session resumes from it, or, where no remote has that branch, in
+the clone only; the run then says to set the branch up with `/setup-personal-notes`. Where GitHub's GraphQL API refuses the listing, as in a cloud session, the triage
 starts from your last submitted review instead, and the whole change without one. A
 credential GitHub names no account for, such as an Actions token, has viewed nothing,
 so CI triages the whole change. The report's first line says where the triage started.

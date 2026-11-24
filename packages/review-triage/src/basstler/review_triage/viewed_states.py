@@ -6,6 +6,8 @@ states GitHub lists and the heads files were seen viewed at.
 from __future__ import annotations
 
 import json
+import os
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
@@ -22,7 +24,14 @@ from basstler.github.pull_request_changes import (
 )
 from basstler.github.repository import Repository
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import RepositoryStateLocation
+from basstler.locations import ProjectLocation, RepositoryStateLocation
+from basstler.personal_notes.branch import (
+    NotesBranchWriter,
+    NotesFileChanges,
+    PersonalNotesBranch,
+    PersonalNotesLocation,
+)
+from basstler.personal_notes.contribution import SetupPersonalNotesSkill
 from basstler.review_triage.comparison import FileVerdict
 from basstler.review_triage.exceptions import PullRequestHeadMoved
 from basstler.review_triage.file_listing import (
@@ -31,6 +40,7 @@ from basstler.review_triage.file_listing import (
     FileViewedState,
 )
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
+from basstler.shell_configuration import FetchedBranchReference
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -57,17 +67,16 @@ class ViewedCheckpointFile(ValidatedJSONModel):
     The head commit by each file's path.
     """
 
+    def rendered(self) -> str:
+        """
+        :return: The file's text.
+        """
+        return json.dumps(self.to_json(), indent=2)
 
-@dataclass(frozen=True)
-class ViewedCheckpoints:
-    """
-    The heads one pull request's files were last seen viewed at, kept in a file of the
-    clone the triage runs in.
-    """
 
-    path: Path
+class ViewedCheckpoints(ABC):
     """
-    The file.
+    The heads one pull request's files were last seen viewed at.
     """
 
     @classmethod
@@ -78,26 +87,47 @@ class ViewedCheckpoints:
         :param git: The clone the triage runs in.
         :param repository: The repository the pull request is opened on.
         :param number: The pull request's number.
-        :return: Where the clone keeps the pull request's checkpoints.
+        :return: The pull request's checkpoints on the clone's personal-notes branch, or
+            in the clone itself where no remote has that branch.
         """
-        directory = git.repository_state_path(
-            RepositoryStateLocation.VIEWED_CHECKPOINTS
+        file_name = PurePosixPath(
+            repository.owner, repository.name, f"{number}{CHECKPOINT_SUFFIX}"
         )
-        return cls(
-            directory
-            / repository.owner
-            / repository.name
-            / f"{number}{CHECKPOINT_SUFFIX}"
+        notes_branch = PersonalNotesBranch(
+            PersonalNotesLocation.resolve(git.working_directory, os.environ), git
         )
+        if notes_branch.fetch_if_present() is None:
+            logger.warning(
+                "Keeping the files seen viewed in this clone only, as no remote has the "
+                f"personal-notes branch {notes_branch.location.branch}; run "
+                f"/{SetupPersonalNotesSkill.skill_name} to keep them for every clone "
+                "and session"
+            )
+            directory = git.repository_state_path(
+                RepositoryStateLocation.VIEWED_CHECKPOINTS
+            )
+            return ClonedViewedCheckpoints(directory / file_name)
+        return NotesBranchViewedCheckpoints(
+            notes_branch, PurePosixPath(ProjectLocation.VIEWED_CHECKPOINTS) / file_name
+        )
+
+    @abstractmethod
+    def read_file(self) -> ViewedCheckpointFile:
+        """
+        :return: The checkpoints as last kept; none where none were kept yet.
+        """
+
+    @abstractmethod
+    def write_file(self, checkpoint_file: ViewedCheckpointFile) -> None:
+        """
+        :param checkpoint_file: The checkpoints to keep in place of the kept ones.
+        """
 
     def read(self) -> dict[PurePosixPath, str]:
         """
         :return: The head commit each file was last seen viewed at, by its path.
         """
-        if not self.path.is_file():
-            return {}
-        text = TextFile(self.path).read()
-        return ViewedCheckpointFile.from_json(json.loads(text)).viewed_at
+        return self.read_file().viewed_at
 
     def record(self, head_commit: str, paths: frozenset[PurePosixPath]) -> None:
         """
@@ -107,9 +137,62 @@ class ViewedCheckpoints:
         if not paths:
             return
         viewed_at = self.read() | dict.fromkeys(paths, head_commit)
+        self.write_file(ViewedCheckpointFile(viewed_at))
+
+
+@dataclass(frozen=True)
+class ClonedViewedCheckpoints(ViewedCheckpoints):
+    """
+    Checkpoints kept in a file of the clone the triage runs in.
+    """
+
+    path: Path
+    """
+    The file.
+    """
+
+    def read_file(self) -> ViewedCheckpointFile:
+        if not self.path.is_file():
+            return ViewedCheckpointFile()
+        return ViewedCheckpointFile.from_json(json.loads(TextFile(self.path).read()))
+
+    def write_file(self, checkpoint_file: ViewedCheckpointFile) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_file = ViewedCheckpointFile(viewed_at)
-        TextFile(self.path).write(json.dumps(checkpoint_file.to_json(), indent=2))
+        TextFile(self.path).write(checkpoint_file.rendered())
+
+
+@dataclass(frozen=True)
+class NotesBranchViewedCheckpoints(ViewedCheckpoints):
+    """
+    Checkpoints kept on the personal-notes branch, so every clone and session of the
+    viewer resumes from them.
+    """
+
+    branch: PersonalNotesBranch
+    """
+    The notes branch, fetched.
+    """
+
+    path: PurePosixPath
+    """
+    The checkpoint file, relative to the branch's root.
+    """
+
+    def read_file(self) -> ViewedCheckpointFile:
+        text = self.branch.git.file_at(FetchedBranchReference.PERSONAL_NOTES, self.path)
+        if text is None:
+            return ViewedCheckpointFile()
+        return ViewedCheckpointFile.from_json(json.loads(text))
+
+    def write_file(self, checkpoint_file: ViewedCheckpointFile) -> None:
+        """
+        :raises NotesBranchMissingError: If no remote has the notes branch any more.
+        :raises NotesPushRejectedError: If the remote rejects the push.
+        """
+        NotesBranchWriter(self.branch).write(
+            NotesFileChanges({self.path: checkpoint_file.rendered()}),
+            f"Record the files seen viewed in {self.path.as_posix()}",
+        )
 
 
 # %% triaging from the viewed states

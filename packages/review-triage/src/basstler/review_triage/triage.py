@@ -40,7 +40,7 @@ from basstler.review_triage.file_moves import FileMoveDetection
 from basstler.review_triage.markdown import MarkdownComparison
 from basstler.review_triage.member_moves import AttributeMoveDetection
 from basstler.review_triage.member_renames import MemberRenamer
-from basstler.review_triage.referents import MemberResolver
+from basstler.review_triage.referents import MemberResolver, ReexportEquivalence
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.plan_replay import PlanReplay, ReplayingFileTriager
 from basstler.review_triage.recorded_plans import PlanRecord
@@ -252,14 +252,18 @@ class PullRequestTriager:
             progress.update()
         base_modules = CommitModules(changes.commits.base_tree)
         head_modules = CommitModules(changes.commits.head_tree)
+        base_resolver = MemberResolver(base_modules)
         return JudgmentContext(
             renames,
             DefinitionIndex(base_modules),
             moved_definitions,
             substitution_renames,
             self.rules,
-            MemberRenamer(renames.binding_renames, MemberResolver(base_modules)),
+            MemberRenamer(renames.binding_renames, base_resolver),
             head_definitions=DefinitionIndex(head_modules),
             base_modules=base_modules,
             head_modules=head_modules,
+            import_source_equivalence=ReexportEquivalence(
+                base_resolver, MemberResolver(head_modules)
+            ),
         )

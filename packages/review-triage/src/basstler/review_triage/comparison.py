@@ -18,6 +18,7 @@ from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import (
     ImportBindings,
+    ImportSourceEquivalence,
     OwnerImports,
     PythonSource,
 )
@@ -277,6 +278,13 @@ class JudgmentContext:
     The head commit's modules, as :attr:`base_modules`.
     """
 
+    import_source_equivalence: ImportSourceEquivalence = field(
+        default_factory=ImportSourceEquivalence, kw_only=True
+    )
+    """
+    Decides whether an import the file being judged respells still binds its object.
+    """
+
     def renamed_imports(self, base: PythonSource, head: PythonSource) -> ImportBindings:
         """
         :param base: The base version of the file being judged.
@@ -516,7 +524,7 @@ class PythonComparison(ContentComparison):
         kinds = set(code_kinds)
         if base.import_statements != head.import_statements:
             if not context.renamed_imports(base, head).agrees_with(
-                head.import_bindings
+                head.import_bindings, context.import_source_equivalence
             ):
                 return None
             kinds.add(MechanicalChange.IMPORTS)

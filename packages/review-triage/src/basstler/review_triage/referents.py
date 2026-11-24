@@ -28,7 +28,7 @@ from basstler.review_triage.name_scopes import (
     NameBinding,
     NameScope,
 )
-from basstler.review_triage.python_source import PythonSource
+from basstler.review_triage.python_source import ImportSourceEquivalence, PythonSource
 from basstler.review_triage.renames import (
     DOTTED_NAME_SEPARATOR,
     ClassAttribute,
@@ -333,6 +333,23 @@ class MemberResolver:
         if names is None or member in followed:
             return None
         return self.top_level_referent(names, member_name, followed | {member})
+
+    def binds_one_object(self, source: str, other_source: str) -> bool:
+        """
+        :param source: The dotted path of a module member an import binds.
+        :param other_source: The dotted path of another.
+        :return: Whether both are proven to refer to one object in this commit.
+        """
+        module, _, member_name = source.rpartition(DOTTED_NAME_SEPARATOR)
+        other_module, _, other_member_name = other_source.rpartition(
+            DOTTED_NAME_SEPARATOR
+        )
+        if not module or not other_module:
+            return False
+        referent = self.member_referent(module, member_name)
+        return referent is not None and referent == self.member_referent(
+            other_module, other_member_name
+        )
 
     def top_level_referent(
         self,
@@ -704,3 +721,34 @@ class MemberResolver:
         module = self.modules.module_path(PurePosixPath(path))
         member = ModuleMember(module, node.name)
         return member if self.class_definition(member) is not None else None
+
+
+# %% import sources binding one object
+
+
+@dataclass(frozen=True)
+class ReexportEquivalence(ImportSourceEquivalence):
+    """
+    Proves two import sources bind one object when the base and the head commit each
+    resolve both to it, as a module re-exporting a member binds what its source does.
+    """
+
+    base_resolver: MemberResolver
+    """
+    What the base commit's names refer to.
+    """
+
+    head_resolver: MemberResolver
+    """
+    What the head commit's names refer to.
+    """
+
+    def binds_one_object(self, source: str, other_source: str) -> bool:
+        """
+        :meth:`ImportSourceEquivalence.binds_one_object`, also proving it for sources
+        both commits resolve to one object.
+        """
+        return super().binds_one_object(source, other_source) or (
+            self.base_resolver.binds_one_object(source, other_source)
+            and self.head_resolver.binds_one_object(source, other_source)
+        )

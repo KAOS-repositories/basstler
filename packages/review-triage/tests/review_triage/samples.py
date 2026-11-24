@@ -258,6 +258,41 @@ class ModuleMoveSample(SampleTrees):
         return "module-move"
 
 
+# %% an import respelled to another module that still exists
+
+
+class ModuleNameKeptSample(SampleTrees):
+    """
+    A pull request respelling an import to another module binding another object of the
+    same name, while the module it imported from stays.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "module-name-kept"
+
+
+# %% an import respelled to the module a re-export reads from
+
+
+class ReexportedImportSample(SampleTrees):
+    """
+    A pull request moving two classes out of a module that re-exports one of them and
+    binds the other's name to a different class, with a caller importing each from its
+    new module.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "reexported-import"
+
+
 # %% the package root move
 
 

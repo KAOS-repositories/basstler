@@ -478,17 +478,42 @@ class ImportBindings:
             if binding.bound_name not in other.bound_names
         )
 
-    def agrees_with(self, other: ImportBindings) -> bool:
+    def agrees_with(
+        self, other: ImportBindings, equivalence: ImportSourceEquivalence
+    ) -> bool:
         """
         :param other: The bindings of another version of the file.
-        :return: Whether every name both bind is bound to the same sources by both.
+        :param equivalence: Decides whether two sources bind one object.
+        :return: Whether every name both bind is bound to the same sources by both, or
+            by each to one source *equivalence* proves binds the other's object.
         """
-        bound_names = {binding.bound_name for binding in self.bindings}
-        return all(
-            self.sources_of(binding.bound_name) == other.sources_of(binding.bound_name)
-            for binding in other.bindings
-            if binding.bound_name in bound_names
-        )
+        for bound_name in self.bound_names & other.bound_names:
+            sources = self.sources_of(bound_name)
+            other_sources = other.sources_of(bound_name)
+            if sources == other_sources:
+                continue
+            if len(sources) != 1 or len(other_sources) != 1:
+                return False
+            (source,) = sources
+            (other_source,) = other_sources
+            if not equivalence.binds_one_object(source, other_source):
+                return False
+        return True
+
+
+class ImportSourceEquivalence:
+    """
+    Decides whether two import sources bind one object, proving it only for equal
+    sources.
+    """
+
+    def binds_one_object(self, source: str, other_source: str) -> bool:
+        """
+        :param source: The dotted path one version of a file imports a name from.
+        :param other_source: The dotted path another version imports it from.
+        :return: Whether both are proven to bind one object.
+        """
+        return source == other_source
 
 
 @dataclass(frozen=True)

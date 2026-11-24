@@ -25,7 +25,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install basstler
-        run: pip install "basstler @ git+https://github.com/KAOS-repositories/basstler@main"
+        run: pip install basstler
 
       - name: Triage the files for review
         env:

@@ -219,6 +219,32 @@ def test_a_receiver_reassigned_has_the_class_of_its_last_assignment():
     )
 
 
+def test_a_parameter_reassigned_from_its_own_call_has_its_annotated_class():
+    """
+    A parameter the call's own assignment rebinds has, at the call, the class it is
+    annotated with.
+    """
+    sample = FileSample.RECEIVER_PARAMETER_REASSIGNED
+    assert triaged(sample, RenameMap()) == MechanicalFile(
+        sample.change(), frozenset({KeywordChange.KEYWORD_ARGUMENTS})
+    )
+
+
+def test_a_parameter_a_loop_rebinds_has_no_class():
+    """
+    A parameter a loop around the call rebinds gives the receiver no class.
+    """
+    sample = FileSample.RECEIVER_PARAMETER_REBOUND_IN_LOOP
+    assert triaged(sample, RenameMap()).reasons == (
+        UnprovenKeywordCall(
+            sample.head_line("current.dot(other=table)"),
+            "dot",
+            UnprovenBinding.RECEIVER_CLASS_UNKNOWN,
+            ("ProbabilityTable.dot",),
+        ),
+    )
+
+
 def test_a_receiver_that_may_be_rebound_before_the_call_has_no_class():
     """
     A name a loop, a closure, a ``try`` body or a condition may rebind before the call

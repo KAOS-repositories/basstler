@@ -71,6 +71,8 @@ class FileSample(StrEnum):
     RECEIVER_TYPE_AMBIGUOUS = "receiver-type-ambiguous"
     RECEIVER_TYPE_FOLLOWED = "receiver-type-followed"
     RECEIVER_TYPE_INFERRED = "receiver-type-inferred"
+    RECEIVER_PARAMETER_REASSIGNED = "receiver-parameter-reassigned"
+    RECEIVER_PARAMETER_REBOUND_IN_LOOP = "receiver-parameter-rebound-in-loop"
     RECEIVER_TYPE_REASSIGNED = "receiver-type-reassigned"
     RECEIVER_TYPE_UNKNOWN = "receiver-type-unknown"
     RELATIVE_IMPORT_MOVED = "relative-import-moved"

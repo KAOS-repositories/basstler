@@ -24,6 +24,8 @@ from basstler.review_triage.comparison import (
     MechanicalChange,
     PythonComparison,
 )
+from basstler.review_triage.definition_succession import DefinitionSuccession
+from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.keyword_arguments import KeywordArgumentComparison
 from basstler.review_triage.moved_definitions import MovedDefinition, MovedDefinitions
 from basstler.github.pull_request_changes import PullRequestChanges
@@ -31,7 +33,9 @@ from basstler.review_triage.python_source import LineSpan, PythonSource
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.renames import (
     DOTTED_NAME_SEPARATOR,
+    MemberRename,
     Rename,
+    RenameCandidates,
     RenameDecisions,
     RenameMap,
 )
@@ -41,8 +45,9 @@ from basstler.review_triage.renames import (
 
 class DefinitionMoveDetection(RenameSource):
     """
-    Detects a top-level definition that leaves a module the head commit keeps and is
-    added to exactly one other module, as a rename of its dotted path.
+    Detects a top-level definition that leaves a module the head commit keeps for
+    another module, as a rename of its dotted path, unless the code of another added
+    definition carries it on.
     """
 
     @classproperty
@@ -58,18 +63,64 @@ class DefinitionMoveDetection(RenameSource):
             if change.path.suffix == MODULE_SUFFIX
             and PythonSource.every_version_parses(change)
         ]
+        succession = DefinitionSuccession.from_changes(changes)
         gained: dict[str, list[str]] = {}
         for change in modules:
             for name in self.added_names(change):
                 gained.setdefault(name, []).append(head.module_path(change.path))
-        renames = [
-            Rename(f"{old_module}.{name}", f"{new_modules[0]}.{name}", self)
+        removed = [
+            (old_module, name)
             for change in modules
             for old_module, name in self.removed_names(change, base)
-            if len(new_modules := gained.get(name, [])) == 1
-            and DOTTED_NAME_SEPARATOR in old_module
+            if DOTTED_NAME_SEPARATOR in old_module
         ]
+        renames: list[Rename] = [
+            Rename(old, new, self)
+            for old_module, name in removed
+            if len(new_modules := gained.get(name, [])) == 1
+            and succession.is_uncontested(
+                old := f"{old_module}{DOTTED_NAME_SEPARATOR}{name}",
+                new := f"{new_modules[0]}{DOTTED_NAME_SEPARATOR}{name}",
+            )
+        ]
+        renames.extend(self.renamed_moves(changes, removed, gained, succession))
         return RenameDecisions(tuple(sorted(renames, key=lambda rename: rename.old)))
+
+    def renamed_moves(
+        self,
+        changes: PullRequestChanges,
+        removed: list[tuple[str, str]],
+        gained: dict[str, list[str]],
+        succession: DefinitionSuccession,
+    ) -> Iterator[MemberRename]:
+        """
+        :param changes: A pull request and the files it changes.
+        :param removed: Each module the head commit keeps with a name it no longer
+            defines.
+        :param gained: The modules newly defining each name.
+        :param succession: Which added definition carries on each removed one.
+        :return: The moves of a definition to another module under a new name, where
+            its successor's code and the diff's substitutions both say so.
+        """
+        candidates = RenameCandidates()
+        for change in changes.files:
+            if PythonComparison().applies_to(change):
+                RenameDetection.collect(
+                    PythonSource.from_text(change.base_text),
+                    PythonSource.from_text(change.head_text),
+                    candidates,
+                )
+        names = candidates.dominant_pairs(
+            frozenset(name for _, name in removed), frozenset(gained)
+        )
+        for old_module, name in removed:
+            old = f"{old_module}{DOTTED_NAME_SEPARATOR}{name}"
+            new = succession.successors.get(old)
+            if new is None:
+                continue
+            new_module, _, new_name = new.rpartition(DOTTED_NAME_SEPARATOR)
+            if new_module != old_module and names.get(name) == new_name:
+                yield MemberRename(old, new, self)
 
     def moved_definitions(
         self, changes: PullRequestChanges, renames: RenameMap
@@ -97,34 +148,32 @@ class DefinitionMoveDetection(RenameSource):
             targets.setdefault(head.module_path(change.path), []).append(change)
         moved = []
         for rename in renames.renames:
-            old_module, _, name = rename.old.rpartition(DOTTED_NAME_SEPARATOR)
+            if not isinstance(rename.found_by, DefinitionMoveDetection):
+                continue
+            old_module, _, old_name = rename.old.rpartition(DOTTED_NAME_SEPARATOR)
+            new_module, _, new_name = rename.new.rpartition(DOTTED_NAME_SEPARATOR)
             source = next(
                 (
                     candidate
                     for candidate in sources.get(old_module, [])
-                    if name in PythonSource.from_text(candidate.base_text).defined_names
+                    if old_name
+                    in PythonSource.from_text(candidate.base_text).defined_names
                 ),
                 None,
             )
             target = next(
                 (
                     candidate
-                    for candidate in targets.get(
-                        rename.new.rpartition(DOTTED_NAME_SEPARATOR)[0], []
-                    )
-                    if name in PythonSource.from_text(candidate.head_text).defined_names
+                    for candidate in targets.get(new_module, [])
+                    if new_name
+                    in PythonSource.from_text(candidate.head_text).defined_names
                 ),
                 None,
             )
-            if (
-                not isinstance(rename.found_by, DefinitionMoveDetection)
-                or source is None
-                or target is None
-            ):
+            if source is None or target is None:
                 continue
             moved.append(
                 MovedDefinition(
-                    name,
                     source.previous_path or source.path,
                     source.base_text,
                     base.package(source.previous_path or source.path),
@@ -209,8 +258,12 @@ class DefinitionMoveComparison(FileJudgment):
             change.base_text or "",
             context.package_of(context.base_modules, base_path),
         )
-        head_rest = head.without(self.spans(head, arriving, base))
-        base_rest = base.without(self.spans(base, leaving, head))
+        head_rest = head.without(
+            self.spans(head, [definition.new_name for definition in arriving], base)
+        )
+        base_rest = base.without(
+            self.spans(base, [definition.name_in(base) for definition in leaving], head)
+        )
         arrival_kinds = self.arrival_changes(head, arriving, context)
         if arrival_kinds is None or not self.imports_only_moved_names(
             base_rest, head_rest, arriving, leaving, context.renames
@@ -228,20 +281,17 @@ class DefinitionMoveComparison(FileJudgment):
 
     @staticmethod
     def spans(
-        source: PythonSource,
-        definitions: tuple[MovedDefinition, ...],
-        other_version: PythonSource,
+        source: PythonSource, names: list[str], other_version: PythonSource
     ) -> tuple[LineSpan, ...]:
         """
         :param source: One version of a module.
-        :param definitions: Definitions it holds that the other version does not.
+        :param names: The names of definitions it holds that the other version does
+            not.
         :param other_version: The module's other version.
         :return: The definitions' lines, with the section header right above each
             when the other version lacks it.
         """
-        spans = tuple(
-            source.definition_span(definition.name) for definition in definitions
-        )
+        spans = tuple(source.definition_span(name) for name in names)
         headers = {
             header
             for span in spans
@@ -265,16 +315,39 @@ class DefinitionMoveComparison(FileJudgment):
         """
         kinds: set[ChangeKind] = set()
         for definition in arriving:
-            source = definition.source
+            source = self.renamed_source(definition, context)
             definition_kinds = self.comparison.text_changes(
-                source.lines_of(source.definition_span(definition.name)),
-                head.lines_of(head.definition_span(definition.name)),
+                source.lines_of(source.definition_span(definition.name_in(source))),
+                head.lines_of(head.definition_span(definition.new_name)),
                 context,
             )
             if definition_kinds is None:
                 return None
             kinds |= definition_kinds
+            if source.text != definition.source_text:
+                kinds.add(MechanicalChange.RENAME)
         return frozenset(kinds)
+
+    @staticmethod
+    def renamed_source(
+        definition: MovedDefinition, context: JudgmentContext
+    ) -> PythonSource:
+        """
+        :param definition: A moved definition.
+        :param context: What the judgment may consult about the pull request.
+        :return: The base version of the module it left, the occurrences proven to
+            refer to a renamed member renamed.
+        """
+        renamer = context.member_renamer
+        if renamer is None or definition.old_name == definition.new_name:
+            return definition.source
+        renamed = renamer.renamed_code(
+            definition.source_text,
+            definition.source_text,
+            definition.source_module,
+            definition.source_path.name == PACKAGE_INITIALIZER,
+        )
+        return PythonSource.from_text(renamed.text, definition.source_package)
 
     @staticmethod
     def imports_only_moved_names(
@@ -301,7 +374,9 @@ class DefinitionMoveComparison(FileJudgment):
             if name in base_names:
                 continue
             allowed = {
-                definition.new_path for definition in leaving if definition.name == name
+                definition.new_path
+                for definition in leaving
+                if definition.new_name == name
             }
             for definition in arriving:
                 source = definition.source

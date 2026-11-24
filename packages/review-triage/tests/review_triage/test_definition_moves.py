@@ -13,12 +13,14 @@ import pytest
 from basstler.review_triage.comparison import MechanicalChange
 from basstler.review_triage.definition_moves import DefinitionMoveDetection
 from basstler.github.pull_request_changes import PullRequestChanges
-from basstler.review_triage.renames import Rename, RenameDecisions
+from basstler.review_triage.renames import MemberRename, Rename, RenameDecisions
 from basstler.review_triage.triage import PullRequestTriager
 
 from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
 from .samples import (
+    DefinitionMoveAgainstRenameSample,
+    DefinitionMoveAndRenameSample,
     DefinitionMoveNamespacePackageSample,
     DefinitionMovePackageRootSample,
     DefinitionMoveSameModulePathSample,
@@ -360,3 +362,80 @@ def test_a_definition_moved_between_files_of_one_dotted_path_is_mechanical(
             {MechanicalChange.DEFINITIONS_MOVED_IN}
         ),
     }
+
+
+# %% a definition carried on under another name
+
+
+def test_a_definition_of_the_old_name_elsewhere_is_no_move_of_a_renamed_one(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A class renamed in its module is no move to another module adding a class of its old
+    name that its code does not carry on.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DefinitionMoveAgainstRenameSample.BASE_TREE,
+        DefinitionMoveAgainstRenameSample.HEAD_TREE,
+    )
+    assert DefinitionMoveDetection().decisions(changes) == RenameDecisions(())
+
+
+def test_the_files_following_an_in_place_rename_beside_a_new_namesake_are_mechanical(
+    scratch_repository: ScratchRepository,
+):
+    """
+    The module renaming the class and the file using it by its new name are mechanical;
+    the module adding a class of the old name is not.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DefinitionMoveAgainstRenameSample.BASE_TREE,
+        DefinitionMoveAgainstRenameSample.HEAD_TREE,
+    )
+    triage = PullRequestTriager().triage(changes)
+    assert {file.change.path: file.kinds for file in triage.mechanical_files} == {
+        PurePosixPath("caller.py"): frozenset({MechanicalChange.RENAME}),
+        PurePosixPath("package/geometry.py"): frozenset({MechanicalChange.RENAME}),
+    }
+    assert {file.change.path for file in triage.files_needing_review} == {
+        PurePosixPath("package/pose.py")
+    }
+
+
+def test_a_definition_moved_under_a_new_name_is_a_rename_of_its_dotted_path(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A class moved to another module under a new name its uses take on is renamed to its
+    path there.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DefinitionMoveAndRenameSample.BASE_TREE,
+        DefinitionMoveAndRenameSample.HEAD_TREE,
+    )
+    detection = DefinitionMoveDetection()
+    assert detection.decisions(changes) == RenameDecisions(
+        (
+            MemberRename(
+                "package.shapes.Square", "package.polygons.RegularSquare", detection
+            ),
+        )
+    )
+
+
+def test_the_files_of_a_definition_moved_under_a_new_name_are_mechanical(
+    scratch_repository: ScratchRepository,
+):
+    """
+    The module the class leaves, the module receiving it renamed, and the file importing
+    it by its new name from there are mechanical.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DefinitionMoveAndRenameSample.BASE_TREE,
+        DefinitionMoveAndRenameSample.HEAD_TREE,
+    )
+    assert PullRequestTriager().triage(changes).files_needing_review == ()

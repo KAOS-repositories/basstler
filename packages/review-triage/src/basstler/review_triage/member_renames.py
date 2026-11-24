@@ -37,7 +37,9 @@ from basstler.review_triage.python_source import (
 from basstler.review_triage.renames import (
     AttributeMove,
     BindingRename,
+    DOTTED_NAME_SEPARATOR,
     ClassAttribute,
+    MemberRename,
     ModuleMember,
     Rename,
     RenameDecisions,
@@ -527,7 +529,7 @@ class RenamedBase:
 
     owner_imports: OwnerImports = OwnerImports()
     """
-    The imports its renamed code gains and may lose for the attribute moves applied.
+    The imports its renamed code gains and may lose for the moves applied.
     """
 
 
@@ -609,6 +611,7 @@ class MemberRenamer:
         search = OccurrenceSearch(self.resolver, names, renames, positions, moves=moves)
         edits = search.search()
         prose_renames = self.prose_renames(tokens, positions, edits, renames)
+        renamed_code = self.edited(code, edits)
         return RenamedBase(
             self.edited(text, edits),
             RenameMap.from_decisions(
@@ -619,9 +622,8 @@ class MemberRenamer:
                     ),
                 ]
             ),
-            self.owner_imports(
-                names, self.edited(code, edits), is_package, search.applied_moves
-            ),
+            self.owner_imports(names, renamed_code, is_package, search.applied_moves)
+            | self.moved_definition_imports(names, renamed_code, renames),
         )
 
     def can_read_new_owner(
@@ -676,6 +678,38 @@ class MemberRenamer:
             )
         )
         return OwnerImports(added, droppable)
+
+    @staticmethod
+    def moved_definition_imports(
+        names: ModuleNames,
+        renamed_code: str,
+        renames: dict[str, tuple[BindingRename, ...]],
+    ) -> OwnerImports:
+        """
+        :param names: A file's base version.
+        :param renamed_code: Its code once the renames are applied.
+        :param renames: The renames applied to it, by their old name.
+        :return: For each definition renamed into another module that the renamed
+            code imports from its old module, that import replaced by one from the new.
+        """
+        bindings = PythonSource.from_text(
+            renamed_code, names.source.package
+        ).import_bindings.bindings
+        moved = {
+            ImportBinding(
+                rename.new_name,
+                f"{rename.definition.module}{DOTTED_NAME_SEPARATOR}{rename.new_name}",
+            ): ImportBinding(rename.new_name, rename.new)
+            for applied in renames.values()
+            for rename in applied
+            if isinstance(rename, MemberRename)
+            and rename.new.rpartition(DOTTED_NAME_SEPARATOR)[0]
+            != rename.definition.module
+        }
+        imported = bindings & moved.keys()
+        return OwnerImports(
+            frozenset(moved[binding] for binding in imported), frozenset(imported)
+        )
 
     @staticmethod
     def prose_renames(

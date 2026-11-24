@@ -96,6 +96,23 @@ def test_a_member_rename_to_another_name_than_the_word_rename_is_kept():
     assert renames.renames == (DECLARED, MEMBER)
 
 
+MOVED_MEMBER = MemberRename(
+    "package.module.old_name", "package.other.new_name", MemberRenameDetection()
+)
+"""
+A rename of a module member that also moves it into another module.
+"""
+
+
+def test_a_member_rename_into_another_module_is_kept_beside_the_word_rename():
+    """
+    A member rename that moves its member is kept even where the word rename gives its
+    old name the same new name, since the word rename leaves its module as it is.
+    """
+    renames = RenameMap.from_decisions([RenameDecisions((DETECTED, MOVED_MEMBER))])
+    assert renames.renames == (DETECTED, MOVED_MEMBER)
+
+
 # %% pairing old and new names by the diff
 
 

@@ -18,7 +18,7 @@ from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 
 from basstler_testing.scratch_repository import ScratchRepository
 from .conftest import committed_pull_request
-from .samples import AttributeRenameSample
+from .samples import AttributeInheritedInHeadSample, AttributeRenameSample
 
 # %% the sample
 
@@ -51,8 +51,8 @@ def test_renamed_attributes_are_renames_of_their_qualified_paths(
 ):
     """
     A method or attribute a class defines under a new name is renamed by its class's
-    qualified path; an override left behind or inherited from the standard library
-    keeps its old name from being renamed.
+    qualified path; an override left behind or inherited from the standard library keeps
+    its old name from being renamed.
     """
     decisions = MemberRenameDetection().decisions(attribute_rename)
     assert {
@@ -115,3 +115,25 @@ def test_an_attribute_not_bound_to_a_renamed_one_needs_review(
     assert path in {
         file.change.path for file in attribute_rename_triage.files_needing_review
     }
+
+
+# %% an attribute the head class inherits
+
+
+def test_an_attribute_the_head_class_inherits_is_not_renamed(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A method a class stops defining but inherits from a new base class is still there,
+    so the method the class adds is no rename of it.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        AttributeInheritedInHeadSample.BASE_TREE,
+        AttributeInheritedInHeadSample.HEAD_TREE,
+    )
+    assert [
+        (rename.old, rename.new)
+        for rename in MemberRenameDetection().decisions(changes).accepted
+        if isinstance(rename, AttributeRename)
+    ] == []

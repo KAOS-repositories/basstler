@@ -138,19 +138,61 @@ items:
   notes: 'Draft #240 at 1b6fb9f6, stacked on #238 (experiments/receiver-inference-experiment)
     on #214. Pins pyrefly==1.4.1; reveals receivers once per pull request; --no-type-checker.
     Conflicts with its base (needs-resolution), CI not read. Next: restack onto #238.'
-- id: viewed-state-start
-  title: Start each file's triage from where its reviewer last viewed it
-  branch: null
+
+- id: module-name-kept
+  title: Keep a module name a file of the head still has from counting as renamed
   track: triage
+  branch: review-triage-module-name-kept
+  pull_request_number: 310
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #310 at 4201c9eb, off main.'
+
+- id: install-docs
+  title: Install review-triage from PyPI in one command
+  track: triage
+  branch: review-triage-install-docs
+  pull_request_number: 314
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on: []
+  status: in progress
+  recommended_model: haiku
+  notes: 'Draft bug #314 at 0b81fef4, off main: the docs install is one uvx basstler@latest command; the
+    git-URL pip install failed. CI not read.'
+
+- id: untokenizable-modules
+  title: Treat a Python module that does not parse as needing review
+  track: triage
+  branch: fix-untokenizable-module-review
+  pull_request_number: 263
   depends_on:
   - binding-renames
-  status: not started
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft bug #263 at ee918f35 on #253: a merge commit with conflict markers crashed tokenize.'
+
+- id: script-pull-request-url
+  title: Let review-triage.sh take a pull request URL and mark files viewed from a fresh clone
+  track: triage
+  branch: review-triage-script-pull-request-url
+  pull_request_number: 265
+  depends_on:
+  - binding-renames
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #265 at 62815229 on #253.'
+
+- id: speed-and-progress
+  title: Make review triage 4x faster, show its progress and keep mark-viewed quiet
+  track: triage
+  branch: review-triage-speed-and-progress
+  pull_request_number: 266
+  depends_on:
+  - script-pull-request-url
+  status: in progress
   recommended_model: opus
-  notes: 'Stacked on #266 (untracked). Replaces LastReviewStart, which a Claude thread reply
-    under the user reset to head on #223. One paged GraphQL snapshot reads headRefOid and
-    each file''s viewerViewedState: VIEWED skipped, UNVIEWED from the merge base, DISMISSED
-    from the latest checkpoint head where it was VIEWED, else the merge base. Each run stores
-    a checkpoint (head, VIEWED files) on personal notes when reachable, else the local cache.
-    Marking stops if headRefOid moved. --since and --from-merge-base stay. #223 moves these
-    paths.'
+  notes: 'Draft #266 at 24a109f8 on #265: one git cat-file --batch, one grep for all rename candidates;
+    CRAM 1019 in 33 s instead of 345 s.'
 landed_item_count: 6

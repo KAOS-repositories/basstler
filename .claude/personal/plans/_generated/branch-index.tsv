@@ -22,6 +22,11 @@ review-triage-binding-renames	review-triage
 review-triage-markdown-binding-renames	review-triage
 claude/magical-euler-j4joud	review-triage
 review-triage-pyrefly-fallback	review-triage
+review-triage-module-name-kept	review-triage
+review-triage-install-docs	review-triage
+fix-untokenizable-module-review	review-triage
+review-triage-script-pull-request-url	review-triage
+review-triage-speed-and-progress	review-triage
 review-triage-viewed-state-start	review-triage-stack
 review-triage-integration	review-triage-stack
 review-triage-script-workspace-install	review-triage-stack

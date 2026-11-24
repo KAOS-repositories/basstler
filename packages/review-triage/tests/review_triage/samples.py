@@ -644,3 +644,22 @@ class AttributeInheritedInHeadSample(SampleTrees):
         The directory holding the attribute-inherited-in-head sample.
         """
         return "attribute-inherited-in-head"
+
+
+# %% the receiver a type checker reveals
+
+
+class ReceiverCheckSample(SampleTrees):
+    """
+    A pull request passing an argument by keyword to a method of what a factory returns,
+    unannotated in the first pair of trees and annotated in the second.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    ANSWERED_BASE_TREE = "answered-base"
+    ANSWERED_HEAD_TREE = "answered-head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "receiver-type-checked"

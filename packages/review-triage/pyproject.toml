@@ -32,6 +32,7 @@ dependencies = [
     "cyclopts>=5.3",
     "libcst>=1.8",
     "pydantic>=2.11",
+    "pyrefly==1.4.1",
     "pyyaml>=6",
     "basstler-core",
     "basstler-git",

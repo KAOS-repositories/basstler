@@ -174,6 +174,29 @@ class CommitModules(DefinitionSearch):
                 return directory
         return None
 
+    @cached_property
+    def import_roots(self) -> tuple[PurePosixPath, ...]:
+        """
+        The directories the commit's modules are imported from, as :meth:`module_path`
+        resolves them: its root, the sources directory of every project of the ``src``
+        layout, and every other directory holding a package no package encloses.
+        """
+        modules = [
+            path for path in self.tree.file_paths if path.suffix == MODULE_SUFFIX
+        ]
+        sources = {self.sources_directory(path) for path in modules} - {None}
+        packages = {
+            path.parent
+            for path in modules
+            if path.name == PACKAGE_INITIALIZER and self.sources_directory(path) is None
+        }
+        top_packages = {
+            package.parent
+            for package in packages
+            if packages.isdisjoint(package.parents)
+        }
+        return tuple(sorted({PurePosixPath("."), *top_packages, *sources}))
+
     def package(self, path: PurePosixPath) -> tuple[str, ...]:
         """
         :param path: A module's file.

@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from basstler.class_property import classproperty
-from basstler.exceptions import DataclassException
+from basstler.exceptions import DataclassException, ExternalCallFailed
 from basstler.locations import BasstlerRepositoryLocation
 from basstler.github.basstler_project import BasstlerProject
 from basstler.github.repository import PullRequestReference, Repository
@@ -171,3 +171,26 @@ class UnknownRecordedPlanError(DataclassException):
 
     def suggest_correction(self) -> str:
         return f"Name one of: {', '.join(self.known_names)}."
+
+
+@dataclass
+class TypeCheckerFailed(ExternalCallFailed):
+    """
+    Raised when a type checker exits with a status other than those of a run that
+    checked the files.
+    """
+
+    command: tuple[str, ...]
+    """
+    The program and its arguments.
+    """
+
+    @property
+    def call(self) -> str:
+        return f"`{' '.join(self.command)}`"
+
+    def suggest_correction(self) -> str:
+        return (
+            "fix what the output names and run it again, or pass --no-type-checker to "
+            "leave the receivers basstler cannot infer for review"
+        )

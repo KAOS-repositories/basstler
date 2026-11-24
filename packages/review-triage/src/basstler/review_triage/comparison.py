@@ -22,6 +22,7 @@ from basstler.review_triage.python_source import (
     OwnerImports,
     PythonSource,
 )
+from basstler.review_triage.receiver_probes import RevealedReceivers
 from basstler.review_triage.renames import RenameDecisions, RenameMap
 from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
@@ -283,6 +284,12 @@ class JudgmentContext:
     )
     """
     Decides whether an import the file being judged respells still binds its object.
+    """
+
+    revealed_receivers: RevealedReceivers | None = field(default=None, kw_only=True)
+    """
+    The classes a type checker reveals for the pull request's receivers, ``None``
+    without a type checker.
     """
 
     def renamed_imports(self, base: PythonSource, head: PythonSource) -> ImportBindings:

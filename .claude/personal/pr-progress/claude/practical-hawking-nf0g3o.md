@@ -7,7 +7,9 @@ Done
 - #299-#310 as before; #311 re-exported import proof, #312 viewed checkpoints in notes, #313 Pyrefly receivers, all stacked on #309.
 - #312: without a notes branch the checkpoints stay in the clone and the run warns, naming /setup-personal-notes (826abbdc).
 - CI read green at current heads of #299-#306, #308-#311 and #313 (Tests); #312 at 826abbdc was still running.
-- claude/practical-hawking-nf0g3o = #309 + #311-#314 at af131fc6; review-triage 419 pass locally.
+- claude/practical-hawking-nf0g3o = #309 + #311-#314 at 178c4452; review-triage 419 pass locally (at af131fc6).
+- #300 docs show the curl one-liner (ecaee4fe), merged forward through #301-#313 and the feature branch.
+- cram2 1050 via the curl one-liner at 178c4452's script: 50/109 need review; spot-checked mechanical files, no false positives.
 - #314 (bug, off main): docs install is one `uvx basstler@latest ...` command; the git-URL pip install failed.
 - Triage at 9cac997a: #297 34/101 need review, 1019 111/464; the 12 newly mechanical 1019 files read, all renames.
 

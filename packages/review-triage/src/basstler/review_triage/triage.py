@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
 from basstler.git.commit_range import FileVersions
@@ -43,10 +43,12 @@ from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.referents import MemberResolver
 from basstler.review_triage.module_moves import ModuleMoveDetection
 from basstler.review_triage.plan_replay import PlanReplay, ReplayingFileTriager
+from basstler.review_triage.receiver_probes import RevealedReceivers
 from basstler.review_triage.recorded_plans import PlanRecord
 from basstler.review_triage.rename_sources import RenameSource
 from basstler.review_triage.rule_fixes import RuleFixComparison
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
+from basstler.review_triage.type_checkers import Pyrefly, TypeChecker
 from basstler.review_triage.renames import RenameDecisions, RenameMap
 from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
@@ -159,6 +161,12 @@ class PullRequestTriager:
     The files a judging process is handed at a time.
     """
 
+    type_checker: TypeChecker | None = field(default_factory=Pyrefly)
+    """
+    The type checker answering the receivers basstler's own inference leaves open,
+    ``None`` to leave them open.
+    """
+
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
@@ -217,6 +225,10 @@ class PullRequestTriager:
                     verdicts[change.path] = triager.triage(change)
                     progress.update()
                 return verdicts
+            receivers = triager.context.revealed_receivers
+            if receivers is not None:
+                # Revealed once here, so the processes judging files share the classes.
+                _ = receivers.classes
             with ProcessPoolExecutor(worker_count) as pool:
                 judging = [pool.submit(triager.triage_each, batch) for batch in batches]
                 for judged in as_completed(judging):
@@ -262,4 +274,9 @@ class PullRequestTriager:
             head_definitions=DefinitionIndex(head_modules),
             base_modules=base_modules,
             head_modules=head_modules,
+            revealed_receivers=(
+                None
+                if self.type_checker is None
+                else RevealedReceivers.from_changes(changes, self.type_checker)
+            ),
         )

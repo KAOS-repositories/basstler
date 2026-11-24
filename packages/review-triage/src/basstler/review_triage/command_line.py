@@ -117,6 +117,12 @@ class TriagePublication:
     Plans commits applied beyond those their messages record.
     """
 
+    type_checker: bool = True
+    """
+    Whether Pyrefly answers the method call receivers basstler's own inference leaves
+    open.
+    """
+
     @classmethod
     def from_arguments(
         cls,
@@ -129,6 +135,7 @@ class TriagePublication:
         ignore_rules: tuple[TriageRule, ...] = (),
         from_merge_base: bool = False,
         plans: tuple[str, ...] = (),
+        type_checker: bool = True,
     ) -> TriagePublication:
         """
         :param pull_request: The pull request's number.
@@ -140,6 +147,7 @@ class TriagePublication:
         :param ignore_rules: The rules to turn off.
         :param from_merge_base: Whether to triage the whole change.
         :param plans: Plans commits applied, each as ``commit=plan``.
+        :param type_checker: Whether Pyrefly answers the receivers left open.
         :return: The publication triaging from *since*, else from before the *last*
             commits, else from the merge base if *from_merge_base*, else each file from
             where the viewer last viewed it.
@@ -161,6 +169,7 @@ class TriagePublication:
                 frozenset(select_rules), frozenset(ignore_rules)
             ),
             plan_records=tuple(PlanRecord.from_argument(plan) for plan in plans),
+            type_checker=type_checker,
         )
 
     def outcome(self) -> TriageOutcome:
@@ -182,6 +191,7 @@ class TriagePublication:
                 ReviewTriageSettings.from_checkout(checkout).selection
             ),
             plan_records=self.plan_records,
+            type_checker=default.type_checker if self.type_checker else None,
         )
         if isinstance(self.start, ViewedStateStart):
             return ViewedFilesTriage(
@@ -238,6 +248,7 @@ def report(
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
     plan: tuple[str, ...] = (),
+    type_checker: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown; by default each file
@@ -260,6 +271,8 @@ def report(
         those settings; repeatable.
     :param plan: A code modification plan a commit applied, as ``commit=plan``, for a
         commit whose message does not record it; repeatable.
+    :param type_checker: Whether Pyrefly answers the method call receivers whose class
+        basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -272,6 +285,7 @@ def report(
         ignore_rule,
         from_merge_base,
         plan,
+        type_checker,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -297,6 +311,7 @@ def mark_viewed(
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
     plan: tuple[str, ...] = (),
+    type_checker: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the logged-in account, or, where
@@ -325,6 +340,8 @@ def mark_viewed(
         those settings; repeatable.
     :param plan: A code modification plan a commit applied, as ``commit=plan``, for a
         commit whose message does not record it; repeatable.
+    :param type_checker: Whether Pyrefly answers the method call receivers whose class
+        basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     :raises GraphQLErrorsReturned: If marking them directly, alone, fails.
     :raises FilesNotMarkedViewed: If neither way marks them.
@@ -340,6 +357,7 @@ def mark_viewed(
         ignore_rule,
         from_merge_base,
         plan,
+        type_checker,
     ).outcome()
     (TriageSummary() if summary_only else MarkdownReport()).publish(outcome)
     marked_repository = Repository.from_name_or_remote(repository, git)
@@ -368,6 +386,7 @@ def mark_viewed_in_reviews(
     repository: str | None = None,
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
+    type_checker: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Mark viewed, for the logged-in account, the mechanical files of every open pull
@@ -379,6 +398,8 @@ def mark_viewed_in_reviews(
     :param select_rule: An opt-in rule to turn on, adding to the checkout's
         ``[tool.basstler.review-triage]`` settings in ``pyproject.toml``; repeatable.
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
+    :param type_checker: Whether Pyrefly answers the method call receivers whose class
+        basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     :raises GraphQLErrorsReturned: Once every pull request was tried, if any was
         refused.
@@ -395,6 +416,7 @@ def mark_viewed_in_reviews(
             None,
             select_rule,
             ignore_rule,
+            type_checker=type_checker,
         ).outcome()
         for number in reviewed.numbers(github)
     )

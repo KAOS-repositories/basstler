@@ -149,6 +149,11 @@ class ReachableDefinition:
     The signature of calling it, ``None`` when it cannot be read.
     """
 
+    definition: Definition | None = None
+    """
+    The function, method or class reached, ``None`` when it is not read.
+    """
+
 
 class CallTarget(ABC):
     """
@@ -205,7 +210,7 @@ class NamedTarget(CallTarget):
             return []
         return [
             ReachableDefinition(
-                definition.qualified_name, reader.signature_of(definition)
+                definition.qualified_name, reader.signature_of(definition), definition
             )
             for definition in reader.definitions.definitions_of(self.callee)
         ]
@@ -284,6 +289,7 @@ class MethodTarget(CallTarget):
             ReachableDefinition(
                 self.qualified_method_name(definition.name),
                 reader.method_signature(definition, self.callee),
+                definition.method(self.callee),
             )
             for definition in classes
             if reader.defines(definition, self.callee)
@@ -327,7 +333,7 @@ class ClassTarget(CallTarget):
         ]
         return [
             ReachableDefinition(
-                definition.qualified_name, reader.signature_of(definition)
+                definition.qualified_name, reader.signature_of(definition), definition
             )
             for definition in classes
         ]
@@ -1014,3 +1020,30 @@ CALLEE_RESOLUTIONS: tuple[CalleeResolution, ...] = (
 """
 The built-in resolutions, the first giving a call a target deciding it.
 """
+
+
+@dataclass(frozen=True)
+class CalleeResolutions:
+    """
+    The ways a call may reach its callee, tried in order.
+    """
+
+    ways: tuple[CalleeResolution, ...] = CALLEE_RESOLUTIONS
+    """
+    The resolutions, the first giving a call a target deciding it.
+    """
+
+    def target(self, function: ast.expr, scope: CallScope) -> CallTarget | None:
+        """
+        :param function: The called expression of a call.
+        :param scope: What the code around the call tells.
+        :return: The target of the first resolution giving one, ``None`` when none does.
+        """
+        return next(
+            (
+                found
+                for resolution in self.ways
+                if (found := resolution.target(function, scope)) is not None
+            ),
+            None,
+        )

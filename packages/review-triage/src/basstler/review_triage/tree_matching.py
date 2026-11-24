@@ -13,11 +13,50 @@ from functools import cached_property
 from basstler.class_property import classproperty
 from basstler.review_triage.calls import CallScope
 from basstler.review_triage.comparison import ChangeKind, ReviewReason
-from basstler.review_triage.definitions import DefinitionIndex
+from basstler.review_triage.definitions import DefinitionIndex, FunctionDefinition
+from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.name_scopes import SCOPED_FIELDS, NameScope
 from basstler.review_triage.python_source import ImportBindings, PythonSource
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import SignatureReader
+
+# %% what a finding is proved against
+
+
+@dataclass(frozen=True)
+class CommitReaders:
+    """
+    Read the signatures of the commits a pull request compares.
+    """
+
+    base: SignatureReader
+    """
+    Reads the base commit's signatures.
+    """
+
+    head: SignatureReader
+    """
+    Reads the head commit's signatures.
+    """
+
+    member_renamer: MemberRenamer | None = None
+    """
+    Renames the base commit's proven occurrences of the module members the pull request
+    renames; ``None`` when it renames none.
+    """
+
+    def renamed_base_definition(
+        self, definition: FunctionDefinition
+    ) -> FunctionDefinition:
+        """
+        :param definition: A function or method :attr:`base` read.
+        :return: It as :meth:`MemberRenamer.renamed_definition` reads it, itself when
+            the pull request renames no module member.
+        """
+        if self.member_renamer is None:
+            return definition
+        return self.member_renamer.renamed_definition(definition, self.base.definitions)
+
 
 # %% findings
 
@@ -37,10 +76,10 @@ class Finding(ABC):
 
     @abstractmethod
     def unproven_reason(
-        self, reader: SignatureReader, renames: RenameMap
+        self, readers: CommitReaders, renames: RenameMap
     ) -> ReviewReason | None:
         """
-        :param reader: Reads the base commit's signatures.
+        :param readers: Read the signatures of both commits.
         :param renames: The renames the pull request makes throughout.
         :return: Why the difference may change what the code does, ``None`` when it
             cannot.
@@ -58,6 +97,32 @@ class Finding(ABC):
 # %% rules
 
 
+@dataclass(frozen=True)
+class ComparedNodeTypes:
+    """
+    The type of a node of the base tree and that of the node at its place in the head
+    tree.
+    """
+
+    base: type[ast.AST]
+    """
+    The type of the base tree's node.
+    """
+
+    head: type[ast.AST]
+    """
+    The type of the head tree's node.
+    """
+
+    @classmethod
+    def alike(cls, *node_types: type[ast.AST]) -> tuple[ComparedNodeTypes, ...]:
+        """
+        :param node_types: Types of nodes.
+        :return: Each type compared with a node of the same type.
+        """
+        return tuple(cls(node_type, node_type) for node_type in node_types)
+
+
 class DifferenceRule(ABC):
     """
     Compares the nodes of some types, allowing a particular difference between them.
@@ -65,16 +130,17 @@ class DifferenceRule(ABC):
 
     @classproperty
     @abstractmethod
-    def node_types(cls) -> tuple[type[ast.AST], ...]:
+    def compared_types(cls) -> tuple[ComparedNodeTypes, ...]:
         """
-        The types of the nodes this rule compares.
+        The types of the pairs of nodes this rule compares.
         """
 
     @abstractmethod
     def matches(self, base: ast.AST, head: ast.AST, matcher: TreeMatcher) -> bool:
         """
-        :param base: A node of the base tree of one of :attr:`node_types`.
-        :param head: The node of the same type at the same place in the head tree.
+        :param base: A node of the base tree, of a type of :attr:`compared_types`.
+        :param head: The node at the same place in the head tree, of the type compared
+            with it.
         :param matcher: The comparison in progress, for the nodes' children and to
             record findings.
         :return: Whether the two are equal but for differences this rule allows.
@@ -92,7 +158,8 @@ class TreeMatcher:
 
     rules: tuple[DifferenceRule, ...]
     """
-    The rules allowing differences, the first comparing a node's type deciding it.
+    The rules allowing differences, the first comparing a pair of node types deciding
+    it.
     """
 
     head_imports: ImportBindings
@@ -137,13 +204,13 @@ class TreeMatcher:
     """
 
     @cached_property
-    def rule_by_type(self) -> dict[type[ast.AST], DifferenceRule]:
+    def rule_by_types(self) -> dict[ComparedNodeTypes, DifferenceRule]:
         """
-        The rule comparing each node type some rule compares.
+        The rule comparing each pair of node types some rule compares.
         """
-        rules: dict[type[ast.AST], DifferenceRule] = {}
+        rules: dict[ComparedNodeTypes, DifferenceRule] = {}
         for rule in reversed(self.rules):
-            rules |= dict.fromkeys(rule.node_types, rule)
+            rules |= dict.fromkeys(rule.compared_types, rule)
         return rules
 
     @property
@@ -176,12 +243,10 @@ class TreeMatcher:
             )
         if not isinstance(base, ast.AST):
             return base == head
-        if type(base) is not type(head):
-            return False
-        rule = self.rule_by_type.get(type(base))
-        if rule is None:
-            return self.matches_fields(base, head)
-        return rule.matches(base, head, self)
+        rule = self.rule_by_types.get(ComparedNodeTypes(type(base), type(head)))
+        if rule is not None:
+            return rule.matches(base, head, self)
+        return type(base) is type(head) and self.matches_fields(base, head)
 
     def matches_fields(
         self, base: ast.AST, head: ast.AST, skipped: frozenset[str] = frozenset()

@@ -16,6 +16,7 @@ from basstler.review_triage.definitions import DefinitionIndex, SourceDefinition
 from basstler.review_triage.keyword_arguments import KeywordConversion
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import Signature, SignatureReader
+from basstler.review_triage.tree_matching import CommitReaders
 
 from .samples import SIGNATURE_DEFINITIONS
 from basstler.text_file import TextFile
@@ -148,4 +149,5 @@ def test_a_keyword_binds_only_where_the_parameter_takes_it(
     definition the call may reach: by name anywhere, through the class hierarchy, or
     through the class an attribute is declared to hold, by name where none is declared.
     """
-    assert (conversion.unproven_reason(reader, RenameMap()) is None) is binds
+    readers = CommitReaders(reader, reader)
+    assert (conversion.unproven_reason(readers, RenameMap()) is None) is binds

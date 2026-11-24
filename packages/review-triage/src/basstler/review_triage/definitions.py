@@ -6,14 +6,15 @@ small records holding only what deciding a call's binding needs.
 from __future__ import annotations
 
 import ast
-from abc import ABC, abstractmethod
+import copy
+from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
 
 from basstler.review_triage.python_source import AnnotatedType, PythonSource
-from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR
+from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
 
 # %% names the reading recognises
 
@@ -62,6 +63,39 @@ class DataclassName(StrEnum):
 PROPERTY_DECORATORS = frozenset({"property", "cached_property"})
 """
 The decorators that make a method an attribute holding what it returns.
+"""
+
+ABSTRACT_BASE_CLASS_MODULE = ABC.__module__
+"""
+The module whose classes keep a class from making instances while a method is abstract.
+"""
+
+
+class AbstractBaseClassMember(StrEnum):
+    """
+    The members of :mod:`abc` that keep a class from making instances while one of its
+    methods is abstract.
+    """
+
+    BASE_CLASS = ABC.__name__
+    """
+    The class whose subclasses do so.
+    """
+
+    METACLASS = ABCMeta.__name__
+    """
+    The metaclass whose classes do so.
+    """
+
+    ABSTRACT_METHOD = abstractmethod.__name__
+    """
+    The decorator making a method abstract.
+    """
+
+
+METACLASS_KEYWORD = "metaclass"
+"""
+The keyword of a class definition naming the class's metaclass.
 """
 
 TYPE_VARIABLE = "TypeVar"
@@ -155,6 +189,18 @@ class FunctionDefinition:
     of, its return annotation being the type variable ``T``.
     """
 
+    is_abstract: bool = False
+    """
+    Whether its one decorator is :func:`abc.abstractmethod`.
+    """
+
+    node: ast.FunctionDef | ast.AsyncFunctionDef = field(
+        compare=False, repr=False, kw_only=True
+    )
+    """
+    The definition as the file spells it.
+    """
+
     @property
     def qualified_name(self) -> str:
         """
@@ -163,6 +209,18 @@ class FunctionDefinition:
         if self.owner is None:
             return self.name
         return f"{self.owner}{DOTTED_NAME_SEPARATOR}{self.name}"
+
+    def bare_code(self, renames: RenameMap) -> str:
+        """
+        :param renames: The renames to apply first.
+        :return: The definition without its decorators and its docstring, as
+            :meth:`PythonSource.code` gives a file's code.
+        """
+        bare = copy.copy(self.node)
+        bare.decorator_list = []
+        if ast.get_docstring(self.node, clean=False) is not None and len(bare.body) > 1:
+            bare.body = bare.body[1:]
+        return PythonSource.from_text(ast.unparse(bare)).code(renames)
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +306,13 @@ class ClassDefinition:
     """
     The attributes it declares a class for: in its body, on ``self`` in its methods
     or as the return of its properties.
+    """
+
+    is_abstract_base_class: bool = False
+    """
+    Whether it derives from :class:`abc.ABC` or names :class:`abc.ABCMeta` as its
+    metaclass itself, so that neither it nor a subclass leaving a method abstract
+    makes instances.
     """
 
     @property
@@ -364,6 +429,13 @@ class DefinitionReader:
                 )
             ),
             class_argument_parameter=self.class_argument_parameter(node),
+            is_abstract=len(node.decorator_list) == 1
+            and self.source.import_bindings.refers_to(
+                node.decorator_list[0],
+                ABSTRACT_BASE_CLASS_MODULE,
+                AbstractBaseClassMember.ABSTRACT_METHOD,
+            ),
+            node=node,
         )
 
     def generic_names(
@@ -427,6 +499,28 @@ class DefinitionReader:
             ),
             is_dataclass=decorator is not None,
             attribute_types=tuple(self.attribute_types(node)),
+            is_abstract_base_class=self.is_abstract_base_class(node),
+        )
+
+    def is_abstract_base_class(self, node: ast.ClassDef) -> bool:
+        """
+        :param node: A class definition.
+        :return: :attr:`ClassDefinition.is_abstract_base_class` of the class.
+        """
+        bindings = self.source.import_bindings
+        return any(
+            bindings.refers_to(
+                base, ABSTRACT_BASE_CLASS_MODULE, AbstractBaseClassMember.BASE_CLASS
+            )
+            for base in node.bases
+        ) or any(
+            keyword.arg == METACLASS_KEYWORD
+            and bindings.refers_to(
+                keyword.value,
+                ABSTRACT_BASE_CLASS_MODULE,
+                AbstractBaseClassMember.METACLASS,
+            )
+            for keyword in node.keywords
         )
 
     def attribute_types(self, node: ast.ClassDef) -> Iterator[AttributeType]:
@@ -690,6 +784,24 @@ class DefinitionIndex:
         for file in files:
             yield from self.by_file[file]
 
+    def file_defining(self, definition: FunctionDefinition) -> str | None:
+        """
+        :param definition: A function or method read from one of this commit's files.
+        :return: The key of that file, ``None`` when no file read so far holds it.
+        """
+        return next(
+            (
+                key
+                for key, found in self.by_file.items()
+                if any(
+                    isinstance(candidate, FunctionDefinition)
+                    and candidate.node is definition.node
+                    for candidate in found
+                )
+            ),
+            None,
+        )
+
     def load(self, names: frozenset[str]) -> None:
         """
         Find the definitions of every name not looked up yet, in one search.
@@ -788,6 +900,42 @@ class DefinitionIndex:
         return self.unreadable_names.isdisjoint(
             names
         ) and self.classes_with_unreadable_subclasses.isdisjoint(lower_names)
+
+    def runs_on_instances(self, method: FunctionDefinition) -> bool:
+        """
+        :param method: A method of a class of the commit.
+        :return: Whether an instance may run it: unless it is abstract and every class
+            defining it is an abstract base class.
+        """
+        if not method.is_abstract or method.owner is None:
+            return True
+        owners = [
+            owner
+            for owner in self.classes_named(method.owner)
+            if method in owner.methods
+        ]
+        return not owners or not all(
+            self.is_abstract_base_class(owner, frozenset()) for owner in owners
+        )
+
+    def is_abstract_base_class(
+        self, definition: ClassDefinition, visited: frozenset[str]
+    ) -> bool:
+        """
+        :param definition: A class definition.
+        :param visited: The names of the classes it is reached from, not looked at again.
+        :return: Whether it is :attr:`ClassDefinition.is_abstract_base_class` or one of
+            its bases names only such classes.
+        """
+        if definition.is_abstract_base_class:
+            return True
+        reached = visited | {definition.name}
+        return any(
+            (bases := self.classes_named(base))
+            and all(self.is_abstract_base_class(found, reached) for found in bases)
+            for base in definition.bases
+            if base and base not in reached
+        )
 
     def ancestors_of(self, classes: list[ClassDefinition]) -> list[ClassDefinition]:
         """

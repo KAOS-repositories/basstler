@@ -259,6 +259,13 @@ class JudgmentContext:
     The reasons for review the judgments of the file being judged found so far.
     """
 
+    head_definitions: DefinitionIndex = field(
+        default_factory=DefinitionIndex, kw_only=True
+    )
+    """
+    The functions, methods and classes the head commit defines.
+    """
+
     base_modules: CommitModules | None = field(default=None, kw_only=True)
     """
     The base commit's modules, which say the package each version of a file is in;

@@ -320,6 +320,24 @@ def old_name_renamed() -> RenameMap:
     return RenameMap((Rename("old_name", "new_name", RenameDetection()),))
 
 
+@pytest.fixture
+def poses_renamed() -> RenameMap:
+    """
+    :return: The renames of the property samples: the pose, its matrix and the property
+        reading it.
+    """
+    return RenameMap(
+        tuple(
+            Rename(old, new, RenameDetection())
+            for old, new in (
+                ("as_matrix", "to_transform"),
+                ("Matrix", "Transform"),
+                ("Pose", "SpatialPose"),
+            )
+        )
+    )
+
+
 def commit_trees(
     scratch_repository: ScratchRepository,
     base_files: dict[Path, str],

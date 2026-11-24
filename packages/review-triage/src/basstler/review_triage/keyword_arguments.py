@@ -12,10 +12,9 @@ from enum import StrEnum
 
 from basstler.class_property import classproperty
 from basstler.review_triage.calls import (
-    ReachableDefinition,
-    CALLEE_RESOLUTIONS,
-    CalleeResolution,
+    CalleeResolutions,
     CallTarget,
+    ReachableDefinition,
 )
 from basstler.review_triage.comparison import (
     ChangeKind,
@@ -31,10 +30,17 @@ from basstler.review_triage.definitions import (
     SourceDefinitions,
 )
 from basstler.review_triage.name_scopes import NameScope
+from basstler.review_triage.property_calls import PropertyReadAsMethodCall
 from basstler.review_triage.python_source import PythonSource
 from basstler.review_triage.renames import RenameMap
 from basstler.review_triage.signatures import DecoratorPolicy, SignatureReader
-from basstler.review_triage.tree_matching import DifferenceRule, Finding, TreeMatcher
+from basstler.review_triage.tree_matching import (
+    CommitReaders,
+    ComparedNodeTypes,
+    DifferenceRule,
+    Finding,
+    TreeMatcher,
+)
 
 # %% what the change consists of
 
@@ -198,13 +204,14 @@ class KeywordConversion(Finding):
         return KeywordChange.KEYWORD_ARGUMENTS
 
     def unproven_reason(
-        self, reader: SignatureReader, renames: RenameMap
+        self, readers: CommitReaders, renames: RenameMap
     ) -> UnprovenKeywordCall | None:
         """
         ``None`` when every definition the call may reach that takes its positional
         arguments binds each to the parameter of its keyword, and at least one takes
         them.
         """
+        reader = readers.base
         target = self.target.in_base(renames)
         definitions = target.reachable_definitions(reader)
         unreadable = [found for found in definitions if found.signature is None]
@@ -267,7 +274,7 @@ class KeywordOnlyDefinition(Finding):
         return KeywordChange.KEYWORD_ONLY
 
     def unproven_reason(
-        self, reader: SignatureReader, renames: RenameMap
+        self, readers: CommitReaders, renames: RenameMap
     ) -> ReviewReason | None:
         """
         Always ``None``: a call still passing such a parameter positionally fails
@@ -297,13 +304,13 @@ class AddedDecorator(Finding):
         return KeywordChange.IDENTITY_DECORATORS
 
     def unproven_reason(
-        self, reader: SignatureReader, renames: RenameMap
+        self, readers: CommitReaders, renames: RenameMap
     ) -> UnprovenDecorator | None:
         """
         ``None`` when every definition of the decorator in the base commit returns what
         it decorates.
         """
-        if reader.definitions.is_identity(renames.original_identifier(self.name)):
+        if readers.base.definitions.is_identity(renames.original_identifier(self.name)):
             return None
         return UnprovenDecorator(self.line, self.name)
 
@@ -324,14 +331,14 @@ class ArgumentsPassedByKeyword(DifferenceRule):
     expressions kept and evaluated in the same order.
     """
 
-    resolutions: tuple[CalleeResolution, ...] = CALLEE_RESOLUTIONS
+    resolutions: CalleeResolutions = CalleeResolutions()
     """
-    The ways a call may reach its callee, the first giving it a target deciding it.
+    The ways a call may reach its callee.
     """
 
     @classproperty
-    def node_types(cls) -> tuple[type[ast.AST], ...]:
-        return (ast.Call,)
+    def compared_types(cls) -> tuple[ComparedNodeTypes, ...]:
+        return ComparedNodeTypes.alike(ast.Call)
 
     def matches(self, base: ast.Call, head: ast.Call, matcher: TreeMatcher) -> bool:
         kept = len(head.args)
@@ -346,15 +353,7 @@ class ArgumentsPassedByKeyword(DifferenceRule):
             return False
         if not moved:
             return True
-        scope = matcher.scope
-        target = next(
-            (
-                found
-                for resolution in self.resolutions
-                if (found := resolution.target(base.func, scope)) is not None
-            ),
-            None,
-        )
+        target = self.resolutions.target(base.func, matcher.scope)
         if (
             target is None
             or any(isinstance(argument, ast.Starred) for argument in base.args)
@@ -383,8 +382,8 @@ class ParametersMadeKeywordOnly(DifferenceRule):
     """
 
     @classproperty
-    def node_types(cls) -> tuple[type[ast.AST], ...]:
-        return (ast.arguments,)
+    def compared_types(cls) -> tuple[ComparedNodeTypes, ...]:
+        return ComparedNodeTypes.alike(ast.arguments)
 
     def matches(
         self, base: ast.arguments, head: ast.arguments, matcher: TreeMatcher
@@ -424,8 +423,10 @@ class DefinitionDecorators(DifferenceRule):
     """
 
     @classproperty
-    def node_types(cls) -> tuple[type[ast.AST], ...]:
-        return (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+    def compared_types(cls) -> tuple[ComparedNodeTypes, ...]:
+        return ComparedNodeTypes.alike(
+            ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef
+        )
 
     def matches(
         self,
@@ -517,6 +518,7 @@ KEYWORD_RULES: tuple[DifferenceRule, ...] = (
     ArgumentsPassedByKeyword(),
     ParametersMadeKeywordOnly(),
     DefinitionDecorators(),
+    PropertyReadAsMethodCall(),
 )
 """
 The built-in rules of the keyword judgment.
@@ -563,9 +565,13 @@ class KeywordArgumentComparison(PythonComparison):
         )
         if not matcher.matches(base_tree, head.code_tree(RenameMap())):
             return None
-        reader = SignatureReader(context.base_definitions, self.decorators)
+        readers = CommitReaders(
+            SignatureReader(context.base_definitions, self.decorators),
+            SignatureReader(context.head_definitions, self.decorators),
+            context.member_renamer,
+        )
         renames = context.renames
-        reader.definitions.load(
+        readers.base.definitions.load(
             frozenset().union(
                 *(finding.looked_up_names(renames) for finding in matcher.findings)
             )
@@ -573,7 +579,7 @@ class KeywordArgumentComparison(PythonComparison):
         reasons = [
             reason
             for finding in matcher.findings
-            if (reason := finding.unproven_reason(reader, renames)) is not None
+            if (reason := finding.unproven_reason(readers, renames)) is not None
         ]
         if reasons:
             context.review_reasons.extend(reasons)

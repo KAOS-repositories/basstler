@@ -11,9 +11,16 @@ import re
 import tokenize
 from dataclasses import dataclass, field
 from functools import cached_property
+from pathlib import PurePosixPath
 
 from basstler.git.commit_range import FileVersions
-from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER
+from basstler.review_triage.commit_tree import FILE_KEY_SEPARATOR, PACKAGE_INITIALIZER
+from basstler.review_triage.definitions import (
+    Definition,
+    DefinitionIndex,
+    DefinitionReader,
+    FunctionDefinition,
+)
 from basstler.review_triage.markdown_document import MarkdownCode
 from basstler.review_triage.name_scopes import (
     COMPREHENSION_TYPES,
@@ -549,6 +556,51 @@ class MemberRenamer:
     """
     What the base commit's names refer to.
     """
+
+    renamed_files: dict[str, tuple[Definition, ...]] = field(
+        default_factory=dict, compare=False, repr=False
+    )
+    """
+    The definitions of each base file renamed so far, read from its renamed version, by
+    the file's key.
+    """
+
+    def renamed_definition(
+        self, definition: FunctionDefinition, definitions: DefinitionIndex
+    ) -> FunctionDefinition:
+        """
+        :param definition: A definition the base commit's index read.
+        :param definitions: That index.
+        :return: The same definition read from its file's base version with the proven
+            occurrences renamed; *definition* itself when that version is not read.
+        """
+        key = definitions.file_defining(definition)
+        if key is None:
+            return definition
+        if key not in self.renamed_files:
+            path = PurePosixPath(key.partition(FILE_KEY_SEPARATOR)[2])
+            text = self.resolver.modules.texts_of((key,))[key]
+            renamed = PythonSource.from_text(
+                self.renamed_code(
+                    text,
+                    text,
+                    self.resolver.modules.module_path(path),
+                    path.name == PACKAGE_INITIALIZER,
+                ).text
+            )
+            self.renamed_files[key] = (
+                tuple(DefinitionReader(renamed).definitions()) if renamed.parses else ()
+            )
+        return next(
+            (
+                found
+                for found in self.renamed_files[key]
+                if isinstance(found, FunctionDefinition)
+                and (found.node.lineno, found.node.col_offset)
+                == (definition.node.lineno, definition.node.col_offset)
+            ),
+            definition,
+        )
 
     def renamed_base(self, change: FileVersions) -> RenamedBase:
         """

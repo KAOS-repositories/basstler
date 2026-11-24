@@ -15,10 +15,12 @@ report in its summary. The job needs only `contents: read` and
 ## On your own machine
 
 ```bash
-pip install "basstler @ git+https://github.com/KAOS-repositories/basstler@main"
-basstler review-triage report <pull request> --repository <owner>/<name>
-basstler review-triage mark-viewed <pull request> --repository <owner>/<name>
+uvx basstler@latest review-triage mark-viewed <pull request> --repository <owner>/<name>
 ```
+
+This runs the latest release from PyPI without installing it; use `report` in place of
+`mark-viewed` to only print the triage. Without `uv`, `pip install basstler` and drop
+the `uvx` and `@latest`.
 
 `mark-viewed` marks the mechanical files viewed for the account whose GitHub
 credential is configured (`GH_TOKEN`, or `gh auth login`). It uses GitHub's GraphQL

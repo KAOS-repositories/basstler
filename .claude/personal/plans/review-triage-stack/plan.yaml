@@ -1,0 +1,178 @@
+schema_version: 1
+id: review-triage-stack
+title: 'Review triage stack: every triage feature restacked on main, so mark-viewed proves #297 and CRAM
+  1019'
+description: The open triage pull requests restacked on main as one chain, each new proof its own draft
+  pull request, with claude/practical-hawking-nf0g3o holding them all; mechanical files are marked viewed
+  with no false positives, on Windows and Ubuntu.
+default_repository: KAOS-repositories/basstler
+waves:
+- id: stack
+  name: Restacked triage
+tracks:
+- id: stack
+  name: One chain from main
+  wave: stack
+items:
+- id: viewed-state-start
+  title: Start each file's triage from where its reviewer last viewed it
+  branch: review-triage-viewed-state-start
+  track: stack
+  depends_on:
+  - member-moves
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #303 at 68105e99 on #302. One paged GraphQL snapshot reads headRefOid and each file''s
+    viewerViewedState: VIEWED skipped, UNVIEWED from the merge base, DISMISSED from the latest checkpoint
+    head where it was VIEWED. Marking stops if headRefOid moved.'
+  pull_request_number: 303
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+- id: triage-integration
+  title: One branch with every open triage pull request, on main
+  track: stack
+  branch: review-triage-integration
+  pull_request_number: 299
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - review-triage/binding-renames
+  - review-triage/markdown-binding-renames
+  - review-triage/move-split
+  - review-triage/per-reviewer-viewed-marking
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #299 at 4263bc13: the base of the restacked triage stack (#300-#313). claude/practical-hawking-nf0g3o
+    holds #309 + #311-#314.'
+- id: script-workspace-install
+  title: Install basstler from a clone of its workspace in review-triage.sh
+  track: stack
+  branch: review-triage-script-workspace-install
+  pull_request_number: 300
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - triage-integration
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #300 at ecaee4fe. The docs show the curl one-liner with BASSTLER_REF for an unmerged branch.'
+- id: namespace-packages
+  title: Resolve a namespace package's modules by their project's src directory
+  track: stack
+  branch: review-triage-namespace-packages
+  pull_request_number: 301
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - script-workspace-install
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #301 at eee5dc99.'
+- id: member-moves
+  title: Prove a class attribute moved into a like class mechanical where it is read
+  track: stack
+  branch: review-triage-member-moves
+  pull_request_number: 302
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - namespace-packages
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #302 at 1ad759e8.'
+- id: reproducing-definitions
+  title: Prove a definition moved under a new name mechanical by which head definition reproduces it
+  track: stack
+  branch: review-triage-reproducing-definitions
+  pull_request_number: 304
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - viewed-state-start
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #304 at bfcb05b9.'
+- id: reason-lines
+  title: Keep reason line numbers right in files whose module documentation is left out
+  track: stack
+  branch: review-triage-reason-lines
+  pull_request_number: 305
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - reproducing-definitions
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #305 at 94aa275a.'
+- id: property-methods
+  title: Prove a property read turned into a method call mechanical
+  track: stack
+  branch: review-triage-property-methods
+  pull_request_number: 306
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - reason-lines
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #306 at 452d2568.'
+- id: renamed-pass-reasons
+  title: Report the reasons of the judgment that renamed a file's members
+  track: stack
+  branch: review-triage-renamed-pass-reasons
+  pull_request_number: 307
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - property-methods
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #307 at 57e60b9d. Tests failed at e9d601e0 (basstler-github metadata had no Source URL);
+    the re-run is not read.'
+- id: parameter-receivers
+  title: Give a reassigned parameter its annotated class before the reassignment
+  track: stack
+  branch: review-triage-parameter-receivers
+  pull_request_number: 308
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - renamed-pass-reasons
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #308 at 5d105245.'
+- id: reviewer-workflow
+  title: Mark viewed for every reviewer, on their own schedule
+  track: stack
+  branch: review-triage-reviewer-workflow
+  pull_request_number: 309
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - parameter-receivers
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #309 at 7641fad9: per-reviewer-viewed-marking (#262) ported onto the stack.'
+- id: reexported-imports
+  title: Prove an import respelled to the module a re-export reads from
+  track: stack
+  branch: review-triage-reexported-imports
+  pull_request_number: 311
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - reviewer-workflow
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #311 at 854b6c15.'
+- id: viewed-checkpoints-in-notes
+  title: Keep the files seen viewed on the personal-notes branch
+  track: stack
+  branch: review-triage-viewed-checkpoints-in-notes
+  pull_request_number: 312
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - reviewer-workflow
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #312 at 81ca28d1. Without a notes branch the checkpoints stay in the clone and the run
+    warns, naming /setup-personal-notes.'
+- id: pyrefly-receivers
+  title: Answer the receivers basstler cannot infer with the classes Pyrefly reveals
+  track: stack
+  branch: review-triage-pyrefly-receivers
+  pull_request_number: 313
+  session: https://claude.ai/code/session_01JxHGiMaBTJPWdiw5tn4mNv
+  depends_on:
+  - reviewer-workflow
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #313 at 40e10177: pyrefly-receiver-fallback (#240) ported onto the stack.'

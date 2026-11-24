@@ -206,4 +206,14 @@ items:
   depends_on: []
   status: not started
   recommended_model: sonnet
+
+- id: notes-unused-stack-dependency
+  title: Drop basstler-notes' unused dependency on basstler-stack
+  track: package-split
+  branch: chore/notes-drops-unused-stack-dependency
+  pull_request_number: 298
+  depends_on: []
+  status: in progress
+  recommended_model: haiku
+  notes: '#298 at 57339bfc, off main, ready for review: nothing in packages/notes imports basstler.stack.'
 landed_item_count: 8

@@ -5,9 +5,9 @@ Plan
 
 Done
 - #299-#309 as before. #310 (bug, off main): a module name a head file keeps no longer counts as renamed.
-- Pyrefly fallback (port of #240) committed 05ba7a87 on review-triage-pyrefly-receivers; review-triage tests green.
-- Re-exported import proof on review-triage-reexported-imports (39d536be); viewed checkpoints in notes on review-triage-viewed-checkpoints-in-notes (32c91416).
+- Stacked draft PRs on #309, all release:minor: #311 re-exported import proof (carries #310's commit), #312 viewed checkpoints in notes, #313 Pyrefly receivers (port of #240).
+- Shared plan/* test failures were a plan-save env missing tqdm/pyrefly; after uv sync, 191 plan tests pass on all three branches.
 
 Next
-- Read basstler-package suite results for the int and ckpt branches, then push both and the Pyrefly branch as stacked draft PRs on #309.
-- CI of #299-#310 and the Windows run not yet read green; update claude/practical-hawking-nf0g3o after.
+- CI of #299-#313 and the Windows run not yet read green.
+- Merge #311-#313 into claude/practical-hawking-nf0g3o after.

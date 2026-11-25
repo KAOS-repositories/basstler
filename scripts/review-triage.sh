@@ -130,7 +130,9 @@ native_path() {
     fi
 }
 
-# The workspace's distributions are installed together, so each finds the others.
+# The workspace's distributions are installed together, so each finds the others. They
+# are reinstalled at each new commit: uv rebuilds a local one only when its project file
+# changes, and keeps the old code otherwise.
 install_basstler() {
     local commit stamp python
     commit="$reference"
@@ -151,7 +153,7 @@ install_basstler() {
     git -C "$source_clone" checkout --quiet --force --detach FETCH_HEAD
     if command -v uv >/dev/null; then
         UV_PROJECT_ENVIRONMENT="$(native_path "$environment")" uv sync --quiet --frozen \
-            --package basstler --no-dev --no-editable --project "$source_clone"
+            --package basstler --no-dev --no-editable --reinstall --project "$source_clone"
     else
         python="$(system_python)"
         [[ -d "$environment" ]] || "$python" -m venv "$environment"

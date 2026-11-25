@@ -412,6 +412,13 @@ class ImportBinding:
     The dotted path of the module or module member the name is bound to.
     """
 
+    @property
+    def member_name(self) -> str:
+        """
+        The last name of :attr:`source`, the member's name in its module.
+        """
+        return self.source.rpartition(DOTTED_NAME_SEPARATOR)[2]
+
 
 @dataclass(frozen=True)
 class ImportBindings:
@@ -805,6 +812,23 @@ class PythonSource:
             for node in ast.walk(self.code_tree(renames))
             if isinstance(node, ast.Name)
         )
+
+    @cached_property
+    def decorator_only_names(self) -> frozenset[str]:
+        """
+        The bare names the file's code refers to only as whole decorators.
+        """
+        tree = self.code_tree(RenameMap())
+        decorators = {
+            id(decorator)
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            for decorator in node.decorator_list
+            if isinstance(decorator, ast.Name)
+        }
+        names = [node for node in ast.walk(tree) if isinstance(node, ast.Name)]
+        elsewhere = {node.id for node in names if id(node) not in decorators}
+        return frozenset(node.id for node in names) - elsewhere
 
     @cached_property
     def import_bindings(self) -> ImportBindings:

@@ -66,6 +66,10 @@ def triaged(sample: FileSample, renames: RenameMap) -> FileVerdict:
             FileSample.DOCSTRING_EXAMPLE_KEYWORD_ARGUMENTS,
             {KeywordChange.KEYWORD_ARGUMENTS},
         ),
+        (
+            FileSample.KEYWORD_ARGUMENTS_TO_IDENTITY_DECORATED,
+            {KeywordChange.KEYWORD_ARGUMENTS},
+        ),
         (FileSample.KEYWORD_ONLY_PARAMETERS, {KeywordChange.KEYWORD_ONLY}),
         (FileSample.IDENTITY_DECORATOR_ADDED, {KeywordChange.IDENTITY_DECORATORS}),
         (
@@ -81,8 +85,8 @@ def test_a_call_binding_as_before_is_mechanical(
     """
     Keywords naming the parameters the base definitions bound the arguments to, in the
     code, where :func:`pytest.raises` passes them on or in a docstring's python example,
-    keyword-only parameters and added identity decorators, imported or not, are
-    mechanical.
+    also through identity decorators, keyword-only parameters and added identity
+    decorators, imported or not, are mechanical.
     """
     assert triaged(sample, RenameMap()) == MechanicalFile(
         sample.change(), frozenset(kinds)
@@ -95,13 +99,14 @@ def test_a_call_binding_as_before_is_mechanical(
         FileSample.KEYWORD_ARGUMENTS_SWAPPED,
         FileSample.KEYWORD_ARGUMENTS_REORDERED,
         FileSample.KEYWORD_ARGUMENTS_UNKNOWN_CALLEE,
+        FileSample.KEYWORD_ARGUMENTS_TO_WRAPPING_DECORATED,
         FileSample.BEHAVIOUR_CHANGED,
     ],
 )
 def test_a_call_that_may_bind_differently_needs_review(sample: FileSample):
     """
     Keywords naming other parameters, arguments evaluated in another order and calls of
-    a callee the base commit does not define need review.
+    a callee the base commit does not define, or decorates with a wrapper, need review.
     """
     assert triaged(sample, RenameMap()) == FileNeedingReview(sample.change())
 

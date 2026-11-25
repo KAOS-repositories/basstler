@@ -55,6 +55,8 @@ class FileSample(StrEnum):
     KEYWORD_ARGUMENTS_FORWARDED_BY_RAISES_SWAPPED = (
         "keyword-arguments-forwarded-by-raises-swapped"
     )
+    KEYWORD_ARGUMENTS_TO_IDENTITY_DECORATED = "keyword-arguments-to-identity-decorated"
+    KEYWORD_ARGUMENTS_TO_WRAPPING_DECORATED = "keyword-arguments-to-wrapping-decorated"
     KEYWORD_ARGUMENTS_REORDERED = "keyword-arguments-reordered"
     KEYWORD_ARGUMENTS_SWAPPED = "keyword-arguments-swapped"
     KEYWORD_ARGUMENTS_UNKNOWN_CALLEE = "keyword-arguments-unknown-callee"

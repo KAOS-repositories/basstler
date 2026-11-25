@@ -5,6 +5,7 @@ file does or says, otherwise in need of review.
 
 from __future__ import annotations
 
+import difflib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -133,6 +134,125 @@ class ReviewReason(ABC):
         """
 
 
+class Difference(StrEnum):
+    """
+    A part of a file's change that no judgment proved mechanical.
+    """
+
+    ADDED_FILE = "the file is added"
+    """
+    The file is new, so there is no base version to compare it with.
+    """
+
+    DELETED_FILE = "the file is deleted"
+    """
+    The file is gone, so there is no head version to compare.
+    """
+
+    BINARY_FILE = "the file is binary"
+    """
+    Git compares the file as binary, which no judgment reads.
+    """
+
+    CODE_CHANGED = "the code here differs beyond the changes proven mechanical"
+    """
+    The code stops matching its base version here.
+    """
+
+    DOCSTRING_REWORDED = "the docstring is reworded beyond renames and reflowing"
+    """
+    A documentation string says something else.
+    """
+
+    COMMENT_REWORDED = "a comment is reworded beyond renames and reflowing"
+    """
+    A comment says something else.
+    """
+
+    TEXT_CHANGED = "no judgment proves the change from here on mechanical"
+    """
+    The first changed line of a file no judgment gave a narrower reason for.
+    """
+
+
+@dataclass(frozen=True)
+class UnprovenDifference(ReviewReason):
+    """
+    A part of a file's change no judgment proved mechanical.
+    """
+
+    difference: Difference
+    """
+    Which part it is.
+    """
+
+    @property
+    def explanation(self) -> str:
+        return self.difference
+
+    @classmethod
+    def from_change(cls, change: FileVersions) -> UnprovenDifference:
+        """
+        :param change: A file needing review that no judgment gave a reason for.
+        :return: Its first changed line, or the whole file when no judgment reads it.
+        """
+        if change.is_binary:
+            return cls(1, Difference.BINARY_FILE)
+        if change.base_text is None:
+            return cls(1, Difference.ADDED_FILE)
+        if change.head_text is None:
+            return cls(1, Difference.DELETED_FILE)
+        head_lines = change.head_text.splitlines()
+        opcodes = difflib.SequenceMatcher(
+            None, change.base_text.splitlines(), head_lines, autojunk=False
+        ).get_opcodes()
+        first = next((opcode for opcode in opcodes if opcode[0] != "equal"), None)
+        head_start = 0 if first is None else first[3]
+        return cls(min(head_start, len(head_lines) - 1) + 1, Difference.TEXT_CHANGED)
+
+
+class ImportMismatch(StrEnum):
+    """
+    How the two versions of a file import a name differently.
+    """
+
+    ONLY_HEAD = "only the head version imports it, and not as a respelling"
+    """
+    The head binds a name the base did not, its code not shown to read it as before.
+    """
+
+    ONLY_BASE = "only the base version imports it, and not as a respelling"
+    """
+    The base bound a name the head no longer does, not shown to be unused or respelled.
+    """
+
+    SOURCE_CHANGED = "the versions import it from different sources"
+    """
+    Both bind the name, to objects not shown to be the same.
+    """
+
+
+@dataclass(frozen=True)
+class ImportDifference(ReviewReason):
+    """
+    A name the two versions of a file import differently.
+    """
+
+    bound_name: str
+    """
+    The name the import binds.
+    """
+
+    mismatch: ImportMismatch
+    """
+    How the versions import it differently.
+    """
+
+    @property
+    def explanation(self) -> str:
+        return f"`{self.bound_name}` - {self.mismatch}"
+
+
 @dataclass(frozen=True)
 class FileVerdict(ABC):
     """
@@ -165,8 +285,7 @@ class FileNeedingReview(FileVerdict):
 
     reasons: tuple[ReviewReason, ...] = field(default=(), compare=False)
     """
-    The parts of the change a judgment tried and failed to show mechanical; empty when
-    no judgment names one.
+    The parts of the change a judgment tried and failed to show mechanical.
     """
 
 
@@ -473,14 +592,30 @@ class PythonComparison(ContentComparison):
                 or not context.base_definitions.is_identity(binding.member_name)
             )
         )
-        if not (
-            base_imports.binds_only_respellings(
-                head_imports, base.referenced_names(context.renames)
-            )
-            and head_imports.binds_only_respellings(
-                base_imports, head.referenced_names(RenameMap())
-            )
-        ):
+        unexplained = [
+            *(
+                ImportDifference(
+                    head.import_line(binding.bound_name),
+                    binding.bound_name,
+                    ImportMismatch.ONLY_BASE,
+                )
+                for binding in base_imports.unexplained_bindings(
+                    head_imports, base.referenced_names(context.renames)
+                )
+            ),
+            *(
+                ImportDifference(
+                    head.import_line(binding.bound_name),
+                    binding.bound_name,
+                    ImportMismatch.ONLY_HEAD,
+                )
+                for binding in head_imports.unexplained_bindings(
+                    base_imports, head.referenced_names(RenameMap())
+                )
+            ),
+        ]
+        if unexplained:
+            context.review_reasons.extend(unexplained)
             return None
         return kinds
 
@@ -532,18 +667,41 @@ class PythonComparison(ContentComparison):
             return None
         kinds = set(code_kinds)
         if base.import_statements != head.import_statements:
-            if not context.renamed_imports(base, head).agrees_with(
+            disagreeing = context.renamed_imports(base, head).disagreeing_names(
                 head.import_bindings, context.import_source_equivalence
-            ):
+            )
+            if disagreeing:
+                context.review_reasons.extend(
+                    ImportDifference(
+                        head.import_line(name), name, ImportMismatch.SOURCE_CHANGED
+                    )
+                    for name in disagreeing
+                )
                 return None
             kinds.add(MechanicalChange.IMPORTS)
-        prose_pairs = [
-            *zip(base.documentation, head.documentation, strict=True),
-            (base.comments, head.comments),
+        prose_parts = [
+            *(
+                (
+                    base_prose,
+                    statement.value.value,
+                    statement.lineno,
+                    Difference.DOCSTRING_REWORDED,
+                )
+                for base_prose, statement in zip(
+                    base.documentation, head.documentation_statements, strict=True
+                )
+            ),
+            (
+                base.comments,
+                head.comments,
+                head.first_comment_line_differing_from(base),
+                Difference.COMMENT_REWORDED,
+            ),
         ]
-        for base_prose, head_prose in prose_pairs:
+        for base_prose, head_prose, line, difference in prose_parts:
             prose_kinds = self.prose.text_changes(base_prose, head_prose, context)
             if prose_kinds is None:
+                context.review_reasons.append(UnprovenDifference(line, difference))
                 return None
             kinds |= prose_kinds
         return frozenset(kinds)
@@ -632,7 +790,8 @@ class FileTriager:
         """
         :param change: A file the pull request changes.
         :return: Whether a reviewer has to read it, with the reasons of the judgment
-            that renamed its members when that judgment gave any.
+            that renamed its members when that judgment gave any, else of the others,
+            else its first changed line.
         """
         member_renamed_context = replace(self.context, review_reasons=[])
         context = replace(self.context, review_reasons=[])
@@ -643,7 +802,11 @@ class FileTriager:
             kinds |= {MechanicalChange.MOVE}
         if not kinds:
             reasons = member_renamed_context.review_reasons or context.review_reasons
-            return FileNeedingReview(change, tuple(dict.fromkeys(reasons)))
+            return FileNeedingReview(
+                change,
+                tuple(dict.fromkeys(reasons))
+                or (UnprovenDifference.from_change(change),),
+            )
         return MechanicalFile(change, kinds)
 
     def triage_each(self, changes: tuple[FileVersions, ...]) -> tuple[FileVerdict, ...]:

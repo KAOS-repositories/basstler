@@ -36,9 +36,11 @@ items:
   - identity-decorator-imports
   status: in progress
   recommended_model: opus
-  notes: 'Draft #318 at 8a7fe447 on #317. ImportDifference and UnprovenDifference from the import,
-    docstring, comment and code comparisons; the first changed line as the fallback. Markdown code-block
-    reasons still count lines from the block.'
+  notes: >
+    Draft #318 at e4e56931 on #317, merged into claude/practical-hawking-nf0g3o at 5cf4ecef.
+    ImportDifference and UnprovenDifference from the import, docstring, comment and code
+    comparisons; the first changed line as the fallback; an emptied docstring keeps its line.
+    Markdown code-block reasons still count lines from the block.
 - id: raises-forwarding
   title: Prove keyword arguments forwarded through pytest.raises
   track: coverage

@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -239,6 +239,11 @@ BASSTLER_PROJECT = Path("packages") / "basstler" / "pyproject.toml"
 The basstler distribution's project file in a clone of the workspace.
 """
 
+BASSTLER_MODULE = Path("packages") / "basstler" / "src" / "basstler" / "module.py"
+"""
+A module of the basstler distribution, changed without its project file.
+"""
+
 
 @dataclass(frozen=True)
 class BasstlerSource:
@@ -265,6 +270,25 @@ class BasstlerSource:
     """
     The file the ``uv`` stand-in records its arguments in.
     """
+
+    def with_new_commit(self) -> BasstlerSource:
+        """
+        :return: This source after a commit changing a module but no project file.
+        """
+        self.repository.write(BASSTLER_MODULE, "CHANGED = True\n")
+        self.repository.commit_everything("Change a module")
+        return replace(self, commit=self.repository.git.commit_at("HEAD"))
+
+    def synced_arguments(self) -> list[list[str]]:
+        """
+        :return: The arguments of each ``uv sync`` so far, the project path left out.
+        """
+        syncs: list[list[str]] = []
+        for argument in TextFile(self.uv_log).read().splitlines():
+            if argument == "sync":
+                syncs.append([])
+            syncs[-1].append(argument)
+        return [arguments[:-1] for arguments in syncs]
 
     def run(self, home: Path, call_log: Path) -> subprocess.CompletedProcess[str]:
         """
@@ -340,6 +364,7 @@ def test_basstler_is_installed_from_a_clone_of_its_workspace(
         "basstler",
         "--no-dev",
         "--no-editable",
+        "--reinstall",
         "--project",
     ]
     assert Path(project) == home / "basstler"
@@ -372,3 +397,20 @@ def test_a_second_run_at_the_same_commit_installs_nothing(
 
     assert completed.returncode == 0, completed.stderr
     assert TextFile(basstler_source.uv_log).read().splitlines().count("sync") == 1
+
+
+def test_a_run_at_a_new_commit_reinstalls_what_it_changed(
+    basstler_source: BasstlerSource, tmp_path: Path
+):
+    """
+    A commit changing modules but no project file still replaces the installed ones.
+    """
+    home = tmp_path / "home"
+    call_log = tmp_path / "python-calls.log"
+    basstler_source.run(home, call_log)
+    changed = basstler_source.with_new_commit()
+
+    completed = changed.run(home, call_log)
+
+    assert completed.returncode == 0, completed.stderr
+    assert "--reinstall" in changed.synced_arguments()[-1]

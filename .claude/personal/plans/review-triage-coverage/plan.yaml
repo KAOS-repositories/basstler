@@ -67,3 +67,34 @@ items:
     Draft #320 at 7b6d2546 on #318, merged into claude/practical-hawking-nf0g3o at 4df961c3.
     code-block python examples in docstrings are judged as code; doctest >>> and bare :: blocks are
     not. Turns CRAM 1062's utils/file_loader.py mechanical.
+
+- id: identity-decorated-signatures
+  title: Read a signature through a decorator the commit defines as an identity
+  track: coverage
+  branch: review-triage-identity-decorated-signatures
+  pull_request_number: 322
+  session: https://claude.ai/code/session_01JxHGiN7cZrpnejRYWSnZZz
+  depends_on:
+  - rejection-reasons
+  status: in progress
+  recommended_model: sonnet
+  notes: >
+    Draft #322 at 5d7cd033 on #318, merged into claude/practical-hawking-nf0g3o at 5cf4ecef.
+    DecoratorPolicy.reads passes a decorator the commit defines as an identity function. Turns the 33
+    CRAM 1062 files calling create_descriptor, under krrood's called_positionally, mechanical again.
+
+- id: added-docstrings
+  title: Count docstrings gained or lost as mechanical where a rule says so
+  track: coverage
+  branch: review-triage-added-docstrings
+  pull_request_number: 323
+  session: https://claude.ai/code/session_01JxHGiN7cZrpnejRYWSnZZz
+  depends_on:
+  - rejection-reasons
+  status: in progress
+  recommended_model: opus
+  notes: >
+    Draft #323 at c5073226 on #318, merged into claude/practical-hawking-nf0g3o at 5cf4ecef.
+    docstrings-added-or-removed (opt-in) and test-docstrings-added-or-removed (default, opt-out) rules;
+    docstrings paired by DocumentationPlace. CRAM 1062 at 2cb220f1: 37 of 218 by default, 21 with
+    the opt-in rule.

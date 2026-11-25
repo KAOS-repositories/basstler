@@ -54,9 +54,12 @@ items:
 - id: docstring-examples
   title: Judge Python examples in docstrings as code
   track: coverage
+  branch: review-triage-docstring-examples
+  pull_request_number: 320
+  session: https://claude.ai/code/session_01JxHGiN7cZrpnejRYWSnZZz
   depends_on:
   - rejection-reasons
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: Code examples in docstrings are compared as prose, so keyword conversions inside them need review
     (CRAM 1062's utils/file_loader.py). Compare doctest and literal-block examples with the code comparison.

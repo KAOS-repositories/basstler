@@ -31,6 +31,7 @@ review-triage-speed-and-progress	review-triage
 review-triage-identity-decorator-imports	review-triage-coverage
 review-triage-rejection-reasons	review-triage-coverage
 review-triage-raises-forwarding	review-triage-coverage
+review-triage-docstring-examples	review-triage-coverage
 review-triage-viewed-state-start	review-triage-stack
 review-triage-integration	review-triage-stack
 review-triage-script-workspace-install	review-triage-stack

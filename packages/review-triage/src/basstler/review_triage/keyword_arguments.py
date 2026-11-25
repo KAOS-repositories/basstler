@@ -323,6 +323,41 @@ class AddedDecorator(Finding):
         return frozenset({renames.original_identifier(self.name)})
 
 
+# %% callables that pass their arguments on
+
+
+@dataclass(frozen=True)
+class CallForwarder:
+    """
+    A function that calls the callable it is passed with the arguments after it.
+    """
+
+    module: str
+    """
+    The module defining the function.
+    """
+
+    member: str
+    """
+    The function's name in its module.
+    """
+
+    callable_position: int
+    """
+    The position of the argument it calls.
+    """
+
+
+CALL_FORWARDERS: tuple[CallForwarder, ...] = (
+    CallForwarder("pytest", "raises", 1),
+    CallForwarder("pytest", "warns", 1),
+)
+"""
+The functions of third-party libraries known to call their callable argument with the
+arguments after it.
+"""
+
+
 # %% rules
 
 
@@ -336,6 +371,11 @@ class ArgumentsPassedByKeyword(DifferenceRule):
     resolutions: CalleeResolutions = CalleeResolutions()
     """
     The ways a call may reach its callee.
+    """
+
+    forwarders: tuple[CallForwarder, ...] = CALL_FORWARDERS
+    """
+    The functions whose keyword arguments are those of the callable they are passed.
     """
 
     @classproperty
@@ -355,7 +395,14 @@ class ArgumentsPassedByKeyword(DifferenceRule):
             return False
         if not moved:
             return True
-        target = self.resolutions.target(base.func, matcher.scope)
+        position = self.forwarded_callable_position(head, matcher)
+        if position is None:
+            base_callee, head_callee, first_position = base.func, head.func, kept
+        else:
+            base_callee = base.args[position]
+            head_callee = head.args[position]
+            first_position = kept - position - 1
+        target = self.resolutions.target(base_callee, matcher.scope)
         if (
             target is None
             or any(isinstance(argument, ast.Starred) for argument in base.args)
@@ -366,14 +413,35 @@ class ArgumentsPassedByKeyword(DifferenceRule):
         matcher.record(
             KeywordConversion(
                 target,
-                kept,
+                first_position,
                 tuple(keyword.arg for keyword in new_keywords),
-                PythonSource.referenced_name(head.func) or "",
+                PythonSource.referenced_name(head_callee) or "",
                 head.lineno,
-                isinstance(head.func, ast.Attribute),
+                isinstance(head_callee, ast.Attribute),
             )
         )
         return True
+
+    def forwarded_callable_position(
+        self, head: ast.Call, matcher: TreeMatcher
+    ) -> int | None:
+        """
+        :param head: A call of the head tree.
+        :param matcher: The comparison in progress.
+        :return: The position of the argument a call of one of :attr:`forwarders` calls
+            with its keyword arguments, ``None`` when it calls no argument with them.
+        """
+        return next(
+            (
+                forwarder.callable_position
+                for forwarder in self.forwarders
+                if len(head.args) > forwarder.callable_position
+                and matcher.head_imports.refers_to(
+                    head.func, forwarder.module, forwarder.member
+                )
+            ),
+            None,
+        )
 
 
 @dataclass(frozen=True)

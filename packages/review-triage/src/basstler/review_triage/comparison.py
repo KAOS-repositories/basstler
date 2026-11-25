@@ -15,6 +15,7 @@ from pathlib import PurePosixPath
 from basstler.class_property import classproperty
 from basstler.git.commit_range import FileVersions
 from basstler.review_triage.commit_tree import PACKAGE_INITIALIZER, CommitModules
+from basstler.review_triage.docstring_examples import DocumentedExamples
 from basstler.review_triage.member_renames import MemberRenamer
 from basstler.review_triage.moved_definitions import MovedDefinitions
 from basstler.review_triage.python_source import (
@@ -679,31 +680,74 @@ class PythonComparison(ContentComparison):
                 )
                 return None
             kinds.add(MechanicalChange.IMPORTS)
-        prose_parts = [
-            *(
-                (
-                    base_prose,
-                    statement.value.value,
-                    statement.lineno,
-                    Difference.DOCSTRING_REWORDED,
-                )
-                for base_prose, statement in zip(
-                    base.documentation, head.documentation_statements, strict=True
-                )
-            ),
-            (
-                base.comments,
-                head.comments,
-                head.first_comment_line_differing_from(base),
-                Difference.COMMENT_REWORDED,
-            ),
-        ]
-        for base_prose, head_prose, line, difference in prose_parts:
-            prose_kinds = self.prose.text_changes(base_prose, head_prose, context)
-            if prose_kinds is None:
-                context.review_reasons.append(UnprovenDifference(line, difference))
+        for base_documentation, statement in zip(
+            base.documentation, head.documentation_statements, strict=True
+        ):
+            documentation_kinds = self.documentation_changes(
+                base_documentation, statement.value.value, statement.lineno, context
+            )
+            if documentation_kinds is None:
                 return None
-            kinds |= prose_kinds
+            kinds |= documentation_kinds
+        comment_kinds = self.prose.text_changes(base.comments, head.comments, context)
+        if comment_kinds is None:
+            context.review_reasons.append(
+                UnprovenDifference(
+                    head.first_comment_line_differing_from(base),
+                    Difference.COMMENT_REWORDED,
+                )
+            )
+            return None
+        kinds |= comment_kinds
+        return frozenset(kinds)
+
+    def documentation_changes(
+        self,
+        base_documentation: str,
+        head_documentation: str,
+        head_line: int,
+        context: JudgmentContext,
+    ) -> ChangeKinds | None:
+        """
+        :param base_documentation: A docstring of the base version.
+        :param head_documentation: The docstring in its place in the head version.
+        :param head_line: The head line the docstring starts on.
+        :param context: What the judgment may consult, collecting the reasons for review.
+        :return: What the docstring's change consists of, its python examples judged
+            as code, ``None`` when it is not provably mechanical.
+        """
+        base_split = DocumentedExamples.from_docstring(base_documentation)
+        head_split = DocumentedExamples.from_docstring(head_documentation)
+        if len(base_split.examples) != len(head_split.examples):
+            base_split = DocumentedExamples(base_documentation, ())
+            head_split = DocumentedExamples(head_documentation, ())
+        kinds = self.prose.text_changes(base_split.prose, head_split.prose, context)
+        if kinds is None:
+            context.review_reasons.append(
+                UnprovenDifference(head_line, Difference.DOCSTRING_REWORDED)
+            )
+            return None
+        kinds = set(kinds)
+        for base_example, head_example in zip(
+            base_split.examples, head_split.examples, strict=True
+        ):
+            if base_example.code == head_example.code:
+                continue
+            example_context = replace(context, review_reasons=[])
+            example_kinds = self.source_changes(
+                PythonSource.from_text(base_example.code),
+                PythonSource.from_text(head_example.code),
+                example_context,
+            )
+            if example_kinds is None:
+                example_line = head_line + head_example.first_line
+                context.review_reasons.extend(
+                    replace(reason, line=example_line + reason.line - 1)
+                    for reason in example_context.review_reasons
+                    or [UnprovenDifference(1, Difference.CODE_CHANGED)]
+                )
+                return None
+            kinds |= example_kinds
         return frozenset(kinds)
 
     def code_changes(

@@ -268,10 +268,10 @@ class RepositoryStateLocation(PathEnumeration):
     configuration's ``PLAN_STATE_SYNC_STAMP`` spells the same name.
     """
 
-    VIEWED_MARKING_STAMP = DIRECTORY / "viewed-marked-head"
+    VIEWED_MARKINGS = DIRECTORY / "viewed-marked-heads"
     """
-    The pull request the files were last marked viewed on, and the head commit they
-    were marked at.
+    Each pull request whose files were marked viewed, and the head commit they were
+    last marked at.
     """
 
     PERSONAL_SETTINGS_SYNC_STAMP = DIRECTORY / "personal-settings-sync-hash"

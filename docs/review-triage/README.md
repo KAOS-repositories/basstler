@@ -16,9 +16,10 @@ request's repository when it is not the checkout's `origin`.
 
 ## In a Claude Code session, automatically
 
-A session with the basstler plugin marks the mechanical files of the pull request its
-checked-out branch has open each time a turn ends, once for each head commit, so every
-change Claude pushes is marked without anything to run. It marks directly where the
+A session with the basstler plugin marks the mechanical files of every open pull request
+whose head commit is the tip of one of the clone's local branches each time a turn ends,
+once for each head commit, so every change Claude pushes is marked without anything to
+run, stacked pull requests a resolve or restack pushed included. It marks directly where the
 session can, and asks a repository's Actions to where it cannot, as in a cloud session:
 set that route up as in [route 2](#route-2-from-a-repositorys-actions-from-anywhere).
 A push made outside a session is not marked until the next one, or until you run

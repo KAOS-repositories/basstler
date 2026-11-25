@@ -380,6 +380,14 @@ class Repository(GitRepository):
         """
         return f"{self.pull_requests_path}/{number}"
 
+    @property
+    def open_pull_requests_path(self) -> str:
+        """
+        The REST path listing the repository's open pull requests, a page at a time.
+        """
+        query = urlencode({"state": "open"})
+        return f"{self.pull_requests_path}?{query}"
+
     def open_pull_requests_from_branch_path(self, branch: str) -> str:
         """
         :param branch: A branch of this repository itself.

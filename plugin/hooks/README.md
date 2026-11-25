@@ -314,9 +314,10 @@ Claude Code's own permission classifier may still have the last word.
 ## Marking the session's pull request viewed
 
 A `Stop` hook ([`basstler.review_triage.stop_hook`](../../src/basstler/review_triage/stop_hook.py))
-runs `basstler review-triage mark-viewed` for the open pull request of the checked-out branch when a turn ends.
+runs `basstler review-triage mark-viewed` when a turn ends, for every open pull request whose head commit is the
+tip of a local branch, so the pull requests a resolve or restack pushed are marked as well as the checked-out one.
 It does so once for each head commit GitHub reports, recorded under the git directory's `basstler/`, so a turn that
-pushed nothing costs one read. A branch without an open pull request is left alone, and a marking that fails
+pushed nothing costs one listing. A branch without an open pull request is left alone, and a marking that fails
 is reported and tried again at the next turn.
 
 ## Safety

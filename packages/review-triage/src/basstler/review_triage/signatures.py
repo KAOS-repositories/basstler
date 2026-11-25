@@ -116,13 +116,16 @@ class DecoratorPolicy:
     The names of the decorators known to keep what they decorate callable as written.
     """
 
-    def reads(self, definition: Definition) -> bool:
+    def reads(self, definition: Definition, definitions: DefinitionIndex) -> bool:
         """
         :param definition: A function, method or class.
-        :return: Whether every decorator it carries keeps its parameters as written.
+        :param definitions: The definitions of the commit *definition* is read from.
+        :return: Whether every decorator it carries keeps its parameters as written,
+            being known to or defined in *definitions* as returning what it decorates.
         """
         return all(
             decorator in self.signature_preserving
+            or (decorator is not None and definitions.is_identity(decorator))
             for decorator in definition.decorators
         )
 
@@ -151,7 +154,7 @@ class SignatureReader:
         :param definition: A function, method or class.
         :return: The signature of calling it, ``None`` when it cannot be read.
         """
-        if not self.decorators.reads(definition):
+        if not self.decorators.reads(definition, self.definitions):
             return None
         if isinstance(definition, ClassDefinition):
             return self.class_signature(definition)
@@ -305,7 +308,7 @@ class SignatureReader:
             return ()
         if not definitions or not all(
             isinstance(definition, ClassDefinition)
-            and self.decorators.reads(definition)
+            and self.decorators.reads(definition, self.definitions)
             for definition in definitions
         ):
             return None

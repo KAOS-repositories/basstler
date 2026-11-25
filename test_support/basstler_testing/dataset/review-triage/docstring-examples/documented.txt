@@ -1,0 +1,14 @@
+Load a file.
+
+.. code-block:: python
+    :linenos:
+
+    loader = FileLoader()
+    if loader:
+        loader.load(name="a")
+
+Prose after the example.
+
+.. code:: python3
+
+    print(1)

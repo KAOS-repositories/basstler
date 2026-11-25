@@ -28,6 +28,8 @@ class FileSample(StrEnum):
     CODE_REFORMATTED = "code-reformatted"
     COMMENT_REWORDED = "comment-reworded"
     CONFLICT_MARKERS = "conflict-markers"
+    DOCSTRING_EXAMPLE_CHANGED = "docstring-example-changed"
+    DOCSTRING_EXAMPLE_KEYWORD_ARGUMENTS = "docstring-example-keyword-arguments"
     DOCSTRING_REFLOWED = "docstring-reflowed"
     DOCSTRING_REWORDED = "docstring-reworded"
     DOCUMENTATION_IMPORT_MOVED = "documentation-import-moved"

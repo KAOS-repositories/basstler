@@ -16,6 +16,7 @@ import pytest
 import basstler.review_triage.stop_hook
 from basstler.github.client import GitHubReader
 from basstler.locations import BasstlerVariable, PluginLocation, RepositoryStateLocation
+from basstler.playbook.plugin import HookCommand
 from basstler.review_triage.stop_hook import SessionPullRequest
 
 from basstler_testing.constants.paths import DatasetLocation
@@ -143,9 +144,15 @@ def test_the_plugin_runs_the_hook_when_a_turn_ends():
     manifest = json.loads(
         (plugin_root / PluginLocation.HOOKS / "hooks.json").read_text(encoding="utf-8")
     )
-    (registration,) = manifest["hooks"]["Stop"]
-    (hook,) = registration["hooks"]
-    assert hook["command"].endswith(
+    commands = [
+        hook["command"]
+        for registration in manifest["hooks"]["Stop"]
+        for hook in registration["hooks"]
+    ]
+    expected_ending = (
         f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
         f"{basstler.review_triage.stop_hook.__spec__.name.removeprefix('basstler.')}"
     )
+    assert [command for command in commands if command.endswith(expected_ending)] == [
+        f"{HookCommand.plugin_root_placeholder}/{expected_ending}"
+    ]

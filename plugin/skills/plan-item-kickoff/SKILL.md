@@ -84,3 +84,8 @@ decisions as they are made, and stop to ask only past the bar in
 [`execution-modes.md`](../plan-item-mode/execution-modes.md). Work that needs more than
 this pull request goes to the plan's tracking issue and the user. Finish by reporting
 what was built and decided.
+
+## 6. Loop
+
+In `auto` mode, end with `basstler.sh plan.agentic_loop finish-changes
+--pull-request <n>`, plus `--[no-]loop` for `loop=on|off`.

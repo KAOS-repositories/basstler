@@ -281,6 +281,16 @@ class RepositoryStateLocation(PathEnumeration):
     the same name.
     """
 
+    AGENTIC_LOOP_NEXT_SESSION = DIRECTORY / "agentic-loop-next-session.json"
+    """
+    The session a finished stage of an agentic loop asks the turn's end to start.
+    """
+
+    AGENTIC_LOOP_LOG = DIRECTORY / "agentic-loop.log"
+    """
+    What the sessions an agentic loop starts on this machine print.
+    """
+
 
 class CommitScratchFile(PathEnumeration):
     """
@@ -454,6 +464,26 @@ class PlanHandoverLocation(PathEnumeration):
     )
     """
     The template a handover pull request's description is rendered from.
+    """
+
+
+class AgenticLoopLocation(PathEnumeration):
+    """
+    The templates an agentic loop renders.
+    """
+
+    PROMPT_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "agentic_loop_prompt.md.jinja"
+    )
+    """
+    The first message of a session the loop starts.
+    """
+
+    CLOUD_REQUEST_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "agentic_loop_cloud_request.md.jinja"
+    )
+    """
+    What a cloud session is told to do at its turn's end to start the next session.
     """
 
 
@@ -762,6 +792,11 @@ class ProjectLocation(PathEnumeration):
     PERSONAL_PLAN_ITEM_MODES = PERSONAL_NOTES / "plan-item-modes.toml"
     """
     The per-user override of :attr:`PackageLocation.PLAN_ITEM_MODE_DEFAULTS`.
+    """
+
+    PERSONAL_AGENTIC_LOOP_SETTINGS = PERSONAL_NOTES / "agentic-loop.toml"
+    """
+    Whether finished plan-item stages start the next stage's session, and how often.
     """
 
     AGENTS_INSTRUCTIONS = Path("AGENTS.md")

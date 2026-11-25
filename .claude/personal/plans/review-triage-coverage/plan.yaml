@@ -63,5 +63,7 @@ items:
   - rejection-reasons
   status: in progress
   recommended_model: opus
-  notes: Code examples in docstrings are compared as prose, so keyword conversions inside them need review
-    (CRAM 1062's utils/file_loader.py). Compare doctest and literal-block examples with the code comparison.
+  notes: >
+    Draft #320 at 7b6d2546 on #318, merged into claude/practical-hawking-nf0g3o at 4df961c3.
+    code-block python examples in docstrings are judged as code; doctest >>> and bare :: blocks are
+    not. Turns CRAM 1062's utils/file_loader.py mechanical.

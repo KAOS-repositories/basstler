@@ -62,6 +62,10 @@ def triaged(sample: FileSample, renames: RenameMap) -> FileVerdict:
             FileSample.KEYWORD_ARGUMENTS_FORWARDED_BY_RAISES,
             {KeywordChange.KEYWORD_ARGUMENTS},
         ),
+        (
+            FileSample.DOCSTRING_EXAMPLE_KEYWORD_ARGUMENTS,
+            {KeywordChange.KEYWORD_ARGUMENTS},
+        ),
         (FileSample.KEYWORD_ONLY_PARAMETERS, {KeywordChange.KEYWORD_ONLY}),
         (FileSample.IDENTITY_DECORATOR_ADDED, {KeywordChange.IDENTITY_DECORATORS}),
         (
@@ -75,9 +79,10 @@ def test_a_call_binding_as_before_is_mechanical(
     sample: FileSample, kinds: set[KeywordChange]
 ):
     """
-    Keywords naming the parameters the base definitions bound the arguments to, also
-    where :func:`pytest.raises` passes them on, keyword-only parameters and added
-    identity decorators, imported or not, are mechanical.
+    Keywords naming the parameters the base definitions bound the arguments to, in the
+    code, where :func:`pytest.raises` passes them on or in a docstring's python example,
+    keyword-only parameters and added identity decorators, imported or not, are
+    mechanical.
     """
     assert triaged(sample, RenameMap()) == MechanicalFile(
         sample.change(), frozenset(kinds)
@@ -106,6 +111,7 @@ def test_a_call_that_may_bind_differently_needs_review(sample: FileSample):
     [
         (FileSample.BEHAVIOUR_CHANGED, "return width + height"),
         (FileSample.STATEMENT_APPENDED, "print(total)"),
+        (FileSample.DOCSTRING_EXAMPLE_CHANGED, "assert area(2.0, 4.0) == 8.0"),
     ],
 )
 def test_code_changed_beyond_the_rules_is_the_reason_for_review(
@@ -113,7 +119,7 @@ def test_code_changed_beyond_the_rules_is_the_reason_for_review(
 ):
     """
     Code the rules cannot match names the head line where it stops matching: a changed
-    expression, or the first statement a body gains.
+    expression, the first statement a body gains, or a docstring example's line.
     """
     assert triaged(sample, RenameMap()).reasons == (
         UnprovenDifference(sample.head_line(code), Difference.CODE_CHANGED),

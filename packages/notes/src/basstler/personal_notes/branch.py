@@ -104,16 +104,14 @@ class PersonalNotesBranch:
             remotes.append(upstream_remote)
         return remotes
 
-    def fetch(self) -> str:
+    def fetch_reachable(self) -> str | None:
         """
         Fetch the branch into :attr:`FetchedBranchReference.PERSONAL_NOTES` from the
         first remote that has it.
 
-        :return: That remote.
-        :raises NotesBranchMissingError: If no candidate remote has the branch.
+        :return: That remote, ``None`` when no candidate remote has the branch.
         """
-        remotes = self.candidate_remotes()
-        for remote in remotes:
+        for remote in self.candidate_remotes():
             if self.git.attempt(
                 "fetch",
                 "--quiet",
@@ -123,7 +121,21 @@ class PersonalNotesBranch:
                 f"{FetchedBranchReference.PERSONAL_NOTES}",
             ).succeeded:
                 return remote
-        raise NotesBranchMissingError(self.location.branch, tuple(remotes))
+        return None
+
+    def fetch(self) -> str:
+        """
+        :meth:`fetch_reachable`, for a caller that cannot go on without the branch.
+
+        :return: The remote the branch was fetched from.
+        :raises NotesBranchMissingError: If no candidate remote has the branch.
+        """
+        remote = self.fetch_reachable()
+        if remote is None:
+            raise NotesBranchMissingError(
+                self.location.branch, tuple(self.candidate_remotes())
+            )
+        return remote
 
 
 # %% writing

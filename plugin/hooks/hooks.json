@@ -14,6 +14,14 @@
       {
         "hooks": [
           {
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh plan.agentic_loop.stop_hook",
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh review_triage.stop_hook",
             "type": "command"
           }

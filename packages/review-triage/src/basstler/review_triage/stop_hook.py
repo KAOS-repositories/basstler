@@ -1,6 +1,7 @@
 """
-The hook Claude Code runs when a turn ends: it marks the mechanical files of the pull
-request the session works on viewed, once for each head commit.
+The hook Claude Code runs when a turn ends: it marks the mechanical files viewed of
+every open pull request whose head this clone holds as a branch, once for each head
+commit.
 
 Usage:
     "${BASSTLER_PYTHON}" -m basstler.review_triage.stop_hook
@@ -12,25 +13,73 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Annotated
 
 from cyclopts import App
+from pydantic import AliasChoices, AliasPath, Field
 
 from basstler.exit_codes import StackExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubReader, GitHubRestClient
 from basstler.github.repository import HasRepository, Repository
-from basstler.github.rest_models import PullRequestAtHead, RestPullRequestSummary
+from basstler.json_model import ValidatedJSONModel
 from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
 from basstler.review_triage.command_line import mark_viewed
+from basstler.text_file import TextFile
 
-# %% the pull request of the session
+# %% the pull requests and the heads they were marked at
+
+
+class PullRequestHeadCommit(ValidatedJSONModel):
+    """
+    A pull request and the commit its head branch points at.
+    """
+
+    number: int
+    """
+    The pull request's number.
+    """
+
+    head_commit: Annotated[
+        str,
+        Field(validation_alias=AliasChoices("head_commit", AliasPath("head", "sha"))),
+    ]
+    """
+    The hash of the commit its head branch points at.
+    """
+
+
+class ViewedMarkings(ValidatedJSONModel):
+    """
+    The head each pull request's files were last marked viewed at.
+    """
+
+    pull_requests: tuple[PullRequestHeadCommit, ...] = ()
+    """
+    One entry per pull request.
+    """
+
+    def with_marked(self, pull_request: PullRequestHeadCommit) -> ViewedMarkings:
+        """
+        :param pull_request: A pull request whose files were just marked viewed.
+        :return: These markings, with that pull request's entry at its current head.
+        """
+        others = tuple(
+            marked
+            for marked in self.pull_requests
+            if marked.number != pull_request.number
+        )
+        return ViewedMarkings(pull_requests=(*others, pull_request))
+
+
+# %% the pull requests of the session
 
 
 @dataclass(frozen=True)
-class SessionPullRequest(HasRepository):
+class SessionPullRequests(HasRepository):
     """
-    The open pull request of the branch a session has checked out in its repository, and
-    whether the files of its current head are marked viewed.
+    The open pull requests of a repository whose head commit a session's clone holds as
+    the tip of a local branch, and which of them are not marked viewed at that head.
     """
 
     git: GitCommandRunner
@@ -46,55 +95,48 @@ class SessionPullRequest(HasRepository):
     @property
     def stamp(self) -> Path:
         """
-        The file recording the head the files were last marked viewed at.
+        The file recording the head each pull request was last marked viewed at.
         """
-        return self.git.repository_state_path(
-            RepositoryStateLocation.VIEWED_MARKING_STAMP
-        )
+        return self.git.repository_state_path(RepositoryStateLocation.VIEWED_MARKINGS)
 
-    def unmarked(self) -> RestPullRequestSummary | None:
+    def unmarked(self) -> list[PullRequestHeadCommit]:
         """
-        :return: The pull request of the checked-out branch when the files of its
-            current head are not marked viewed yet, ``None`` when there is none or they
-            are.
+        :return: Every open pull request whose head is a local branch's tip and whose
+            files are not marked viewed at that head, in the order GitHub lists them.
         """
-        branch = self.git.checked_out_branch()
-        if not branch:
-            return None
-        pages = self.client.get_pages(
-            self.repository.open_pull_requests_from_branch_path(branch)
+        branch_tips = set(
+            self.git.run("for-each-ref", "--format=%(objectname)", "refs/heads").split()
         )
+        marked = self.markings().pull_requests
         listed = [
-            RestPullRequestSummary.from_json(entry) for page in pages for entry in page
+            PullRequestHeadCommit.from_json(entry)
+            for entry in self.client.get_entries(
+                self.repository.open_pull_requests_path
+            )
         ]
-        if not listed:
-            return None
-        pull_request = listed[0]
-        marked = self.marked_head()
-        if marked is not None and marked.is_at(pull_request):
-            return None
-        return pull_request
+        return [
+            pull_request
+            for pull_request in listed
+            if pull_request.head_commit in branch_tips and pull_request not in marked
+        ]
 
-    def marked_head(self) -> PullRequestAtHead | None:
+    def markings(self) -> ViewedMarkings:
         """
-        :return: The head the files were last marked viewed at, ``None`` when they never
-            were.
+        :return: The heads the files were last marked viewed at; none before the first
+            marking.
         """
         if not self.stamp.exists():
-            return None
-        return PullRequestAtHead.from_json(
-            json.loads(self.stamp.read_text(encoding="utf-8"))
-        )
+            return ViewedMarkings()
+        return ViewedMarkings.from_json(json.loads(TextFile(self.stamp).read()))
 
-    def record_marked(self, pull_request: RestPullRequestSummary) -> None:
+    def record_marked(self, pull_request: PullRequestHeadCommit) -> None:
         """
-        :param pull_request: The pull request whose files were just marked viewed, at
-            the head it has now.
+        :param pull_request: A pull request whose files were just marked viewed, at the
+            head it has now.
         """
         self.stamp.parent.mkdir(parents=True, exist_ok=True)
-        self.stamp.write_text(
-            json.dumps(PullRequestAtHead.from_json(pull_request.to_json()).to_json()),
-            encoding="utf-8",
+        TextFile(self.stamp).write(
+            json.dumps(self.markings().with_marked(pull_request).to_json())
         )
 
 
@@ -107,10 +149,10 @@ The command, run with the project root as its working directory.
 
 
 @app.default
-def mark_session_pull_request() -> StackExitCode:
+def mark_session_pull_requests() -> StackExitCode:
     """
-    Mark the checked-out branch's pull request viewed, unless it already is at its
-    current head or the branch has none open.
+    Mark viewed each open pull request whose head this clone holds as a branch, unless
+    it already is at that head.
 
     :return: :attr:`StackExitCode.SUCCESS`; a failure to mark raises instead.
     """
@@ -118,11 +160,10 @@ def mark_session_pull_request() -> StackExitCode:
         os.environ.get(ClaudeCodeVariable.PROJECT_DIRECTORY, Path.cwd())
     )
     git = GitCommandRunner(project_root)
-    session = SessionPullRequest(
+    session = SessionPullRequests(
         Repository.from_name_or_remote(None, git), git, GitHubRestClient()
     )
-    pull_request = session.unmarked()
-    if pull_request is not None:
+    for pull_request in session.unmarked():
         mark_viewed(pull_request.number)
         session.record_marked(pull_request)
     return StackExitCode.SUCCESS

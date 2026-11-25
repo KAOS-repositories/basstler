@@ -91,8 +91,8 @@ now, not what you expect. Call the route set up only when nothing is left.
 
 ## 4. Confirm
 
-Say which routes work now and how to use them; a session's Stop hook marks its pull
-request each turn by whichever route works. Otherwise:
+Say which routes work now and how to use them; a session's Stop hook marks every
+pull request it pushed each turn by whichever route works. Otherwise:
 - `basstler review-triage mark-viewed <number>` tries the computer route and falls back
   to Actions;
 - `basstler review-triage request-mark-viewed <number>` asks Actions directly.

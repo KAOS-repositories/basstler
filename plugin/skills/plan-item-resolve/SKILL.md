@@ -1,7 +1,7 @@
 ---
 name: plan-item-resolve
 description: Resolve what stalls an underway plan item - conflicts, CI, review threads, tracking-issue discussion - on its existing branch, per the execution mode. Invoke as "/plan-item-resolve {plan-id} {item-id}" or "/plan-item-resolve {pull-request-number}". Use from a plan page's Resolve/Resume/Reconsider link or when asked to resolve, unblock or resume an item.
-allowed-tools: Bash, Read, Grep, Glob, Edit, Write, AskUserQuestion, Skill, EnterPlanMode, ExitPlanMode, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__issue_read, mcp__github__get_file_contents, mcp__github__update_pull_request, mcp__claude-code-remote__subscribe_pr_activity
+allowed-tools: Bash, Read, Grep, Glob, Edit, Write, AskUserQuestion, Skill, EnterPlanMode, ExitPlanMode, mcp__github__list_pull_requests, mcp__github__pull_request_read, mcp__github__issue_read, mcp__github__get_file_contents, mcp__github__update_pull_request, mcp__claude-code-remote__subscribe_pr_activity, mcp__claude-code-remote__create_session
 ---
 
 # Plan item resolve
@@ -205,6 +205,12 @@ branch, which a resolve otherwise leaves holding the state it replaced — follo
 
 Finish by reporting what was wrong, what was changed, and what was decided —
 in `auto` mode this report is the user's first look at the resolution.
+
+Last, hand over as [`agentic-loop.md`](../plan-item-loop/agentic-loop.md) says, with
+`finish-changes`, passing `--review-round <n>` when the invocation said `round=<n>` and
+`--loop` or `--no-loop` when it said `loop=on` or `loop=off`. An invocation with
+`loop=on` runs in `auto` mode, and its review threads are those the review of round `<n>`
+posted.
 
 ## Untracked pull requests
 

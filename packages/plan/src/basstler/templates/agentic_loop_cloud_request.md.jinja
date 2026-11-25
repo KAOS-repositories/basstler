@@ -1,0 +1,8 @@
+The agentic loop starts the next session on {{ session.repository.full_name }}#{{ session.pull_request }}: {{ session.stage }} round {{ session.review_round }}. Call `{{ create_session_tool }}` once, with:
+
+- `source_url`: `{{ session.repository.url }}`
+- `source_revision`: `{{ session.branch }}`
+- `title`: `{{ session.title }}`
+- `prompt`: `{{ session.prompt }}`
+
+Then report the new session's id in one line and end your turn.

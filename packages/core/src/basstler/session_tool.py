@@ -125,6 +125,16 @@ class GitHubTool(SessionTool):
     Changes a pull request's title, description, base or draft state.
     """
 
+    WRITE_PULL_REQUEST_REVIEW = "mcp__github__pull_request_review_write"
+    """
+    Creates, submits or deletes a review of a pull request.
+    """
+
+    COMMENT_IN_PULL_REQUEST_REVIEW = "mcp__github__add_comment_to_pending_review"
+    """
+    Adds an inline comment to the signed-in user's pending review.
+    """
+
     LIST_ACTIONS = "mcp__github__actions_list"
     """
     Lists a repository's workflows, runs or jobs.

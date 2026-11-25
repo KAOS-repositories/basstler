@@ -1,0 +1,59 @@
+schema_version: 1
+id: review-triage-coverage
+title: 'Review triage coverage: fewer mechanical files left for review, and a reason for each one left'
+description: Proves more of a keyword-only conversion such as CRAM 1062 mechanical and makes every file
+  that needs review name its reason; each item a draft pull request on review-triage-reexported-imports,
+  merged into claude/practical-hawking-nf0g3o.
+default_repository: KAOS-repositories/basstler
+waves:
+- id: coverage
+  name: Coverage
+tracks:
+- id: coverage
+  name: One chain on the reexported-imports item
+  wave: coverage
+items:
+- id: identity-decorator-imports
+  title: Prove an import added only for an identity decorator
+  track: coverage
+  branch: review-triage-identity-decorator-imports
+  pull_request_number: 317
+  session: https://claude.ai/code/session_01JxHGiN7cZrpnejRYWSnZZz
+  depends_on:
+  - review-triage-stack/reexported-imports
+  status: in progress
+  recommended_model: sonnet
+  notes: 'Draft #317 at 2b783e24 on #311. A name only the head imports is mechanical when its code uses
+    it only as whole decorators whose source member the base commit defines as an identity function.
+    Turns 7 of CRAM 1062''s files mechanical.'
+- id: rejection-reasons
+  title: Name the reason for every file that needs review
+  track: coverage
+  branch: review-triage-rejection-reasons
+  pull_request_number: 318
+  session: https://claude.ai/code/session_01JxHGiN7cZrpnejRYWSnZZz
+  depends_on:
+  - identity-decorator-imports
+  status: in progress
+  recommended_model: opus
+  notes: 'Draft #318 at 8a7fe447 on #317. ImportDifference and UnprovenDifference from the import,
+    docstring, comment and code comparisons; the first changed line as the fallback. Markdown code-block
+    reasons still count lines from the block.'
+- id: raises-forwarding
+  title: Prove keyword arguments forwarded through pytest.raises
+  track: coverage
+  depends_on:
+  - rejection-reasons
+  status: not started
+  recommended_model: opus
+  notes: pytest.raises(E, callee, *args, **kwargs) calls callee with the rest; prove the keyword conversion
+    against callee's signature. 3 of CRAM 1062's test files.
+- id: docstring-examples
+  title: Judge Python examples in docstrings as code
+  track: coverage
+  depends_on:
+  - rejection-reasons
+  status: not started
+  recommended_model: opus
+  notes: Code examples in docstrings are compared as prose, so keyword conversions inside them need review
+    (CRAM 1062's utils/file_loader.py). Compare doctest and literal-block examples with the code comparison.

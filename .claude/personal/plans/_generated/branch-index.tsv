@@ -28,6 +28,8 @@ review-triage-install-docs	review-triage
 fix-untokenizable-module-review	review-triage
 review-triage-script-pull-request-url	review-triage
 review-triage-speed-and-progress	review-triage
+review-triage-identity-decorator-imports	review-triage-coverage
+review-triage-rejection-reasons	review-triage-coverage
 review-triage-viewed-state-start	review-triage-stack
 review-triage-integration	review-triage-stack
 review-triage-script-workspace-install	review-triage-stack

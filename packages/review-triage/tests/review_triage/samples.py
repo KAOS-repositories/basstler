@@ -35,11 +35,13 @@ class FileSample(StrEnum):
     DOCUMENTATION_RENAMED = "documentation-renamed"
     IDENTIFIER_RENAMED = "identifier-renamed"
     IDENTITY_DECORATOR_ADDED = "identity-decorator-added"
+    IDENTITY_DECORATOR_IMPORTED = "identity-decorator-imported"
     IMPORT_ADDED_FROM_OTHER_MODULE = "import-added-from-other-module"
     IMPORT_ADDED_UNDER_STAR_IMPORT = "import-added-under-star-import"
     IMPORT_ADDED_UNUSED = "import-added-unused"
     IMPORT_REMOVED_UNUSED = "import-removed-unused"
     IMPORT_SOURCE_CHANGED = "import-source-changed"
+    IMPORTED_DECORATOR_NOT_IDENTITY = "imported-decorator-not-identity"
     IMPORTS_REORDERED = "imports-reordered"
     KEYWORD_ARGUMENTS_ADDED = "keyword-arguments-added"
     KEYWORD_ARGUMENTS_ADDED_THROUGH_IMPORT_ALIAS = (

@@ -23,6 +23,7 @@ from basstler.review_triage.keyword_arguments import (
     KeywordArgumentComparison,
     KeywordChange,
     UnprovenBinding,
+    UnprovenDecorator,
     UnprovenKeywordCall,
 )
 from basstler.review_triage.python_source import ImportBindings, PythonSource
@@ -57,6 +58,10 @@ def triaged(sample: FileSample, renames: RenameMap) -> FileVerdict:
         ),
         (FileSample.KEYWORD_ONLY_PARAMETERS, {KeywordChange.KEYWORD_ONLY}),
         (FileSample.IDENTITY_DECORATOR_ADDED, {KeywordChange.IDENTITY_DECORATORS}),
+        (
+            FileSample.IDENTITY_DECORATOR_IMPORTED,
+            {KeywordChange.IDENTITY_DECORATORS, MechanicalChange.IMPORTS},
+        ),
         (FileSample.CODE_REFORMATTED, {MechanicalChange.FORMATTING}),
     ],
 )
@@ -65,7 +70,7 @@ def test_a_call_binding_as_before_is_mechanical(
 ):
     """
     Keywords naming the parameters the base definitions bound the arguments to, keyword-
-    only parameters and added identity decorators are mechanical.
+    only parameters and added identity decorators, imported or not, are mechanical.
     """
     assert triaged(sample, RenameMap()) == MechanicalFile(
         sample.change(), frozenset(kinds)
@@ -115,6 +120,18 @@ def test_a_method_of_a_receiver_whose_class_is_inferred_is_resolved(
     """
     assert triaged(sample, RenameMap()) == MechanicalFile(
         sample.change(), frozenset({KeywordChange.KEYWORD_ARGUMENTS})
+    )
+
+
+def test_an_imported_decorator_not_returning_what_it_decorates_needs_review():
+    """
+    An added decorator the head imports is the reason for review when its definition
+    does not return what it decorates.
+    """
+    sample = FileSample.IMPORTED_DECORATOR_NOT_IDENTITY
+    decorator_line = sample.head_line("@called_positionally")
+    assert triaged(sample, RenameMap()) == FileNeedingReview(
+        sample.change(), (UnprovenDecorator(decorator_line, "called_positionally"),)
     )
 
 

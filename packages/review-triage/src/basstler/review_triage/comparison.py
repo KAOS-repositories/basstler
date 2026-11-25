@@ -450,7 +450,8 @@ class PythonComparison(ContentComparison):
         """
         :meth:`ContentComparison.changes`, resolving each version's relative imports
         against the directory holding it; a name only one version imports needs review
-        unless its code uses it and both versions star-import it from one module.
+        unless its code uses it and both versions star-import it from one module, or
+        only the head imports it, as an identity decorator of the base commit.
         """
         base_path = change.previous_path or change.path
         base = PythonSource.from_text(
@@ -462,8 +463,16 @@ class PythonComparison(ContentComparison):
         kinds = self.source_changes(base, head, context)
         if kinds is None or MechanicalChange.IMPORTS not in kinds:
             return kinds
-        head_imports = head.import_bindings
         base_imports = context.renamed_imports(base, head)
+        head_imports = ImportBindings(
+            frozenset(
+                binding
+                for binding in head.import_bindings.bindings
+                if binding.bound_name in base_imports.bound_names
+                or binding.bound_name not in head.decorator_only_names
+                or not context.base_definitions.is_identity(binding.member_name)
+            )
+        )
         if not (
             base_imports.binds_only_respellings(
                 head_imports, base.referenced_names(context.renames)

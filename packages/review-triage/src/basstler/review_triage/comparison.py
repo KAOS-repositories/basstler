@@ -24,6 +24,7 @@ from basstler.review_triage.python_source import (
     PythonSource,
 )
 from basstler.review_triage.renames import RenameDecisions, RenameMap
+from basstler.review_triage.pytest_layout import PytestFileLayout
 from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 from basstler.review_triage.definitions import DefinitionIndex
 
@@ -103,6 +104,12 @@ class MechanicalChange(ChangeKind):
     """
     The documentation at the top of a module changed, which the module documentation
     rule counts as mechanical.
+    """
+
+    DOCSTRINGS_ADDED_OR_REMOVED = "docstrings added or removed"
+    """
+    Functions, classes or fields gained or lost docstrings, which the rules counting
+    them count as mechanical.
     """
 
     BASE_BRANCH_MERGE = "base branch merge"
@@ -404,6 +411,22 @@ class JudgmentContext:
     Decides whether an import the file being judged respells still binds its object.
     """
 
+    test_files: PytestFileLayout = field(default_factory=PytestFileLayout, kw_only=True)
+    """
+    Which files of the repository are its tests.
+    """
+
+    def counts_docstrings_added_or_removed(self, path: PurePosixPath) -> bool:
+        """
+        :param path: The path of the file being judged.
+        :return: Whether a rule in force counts the docstrings it gains or loses as
+            mechanical.
+        """
+        return TriageRule.DOCSTRINGS_ADDED_OR_REMOVED in self.rules or (
+            TriageRule.TEST_DOCSTRINGS_ADDED_OR_REMOVED in self.rules
+            and self.test_files.holds(path)
+        )
+
     def renamed_imports(self, base: PythonSource, head: PythonSource) -> ImportBindings:
         """
         :param base: The base version of the file being judged.
@@ -570,7 +593,8 @@ class PythonComparison(ContentComparison):
         :meth:`ContentComparison.changes`, resolving each version's relative imports
         against the directory holding it; a name only one version imports needs review
         unless its code uses it and both versions star-import it from one module, or
-        only the head imports it, as an identity decorator of the base commit.
+        only the head imports it, as an identity decorator of the base commit; the
+        docstrings only one version has are left out where a rule counts them.
         """
         base_path = change.previous_path or change.path
         base = PythonSource.from_text(
@@ -579,7 +603,18 @@ class PythonComparison(ContentComparison):
         head = PythonSource.from_text(
             change.head_text, context.package_of(context.head_modules, change.path)
         )
+        documented: set[ChangeKind] = set()
+        if context.counts_docstrings_added_or_removed(change.path):
+            base, head = (
+                base.without_documentation_missing_from(head),
+                head.without_documentation_missing_from(base),
+            )
+            if base.text != change.base_text or head.text != change.head_text:
+                documented.add(MechanicalChange.DOCSTRINGS_ADDED_OR_REMOVED)
         kinds = self.source_changes(base, head, context)
+        if kinds is not None and documented:
+            # The emptied docstring lines alone read as formatting.
+            kinds = kinds - {MechanicalChange.FORMATTING} | documented
         if kinds is None or MechanicalChange.IMPORTS not in kinds:
             return kinds
         base_imports = context.renamed_imports(base, head)

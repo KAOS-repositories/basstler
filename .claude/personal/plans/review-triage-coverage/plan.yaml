@@ -49,8 +49,10 @@ items:
   - rejection-reasons
   status: in progress
   recommended_model: opus
-  notes: pytest.raises(E, callee, *args, **kwargs) calls callee with the rest; prove the keyword conversion
-    against callee's signature. 3 of CRAM 1062's test files.
+  notes: >
+    Draft #319 at edc0f1f8 on #318, merged into claude/practical-hawking-nf0g3o at 4df961c3.
+    CallForwarder lists pytest.raises and pytest.warns; keywords are proven against the callable
+    they pass on to. Turns CRAM 1062's 3 pytest.raises test files mechanical.
 - id: docstring-examples
   title: Judge Python examples in docstrings as code
   track: coverage

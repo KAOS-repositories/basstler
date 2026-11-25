@@ -620,6 +620,46 @@ class LineSpan:
     """
 
 
+@dataclass(frozen=True)
+class BlockStep:
+    """
+    One step from a block of statements into a block a statement of it holds.
+    """
+
+    statement: int
+    """
+    The position of that statement among the block's code statements.
+    """
+
+    field_name: str
+    """
+    The field of the statement holding the inner block, such as ``body``.
+    """
+
+
+@dataclass(frozen=True)
+class DocumentationPlace:
+    """
+    Where a documentation string stands, by the code statements around it, so that the
+    places of two versions whose code matches agree.
+    """
+
+    block: tuple[BlockStep, ...]
+    """
+    The steps from the module's body to the block holding the string.
+    """
+
+    preceding_statements: int
+    """
+    How many of the block's code statements come before the string.
+    """
+
+    ordinal: int
+    """
+    The string's position among the documentation strings right after them.
+    """
+
+
 # %% the file's parts
 
 
@@ -928,6 +968,81 @@ class PythonSource:
         if shares_lines:
             return self
         return self.without((span,))
+
+    @cached_property
+    def placed_documentation(self) -> dict[DocumentationPlace, ast.stmt]:
+        """
+        The statements holding the documentation strings of the file's functions,
+        classes and fields, by where they stand; the module's own is left out.
+        """
+        placed = dict(self.documentation_in_block((), self.tree.body))
+        first = next(iter(self.tree.body), None)
+        return {
+            place: statement
+            for place, statement in placed.items()
+            if statement is not first
+        }
+
+    @classmethod
+    def documentation_in_block(
+        cls, block: tuple[BlockStep, ...], statements: list[ast.stmt]
+    ) -> Iterator[tuple[DocumentationPlace, ast.stmt]]:
+        """
+        :param block: The steps from the module's body to *statements*.
+        :param statements: A block of statements.
+        :return: The documentation strings in it and in the blocks its statements hold,
+            each with its place.
+        """
+        code_statements = 0
+        ordinal = 0
+        for statement in statements:
+            if isinstance(statement, (ast.Import, ast.ImportFrom)):
+                continue
+            if cls.is_documentation(statement):
+                yield DocumentationPlace(block, code_statements, ordinal), statement
+                ordinal += 1
+                continue
+            ordinal = 0
+            for field_name, value in ast.iter_fields(statement):
+                if (
+                    isinstance(value, list)
+                    and value
+                    and all(isinstance(item, ast.stmt) for item in value)
+                ):
+                    yield from cls.documentation_in_block(
+                        (*block, BlockStep(code_statements, field_name)), value
+                    )
+            code_statements += 1
+
+    def without_documentation_missing_from(self, other: PythonSource) -> PythonSource:
+        """
+        :param other: The other version of the file.
+        :return: The file without the documentation strings of functions, classes and
+            fields that *other* has none in the place of, keeping those sharing lines
+            with other code; itself when none is left out or the rest does not parse.
+        """
+        spans = tuple(
+            LineSpan(statement.lineno, statement.end_lineno)
+            for place, statement in self.placed_documentation.items()
+            if place not in other.placed_documentation
+            and self.stands_on_own_lines(statement)
+        )
+        if not spans:
+            return self
+        remaining = self.without(spans)
+        return remaining if remaining.parses else self
+
+    def stands_on_own_lines(self, statement: ast.stmt) -> bool:
+        """
+        :param statement: A statement of the file.
+        :return: Whether no other code shares its first or last line.
+        """
+        lines = self.text.splitlines()
+        before = lines[statement.lineno - 1].encode()[: statement.col_offset]
+        after = lines[statement.end_lineno - 1].encode()[statement.end_col_offset :]
+        return not before.strip() and (
+            not after.strip() or after.strip().startswith(b"#")
+        )
 
     @cached_property
     def comments(self) -> str:

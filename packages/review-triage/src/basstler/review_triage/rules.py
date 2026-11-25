@@ -27,8 +27,20 @@ class TriageRule(StrEnum):
     Any change to the documentation at the top of a module is mechanical.
     """
 
+    DOCSTRINGS_ADDED_OR_REMOVED = "docstrings-added-or-removed"
+    """
+    A docstring a function, class or field gains or loses is mechanical.
+    """
 
-DEFAULT_RULES = frozenset({TriageRule.MODULE_DOCUMENTATION})
+    TEST_DOCSTRINGS_ADDED_OR_REMOVED = "test-docstrings-added-or-removed"
+    """
+    A docstring a function, class or field of a test file gains or loses is mechanical.
+    """
+
+
+DEFAULT_RULES = frozenset(
+    {TriageRule.MODULE_DOCUMENTATION, TriageRule.TEST_DOCSTRINGS_ADDED_OR_REMOVED}
+)
 """
 The rules on unless a project or the command line turns them off.
 """

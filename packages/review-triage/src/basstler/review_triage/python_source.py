@@ -741,13 +741,14 @@ class PythonSource:
     def code_statements(statements: list[ast.stmt]) -> Iterator[ast.stmt]:
         """
         :param statements: A block of statements.
-        :return: Its statements other than imports, each documentation string emptied.
+        :return: Its statements other than imports, each documentation string emptied in its place.
         """
         for statement in statements:
             if isinstance(statement, (ast.Import, ast.ImportFrom)):
                 continue
             if PythonSource.is_documentation(statement):
-                yield ast.Expr(ast.Constant(""))
+                emptied = ast.copy_location(ast.Constant(""), statement.value)
+                yield ast.copy_location(ast.Expr(emptied), statement)
                 continue
             yield statement
 

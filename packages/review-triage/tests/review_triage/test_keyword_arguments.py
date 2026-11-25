@@ -106,6 +106,7 @@ def test_a_call_that_may_bind_differently_needs_review(sample: FileSample):
     [
         (FileSample.BEHAVIOUR_CHANGED, "return width + height"),
         (FileSample.STATEMENT_APPENDED, "print(total)"),
+        (FileSample.DOCSTRING_ADDED_OVER_CODE, '"""'),
         (FileSample.DOCSTRING_EXAMPLE_CHANGED, "assert area(2.0, 4.0) == 8.0"),
     ],
 )
@@ -114,7 +115,8 @@ def test_code_changed_beyond_the_rules_is_the_reason_for_review(
 ):
     """
     Code the rules cannot match names the head line where it stops matching: a changed
-    expression, the first statement a body gains, or a docstring example's line.
+    expression, the first statement a body gains, a docstring standing where code was,
+    or a docstring example's line.
     """
     assert triaged(sample, RenameMap()).reasons == (
         UnprovenDifference(sample.head_line(code), Difference.CODE_CHANGED),

@@ -5,9 +5,10 @@ prepares the clone basstler reads that pull request from.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -15,9 +16,12 @@ import pytest
 from basstler_testing.constants.environment import (
     FileMode,
     RecordingPythonStubVariable,
+    RecordingUvStubVariable,
     ReviewTriageScriptVariable,
+    SearchPathVariable,
 )
 from basstler_testing.constants.paths import DatasetLocation, RepositoryLocation
+from basstler_testing.scratch_repository import ScratchRepository
 from basstler_testing.script_runner import BashScriptRunner
 from basstler.text_file import TextFile
 
@@ -226,3 +230,187 @@ def test_a_clone_with_another_origin_is_pointed_at_the_repository(
     assert installed_triage.origin_url(REPOSITORY) == (
         f"https://github.com/{REPOSITORY}.git"
     )
+
+
+# %% installing basstler from its workspace
+
+BASSTLER_PROJECT = Path("packages") / "basstler" / "pyproject.toml"
+"""
+The basstler distribution's project file in a clone of the workspace.
+"""
+
+BASSTLER_MODULE = Path("packages") / "basstler" / "src" / "basstler" / "module.py"
+"""
+A module of the basstler distribution, changed without its project file.
+"""
+
+
+@dataclass(frozen=True)
+class BasstlerSource:
+    """
+    A basstler repository to install from, and a ``uv`` recording what it installs.
+    """
+
+    repository: ScratchRepository
+    """
+    The repository the script installs from.
+    """
+
+    commit: str
+    """
+    The commit installed.
+    """
+
+    uv_directory: Path
+    """
+    The directory holding the ``uv`` stand-in.
+    """
+
+    uv_log: Path
+    """
+    The file the ``uv`` stand-in records its arguments in.
+    """
+
+    def with_new_commit(self) -> BasstlerSource:
+        """
+        :return: This source after a commit changing a module but no project file.
+        """
+        self.repository.write(BASSTLER_MODULE, "CHANGED = True\n")
+        self.repository.commit_everything("Change a module")
+        return replace(self, commit=self.repository.git.commit_at("HEAD"))
+
+    def synced_arguments(self) -> list[list[str]]:
+        """
+        :return: The arguments of each ``uv sync`` so far, the project path left out.
+        """
+        syncs: list[list[str]] = []
+        for argument in TextFile(self.uv_log).read().splitlines():
+            if argument == "sync":
+                syncs.append([])
+            syncs[-1].append(argument)
+        return [arguments[:-1] for arguments in syncs]
+
+    def run(self, home: Path, call_log: Path) -> subprocess.CompletedProcess[str]:
+        """
+        :param home: The script's home, with nothing installed yet.
+        :param call_log: The file the installed interpreter records its arguments in.
+        :return: The script, run on a pull request, once finished.
+        """
+        return BashScriptRunner(
+            project_root=home.parent,
+            script_path=RepositoryLocation.REVIEW_TRIAGE_SCRIPT,
+        ).run(
+            REPOSITORY,
+            PULL_REQUEST_NUMBER,
+            **{
+                ReviewTriageScriptVariable.HOME: str(home),
+                ReviewTriageScriptVariable.REFERENCE: self.commit,
+                ReviewTriageScriptVariable.SOURCE_REPOSITORY: str(
+                    self.repository.project_root
+                ),
+                RecordingUvStubVariable.CALL_LOG: str(self.uv_log),
+                RecordingUvStubVariable.PYTHON: str(
+                    DatasetLocation.RECORDING_PYTHON_STUB
+                ),
+                RecordingPythonStubVariable.CALL_LOG: str(call_log),
+                SearchPathVariable.EXECUTABLE_SEARCH_PATH: (
+                    f"{self.uv_directory}{os.pathsep}"
+                    f"{SearchPathVariable.EXECUTABLE_SEARCH_PATH.read()}"
+                ),
+            },
+        )
+
+
+@pytest.fixture
+def basstler_source(
+    scratch_repository: ScratchRepository, tmp_path: Path
+) -> BasstlerSource:
+    """
+    :return: A basstler workspace of one commit, and a ``uv`` installing nothing.
+    """
+    scratch_repository.write(BASSTLER_PROJECT, '[project]\nname = "basstler"\n')
+    scratch_repository.commit_everything("Add the basstler distribution")
+    uv_directory = tmp_path / "uv"
+    uv_directory.mkdir()
+    uv = uv_directory / "uv"
+    shutil.copy(DatasetLocation.RECORDING_UV_STUB, uv)
+    uv.chmod(FileMode.EXECUTABLE)
+    return BasstlerSource(
+        scratch_repository,
+        scratch_repository.git.commit_at("HEAD"),
+        uv_directory,
+        tmp_path / "uv-calls.log",
+    )
+
+
+def test_basstler_is_installed_from_a_clone_of_its_workspace(
+    basstler_source: BasstlerSource, tmp_path: Path
+):
+    """
+    The basstler distribution is synced from a clone of the commit asked for, with the
+    versions the workspace's lock pins, into the script's own environment.
+    """
+    home = tmp_path / "home"
+
+    completed = basstler_source.run(home, tmp_path / "python-calls.log")
+
+    assert completed.returncode == 0, completed.stderr
+    *arguments, project = TextFile(basstler_source.uv_log).read().splitlines()
+    assert arguments == [
+        "sync",
+        "--quiet",
+        "--frozen",
+        "--package",
+        "basstler",
+        "--no-dev",
+        "--no-editable",
+        "--reinstall",
+        "--project",
+    ]
+    assert Path(project) == home / "basstler"
+
+
+def test_the_clone_installed_from_holds_the_commit_asked_for(
+    basstler_source: BasstlerSource, tmp_path: Path
+):
+    """
+    The workspace is checked out at the commit installed, beside the environment.
+    """
+    home = tmp_path / "home"
+
+    basstler_source.run(home, tmp_path / "python-calls.log")
+
+    assert (home / "basstler" / BASSTLER_PROJECT).is_file()
+
+
+def test_a_second_run_at_the_same_commit_installs_nothing(
+    basstler_source: BasstlerSource, tmp_path: Path
+):
+    """
+    The environment is installed once per commit and reused by every later run.
+    """
+    home = tmp_path / "home"
+    call_log = tmp_path / "python-calls.log"
+    basstler_source.run(home, call_log)
+
+    completed = basstler_source.run(home, call_log)
+
+    assert completed.returncode == 0, completed.stderr
+    assert TextFile(basstler_source.uv_log).read().splitlines().count("sync") == 1
+
+
+def test_a_run_at_a_new_commit_reinstalls_what_it_changed(
+    basstler_source: BasstlerSource, tmp_path: Path
+):
+    """
+    A commit changing modules but no project file still replaces the installed ones.
+    """
+    home = tmp_path / "home"
+    call_log = tmp_path / "python-calls.log"
+    basstler_source.run(home, call_log)
+    changed = basstler_source.with_new_commit()
+
+    completed = changed.run(home, call_log)
+
+    assert completed.returncode == 0, completed.stderr
+    assert "--reinstall" in changed.synced_arguments()[-1]

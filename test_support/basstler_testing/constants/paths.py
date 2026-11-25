@@ -415,6 +415,11 @@ class DatasetLocation(PathEnumeration):
     An interpreter that runs nothing and records the arguments it is given.
     """
 
+    RECORDING_UV_STUB = STUBS / "recording_uv.sh"
+    """
+    A ``uv`` that installs nothing and records the arguments it is given.
+    """
+
     DISPATCH_CHECK_NEEDS_SETUP_STUB = STUBS / "dispatch_check_needs_setup.py"
     """
     A module standing in for :mod:`basstler.plan_site.dispatch_check`, reporting a

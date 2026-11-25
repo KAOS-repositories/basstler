@@ -13,7 +13,8 @@ import pytest
 
 import basstler.plan_site.entry_point_approval
 from basstler.session_tool import BuiltInTool
-from basstler.locations import EntryPointFlag, BasstlerVariable, PluginLocation
+from basstler.playbook.plugin import PackageModuleCommand
+from basstler.locations import BasstlerVariable, PluginLocation
 from basstler.maintenance.commands import FastForwardCommand, RestackCommand
 from basstler.plan_site.attach_approval import AttachAnswer, PermissionDecision
 from basstler.plugin_root import PluginRoot
@@ -201,6 +202,6 @@ def test_the_plugin_runs_the_hook_before_the_shell_tool():
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} {EntryPointFlag.HOOK} "
+        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} {PackageModuleCommand.hook_flag} "
         f"{basstler.plan_site.entry_point_approval.__spec__.name.removeprefix('basstler.')}"
     )

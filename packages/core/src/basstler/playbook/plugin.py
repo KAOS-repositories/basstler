@@ -21,7 +21,6 @@ from basstler.generated_file import GeneratedFile
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import (
     ClaudeCodeVariable,
-    EntryPointFlag,
     PackageLocation,
     PluginLocation,
     PluginSkillLocation,
@@ -105,6 +104,14 @@ class PackageModuleCommand(HookCommand):
     The module, which runs as ``python -m``.
     """
 
+    @classproperty
+    def hook_flag(cls) -> str:
+        """
+        The entry point's flag that makes the module run as a hook, which outside a git
+        work tree does nothing and exits silently with success.
+        """
+        return "--hook"
+
     @property
     def command_line(self) -> str:
         module_name = self.module.__spec__.name.removeprefix(
@@ -113,7 +120,7 @@ class PackageModuleCommand(HookCommand):
         return (
             f"{self.plugin_root_placeholder}/"
             f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
-            f"{EntryPointFlag.HOOK} {module_name}"
+            f"{self.hook_flag} {module_name}"
         )
 
 

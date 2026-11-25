@@ -15,7 +15,8 @@ import pytest
 
 from basstler.bash import Bash
 from basstler.exit_codes import ShellConfigurationExitCode
-from basstler.locations import EntryPointFlag, PluginLocation
+from basstler.playbook.plugin import PackageModuleCommand
+from basstler.locations import PluginLocation
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from basstler_testing.constants.environment import (
@@ -180,7 +181,7 @@ def test_a_hook_run_outside_a_work_tree_does_nothing_and_says_nothing(
     result = run_entry_point_outside(
         entry_point_repository,
         outside_any_repository,
-        EntryPointFlag.HOOK,
+        PackageModuleCommand.hook_flag,
         MODULE_WITH_HELP,
         "--help",
     )
@@ -192,7 +193,10 @@ def test_a_hook_run_inside_a_work_tree_runs_the_module(
     entry_point_repository: ScratchRepository,
 ):
     result = run_entry_point(
-        entry_point_repository, EntryPointFlag.HOOK, MODULE_WITH_HELP, "--help"
+        entry_point_repository,
+        PackageModuleCommand.hook_flag,
+        MODULE_WITH_HELP,
+        "--help",
     )
 
     assert f"basstler.{MODULE_WITH_HELP}" in result.stdout

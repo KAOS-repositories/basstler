@@ -1,0 +1,40 @@
+schema_version: 1
+id: agentic-loops
+title: 'Agentic loops: finished stages start the sessions that follow them'
+description: A finished plan-item stage starts the next stage's session by itself, so work is reviewed
+  and resolved without anyone starting each session. The first loop is kickoff, review, resolve and
+  review again, capped by rounds and turned on per user; each session also marks every pull request it
+  pushed viewed.
+default_repository: KAOS-repositories/basstler
+tracking_issue: 316
+waves:
+- id: first-loop
+  name: First loop
+  description: Kickoff, review and resolve chained, then proven on a real run.
+tracks:
+- id: loops
+  name: Loops
+  wave: first-loop
+items:
+- id: review-resolve-loop
+  title: Kickoff, review and resolve start each other's sessions until a review finds nothing
+  branch: ccr-a129c995-gp0fm8
+  status: in progress
+  recommended_model: opus
+  track: loops
+  depends_on: []
+  pull_request_number: 315
+  session: https://claude.ai/code/session_01JxHGiLtj9SNPjpaC8bZNCS
+  notes: 'Draft #315: basstler.plan.agentic_loop with a Stop hook starting the next session (claude
+    --print locally, create_session in the cloud), /plan-item-review, /plan-item-loop, and the review-triage
+    Stop hook marking every open pull request at a local branch tip viewed. Not yet run end to end.'
+- id: loop-end-to-end
+  title: Run one loop end to end, locally and in the cloud, and fix what the run shows
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: loops
+  depends_on:
+  - review-resolve-loop
+  notes: Turn the loop on, kick off a small item, and follow it through review and resolve in both
+    environments; fix what breaks in the hand-over, the prompts or the skills' instructions.

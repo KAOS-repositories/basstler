@@ -10,6 +10,7 @@ import ast
 import pytest
 
 from basstler.review_triage.comparison import (
+    Difference,
     FileNeedingReview,
     FileVerdict,
     FileTriager,
@@ -17,6 +18,7 @@ from basstler.review_triage.comparison import (
     MechanicalChange,
     MechanicalFile,
     ProseComparison,
+    UnprovenDifference,
 )
 from basstler.review_triage.keyword_arguments import (
     KEYWORD_RULES,
@@ -92,6 +94,27 @@ def test_a_call_that_may_bind_differently_needs_review(sample: FileSample):
     a callee the base commit does not define need review.
     """
     assert triaged(sample, RenameMap()) == FileNeedingReview(sample.change())
+
+
+@pytest.mark.parametrize(
+    ("sample", "code"),
+    [
+        (FileSample.BEHAVIOUR_CHANGED, "return width + height"),
+        (FileSample.STATEMENT_APPENDED, "print(total)"),
+        (FileSample.DOCSTRING_ADDED_OVER_CODE, '"""'),
+    ],
+)
+def test_code_changed_beyond_the_rules_is_the_reason_for_review(
+    sample: FileSample, code: str
+):
+    """
+    Code the rules cannot match names the head line where it stops matching: a changed
+    expression, the first statement a body gains, or a docstring standing where code
+    was.
+    """
+    assert triaged(sample, RenameMap()).reasons == (
+        UnprovenDifference(sample.head_line(code), Difference.CODE_CHANGED),
+    )
 
 
 def test_the_plain_comparison_verdicts_are_kept(old_name_renamed: RenameMap):

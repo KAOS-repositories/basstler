@@ -26,7 +26,9 @@ class FileSample(StrEnum):
 
     BEHAVIOUR_CHANGED = "behaviour-changed"
     CODE_REFORMATTED = "code-reformatted"
+    COMMENT_REWORDED = "comment-reworded"
     CONFLICT_MARKERS = "conflict-markers"
+    DOCSTRING_ADDED_OVER_CODE = "docstring-added-over-code"
     DOCSTRING_REFLOWED = "docstring-reflowed"
     DOCSTRING_REWORDED = "docstring-reworded"
     DOCUMENTATION_IMPORT_MOVED = "documentation-import-moved"
@@ -78,6 +80,7 @@ class FileSample(StrEnum):
     RECEIVER_TYPE_REASSIGNED = "receiver-type-reassigned"
     RECEIVER_TYPE_UNKNOWN = "receiver-type-unknown"
     RELATIVE_IMPORT_MOVED = "relative-import-moved"
+    STATEMENT_APPENDED = "statement-appended"
     STRING_LITERAL_RENAMED = "string-literal-renamed"
     TEMPLATE_RENAMED = "template-renamed"
     UTF_8_AND_TREE_REMOVAL_FIXES = "utf-8-and-tree-removal-fixes"

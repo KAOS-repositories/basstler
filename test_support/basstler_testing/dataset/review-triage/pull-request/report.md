@@ -13,7 +13,9 @@ Renames applied - check them once here instead of in every file:
 ### Needs review
 
 - `added.py`
+  - line 1: the file is added
 - `geometry.py`
+  - line 5: the code here differs beyond the changes proven mechanical
 
 ### Mechanical
 

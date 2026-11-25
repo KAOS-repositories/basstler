@@ -2,19 +2,39 @@ schema_version: 1
 id: agentic-loops
 title: 'Agentic loops: finished stages start the sessions that follow them'
 description: A finished plan-item stage starts the next stage's session by itself, so work is reviewed
-  and resolved without anyone starting each session. The first loop is kickoff, review, resolve and
-  review again, capped by rounds and turned on per user; each session also marks every pull request it
-  pushed viewed.
+  and resolved without anyone starting each session. The first loop is kickoff, review, resolve and review
+  again, capped by rounds and turned on per user; each session also marks every pull request it pushed
+  viewed. Later items make the loop stop on blocking findings only, report every hand-over on the pull
+  request, decide from GitHub data, and bound every session's cost.
 default_repository: KAOS-repositories/basstler
 tracking_issue: 316
 waves:
 - id: first-loop
   name: First loop
   description: Kickoff, review and resolve chained, then proven on a real run.
+- id: hardening
+  name: Hardening before the first run
+  description: The stop rule, hand-overs, loop state, session limits and CI gate a real run needs to teach
+    something.
+- id: refinement
+  name: Refinement after the first run
+  description: Better reviews and stop rules, chosen by what the first run shows.
+- id: options
+  name: Options kept in reserve
+  description: Alternative runners and measurement, taken up once the chain is proven.
 tracks:
 - id: loops
   name: Loops
   wave: first-loop
+- id: loop-safety
+  name: Loop safety
+  wave: hardening
+- id: review-quality
+  name: Review quality
+  wave: refinement
+- id: loop-alternatives
+  name: Loop alternatives
+  wave: options
 items:
 - id: review-resolve-loop
   title: Kickoff, review and resolve start each other's sessions until a review finds nothing
@@ -25,9 +45,10 @@ items:
   depends_on: []
   pull_request_number: 315
   session: https://claude.ai/code/session_01JxHGiLtj9SNPjpaC8bZNCS
-  notes: 'Draft #315: basstler.plan.agentic_loop with a Stop hook starting the next session (claude
-    --print locally, create_session in the cloud), /plan-item-review, /plan-item-loop, and the review-triage
-    Stop hook marking every open pull request at a local branch tip viewed. Not yet run end to end.'
+  notes: 'Draft #315: basstler.plan.agentic_loop with a Stop hook starting the next session (claude --print
+    locally, create_session in the cloud), /plan-item-review, /plan-item-loop, and the review-triage Stop
+    hook marking every open pull request at a local branch tip viewed. Not yet run end to end. The hardening
+    items stack on its branch.'
 - id: loop-end-to-end
   title: Run one loop end to end, locally and in the cloud, and fix what the run shows
   branch: null
@@ -36,5 +57,175 @@ items:
   track: loops
   depends_on:
   - review-resolve-loop
-  notes: Turn the loop on, kick off a small item, and follow it through review and resolve in both
-    environments; fix what breaks in the hand-over, the prompts or the skills' instructions.
+  - blocking-findings-stop
+  - loud-handover
+  - github-loop-state
+  - headless-session-limits
+  - ci-gate
+  notes: Turn the loop on, kick off a small item, and follow it through review and resolve in both environments;
+    fix what breaks in the hand-over, the prompts or the skills' instructions. Record the round where
+    blocking findings reach zero, every hand-over comment and each stage's cost; the refinement items
+    are reprioritised from that.
+
+- id: blocking-findings-stop
+  title: Continue the loop only on blocking findings
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: loop-safety
+  depends_on:
+  - review-resolve-loop
+  notes: Classify each review finding as blocking (a /code-review bug, a code-rules checker violation)
+    or advisory (a judgement against AGENTS.md). Both are posted; only blocking ones start a resolve.
+    finish-review takes the blocking count, and a review with none ends the loop with its own LoopEnd
+    member. Test first that an advisory-only review ends the loop.
+
+- id: loud-handover
+  title: Report every hand-over on the pull request, and fail it where the agent can still act
+  branch: null
+  status: not started
+  recommended_model: opus
+  track: loop-safety
+  depends_on:
+  - review-resolve-loop
+  notes: finish-changes and finish-review check that the next session can start (claude on the path locally)
+    before the turn ends, and fail with the fix if not. PendingSession keeps its record until the start
+    succeeds. One pull request comment per transition - started (stage, round, session), ended (why) or
+    failed (the command that continues it). Tests cover a missing claude, a cloud turn that never calls
+    create_session, and a retried stop starting one session only.
+
+- id: github-loop-state
+  title: Read the findings count, round and head SHA back from GitHub, and notice a moved head
+  branch: null
+  status: not started
+  recommended_model: opus
+  track: loop-safety
+  depends_on:
+  - blocking-findings-stop
+  - loud-handover
+  notes: finish-review counts the unresolved threads its review posted at the reviewed head SHA instead
+    of trusting a typed --findings, and the transition comment carries the round and SHA in a machine-readable
+    marker the next stage parses into a model. NextSession carries that SHA; a stage that finds a different
+    head re-reads the threads against it and says so instead of acting on stale lines. Tests on mocked
+    GitHub payloads, including a review whose post failed and a head moved between stages.
+
+- id: headless-session-limits
+  title: Start local sessions with turn, budget and permission limits and machine-readable output
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: loop-safety
+  depends_on:
+  - review-resolve-loop
+  notes: LocalSessionStarter passes --permission-mode, the stage skill's allowed tools, --max-turns and
+    --max-budget-usd from new LoopSettings fields, and --output-format stream-json to the log; the session
+    id is kept for the transition comment. Test the exact command line against a mocked claude.
+
+- id: ci-gate
+  title: Count a failing check at the head commit as a blocking finding
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: loop-safety
+  depends_on:
+  - blocking-findings-stop
+  notes: The review reads the head commit's check runs; a failing or pending-then-failed check counts
+    as blocking, so a red pull request goes to a resolve instead of ending clean. Tests on mocked check-run
+    payloads.
+
+- id: review-workflow
+  title: Run the review stage as a dynamic workflow that finds, verifies and ranks
+  branch: null
+  status: not started
+  recommended_model: opus
+  track: review-quality
+  depends_on:
+  - github-loop-state
+  notes: /plan-item-review runs a Claude Code dynamic workflow - one finder per changed file, an agent
+    that tries to refute each finding at the head SHA, then a ranking - returning a schema-checked {blocking,
+    findings}. Shipping a workflows/ folder in the plugin needs the AGENTS.md package rule changed first;
+    ask before. Test the skill's handling of the workflow's JSON with fixtures.
+
+- id: no-progress-stop
+  title: End the loop when a round makes no progress
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: review-quality
+  depends_on:
+  - github-loop-state
+  notes: A new LoopEnd member when round n's blocking findings are not fewer than round n-1's, or a finding
+    repeats a rule on a line an earlier round flagged; the end comment says which. Tests over sequences
+    of round states read from the transition markers.
+
+- id: delta-review
+  title: Review only what changed since the last reviewed commit, from round 2 on
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: review-quality
+  depends_on:
+  - github-loop-state
+  notes: From round 2 the review reads the diff from the previous round's reviewed SHA, plus whether each
+    earlier thread was addressed, judged with the resolve's reply on it. Test that unchanged code accepted
+    in round 1 gets no new finding in round 2.
+
+- id: test-tamper-guard
+  title: Keep unattended resolves from bending tests, and flag it in review
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: review-quality
+  depends_on:
+  - blocking-findings-stop
+  notes: An unattended resolve never edits, skips or weakens a test to pass it and replies on the thread
+    instead. The review marks any test file the resolve's commits changed as a blocking finding unless
+    the thread asked for it. Test the detection on fixture diffs.
+
+- id: review-model
+  title: Let the review stage run on its own model
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: review-quality
+  depends_on:
+  - headless-session-limits
+  notes: An optional review_model in LoopSettings, passed as create_session's model in the cloud and --model
+    locally; unset keeps today's behaviour. Tests on the rendered cloud request and the local command
+    line.
+
+- id: workflow-loop-trial
+  title: Try one review-resolve loop as a single dynamic workflow beside the session chain
+  branch: null
+  status: not started
+  recommended_model: opus
+  track: loop-alternatives
+  depends_on:
+  - loop-end-to-end
+  - review-workflow
+  notes: Run one item's whole loop as a workflow with its stop rules in the script and compare it with
+    the chain on hand-over failures, cost and whether its agents can follow the resolve skill. A new loop
+    kind - propose on the tracking issue first. Keep or drop it from the comparison.
+
+- id: event-driven-runner
+  title: Host the loop stages in a GitHub Actions runner triggered by pull request events
+  branch: null
+  status: deferred
+  recommended_model: opus
+  track: loop-alternatives
+  depends_on:
+  - loop-end-to-end
+  notes: Kept in reserve for loops that must outlive a closed computer or run for a team, via claude-code-action
+    on pull_request_review. Deferred because it relies on GitHub's scheduler, against the determinism
+    rule; reconsider only if the chain proves insufficient.
+
+- id: loop-metrics
+  title: Show each loop's rounds, ending and dismissed findings on the plan site
+  branch: null
+  status: not started
+  recommended_model: sonnet
+  track: loop-alternatives
+  depends_on:
+  - github-loop-state
+  notes: From the transition markers, per pull request - rounds used, how the loop ended, blocking findings
+    per round and findings dismissed by hand (the false-positive rate). Tests on fixture comment streams.

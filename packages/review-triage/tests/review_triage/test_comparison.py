@@ -4,6 +4,7 @@ Judging one file's change as mechanical or needing review.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import PurePosixPath
 
@@ -13,14 +14,19 @@ from basstler.git.commit_range import FileVersions
 from basstler.review_triage.comparison import (
     ChangeKind,
     ChangeKinds,
+    Difference,
     FileJudgment,
     FileNeedingReview,
     FileTriager,
+    ImportDifference,
+    ImportMismatch,
     JudgmentContext,
     MechanicalChange,
     MechanicalFile,
     ProseComparison,
     PythonComparison,
+    ReviewReason,
+    UnprovenDifference,
 )
 from basstler.review_triage.renames import Rename, RenameMap
 
@@ -95,14 +101,70 @@ def test_a_change_of_meaning_needs_review(
     sample: FileSample, old_name_renamed: RenameMap
 ):
     """
-    A changed import source, an import the code does not use, an import of a name another
-    module's star import supplied, or a changed string literal, docstring wording or
-    expression needs review, renames or not.
+    A changed import source, an import the code does not use, an import of a name
+    another module's star import supplied, or a changed string literal, docstring
+    wording or expression needs review, renames or not.
     """
     change = sample.change()
     assert FileTriager(JudgmentContext(old_name_renamed)).triage(
         change
     ) == FileNeedingReview(change)
+
+
+@pytest.mark.parametrize(
+    ("sample", "code", "expected"),
+    [
+        (
+            FileSample.IMPORT_SOURCE_CHANGED,
+            "from pickle import loads",
+            lambda line: ImportDifference(line, "loads", ImportMismatch.SOURCE_CHANGED),
+        ),
+        (
+            FileSample.IMPORT_ADDED_UNUSED,
+            "import json",
+            lambda line: ImportDifference(line, "json", ImportMismatch.ONLY_HEAD),
+        ),
+        (
+            FileSample.IMPORT_REMOVED_UNUSED,
+            "from __future__ import annotations",
+            lambda line: ImportDifference(line, "json", ImportMismatch.ONLY_BASE),
+        ),
+        (
+            FileSample.IMPORT_ADDED_FROM_OTHER_MODULE,
+            "from posixpath import join",
+            lambda line: ImportDifference(line, "join", ImportMismatch.ONLY_HEAD),
+        ),
+        (
+            FileSample.STRING_LITERAL_RENAMED,
+            'COMMAND = "new_name"',
+            lambda line: UnprovenDifference(line, Difference.TEXT_CHANGED),
+        ),
+        (
+            FileSample.DOCSTRING_REWORDED,
+            '"""',
+            lambda line: UnprovenDifference(line, Difference.DOCSTRING_REWORDED),
+        ),
+        (
+            FileSample.COMMENT_REWORDED,
+            "# Both sides are in feet.",
+            lambda line: UnprovenDifference(line, Difference.COMMENT_REWORDED),
+        ),
+        (
+            FileSample.BEHAVIOUR_CHANGED,
+            "return width + height",
+            lambda line: UnprovenDifference(line, Difference.TEXT_CHANGED),
+        ),
+    ],
+)
+def test_a_change_of_meaning_names_the_part_not_proven(
+    sample: FileSample, code: str, expected: Callable[[int], ReviewReason]
+):
+    """
+    A file needing review names the import, docstring, comment or line the judgments
+    could not prove mechanical, on the line of the head version showing *code*.
+    """
+    verdict = FileTriager(JudgmentContext()).triage(sample.change())
+    assert verdict.reasons == (expected(sample.head_line(code)),)
 
 
 def test_a_rename_the_pull_request_does_not_make_needs_review():
@@ -149,6 +211,34 @@ def test_a_file_no_judgment_proves_mechanical_needs_review(change: FileVersions)
     review.
     """
     assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
+
+
+@pytest.mark.parametrize(
+    ("change", "difference"),
+    [
+        (
+            replace(FileSample.BEHAVIOUR_CHANGED.change(), base_text=None),
+            Difference.ADDED_FILE,
+        ),
+        (
+            replace(FileSample.BEHAVIOUR_CHANGED.change(), head_text=None),
+            Difference.DELETED_FILE,
+        ),
+        (
+            FileVersions(PurePosixPath("logo.png"), is_binary=True),
+            Difference.BINARY_FILE,
+        ),
+    ],
+    ids=["added", "deleted", "binary"],
+)
+def test_a_whole_file_no_judgment_reads_is_the_reason_for_review(
+    change: FileVersions, difference: Difference
+):
+    """
+    An added, deleted or binary file needs review for being one, on its first line.
+    """
+    verdict = FileTriager(JudgmentContext()).triage(change)
+    assert verdict.reasons == (UnprovenDifference(1, difference),)
 
 
 # %% relative imports

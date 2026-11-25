@@ -412,6 +412,13 @@ class ImportBinding:
     The dotted path of the module or module member the name is bound to.
     """
 
+    @property
+    def member_name(self) -> str:
+        """
+        The last name of :attr:`source`, the member's name in its module.
+        """
+        return self.source.rpartition(DOTTED_NAME_SEPARATOR)[2]
+
 
 @dataclass(frozen=True)
 class ImportBindings:
@@ -458,47 +465,81 @@ class ImportBindings:
         """
         return frozenset(binding.bound_name for binding in self.bindings)
 
-    def binds_only_respellings(
+    def unexplained_bindings(
         self, other: ImportBindings, referenced_names: frozenset[str]
-    ) -> bool:
+    ) -> tuple[ImportBinding, ...]:
         """
         :param other: The bindings of another version of the file.
         :param referenced_names: The names this version's code refers to.
-        :return: Whether every name only these bindings bind is one the code refers to
-            and both versions reached through the same star import of its module.
+        :return: The star imports the other version lacks, and each name only these
+            bindings bind that the code does not refer to or that both versions did
+            not reach through the same star import of its module, by name.
         """
         star_sources = self.sources_of(STAR_IMPORT)
-        return star_sources == other.sources_of(STAR_IMPORT) and all(
-            binding.bound_name in referenced_names
-            and binding.source.rpartition(DOTTED_NAME_SEPARATOR)[0]
-            + DOTTED_NAME_SEPARATOR
-            + STAR_IMPORT
-            in star_sources
-            for binding in self.bindings
-            if binding.bound_name not in other.bound_names
+        other_star_sources = other.sources_of(STAR_IMPORT)
+        if star_sources != other_star_sources:
+            unexplained = {
+                binding
+                for binding in self.bindings
+                if binding.bound_name == STAR_IMPORT
+                and binding.source not in other_star_sources
+            }
+        else:
+            unexplained = {
+                binding
+                for binding in self.bindings
+                if binding.bound_name not in other.bound_names
+                and not (
+                    binding.bound_name in referenced_names
+                    and binding.source.rpartition(DOTTED_NAME_SEPARATOR)[0]
+                    + DOTTED_NAME_SEPARATOR
+                    + STAR_IMPORT
+                    in star_sources
+                )
+            }
+        return tuple(
+            sorted(
+                unexplained, key=lambda binding: (binding.bound_name, binding.source)
+            )
         )
 
-    def agrees_with(
+    def disagreeing_names(
         self, other: ImportBindings, equivalence: ImportSourceEquivalence
-    ) -> bool:
+    ) -> tuple[str, ...]:
         """
         :param other: The bindings of another version of the file.
         :param equivalence: Decides whether two sources bind one object.
-        :return: Whether every name both bind is bound to the same sources by both, or
-            by each to one source *equivalence* proves binds the other's object.
+        :return: Each name both bind, in order, that they bind to different sources
+            but for one source each that *equivalence* proves binds the same object.
         """
-        for bound_name in self.bound_names & other.bound_names:
-            sources = self.sources_of(bound_name)
-            other_sources = other.sources_of(bound_name)
-            if sources == other_sources:
-                continue
-            if len(sources) != 1 or len(other_sources) != 1:
-                return False
-            (source,) = sources
-            (other_source,) = other_sources
-            if not equivalence.binds_one_object(source, other_source):
-                return False
-        return True
+        return tuple(
+            bound_name
+            for bound_name in sorted(self.bound_names & other.bound_names)
+            if not self.binds_alike(bound_name, other, equivalence)
+        )
+
+    def binds_alike(
+        self,
+        bound_name: str,
+        other: ImportBindings,
+        equivalence: ImportSourceEquivalence,
+    ) -> bool:
+        """
+        :param bound_name: A name both bindings bind.
+        :param other: The bindings of another version of the file.
+        :param equivalence: Decides whether two sources bind one object.
+        :return: Whether both bind it to the same sources, or each to one source
+            *equivalence* proves binds the other's object.
+        """
+        sources = self.sources_of(bound_name)
+        other_sources = other.sources_of(bound_name)
+        if sources == other_sources:
+            return True
+        if len(sources) != 1 or len(other_sources) != 1:
+            return False
+        (source,) = sources
+        (other_source,) = other_sources
+        return equivalence.binds_one_object(source, other_source)
 
 
 class ImportSourceEquivalence:
@@ -807,6 +848,23 @@ class PythonSource:
         )
 
     @cached_property
+    def decorator_only_names(self) -> frozenset[str]:
+        """
+        The bare names the file's code refers to only as whole decorators.
+        """
+        tree = self.code_tree(RenameMap())
+        decorators = {
+            id(decorator)
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            for decorator in node.decorator_list
+            if isinstance(decorator, ast.Name)
+        }
+        names = [node for node in ast.walk(tree) if isinstance(node, ast.Name)]
+        elsewhere = {node.id for node in names if id(node) not in decorators}
+        return frozenset(node.id for node in names) - elsewhere
+
+    @cached_property
     def import_bindings(self) -> ImportBindings:
         """
         The names the file's imports bind, as the file spells them.
@@ -831,7 +889,17 @@ class PythonSource:
         The file's documentation strings, in the order they occur.
         """
         return tuple(
-            node.value.value
+            statement.value.value for statement in self.documentation_statements
+        )
+
+    @cached_property
+    def documentation_statements(self) -> tuple[ast.Expr, ...]:
+        """
+        The statements holding the file's documentation strings, in the order they
+        occur.
+        """
+        return tuple(
+            node
             for node in ast.walk(self.tree)
             if isinstance(node, ast.stmt) and self.is_documentation(node)
         )
@@ -866,10 +934,58 @@ class PythonSource:
         The text of the file's comments, one per line, in the order they occur.
         """
         return "\n".join(
-            token.string.removeprefix("#")
+            token.string.removeprefix("#") for token in self.comment_tokens
+        )
+
+    @cached_property
+    def comment_tokens(self) -> tuple[tokenize.TokenInfo, ...]:
+        """
+        The file's comments, in the order they occur.
+        """
+        return tuple(
+            token
             for token in tokenize.generate_tokens(io.StringIO(self.text).readline)
             if token.type == tokenize.COMMENT
         )
+
+    def first_comment_line_differing_from(self, other: PythonSource) -> int:
+        """
+        :param other: Another version of the file.
+        :return: The line of the first of this version's comments that reads otherwise
+            than the other's comment in its place, else of its last comment, else 1.
+        """
+        for token, other_token in zip(
+            self.comment_tokens, other.comment_tokens, strict=False
+        ):
+            if token.string != other_token.string:
+                return token.start[0]
+        if len(self.comment_tokens) > len(other.comment_tokens):
+            return self.comment_tokens[len(other.comment_tokens)].start[0]
+        return self.comment_tokens[-1].start[0] if self.comment_tokens else 1
+
+    def import_line(self, bound_name: str) -> int:
+        """
+        :param bound_name: A name an import of either version of the file binds.
+        :return: The line of this version's import statement binding it, else of its
+            first import statement, else 1.
+        """
+        statements = [
+            node
+            for node in ast.walk(self.tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+        ]
+        binding = next(
+            (
+                statement
+                for statement in statements
+                for alias in statement.names
+                if bound_name == (alias.asname or alias.name.split(".")[0])
+            ),
+            None,
+        )
+        if binding is not None:
+            return binding.lineno
+        return min((statement.lineno for statement in statements), default=1)
 
     @cached_property
     def significant_tokens(self) -> tuple[tokenize.TokenInfo, ...]:

@@ -19,10 +19,12 @@ from basstler.review_triage.calls import (
 from basstler.review_triage.comparison import (
     ChangeKind,
     ChangeKinds,
+    Difference,
     JudgmentContext,
     MechanicalChange,
     PythonComparison,
     ReviewReason,
+    UnprovenDifference,
 )
 from basstler.review_triage.definitions import (
     DataclassName,
@@ -550,7 +552,8 @@ class KeywordArgumentComparison(PythonComparison):
     ) -> ChangeKinds | None:
         """
         :meth:`PythonComparison.code_changes`, also allowing the differences
-        :attr:`rules` find once every one of them holds.
+        :attr:`rules` find once every one of them holds, the head line where the code
+        stops matching the reason for review when it does.
         """
         kinds = super().code_changes(base, head, context)
         if kinds is not None:
@@ -565,6 +568,10 @@ class KeywordArgumentComparison(PythonComparison):
             revealed_receivers=context.revealed_receivers,
         )
         if not matcher.matches(base_tree, head.code_tree(RenameMap())):
+            context.review_reasons.extend(
+                UnprovenDifference(node.lineno, Difference.CODE_CHANGED)
+                for node in matcher.mismatched_nodes[:1]
+            )
             return None
         readers = CommitReaders(
             SignatureReader(context.base_definitions, self.decorators),

@@ -173,6 +173,12 @@ class TreeMatcher:
     Every allowed difference found so far.
     """
 
+    mismatched_nodes: list[ast.stmt | ast.expr] = field(default_factory=list)
+    """
+    The head nodes found not to match, innermost first, left out once a caller matches
+    them another way.
+    """
+
     enclosing_classes: list[str] = field(default_factory=list)
     """
     The names of the classes whose bodies are being compared, innermost last.
@@ -244,17 +250,23 @@ class TreeMatcher:
         :return: Whether the two are equal but for differences the rules allow.
         """
         if isinstance(base, list):
-            return (
-                isinstance(head, list)
-                and len(base) == len(head)
-                and all(map(self.matches, base, head))
-            )
+            if not isinstance(head, list):
+                return False
+            if not all(map(self.matches, base, head)):
+                return False
+            if len(base) < len(head) and isinstance(head[len(base)], ast.stmt):
+                self.mismatched_nodes.append(head[len(base)])
+            return len(base) == len(head)
         if not isinstance(base, ast.AST):
             return base == head
         rule = self.rule_by_types.get(ComparedNodeTypes(type(base), type(head)))
         if rule is not None:
-            return rule.matches(base, head, self)
-        return type(base) is type(head) and self.matches_fields(base, head)
+            matched = rule.matches(base, head, self)
+        else:
+            matched = type(base) is type(head) and self.matches_fields(base, head)
+        if not matched and isinstance(head, (ast.stmt, ast.expr)):
+            self.mismatched_nodes.append(head)
+        return matched
 
     def matches_fields(
         self, base: ast.AST, head: ast.AST, skipped: frozenset[str] = frozenset()
@@ -282,13 +294,15 @@ class TreeMatcher:
 
     def attempt(self, base: object, head: object) -> bool:
         """
-        :meth:`matches`, keeping the findings it records only when the two match, so
-        that a caller may try another way of matching them.
+        :meth:`matches`, keeping the findings and mismatches it records only when the
+        two match, so that a caller may try another way of matching them.
         """
         recorded = len(self.findings)
+        mismatched = len(self.mismatched_nodes)
         if self.matches(base, head):
             return True
         del self.findings[recorded:]
+        del self.mismatched_nodes[mismatched:]
         return False
 
     def record(self, finding: Finding) -> None:

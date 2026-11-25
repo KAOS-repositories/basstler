@@ -22,7 +22,12 @@ from .samples import RULE_SETTINGS
 
 MODULE_DOCUMENTATION = frozenset({TriageRule.MODULE_DOCUMENTATION})
 """
-The one rule there is, as a set.
+The module documentation rule, as a set.
+"""
+
+DOCSTRINGS_ADDED_OR_REMOVED = frozenset({TriageRule.DOCSTRINGS_ADDED_OR_REMOVED})
+"""
+A rule off by default, as a set.
 """
 
 
@@ -79,25 +84,30 @@ def test_an_option_selects_a_rule_the_project_does_not():
     """
     Selecting a rule on the command line enables it.
     """
-    options = RuleSelection(select=MODULE_DOCUMENTATION)
-    assert options.applied_to(RuleSelection()) == MODULE_DOCUMENTATION
+    options = RuleSelection(select=DOCSTRINGS_ADDED_OR_REMOVED)
+    assert (
+        options.applied_to(RuleSelection())
+        == DEFAULT_RULES | DOCSTRINGS_ADDED_OR_REMOVED
+    )
 
 
 def test_an_option_ignores_a_rule_the_project_selects():
     """
     Ignoring a rule on the command line disables it, outranking the project.
     """
-    project = RuleSelection(select=MODULE_DOCUMENTATION)
-    options = RuleSelection(ignore=MODULE_DOCUMENTATION)
-    assert options.applied_to(project) == frozenset()
+    project = RuleSelection(select=DOCSTRINGS_ADDED_OR_REMOVED)
+    options = RuleSelection(ignore=DOCSTRINGS_ADDED_OR_REMOVED)
+    assert options.applied_to(project) == DEFAULT_RULES
 
 
 def test_a_rule_the_project_both_selects_and_ignores_is_off():
     """
     A project's own ignore outranks its select.
     """
-    project = RuleSelection(select=MODULE_DOCUMENTATION, ignore=MODULE_DOCUMENTATION)
-    assert RuleSelection().applied_to(project) == frozenset()
+    project = RuleSelection(
+        select=DOCSTRINGS_ADDED_OR_REMOVED, ignore=DOCSTRINGS_ADDED_OR_REMOVED
+    )
+    assert RuleSelection().applied_to(project) == DEFAULT_RULES
 
 
 # %% the options

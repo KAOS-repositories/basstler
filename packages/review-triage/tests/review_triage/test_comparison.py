@@ -29,6 +29,7 @@ from basstler.review_triage.comparison import (
     UnprovenDifference,
 )
 from basstler.review_triage.renames import Rename, RenameMap
+from basstler.review_triage.rules import DEFAULT_RULES, TriageRule
 
 from .samples import TEMPLATE_REINDENTED, FileSample
 from basstler.text_file import TextFile
@@ -388,6 +389,83 @@ def test_the_module_documentation_rule_skips_nothing_else(sample: FileSample):
     """
     change = sample.change()
     assert FileTriager(JudgmentContext()).triage(change) == FileNeedingReview(change)
+
+
+@pytest.mark.parametrize(
+    ("path", "is_test"),
+    [
+        ("tests/shapes.py", True),
+        ("robot/test/shapes.py", True),
+        ("robot/test_shapes.py", True),
+        ("robot/shapes_test.py", True),
+        ("robot/conftest.py", True),
+        ("robot/shapes.py", False),
+        ("robot/testing/shapes.py", False),
+        ("robot/contest_shapes.py", False),
+    ],
+)
+def test_docstrings_added_or_removed_are_mechanical_by_default_only_in_tests(
+    path: str, is_test: bool
+):
+    """
+    Docstrings that a function, class or field gains or loses are mechanical by default
+    in a test file alone.
+    """
+    change = replace(
+        FileSample.DOCSTRINGS_ADDED_AND_REMOVED.change(), path=PurePosixPath(path)
+    )
+    expected = (
+        MechanicalFile(
+            change, frozenset({MechanicalChange.DOCSTRINGS_ADDED_OR_REMOVED})
+        )
+        if is_test
+        else FileNeedingReview(change)
+    )
+    assert FileTriager(JudgmentContext()).triage(change) == expected
+
+
+def test_docstrings_added_or_removed_are_mechanical_once_their_rule_is_on():
+    """
+    Under the rule for every file, docstrings gained or lost outside the tests are
+    mechanical too.
+    """
+    change = FileSample.DOCSTRINGS_ADDED_AND_REMOVED.change()
+    rules = DEFAULT_RULES | {TriageRule.DOCSTRINGS_ADDED_OR_REMOVED}
+    assert FileTriager(JudgmentContext(rules=rules)).triage(change) == MechanicalFile(
+        change, frozenset({MechanicalChange.DOCSTRINGS_ADDED_OR_REMOVED})
+    )
+
+
+def test_docstrings_added_or_removed_in_a_test_need_review_once_its_rule_is_off():
+    """
+    With the rule for test files turned off, a test's docstrings gained or lost need
+    review.
+    """
+    change = replace(
+        FileSample.DOCSTRINGS_ADDED_AND_REMOVED.change(),
+        path=PurePosixPath("tests/test_shapes.py"),
+    )
+    rules = DEFAULT_RULES - {TriageRule.TEST_DOCSTRINGS_ADDED_OR_REMOVED}
+    assert FileTriager(JudgmentContext(rules=rules)).triage(
+        change
+    ) == FileNeedingReview(change)
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [FileSample.DOCSTRING_ADDED_AND_CODE_CHANGED, FileSample.DOCSTRING_REWORDED],
+    ids=["code changes too", "a docstring reworded"],
+)
+def test_the_docstrings_added_or_removed_rule_skips_nothing_else(sample: FileSample):
+    """
+    Changed code, and a docstring both versions have but word differently, need review
+    under the rule too.
+    """
+    change = sample.change()
+    rules = DEFAULT_RULES | {TriageRule.DOCSTRINGS_ADDED_OR_REMOVED}
+    assert FileTriager(JudgmentContext(rules=rules)).triage(
+        change
+    ) == FileNeedingReview(change)
 
 
 # %% extending the triage

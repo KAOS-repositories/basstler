@@ -21,6 +21,7 @@ from basstler.generated_file import GeneratedFile
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import (
     ClaudeCodeVariable,
+    EntryPointFlag,
     PackageLocation,
     PluginLocation,
     PluginSkillLocation,
@@ -111,7 +112,8 @@ class PackageModuleCommand(HookCommand):
         )
         return (
             f"{self.plugin_root_placeholder}/"
-            f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} {module_name}"
+            f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
+            f"{EntryPointFlag.HOOK} {module_name}"
         )
 
 

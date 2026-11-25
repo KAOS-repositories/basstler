@@ -14,7 +14,7 @@ import pytest
 from basstler.github.repository import Repository
 from basstler.session_tool import BuiltInTool, CloudSessionTool
 import basstler.plan_site.attach_approval
-from basstler.locations import BasstlerVariable, PluginLocation
+from basstler.locations import EntryPointFlag, BasstlerVariable, PluginLocation
 from basstler.plan_site.attach_approval import (
     AttachAnswer,
     AttachArguments,
@@ -152,6 +152,6 @@ def test_the_plugin_runs_the_hook_before_the_attach_tool_and_nothing_else():
     ]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
+        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} {EntryPointFlag.HOOK} "
         f"{basstler.plan_site.attach_approval.__spec__.name.removeprefix('basstler.')}"
     )

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from enum import ReprEnum
+from enum import ReprEnum, StrEnum
 from pathlib import Path
 
 import basstler
@@ -506,6 +506,18 @@ class GitHubTemplate(PathEnumeration):
     )
     """
     The command storing one token, read once at a hidden prompt, as several secrets.
+    """
+
+
+class EntryPointFlag(StrEnum):
+    """
+    A flag the plugin's entry point script takes before the module it runs.
+    """
+
+    HOOK = "--hook"
+    """
+    The module runs as a Claude Code hook, so outside a git work tree there is nothing
+    to do and the script exits silently with success.
     """
 
 

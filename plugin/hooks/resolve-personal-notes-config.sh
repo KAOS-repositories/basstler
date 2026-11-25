@@ -26,8 +26,12 @@ PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null 
 PROJECT_ROOT="$(cd "${PROJECT_ROOT}" && pwd)"
 # Every answer below is about a git repository, so anywhere else fails closed rather
 # than reporting plausible rows about nothing. The status is
-# basstler.exit_codes.ShellConfigurationExitCode.NOT_IN_REPOSITORY.
+# basstler.exit_codes.ShellConfigurationExitCode.NOT_IN_REPOSITORY. A hook, which sets
+# OUTSIDE_REPOSITORY_IS_NO_OP (see basstler.sh), has nothing to do there and exits 0 silently.
 if [ "$(git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
+  if [ "${OUTSIDE_REPOSITORY_IS_NO_OP:-false}" = true ]; then
+    exit 0
+  fi
   echo "basstler: ${PROJECT_ROOT} is not inside a git work tree, so nothing was checked - run this from the project's checkout" >&2
   exit 78
 fi

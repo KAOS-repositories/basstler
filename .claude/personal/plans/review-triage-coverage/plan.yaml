@@ -42,9 +42,12 @@ items:
 - id: raises-forwarding
   title: Prove keyword arguments forwarded through pytest.raises
   track: coverage
+  branch: review-triage-raises-forwarding
+  pull_request_number: 319
+  session: https://claude.ai/code/session_01JxHGiN7cZrpnejRYWSnZZz
   depends_on:
   - rejection-reasons
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: pytest.raises(E, callee, *args, **kwargs) calls callee with the rest; prove the keyword conversion
     against callee's signature. 3 of CRAM 1062's test files.

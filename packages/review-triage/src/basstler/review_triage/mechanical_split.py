@@ -5,6 +5,7 @@ mechanical and one making every other change, so a reviewer reads only the secon
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
@@ -21,12 +22,19 @@ from basstler.review_triage.comparison import (
     MechanicalFile,
     PythonComparison,
 )
+from basstler.review_triage.definition_moves import DefinitionMoveComparison
 from basstler.review_triage.exceptions import BaseBranchMergedError, UnprovenSplitError
 from basstler.review_triage.moved_definitions import MovedDefinition, MovedDefinitions
 from basstler.review_triage.python_source import LineSpan, PythonSource
 from basstler.review_triage.source_renaming import SourceRenaming
 from basstler.review_triage.statement_merge import StatementMerge
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
+
+FUTURE_MODULE = "__future__"
+"""
+The module whose imports switch on features of later Python versions, kept apart above
+every other import.
+"""
 
 # %% the files of the mechanical commit
 
@@ -145,6 +153,8 @@ class MechanicalTree:
         :return: Its base version with the definitions leaving it cut and those
             arriving at it pasted, ``None`` when it has no base version and none arrive.
         """
+        if change.base_text is None and self.moved.arriving_at(change.path):
+            return self.added_module_text(change)
         base_path = change.previous_path or change.path
         text = (
             self.cut(base_path) if self.moved.leaving(base_path) else change.base_text
@@ -152,6 +162,118 @@ class MechanicalTree:
         if not self.moved.arriving_at(change.path):
             return text
         return self.pasted(change.path, text or "").removesuffix("\n")
+
+    def added_module_text(self, change: FileVersions) -> str:
+        """
+        :param change: A module the pull request adds and definitions move into.
+        :return: Its docstring, the imports the arriving definitions use, and those
+            definitions in their base versions, in the order the head version holds
+            them; a name is imported as the module it left imports it, otherwise as
+            the head version does.
+        """
+        head = PythonSource(change.head_text or "")
+        arriving = sorted(
+            self.moved.arriving_at(change.path),
+            key=lambda moved: head.definition_span(moved.new_name).first,
+        )
+        definitions = [self.base_lines(moved) for moved in arriving]
+        used = PythonSource("".join(definitions)).referenced_names(
+            self.triager.context.renames
+        )
+        sources = list(dict.fromkeys(moved.source_text for moved in arriving))
+        source_imports = [
+            kept
+            for text in sources
+            for statement in PythonSource(text).tree.body
+            if (kept := self.used_imports(statement, used)) is not None
+        ]
+        imported = frozenset(
+            alias.asname or alias.name.partition(".")[0]
+            for statement in source_imports
+            for node in ast.walk(statement)
+            if isinstance(node, ast.Import | ast.ImportFrom)
+            for alias in node.names
+        )
+        body = head.tree.body
+        documented = bool(body) and PythonSource.is_documentation(body[0])
+        head_imports = [
+            kept
+            for statement in body[documented:]
+            if (kept := self.used_imports(statement, used - imported)) is not None
+        ]
+        statements = (*source_imports, *head_imports)
+        future = [
+            ast.unparse(statement)
+            for statement in statements
+            if isinstance(statement, ast.ImportFrom)
+            and statement.module == FUTURE_MODULE
+        ]
+        imports = [
+            ast.unparse(statement)
+            for statement in statements
+            if not (
+                isinstance(statement, ast.ImportFrom)
+                and statement.module == FUTURE_MODULE
+            )
+        ]
+        preamble = [
+            *(
+                [head.lines_of(LineSpan(1, body[0].end_lineno or 1))]
+                if documented
+                else []
+            ),
+            *(["\n".join(dict.fromkeys(future))] if future else []),
+            *(["\n".join(dict.fromkeys(imports))] if imports else []),
+        ]
+        return "\n\n\n".join(
+            [
+                "\n\n".join(part.rstrip("\n") for part in preamble),
+                *(definition.rstrip("\n") for definition in definitions),
+            ]
+        )
+
+    @staticmethod
+    def used_imports(statement: ast.stmt, used: frozenset[str]) -> ast.stmt | None:
+        """
+        :param statement: A top-level statement of a module.
+        :param used: The names the module's code uses.
+        :return: The import keeping only the names it binds that are used, or a
+            condition holding only imports keeping only those; ``None`` when nothing
+            is left or the statement is neither.
+        """
+        if isinstance(statement, ast.ImportFrom) and statement.module == FUTURE_MODULE:
+            return statement
+        if not PythonSource.is_import(statement):
+            return None
+        if isinstance(statement, ast.If):
+            inner = [
+                kept
+                for nested in statement.body
+                if (kept := MechanicalTree.used_imports(nested, used)) is not None
+            ]
+            return ast.If(test=statement.test, body=inner, orelse=[]) if inner else None
+        if isinstance(statement, ast.Import):
+            names = MechanicalTree.used_aliases(statement.names, used)
+            return ast.Import(names=names) if names else None
+        names = MechanicalTree.used_aliases(statement.names, used)
+        if not names:
+            return None
+        return ast.ImportFrom(
+            module=statement.module, names=names, level=statement.level
+        )
+
+    @staticmethod
+    def used_aliases(aliases: list[ast.alias], used: frozenset[str]) -> list[ast.alias]:
+        """
+        :param aliases: The names an import binds.
+        :param used: The names the module's code uses.
+        :return: Those of them the code uses.
+        """
+        return [
+            alias
+            for alias in aliases
+            if (alias.asname or alias.name.partition(".")[0]) in used
+        ]
 
     def cut(self, path: PurePosixPath) -> str:
         """
@@ -189,15 +311,14 @@ class MechanicalTree:
             part if part.endswith("\n") else f"{part}\n" for part in parts
         )
 
-    @staticmethod
-    def base_lines(moved: MovedDefinition) -> str:
+    def base_lines(self, moved: MovedDefinition) -> str:
         """
         :param moved: A moved definition.
-        :return: Its lines in the module it left, exactly as they were.
+        :return: Its lines in the module it left, the occurrences proven to refer to a
+            renamed member renamed, its own name among them.
         """
-        lines = moved.source_text.splitlines(keepends=True)
-        span = moved.source.definition_span(moved.old_name)
-        return "".join(lines[span.first - 1 : span.last])
+        source = DefinitionMoveComparison.renamed_source(moved, self.triager.context)
+        return source.lines_of(source.definition_span(moved.name_in(source)))
 
     @staticmethod
     def span_with_blank_lines_above(

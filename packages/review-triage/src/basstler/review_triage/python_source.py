@@ -803,6 +803,19 @@ class PythonSource:
             yield statement
 
     @staticmethod
+    def is_import(statement: ast.stmt) -> bool:
+        """
+        :param statement: A statement.
+        :return: Whether it imports, alone or as a condition holding only imports,
+            such as the imports made for type checking alone.
+        """
+        if isinstance(statement, ast.If):
+            return not statement.orelse and all(
+                PythonSource.is_import(nested) for nested in statement.body
+            )
+        return isinstance(statement, ast.Import | ast.ImportFrom)
+
+    @staticmethod
     def is_documentation(statement: ast.stmt) -> bool:
         """
         :param statement: A statement.

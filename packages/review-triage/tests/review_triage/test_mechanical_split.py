@@ -27,7 +27,9 @@ from .conftest import committed_pull_request
 from .samples import (
     DefinitionMoveEditedSample,
     ModuleMoveSample,
+    ImportRespelledMoveSample,
     RenameMixedSample,
+    RenamedMoveEditedSample,
     RenameSampledSample,
     SampleTrees,
 )
@@ -98,8 +100,23 @@ def tree_files(scratch_repository: ScratchRepository, commit: str) -> dict[Path,
             RenameMixedSample.HEAD_TREE,
             RenameMixedSample.MECHANICAL_TREE,
         ),
+        (
+            RenamedMoveEditedSample.BASE_TREE,
+            RenamedMoveEditedSample.HEAD_TREE,
+            RenamedMoveEditedSample.MECHANICAL_TREE,
+        ),
+        (
+            ImportRespelledMoveSample.BASE_TREE,
+            ImportRespelledMoveSample.HEAD_TREE,
+            ImportRespelledMoveSample.MECHANICAL_TREE,
+        ),
     ],
-    ids=["moved definitions", "renames and a rewrapped line"],
+    ids=[
+        "moved definitions",
+        "renames and a rewrapped line",
+        "a definition moved under a new name",
+        "a moved definition's import respelled",
+    ],
 )
 def test_the_mechanical_commit_makes_every_change_proven_mechanical(
     scratch_repository: ScratchRepository,

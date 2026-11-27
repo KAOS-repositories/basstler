@@ -5,7 +5,6 @@ their dotted paths, and judging the modules they move between.
 
 from __future__ import annotations
 
-import ast
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
@@ -485,7 +484,7 @@ class DefinitionMoveComparison(FileJudgment):
                 statements[0]
             )
             only_imports = all(
-                isinstance(statement, ast.Import | ast.ImportFrom)
+                PythonSource.is_import(statement)
                 for statement in statements[documented:]
             )
             if not only_imports or head_rest.comments:

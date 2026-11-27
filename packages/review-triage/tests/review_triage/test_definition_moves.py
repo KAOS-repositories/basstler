@@ -29,6 +29,7 @@ from .samples import (
     DefinitionMoveSample,
     ModuleSplitSample,
     DocumentedConstantMoveSample,
+    TypeCheckingImportMoveSample,
 )
 from basstler.text_file import TextFile
 
@@ -499,5 +500,20 @@ def test_a_moved_constant_takes_its_docstring_along(
         scratch_repository,
         DocumentedConstantMoveSample.BASE_TREE,
         DocumentedConstantMoveSample.HEAD_TREE,
+    )
+    assert PullRequestTriager().triage(changes).files_needing_review == ()
+
+
+def test_a_module_receiving_a_definition_may_import_for_type_checking(
+    scratch_repository: ScratchRepository,
+):
+    """
+    A module added to receive a function, importing what its annotations name under
+    :data:`typing.TYPE_CHECKING` as the module it leaves does, is mechanical.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        TypeCheckingImportMoveSample.BASE_TREE,
+        TypeCheckingImportMoveSample.HEAD_TREE,
     )
     assert PullRequestTriager().triage(changes).files_needing_review == ()

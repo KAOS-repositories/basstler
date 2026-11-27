@@ -519,6 +519,20 @@ class DocumentedConstantMoveSample(SampleTrees):
         return "documented-constant-move"
 
 
+class TypeCheckingImportMoveSample(SampleTrees):
+    """
+    A pull request moving a function into a module it adds, which imports what its
+    annotations name only for type checking, as the module it leaves does.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "type-checking-import-move"
+
+
 class DefinitionMoveEditedSample(SampleTrees):
     """
     A pull request moving two classes into another module, which rewords its module
@@ -536,6 +550,44 @@ class DefinitionMoveEditedSample(SampleTrees):
     @classproperty
     def directory_name(cls) -> str:
         return "definition-move-edited"
+
+
+class RenamedMoveEditedSample(SampleTrees):
+    """
+    A pull request splitting a module into several, one class moving under a new name
+    and rewording a docstring of its members.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    MECHANICAL_TREE = "mechanical"
+    """
+    The tree making only the mechanical changes: every definition moved, the class
+    renamed, its docstring as it was.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "renamed-move-edited"
+
+
+class ImportRespelledMoveSample(SampleTrees):
+    """
+    A pull request moving a function into a module it adds, which imports what the
+    function uses from another module than the one it leaves does.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    MECHANICAL_TREE = "mechanical"
+    """
+    The tree making only the mechanical changes: the function moved, its import as the
+    module it left spells it.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "import-respelled-move"
 
 
 class RenameMixedSample(SampleTrees):

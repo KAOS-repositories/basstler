@@ -3,6 +3,7 @@ query ReviewThreadsPage(
   $name: String!
   $number: Int!
   $threadCursor: String
+  $reviewCursor: String
 ) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
@@ -33,7 +34,11 @@ query ReviewThreadsPage(
           }
         }
       }
-      reviews(first: 100) {
+      reviews(first: 100, after: $reviewCursor) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           author {
             login

@@ -169,6 +169,14 @@ class Review(ValidatedJSONModel):
     When the review was submitted, as an ISO 8601 timestamp.
     """
 
+    @property
+    def says_something(self) -> bool:
+        """
+        Whether the review carries a body or a verdict, unlike the empty comment GitHub
+        files for each reply in a thread.
+        """
+        return bool(self.body.strip()) or self.state is not ReviewState.COMMENTED
+
 
 class BranchPullRequest(ValidatedJSONModel):
     """
@@ -204,6 +212,22 @@ class PageInfo(ValidatedJSONModel):
     end_cursor: Annotated[str | None, Field(alias="endCursor")]
     """
     The cursor to request that next page with.
+    """
+
+
+class ReviewPage(ValidatedJSONModel):
+    """
+    One page of submitted reviews, with where it stands in the whole list.
+    """
+
+    reviews: Annotated[list[Review], Field(alias="nodes")]
+    """
+    The reviews on this page, oldest first.
+    """
+
+    page_info: Annotated[PageInfo, Field(alias="pageInfo")]
+    """
+    Whether another page follows, and the cursor to request it with.
     """
 
 

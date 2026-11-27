@@ -1,12 +1,10 @@
 """
-The one thing about the resolve skill's upstream read worth asserting from code.
+What the resolve skill's reads of a pull request's reviews must and must not do.
 
 The skill is instructions, so most of what it says can only be checked by reading it.
-The exception is what it must *not* condition on: a branch has an upstream pull request
-from the moment its Create is clicked, while the promotion label appears only if someone
-adds it afterwards, so the label is no evidence that the pull request exists. That is an
-absence, computed from the stack tooling's own configuration rather than from a string
-written here, which is what makes it worth a test where a prose assertion would not be.
+Two things are worth asserting: what the upstream read must *not* condition on, and that
+the fork pull request's reviews are read at all, since a review's own body is in neither
+its threads nor its conversation comments.
 
 Filesystem only: no network, no credentials, no scratch repository.
 """
@@ -110,3 +108,16 @@ def test_the_upstream_reviews_are_still_read():
     instructions = skill_document(SkillDirectory.PLAN_ITEM_RESOLVE)
 
     assert upstream_reviews_invocation() in instructions
+
+
+# %% the resolve skill's fork read
+
+
+def test_the_fork_pull_requests_reviews_are_read():
+    """
+    A review submitted with a body and no inline comment is found only among the
+    reviews.
+    """
+    instructions = skill_document(SkillDirectory.PLAN_ITEM_RESOLVE)
+
+    assert '`method: "get_reviews"`' in instructions

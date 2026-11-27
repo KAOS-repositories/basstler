@@ -26,18 +26,13 @@
         ]
       },
       "reviews": {
+        "pageInfo": {"hasNextPage": true, "endCursor": "REVIEWS_CURSOR_PAGE_ONE"},
         "nodes": [
           {
             "author": {"login": "first-reviewer"},
             "state": "CHANGES_REQUESTED",
             "body": "A few naming things.",
             "submittedAt": "2026-08-06T09:15:00Z"
-          },
-          {
-            "author": {"login": "second-reviewer"},
-            "state": "COMMENTED",
-            "body": "",
-            "submittedAt": "2026-08-06T11:02:00Z"
           }
         ]
       },

@@ -1,8 +1,8 @@
-PR #328 (draft, onto claude/practical-hawking-nf0g3o): split a PR in an Action when its author labels it.
+PR #328 (draft, onto claude/practical-hawking-nf0g3o): split after every push by adding M/P/S/R commits.
 Plan:
-- Author-only `split-mechanical` label starts the reusable split workflow; no reviewer branches.
+- Additive split (M cumulative, P/S per push, R head); Action on label + every push while labelled.
 Done:
-- Shared-branch commit reverted; workflows, label and tests at b9e9d2dd; description updated.
+- Implemented and tested at 10d47e44; description updated.
 Next:
-- Run it on a real PR once the workflow is on a base branch.
-- Have set-up-mark-viewed (or a new setup) install the caller in other repositories.
+- Confirm on a test PR that GitHub diffs a merge commit against its first parent.
+- Run the Action for real once on a default branch; installing the caller elsewhere.

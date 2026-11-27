@@ -36,6 +36,9 @@
 #                             (default: KAOS-repositories/basstler on GitHub)
 #   BASSTLER_HOME             where the environment and clones are kept
 #                             (default: ~/.cache/basstler-review-triage)
+#   BASSTLER_GIT_PROTOCOL     ssh or https, how git reaches the repository to push the
+#                             personal notes (default: gh's git_protocol, else https);
+#                             over https git authenticates with the GitHub credential
 set -euo pipefail
 
 readonly basstler_repository="${BASSTLER_REPOSITORY:-https://github.com/KAOS-repositories/basstler}"
@@ -164,9 +167,32 @@ install_basstler() {
 
 # %% the repository's clone and pull requests
 
+# The protocol gh is configured with, so a user set up for SSH pushes over SSH.
+git_protocol() {
+    local protocol="${BASSTLER_GIT_PROTOCOL:-}"
+    if [[ -z "$protocol" ]] && command -v gh >/dev/null; then
+        protocol="$(gh config get git_protocol 2>/dev/null || true)"
+    fi
+    case "${protocol:-https}" in
+    ssh | https) printf '%s\n' "${protocol:-https}" ;;
+    *) fail "BASSTLER_GIT_PROTOCOL must be ssh or https, not $protocol" ;;
+    esac
+}
+
+# Over https, git answers GitHub with the same credential the API calls use instead of
+# asking for a password, which GitHub refuses. The empty helper drops any other helper.
+readonly token_credential_helper='!f() {
+    [ "$1" = get ] || exit 0
+    token="${GH_TOKEN:-${GITHUB_TOKEN:-$(gh auth token 2>/dev/null)}}"
+    [ -n "$token" ] && printf "username=x-access-token\npassword=%s\n" "$token"
+}; f'
+
 # basstler falls back to the clone's origin for the repositories it is not given.
 prepare_clone() {
     local remote_url="https://github.com/$repository.git"
+    if [[ "$(git_protocol)" == "ssh" ]]; then
+        remote_url="git@github.com:$repository.git"
+    fi
     if [[ ! -d "$clone/.git" ]]; then
         mkdir -p "$clone"
         git -C "$clone" init --quiet
@@ -176,6 +202,9 @@ prepare_clone() {
     else
         git -C "$clone" remote add origin "$remote_url"
     fi
+    git -C "$clone" config --unset-all credential.https://github.com.helper || true
+    git -C "$clone" config --add credential.https://github.com.helper ""
+    git -C "$clone" config --add credential.https://github.com.helper "$token_credential_helper"
 }
 
 open_pull_requests() {
@@ -201,7 +230,7 @@ triage() {
     if [[ "$command_name" == "mark-viewed" && -z "$verbose" ]]; then
         output_options=(--summary-only)
     fi
-    (cd "$clone" && "$(environment_python)" -m basstler review-triage "$command_name" "$1" \
+    (cd "$clone" && GIT_TERMINAL_PROMPT=0 "$(environment_python)" -m basstler review-triage "$command_name" "$1" \
         --repository "$repository" \
         ${output_options[@]+"${output_options[@]}"} ${passed_on[@]+"${passed_on[@]}"})
 }

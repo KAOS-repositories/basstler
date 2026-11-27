@@ -279,6 +279,7 @@ class NotesBranchWriter:
         :raises NotesPushRejectedError: If every push attempt was rejected.
         :return: Whether anything was pushed.
         """
+        push_error_output = ""
         for _ in range(self.push_attempts):
             remote = self.branch.fetch()
             with ScratchWorktree(self.branch.git) as worktree:
@@ -294,8 +295,12 @@ class NotesBranchWriter:
                     "-m",
                     message,
                 )
-                if worktree.attempt(
+                push = worktree.attempt(
                     "push", "--quiet", remote, f"HEAD:{self.branch.location.branch}"
-                ).succeeded:
+                )
+                if push.succeeded:
                     return NotesWriteOutcome.PUSHED
-        raise NotesPushRejectedError(self.branch.location.branch, self.push_attempts)
+                push_error_output = push.error_output
+        raise NotesPushRejectedError(
+            self.branch.location.branch, self.push_attempts, push_error_output
+        )

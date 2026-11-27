@@ -298,8 +298,9 @@ Claude Code's own behaviour, not something the hook controls.
 ## Running basstler commands without a prompt
 
 A second `PreToolUse` hook, on `Bash` ([`basstler.plan_site.entry_point_approval`](../../src/basstler/plan_site/entry_point_approval.py)),
-allows `basstler.sh <module> [arguments...]` without asking, however the skill spells the plugin root. A
-command line that chains, pipes, redirects or substitutes anything (`;`, `&&`, `|`, `<`, `>`, `$(...)`,
+allows `basstler.sh <module> [arguments...]` without asking, however the skill spells the plugin root. It may
+follow `cd <directory> &&` (or `;`) and be followed by `; echo "<plain text> $?"`, the status report the setup
+gate's skills append. Anything else chained, piped, redirected or substituted (`;`, `&&`, `|`, `<`, `>`, `$(...)`,
 backticks), any other program, and a script path that is not this plugin's own root, gets no answer, so Claude Code asks as before. As with the attach hook,
 Claude Code's own permission classifier may still have the last word.
 

@@ -1,12 +1,11 @@
 ## Plan
-- Resolve the conflicts between this branch and `main` (0a166f91): merge `main` in, keeping the split of locations, environment and exceptions.
+- Keep #297 mergeable: `main` merged in, split of locations, environment and exceptions kept.
 
 ## Done
-- Merge probe at ccc60b55 found 5 conflicting files (locations.py, actions_budget.py, plan_site/workflows.py, two tests); all resolved in the working tree.
-- ruff check and format, `code-rules check` and `new-crossings origin/main` pass. Tests pass for rules, github, core, git, reviews, stack, notes, plan, review-triage, packaging, build.
-- Upstream review state: not checked, no upstream is named for this clone. No review threads or comments on the pull request.
+- Merged `main` (0a166f91) at d0be36f5 and pushed; merge probe clean at that head. Description updated, PR still a draft.
+- ruff, `code-rules check` and `new-crossings` pass; 11 distributions' tests pass locally (all but basstler and hub).
+- Upstream review state not checked: no upstream is named.
 
 ## Next
-- Finish the basstler and hub test runs, commit the merge, push with `maintenance push`.
-- Update the pull request description and the plan item's record; return the PR to draft.
-- Ask the owner the two open questions in the PR description.
+- Read the basstler and hub test results and CI on d0be36f5.
+- Owner to answer the two open questions in the description.

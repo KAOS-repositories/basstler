@@ -51,6 +51,15 @@ class FileSample(StrEnum):
     )
     KEYWORD_ARGUMENTS_TO_IDENTITY_DECORATED = "keyword-arguments-to-identity-decorated"
     KEYWORD_ARGUMENTS_TO_WRAPPING_DECORATED = "keyword-arguments-to-wrapping-decorated"
+    KEYWORD_ARGUMENTS_TO_FORWARDING_DECORATED = (
+        "keyword-arguments-to-forwarding-decorated"
+    )
+    KEYWORD_ARGUMENTS_TO_FORWARDING_DECORATED_RENAMING = (
+        "keyword-arguments-to-forwarding-decorated-renaming"
+    )
+    KEYWORD_ARGUMENTS_TO_FORWARDING_DECORATED_INSPECTING = (
+        "keyword-arguments-to-forwarding-decorated-inspecting"
+    )
     KEYWORD_ARGUMENTS_REORDERED = "keyword-arguments-reordered"
     KEYWORD_ARGUMENTS_SWAPPED = "keyword-arguments-swapped"
     KEYWORD_ARGUMENTS_UNKNOWN_CALLEE = "keyword-arguments-unknown-callee"

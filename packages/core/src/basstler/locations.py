@@ -75,6 +75,11 @@ class ShippedPath(PathEnumeration):
     The program a helper session runs without ``basstler``, so it imports nothing of it.
     """
 
+    REGULAR_EXPRESSION_MODULE = Path("regular_expression.py")
+    """
+    The module that builds every regular expression from named parts.
+    """
+
 
 @dataclass(frozen=True)
 class NamespacePackage:
@@ -199,6 +204,13 @@ class PackageLocation(PackageFile):
     """
     The ``basstler`` distribution's metadata in a checkout: its name, the interpreters
     it supports and where its version is read from.
+    """
+
+    REGULAR_EXPRESSION_MODULE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.REGULAR_EXPRESSION_MODULE
+    )
+    """
+    :attr:`ShippedPath.REGULAR_EXPRESSION_MODULE`, where the core distribution ships it.
     """
 
 
@@ -502,6 +514,11 @@ class WorkflowLocation(ActionsWorkflowFile):
     PLAN_SITE = DIRECTORY / "plan-site.yml"
     """
     The workflow on the user's site repository that calls :attr:`~basstler.plan_site.locations.SiteWorkflowLocation.PLAN_SITE_BUILD`.
+    """
+
+    UPSTREAM_REVIEWS = DIRECTORY / "upstream-reviews.yml"
+    """
+    basstler's reusable workflow a project calls to read its upstream's reviews.
     """
 
 

@@ -13,7 +13,6 @@ covered without this file being edited.
 from __future__ import annotations
 
 import os
-
 import re
 import subprocess
 from enum import StrEnum
@@ -22,7 +21,15 @@ from pathlib import Path
 import pytest
 
 from basstler.bash import Bash
-from basstler.locations import PluginLocation
+from basstler.class_property import classproperty
+from basstler.locations import PluginLocation, ProjectLocation
+from basstler.regular_expression import (
+    CharacterRange,
+    CharacterSet,
+    MarkupTag,
+    RegularExpression,
+    Separator,
+)
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from basstler_testing.constants.paths import (
@@ -30,6 +37,19 @@ from basstler_testing.constants.paths import (
     SkillDirectory,
     SkillFile,
 )
+from basstler_testing.constants.patterns import MarkdownLinkPattern
+
+
+class PlaceholderGroup(StrEnum):
+    """
+    The part of a placeholder read back from its match.
+    """
+
+    NAME = "name"
+    """
+    What the placeholder stands for.
+    """
+
 
 # %% shell constants
 
@@ -94,6 +114,47 @@ def staleness_document() -> str:
     ).read_text(encoding="utf-8")
 
 
+class DocumentPattern:
+    """
+    The patterns that read the staleness document.
+    """
+
+    @classproperty
+    def relative_link_target(cls) -> re.Pattern[str]:
+        """
+        A Markdown link to a file, capturing its target, as ``](../rule.md)``.
+        """
+        return MarkdownLinkPattern.target("#", Separator.WHITESPACE).compiled()
+
+    @classproperty
+    def placeholder(cls) -> re.Pattern[str]:
+        """
+        A placeholder such as ``<plan-id>``, capturing its name.
+        """
+        return MarkupTag(
+            CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "-")
+            .one_or_more()
+            .captured_as(PlaceholderGroup.NAME),
+        ).compiled()
+
+    @classproperty
+    def named_plan_directory(cls) -> re.Pattern[str]:
+        """
+        A plan's directory named by an actual plan rather than a placeholder, as
+        ``plans/some-plan/``.
+        """
+        lowercase_hyphenated_words = CharacterSet.any_of(
+            CharacterRange.ASCII_LOWERCASE_LETTER, CharacterRange.ASCII_DIGIT, "-"
+        )
+        return RegularExpression.sequence(
+            f"{ProjectLocation.PLANS.name}/",
+            RegularExpression.negative_lookahead("<"),
+            CharacterRange.ASCII_LOWERCASE_LETTER,
+            lowercase_hyphenated_words.zero_or_more(),
+            "/",
+        ).compiled()
+
+
 def linked_documents(skill: Path) -> set[Path]:
     """
     :return: Every file the skill's instructions link to with a relative Markdown link,
@@ -101,7 +162,9 @@ def linked_documents(skill: Path) -> set[Path]:
     """
     return {
         (skill.parent / target).resolve()
-        for target in re.findall(r"\]\(([^)#\s]+)\)", skill.read_text(encoding="utf-8"))
+        for target in DocumentPattern.relative_link_target.findall(
+            skill.read_text(encoding="utf-8")
+        )
     }
 
 
@@ -152,8 +215,11 @@ def test_the_rule_links_the_plan_site_page_instead_of_a_republish():
 
 
 def test_the_rule_names_no_plan_of_its_own():
+    """
+    The document is generic: it shows a plan's directory only through a placeholder.
+    """
     document = staleness_document()
-    placeholders = set(re.findall(r"<([a-z-]+)>", document))
+    placeholders = set(DocumentPattern.placeholder.findall(document))
 
     assert "plan-id" in placeholders
-    assert not re.search(r"plans/(?!<)[a-z][a-z0-9-]*/", document)
+    assert DocumentPattern.named_plan_directory.search(document) is None

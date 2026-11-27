@@ -39,6 +39,13 @@ from basstler.github.exceptions import (
 from basstler.github.workflows import ActivityType, Job, TriggerEvent, Workflow
 from basstler.locations import PackageLocation
 from basstler.github.locations import GitHubProjectLocation
+from basstler.regular_expression import (
+    Anchor,
+    CharacterSet,
+    RegularExpression,
+    SingleQuoted,
+    Wildcard,
+)
 from basstler.render_common import create_template_environment
 from basstler.text_file import TextFile
 
@@ -114,8 +121,24 @@ class WorkflowLimits:
     def repository_pin(cls) -> re.Pattern[str]:
         """
         A condition that runs a job in one named repository only, which a fork never is.
+
+        >>> pattern = WorkflowLimits.repository_pin
+        >>> bool(pattern.fullmatch("github.repository == 'owner/repo'"))
+        True
+        >>> bool(pattern.fullmatch("github.repository != 'owner/repo'"))
+        False
         """
-        return re.compile(r"^github\.repository == '[^']+'(?: && .*)?$")
+        further_condition = RegularExpression.sequence(
+            " && ",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+        )
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            "github.repository == ",
+            SingleQuoted(CharacterSet.any_except("'").one_or_more()),
+            further_condition.optional(),
+            Anchor.LINE_END,
+        ).compiled()
 
     def skips_forks(self, job: Job) -> bool:
         """

@@ -23,6 +23,7 @@ import yaml
 from basstler.class_property import classproperty
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
+from basstler.regular_expression import Anchor, RegularExpression, Separator, Wildcard
 from basstler.text_file import TextFile
 
 
@@ -187,6 +188,28 @@ class Prose:
     The column a wrapped body line is kept under.
     """
 
+    @classproperty
+    def paragraph_break(cls) -> re.Pattern[str]:
+        r"""
+        A line holding nothing but whitespace, which separates two paragraphs.
+
+        >>> Prose.paragraph_break.split("one\n  \ntwo")
+        ['one', 'two']
+        """
+        return RegularExpression.sequence(
+            "\n", Separator.WHITESPACE.zero_or_more(), "\n"
+        ).compiled()
+
+    @classproperty
+    def wrapped_hyphen(cls) -> re.Pattern[str]:
+        r"""
+        A hyphen its author wrapped the line right after.
+
+        >>> Prose.wrapped_hyphen.findall("plan-\nsite")
+        ['-\n']
+        """
+        return RegularExpression.sequence("-\n").compiled()
+
     @property
     def paragraphs(self) -> list[str]:
         """
@@ -198,8 +221,8 @@ class Prose:
         space.
         """
         return [
-            re.sub(r"-\n", "-", paragraph.strip())
-            for paragraph in re.split(r"\n\s*\n", self.text.strip())
+            self.wrapped_hyphen.sub("-", paragraph.strip())
+            for paragraph in self.paragraph_break.split(self.text.strip())
         ]
 
     def folded(self, indent: str) -> str:
@@ -509,10 +532,20 @@ class ManifestKey(KeySpecification, Enum):
 
     @property
     def pattern(self) -> re.Pattern[str]:
-        """
+        r"""
         Matches this key wherever it already appears in an item block.
+
+        >>> ManifestKey.BRANCH.pattern.search("  - id: a\n    branch: claude/work\n")[0]
+        '    branch: claude/work'
         """
-        return re.compile(rf"^\s*{re.escape(self.key)}:\s*.*$")
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            Separator.WHITESPACE.zero_or_more(),
+            f"{self.key}:",
+            Separator.WHITESPACE.zero_or_more(),
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            Anchor.LINE_END,
+        ).compiled()
 
     @property
     def is_block_styled(self) -> bool:

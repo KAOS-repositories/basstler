@@ -18,6 +18,7 @@ from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
 from basstler.github.actions_secret import ActionsSecret
 from basstler.github.repository import Repository
+from basstler.github.basstler_project import BasstlerWorkflowInput
 from basstler.github.workflows import ActivityType, TriggerEvent
 from basstler.json_model import JSONModel
 from basstler.locations import ActionsWorkflowFile, WorkflowLocation
@@ -103,12 +104,8 @@ class GitHubCommandLineOption(StrEnum):
 
 class BuildInput(StrEnum):
     """
-    The inputs of basstler's reusable build, :attr:`SiteWorkflowLocation.PLAN_SITE_BUILD`.
-    """
-
-    BRANCH_OR_TAG = "basstler_branch_or_tag"
-    """
-    The basstler branch or release tag whose renderer builds the site.
+    The inputs of basstler's reusable build, :attr:`SiteWorkflowLocation.PLAN_SITE_BUILD`,
+    beside :class:`BasstlerWorkflowInput`.
     """
 
     REGISTRY = "registry"
@@ -403,7 +400,7 @@ class SiteWorkflow(PlanSiteWorkflow):
         """
         inputs = WorkflowFile.from_yaml(workflow_text).jobs[PlanSiteJob.BUILD].inputs
         return cls(
-            inputs[BuildInput.BRANCH_OR_TAG],
+            inputs[BasstlerWorkflowInput.BRANCH_OR_TAG],
             Repository.parse(inputs[BuildInput.REGISTRY]),
         )
 
@@ -416,7 +413,7 @@ class SiteWorkflow(PlanSiteWorkflow):
                 f"{SiteWorkflowLocation.PLAN_SITE_BUILD.as_posix()}@{self.branch_or_tag}"
             ),
             "inputs": {
-                BuildInput.BRANCH_OR_TAG: self.branch_or_tag,
+                BasstlerWorkflowInput.BRANCH_OR_TAG: self.branch_or_tag,
                 BuildInput.REGISTRY: self.registry.full_name,
             },
             "secrets": {

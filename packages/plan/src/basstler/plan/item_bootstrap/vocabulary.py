@@ -8,8 +8,12 @@ import re
 from enum import Enum, StrEnum
 
 from basstler.exit_codes import ExitCode
-from basstler.plan.model import (
-    ManifestKey,
+from basstler.plan.model import ManifestKey, Prose
+from basstler.regular_expression import (
+    Anchor,
+    CharacterSet,
+    RegularExpression,
+    Separator,
 )
 
 # %% shared vocabulary
@@ -46,33 +50,60 @@ class ManifestLinePattern(Enum):
     What the item-block patching looks for in a raw ``plan.yaml`` line.
     """
 
-    ITEM_START = re.compile(rf"^\s*- {re.escape(ManifestKey.IDENTIFIER.key)}:")
+    ITEM_START = RegularExpression.sequence(
+        Anchor.LINE_START,
+        Separator.WHITESPACE.zero_or_more(),
+        f"- {ManifestKey.IDENTIFIER.key}:",
+    ).compiled()
     """
     Matches the first line of an item block, which is always its ``id``.
+
+    >>> ManifestLinePattern.ITEM_START.value.match("  - id: first-item") is not None
+    True
     """
 
-    SEQUENCE_ENTRY = re.compile(r"^\s*-\s")
+    SEQUENCE_ENTRY = RegularExpression.sequence(
+        Anchor.LINE_START,
+        Separator.WHITESPACE.zero_or_more(),
+        "-",
+        Separator.WHITESPACE,
+    ).compiled()
     """
-    Matches one entry of a block sequence, which YAML lets sit either indented under its
-    key or flush with it.
+    Matches one entry of a block sequence, which YAML lets sit either indented under
+    its key or flush with it.
+
+    >>> pattern = ManifestLinePattern.SEQUENCE_ENTRY.value
+    >>> [bool(pattern.match(line)) for line in ("  - a blocker", "- a blocker", "-1")]
+    [True, True, False]
     """
 
-    TOP_LEVEL_KEY = re.compile(r"^[^\s-]")
+    TOP_LEVEL_KEY = RegularExpression.sequence(
+        Anchor.LINE_START,
+        CharacterSet.any_except(Separator.WHITESPACE, "-"),
+    ).compiled()
     """
     Matches a top-level ``plan.yaml`` key, which is where the last item block ends. A
     sequence entry flush with its key starts with ``-`` and is not one.
+
+    >>> pattern = ManifestLinePattern.TOP_LEVEL_KEY.value
+    >>> [bool(pattern.match(line)) for line in ("items:", "- id: a", "  notes: x")]
+    [True, False, False]
     """
 
-    BLOCK_VALUE = re.compile(
-        r"^\s*("
-        + "|".join(
-            sorted(manifest_key.key for manifest_key in ManifestKey.block_styled())
-        )
-        + "):"
-    )
+    BLOCK_VALUE = RegularExpression.sequence(
+        Anchor.LINE_START,
+        Separator.WHITESPACE.zero_or_more(),
+        RegularExpression.either(
+            *sorted(manifest_key.key for manifest_key in ManifestKey.block_styled())
+        ),
+        ":",
+    ).compiled()
     """
     Matches a key whose value may run over the following lines, derived from
     :meth:`ManifestKey.block_styled` rather than listing those keys a second time.
+
+    >>> ManifestLinePattern.BLOCK_VALUE.value.match("    notes: >") is not None
+    True
     """
 
     def matches(self, line: str) -> bool:
@@ -252,9 +283,12 @@ class BlockScalarStyle(StrEnum):
 
     @property
     def paragraph_separator(self) -> re.Pattern[str]:
-        """
+        r"""
         What separates two paragraphs in a value of this style once it has been read.
+
+        >>> BlockScalarStyle.FOLDED.paragraph_separator.split("one\ntwo")
+        ['one', 'two']
         """
         if self is BlockScalarStyle.LITERAL:
-            return re.compile(r"\n\s*\n")
-        return re.compile(r"\n+")
+            return Prose.paragraph_break
+        return RegularExpression.literal("\n").one_or_more().compiled()

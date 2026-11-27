@@ -7,9 +7,18 @@ appears.
 from __future__ import annotations
 
 import re
+from enum import StrEnum
 
 import pytest
 
+from basstler.class_property import classproperty
+from basstler.regular_expression import (
+    Anchor,
+    BacktickQuoted,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 from basstler.setup.report import CheckStatus, RepositoryCheck, SetupCheck
 
 from basstler_testing.constants.paths import (
@@ -27,11 +36,40 @@ SETUP_SKILL = (
 The setup skill's own document.
 """
 
-ROW_REFERENCE = re.compile(r"`(?P<word>[a-z_]+)` rows?\b")
-"""
-How the skill names a row: by its check or by its status, in code, before the word
-*row*.
-"""
+
+class RowReferenceGroup(StrEnum):
+    """
+    The part of a row reference read back from its match.
+    """
+
+    WORD = "word"
+    """
+    The check or status naming the row.
+    """
+
+
+class RowReference:
+    """
+    How the skill names a row.
+    """
+
+    @classproperty
+    def pattern(cls) -> re.Pattern[str]:
+        """
+        A row named by its check or by its status, in code, before the word *row*, as
+        ``` `git_identity` row ```.
+        """
+        return RegularExpression.sequence(
+            BacktickQuoted(
+                CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_")
+                .one_or_more()
+                .captured_as(RowReferenceGroup.WORD)
+            ),
+            " row",
+            RegularExpression.literal("s").optional(),
+            Anchor.WORD_BOUNDARY,
+        ).compiled()
+
 
 # %% the rows the skill names
 
@@ -40,8 +78,10 @@ How the skill names a row: by its check or by its status, in code, before the wo
     "word",
     sorted(
         {
-            match["word"]
-            for match in ROW_REFERENCE.finditer(SETUP_SKILL.read_text(encoding="utf-8"))
+            match[RowReferenceGroup.WORD]
+            for match in RowReference.pattern.finditer(
+                SETUP_SKILL.read_text(encoding="utf-8")
+            )
         }
     ),
 )

@@ -13,11 +13,19 @@ Filesystem only: no network, no credentials, no scratch repository.
 
 from __future__ import annotations
 
-import re
+from enum import StrEnum
 
+
+from basstler.slash_command import SlashCommand
 from basstler.github.stack_configuration import (
     CommittedStackConfiguration,
     StackSetting,
+)
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+    Separator,
 )
 
 from basstler_testing.constants.paths import RepositoryLocation, SkillDirectory
@@ -46,6 +54,17 @@ def promotion_label() -> str:
     return CommittedStackConfiguration().values()[StackSetting.IN_REVIEW_LABEL]
 
 
+class FrontMatterGroup(StrEnum):
+    """
+    The parts of a skill document's front matter read back from its match.
+    """
+
+    NAME = "name"
+    """
+    The skill's name.
+    """
+
+
 def upstream_reviews_invocation() -> str:
     """
     How a session invokes the upstream-reviews skill.
@@ -53,8 +72,21 @@ def upstream_reviews_invocation() -> str:
     :return: The slash command, read from the skill's own frontmatter.
     """
     frontmatter = skill_document(SkillDirectory.UPSTREAM_REVIEWS)
-    name = re.search(r"^name:\s*(?P<name>\S+)\s*$", frontmatter, re.MULTILINE)
-    return f"/{name.group('name')}"
+    name = (
+        RegularExpression.sequence(
+            Anchor.LINE_START,
+            "name:",
+            Separator.WHITESPACE.zero_or_more(),
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+                FrontMatterGroup.NAME
+            ),
+            Separator.WHITESPACE.zero_or_more(),
+            Anchor.LINE_END,
+        )
+        .compiled()
+        .search(frontmatter)
+    )
+    return f"{SlashCommand.PREFIX}{name[FrontMatterGroup.NAME]}"
 
 
 # %% the resolve skill's upstream read

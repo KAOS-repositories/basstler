@@ -14,11 +14,14 @@ from pathlib import Path
 import pytest
 
 from basstler.bash import Bash
+from basstler.exit_codes import ShellConfigurationExitCode
+from basstler.playbook.plugin import PackageModuleCommand
 from basstler.locations import PluginLocation
 from basstler.shell_configuration import ShellConfigurationFunction
 
 from basstler_testing.constants.environment import (
     ConfigurationVariable,
+    ScrubbedEnvironmentPrefix,
     SearchPathVariable,
 )
 from basstler_testing.executable_stubs import (
@@ -26,6 +29,7 @@ from basstler_testing.executable_stubs import (
     path_hiding_executables,
 )
 from basstler_testing.scratch_repository import ScratchRepository
+from basstler_testing.script_runner import BashScriptRunner
 from .test_session_start import PackageManager, StubVariable
 
 MODULE_WITH_HELP = "maintenance"
@@ -124,6 +128,77 @@ def test_a_ready_package_runs_the_module(entry_point_repository: ScratchReposito
     result = run_entry_point(entry_point_repository, MODULE_WITH_HELP, "--help")
 
     assert result.returncode == 0, result.stderr
+    assert f"basstler.{MODULE_WITH_HELP}" in result.stdout
+
+
+# %% outside a git work tree
+
+
+@pytest.fixture
+def outside_any_repository(tmp_path: Path) -> Path:
+    """
+    :return: A directory no git work tree contains.
+    """
+    outside = tmp_path / "outside-any-repository"
+    outside.mkdir()
+    return outside
+
+
+def run_entry_point_outside(
+    repository: ScratchRepository, outside: Path, *arguments: str
+) -> subprocess.CompletedProcess[str]:
+    """
+    :param repository: The repository whose plugin and home are used.
+    :param outside: The directory to run in.
+    :param arguments: The entry point's arguments.
+    :return: The finished basstler.sh run.
+    """
+    runner = BashScriptRunner(
+        project_root=outside,
+        removed_variable_prefixes=tuple(ScrubbedEnvironmentPrefix),
+        script_path=repository.plugin_root
+        / PluginLocation.HOOKS.value.name
+        / PluginLocation.ENTRY_POINT_SCRIPT.name,
+    )
+    return runner.run(
+        *arguments, **{ConfigurationVariable.HOME: str(repository.basstler_home)}
+    )
+
+
+def test_run_outside_a_work_tree_exits_with_the_configuration_status(
+    entry_point_repository: ScratchRepository, outside_any_repository: Path
+):
+    result = run_entry_point_outside(
+        entry_point_repository, outside_any_repository, MODULE_WITH_HELP, "--help"
+    )
+
+    assert result.returncode == ShellConfigurationExitCode.NOT_IN_REPOSITORY
+
+
+def test_a_hook_run_outside_a_work_tree_does_nothing_and_says_nothing(
+    entry_point_repository: ScratchRepository, outside_any_repository: Path
+):
+    result = run_entry_point_outside(
+        entry_point_repository,
+        outside_any_repository,
+        PackageModuleCommand.hook_flag,
+        MODULE_WITH_HELP,
+        "--help",
+    )
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_a_hook_run_inside_a_work_tree_runs_the_module(
+    entry_point_repository: ScratchRepository,
+):
+    result = run_entry_point(
+        entry_point_repository,
+        PackageModuleCommand.hook_flag,
+        MODULE_WITH_HELP,
+        "--help",
+    )
+
     assert f"basstler.{MODULE_WITH_HELP}" in result.stdout
 
 

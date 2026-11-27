@@ -55,6 +55,7 @@ from basstler.playbook.setup_steps import (
     SetupSteps,
 )
 from basstler.plugin_root import PluginRoot
+from basstler.regular_expression import Anchor, RegularExpression, Separator, Wildcard
 from basstler.shell_configuration import (
     FetchedBranchReference,
     PersonalNotesSetting,
@@ -407,12 +408,22 @@ class PersonalUpstream(HasRepository):
 
     @classproperty
     def setting_line(cls) -> re.Pattern[str]:
-        """
+        r"""
         A ``stack.toml`` line naming the upstream, wherever it sits in the file.
+
+        >>> pattern = PersonalUpstream.setting_line
+        >>> pattern.search('fork = "a/b"\nupstream_repository = "o/r"\n')[0]
+        'upstream_repository = "o/r"\n'
         """
-        return re.compile(
-            rf"^[ \t]*{StackSetting.UPSTREAM_REPOSITORY}[ \t]*=.*(?:\n|$)", re.MULTILINE
-        )
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            Separator.SPACE_OR_TAB.zero_or_more(),
+            StackSetting.UPSTREAM_REPOSITORY,
+            Separator.SPACE_OR_TAB.zero_or_more(),
+            "=",
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            RegularExpression.either(Separator.LINE_BREAK, Anchor.LINE_END),
+        ).compiled()
 
     def written_over(self, existing: str) -> str:
         """

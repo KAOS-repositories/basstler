@@ -25,6 +25,7 @@ from basstler.git.remote_branch import RemoteBranch
 from basstler.git.environment import GitVariable
 from basstler.git.commands import GitCommandRunner
 from basstler.github.remote import GitHubRemote
+from basstler.github.basstler_project import BasstlerWorkflowInput
 from basstler.github.workflows import TriggerEvent
 from basstler.github.client import GitHubReader
 from basstler.github.credential import CredentialProvider
@@ -275,6 +276,10 @@ def test_the_run_answers_a_pull_request_report_request_with_its_recording(
 
 
 def test_the_caller_runs_the_release_it_names_on_pushes_of_a_request():
+    """
+    The caller calls the reusable workflow at the release, installs that release, and
+    runs on pushes of a request branch.
+    """
     workflow = ActionInstallation(BRANCH_OR_TAG).workflow
 
     assert (
@@ -282,7 +287,9 @@ def test_the_caller_runs_the_release_it_names_on_pushes_of_a_request():
         in workflow
     )
     assert (
-        ActionInstallation.branch_or_tag_line.search(workflow)["branch_or_tag"]
+        ActionInstallation.branch_or_tag_line.search(workflow)[
+            BasstlerWorkflowInput.BRANCH_OR_TAG
+        ]
         == BRANCH_OR_TAG
     )
     assert f'branches: ["{ActionBranch.REQUESTS}/**"]' in workflow
@@ -302,10 +309,15 @@ def test_concurrent_requests_are_never_queued_behind_or_cancelled_by_each_other(
 
 
 def test_the_caller_workflow_is_rendered_without_html_escaping():
+    """
+    A release name with HTML's special characters reaches the workflow as written.
+    """
     workflow = ActionInstallation("tag&<name>").workflow
 
     assert (
-        ActionInstallation.branch_or_tag_line.search(workflow)["branch_or_tag"]
+        ActionInstallation.branch_or_tag_line.search(workflow)[
+            BasstlerWorkflowInput.BRANCH_OR_TAG
+        ]
         == "tag&<name>"
     )
 

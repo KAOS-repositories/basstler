@@ -4,7 +4,9 @@ Reading and writing the renames a pull request declares.
 
 from __future__ import annotations
 
-from basstler.review_triage.declaration import TriageDeclaration
+import pytest
+
+from basstler.review_triage.declaration import DeclarationGroup, TriageDeclaration
 from basstler.review_triage.detection import RenameDetection
 from basstler.review_triage.renames import Rename, RenameDecisions
 
@@ -64,3 +66,31 @@ def test_a_declaration_decides_its_renames_for_its_source():
     assert DECLARED.decisions(source) == RenameDecisions(
         (Rename("read_value", "value", source),), frozenset({"write_value"})
     )
+
+
+# %% the comment holding a declaration
+
+
+@pytest.mark.parametrize(
+    ("description", "declaration"),
+    [
+        (
+            f"text\n<!-- {TriageDeclaration.marker}\nrenames: a=b\n-->\nmore",
+            "renames: a=b\n",
+        ),
+        (f"<!--   {TriageDeclaration.marker}  \nx\ny\n-->", "x\ny\n"),
+        (f"<!-- {TriageDeclaration.marker}\n-->", ""),
+        (f"<!-- {TriageDeclaration.marker} renames: a=b -->", None),
+        ("<!-- another comment\nrenames: a=b\n-->", None),
+        (f"{TriageDeclaration.marker}\nrenames: a=b\n-->", None),
+    ],
+)
+def test_the_declaration_is_read_from_the_comment_that_opens_with_the_marker(
+    description: str, declaration: str | None
+):
+    """
+    Each description is listed beside the declaration text read from it.
+    """
+    found = TriageDeclaration.comment_pattern().search(description)
+
+    assert (found[DeclarationGroup.DECLARATION] if found else None) == declaration

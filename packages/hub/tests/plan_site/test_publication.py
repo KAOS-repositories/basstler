@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import textwrap
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
@@ -21,6 +22,7 @@ from typing import Any
 import pytest
 import yaml
 
+from basstler.markdown_code_block import CodeBlockLanguage
 from basstler.bash import Bash
 from basstler.git.branch import Branch
 from basstler.git.remote_branch import RemoteBranch
@@ -61,7 +63,7 @@ from basstler.locations import ProjectLocation
 from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.plan.model import PlanDocument
 from basstler.plan_site import token_storage
-from basstler.plan_site.build_start import CodeFence, SiteAccess
+from basstler.plan_site.build_start import SiteAccess
 from basstler.plan_site.exceptions import (
     PublicationPushRefusedError,
     PushRefusal,
@@ -2083,8 +2085,9 @@ def test_a_rendered_step_shows_the_command_and_then_the_browser_steps(published)
     pending = pending_step(report, UserStep.TURN_ON_PAGES)
 
     assert pending.render() == (
-        f"- {pending.step}:\n    {CodeFence.BASH}\n    {pending.line}\n"
-        f"    {CodeFence.CLOSE}\n  Or in the browser:\n"
+        f"- {pending.step}:\n"
+        + textwrap.indent(CodeBlockLanguage.BASH.fenced(pending.line), "    ")
+        + "\n  Or in the browser:\n"
         + "\n".join(
             f"    {number}. {step}"
             for number, step in enumerate(pending.browser_steps, start=1)

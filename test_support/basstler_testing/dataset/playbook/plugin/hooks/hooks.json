@@ -14,7 +14,7 @@
       {
         "hooks": [
           {
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh playbook.skills_command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/basstler.sh --hook playbook.skills_command",
             "if": "Bash(*basstler.sh*)",
             "type": "command"
           }

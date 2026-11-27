@@ -15,6 +15,7 @@ import pytest
 
 import basstler.review_triage.stop_hook
 from basstler.github.client import GitHubReader
+from basstler.playbook.plugin import PackageModuleCommand
 from basstler.locations import BasstlerVariable, PluginLocation, RepositoryStateLocation
 from basstler.review_triage.stop_hook import SessionPullRequest
 
@@ -146,6 +147,6 @@ def test_the_plugin_runs_the_hook_when_a_turn_ends():
     (registration,) = manifest["hooks"]["Stop"]
     (hook,) = registration["hooks"]
     assert hook["command"].endswith(
-        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} "
+        f"{PluginLocation.ENTRY_POINT_SCRIPT.as_posix()} {PackageModuleCommand.hook_flag} "
         f"{basstler.review_triage.stop_hook.__spec__.name.removeprefix('basstler.')}"
     )

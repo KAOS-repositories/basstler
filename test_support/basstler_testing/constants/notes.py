@@ -4,9 +4,15 @@ Branch names and CLAUDE.local.md sections the personal-notes suites share.
 
 from __future__ import annotations
 
-import re
 from enum import StrEnum
 
+from basstler.regular_expression import (
+    CharacterSet,
+    HtmlComment,
+    RegularExpression,
+    Separator,
+    Wildcard,
+)
 from basstler.shell_configuration import PersonalNotesSetting
 
 
@@ -29,6 +35,17 @@ class ScratchBranch(StrEnum):
     """
     The branch a scratch repository starts on, git's own default, named so a machine
     whose git defaults to another, as Git for Windows does, starts on it too.
+    """
+
+
+class SectionGroup(StrEnum):
+    """
+    The part of a marked section read back from its match.
+    """
+
+    CONTENT = "content"
+    """
+    What lies between the section's markers.
     """
 
 
@@ -70,15 +87,37 @@ class ClaudeLocalSection(StrEnum):
         :return: *content* between this section's markers.
         """
         opening = self if label is None else f"{self}: {label}"
-        return f"<!-- BEGIN-{opening} -->\n{content}<!-- END-{self} -->\n"
+        return (
+            f"{self.comment('BEGIN-' + opening)}\n"
+            f"{content}{self.comment('END-' + self)}\n"
+        )
+
+    @staticmethod
+    def comment(text: str) -> str:
+        """
+        :param text: What the comment says.
+        :return: The HTML comment saying it.
+        """
+        return f"<!-- {text} -->"
 
     def within(self, text: str) -> str:
         """
         :param text: A document holding this section once.
         :return: The section's content, without its markers.
         """
-        pattern = rf"<!-- BEGIN-{self}(?:: [^>]*)? -->\n(.*?)<!-- END-{self} -->"
-        return re.search(pattern, text, re.DOTALL).group(1)
+        label = RegularExpression.sequence(
+            ": ",
+            CharacterSet.any_except(">").zero_or_more(),
+        )
+        pattern = RegularExpression.sequence(
+            HtmlComment(f" BEGIN-{self}", label.optional(), " "),
+            Separator.LINE_BREAK,
+            Wildcard.ANY_CHARACTER.zero_or_more(shortest=True).captured_as(
+                SectionGroup.CONTENT
+            ),
+            HtmlComment(f" END-{self} "),
+        )
+        return pattern.compiled().search(text)[SectionGroup.CONTENT]
 
 
 class ProgressBranch(StrEnum):

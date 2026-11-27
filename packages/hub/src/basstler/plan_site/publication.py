@@ -65,6 +65,12 @@ from basstler.plan_site.workflows import (
     SiteWorkflow,
 )
 from basstler.review_triage.viewed_setup import MarkViewedSetup
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+    Separator,
+)
 from basstler.setup.steps import resolve_repository
 from basstler.shell_configuration import PersonalNotesSetting
 from basstler.standard_streams import StandardStreamHandler
@@ -84,6 +90,43 @@ The command line that publishes again, once this session reaches the site reposi
 
 
 # %% publishing
+
+
+class SymbolicReferenceListing(StrEnum):
+    """
+    The text of the line ``git ls-remote --symref`` lists a symbolic reference on.
+    """
+
+    HEAD = "HEAD"
+    """
+    The reference naming a repository's default branch.
+    """
+
+    BRANCH_GROUP = "branch"
+    """
+    The name the default branch is read back under.
+    """
+
+    @staticmethod
+    def default_branch_line() -> re.Pattern[str]:
+        r"""
+        >>> pattern = SymbolicReferenceListing.default_branch_line()
+        >>> line = pattern.search("ref: refs/heads/main\tHEAD")
+        >>> line[SymbolicReferenceListing.BRANCH_GROUP]
+        'main'
+
+        :return: The line naming the branch a remote's ``HEAD`` points at.
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            f"ref: {Branch.namespace}/",
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+                SymbolicReferenceListing.BRANCH_GROUP
+            ),
+            Separator.WHITESPACE.one_or_more(),
+            SymbolicReferenceListing.HEAD,
+            Anchor.LINE_END,
+        ).compiled()
 
 
 @dataclass
@@ -252,13 +295,15 @@ class PlanSitePublication:
         :return: Its default branch, :attr:`initial_branch` when it has none yet.
         :raises GitCommandFailed: If git cannot reach it.
         """
-        listed = self.git.run("ls-remote", "--symref", remote, "HEAD")
-        match = re.search(
-            r"^ref: refs/heads/(?P<branch>\S+)\s+HEAD$", listed, re.MULTILINE
+        listed = self.git.run(
+            "ls-remote", "--symref", remote, SymbolicReferenceListing.HEAD
         )
+        match = SymbolicReferenceListing.default_branch_line().search(listed)
         return RemoteBranch(
             GitHubRemote(self.git, remote),
-            match["branch"] if match else self.initial_branch,
+            match[SymbolicReferenceListing.BRANCH_GROUP]
+            if match
+            else self.initial_branch,
         )
 
     def site_branch(self) -> RemoteBranch[GitHubRemote] | None:

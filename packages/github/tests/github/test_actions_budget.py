@@ -391,3 +391,27 @@ def test_the_repository_has_workflows_to_check():
     The parametrization above checks nothing if discovery finds no workflow.
     """
     assert Workflow.every_workflow_in_the_repository() != ()
+
+
+# %% the repository pin
+
+
+@pytest.mark.parametrize(
+    ("condition", "is_a_pin"),
+    [
+        ("github.repository == 'owner/repo'", True),
+        ("github.repository == 'owner/repo' && github.event_name == 'push'", True),
+        ("github.repository == 'owner/repo' || github.event_name == 'push'", False),
+        ("github.repository == owner/repo", False),
+        ("github.repository != 'owner/repo'", False),
+        ("github.event_name == 'push'", False),
+    ],
+)
+def test_a_condition_naming_one_repository_is_a_repository_pin(
+    condition: str, is_a_pin: bool
+):
+    """
+    Each condition is listed beside whether it only runs the job in one named
+    repository.
+    """
+    assert (WorkflowLimits.repository_pin.match(condition) is not None) is is_a_pin

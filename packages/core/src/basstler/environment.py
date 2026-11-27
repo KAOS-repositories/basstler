@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import os
 from enum import StrEnum
+from pathlib import Path
 
 from basstler.credential_origin import CredentialOrigin
+from basstler.text_file import TextFile
 
 
 class EnvironmentFlag(StrEnum):
@@ -174,4 +176,64 @@ class GitHubActionsVariable(EnvironmentVariable):
     REPOSITORY_OWNER = "GITHUB_REPOSITORY_OWNER"
     """
     The owner of the repository the workflow runs in.
+    """
+
+
+FILE_VARIABLE_SUFFIX = "_FILE"
+"""
+What a variable naming a file that holds a setting appends to the setting's own name.
+"""
+
+
+class HubInstanceVariable(EnvironmentVariable):
+    """
+    The settings a plan service instance is configured with, each given in the variable
+    itself or in a file the variable with :data:`FILE_VARIABLE_SUFFIX` appended names.
+    """
+
+    APP_ID = "BASSTLER_HUB_APP_ID"
+    """
+    The numeric ID of the GitHub App the instance acts as.
+    """
+
+    PRIVATE_KEY = "BASSTLER_HUB_PRIVATE_KEY"
+    """
+    The GitHub App's private key, in PEM.
+    """
+
+    WEBHOOK_SECRET = "BASSTLER_HUB_WEBHOOK_SECRET"
+    """
+    The secret GitHub signs the App's webhook deliveries with.
+    """
+
+    @property
+    def file_variable(self) -> str:
+        """
+        The variable naming a file that holds this setting, as a container host mounts
+        a secret.
+        """
+        return f"{self}{FILE_VARIABLE_SUFFIX}"
+
+    def read_value_or_file(self) -> str | None:
+        """
+        :return: The variable's value; else the text of the file :attr:`file_variable`
+            names, without the newline ending it; else ``None``.
+        """
+        value = self.read()
+        if value is not None:
+            return value
+        path = os.environ.get(self.file_variable)
+        if path is None:
+            return None
+        return TextFile(Path(path)).read().removesuffix("\n")
+
+
+class ContainerHostVariable(EnvironmentVariable):
+    """
+    The variables a container host sets for the container it runs.
+    """
+
+    PORT = "PORT"
+    """
+    The port the container is expected to listen on.
     """

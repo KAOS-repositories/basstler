@@ -9,7 +9,9 @@ import pytest
 import yaml
 from basstler.github.workflows import ActivityType
 from basstler.packaging.package_index import PackageIndex
+from basstler.package_map import Distribution
 from basstler.packaging.publish_workflow import (
+    ContainerRegistryPermission,
     IdentityTokenPermission,
     PublishAction,
     PublishActionInput,
@@ -19,7 +21,7 @@ from basstler.text_file import TextFile
 
 from basstler_testing.constants.paths import RepositoryLocation
 
-from .publish_jobs import PublishJobName
+from .publish_jobs import PublishJobName, PublishStepId
 
 # %% the workflow
 
@@ -193,3 +195,65 @@ def test_a_publish_that_stopped_can_be_run_again(workflow: PublishWorkflow):
     publish = workflow.jobs[PublishJobName.PUBLISH].step_using(PublishAction.PUBLISH)
 
     assert publish.action_inputs_by_name[PublishActionInput.SKIP_EXISTING] is True
+
+
+# %% the plan service's image
+
+
+def test_the_image_is_published_only_for_a_commit_a_release_tags(
+    workflow: PublishWorkflow,
+):
+    """
+    It waits for the build, which stops at a commit no release tags, and is named after
+    the exact tag of the commit it checks out.
+    """
+    image = workflow.jobs[PublishJobName.PUBLISH_IMAGE]
+    push = image.identified_step(PublishStepId.PUSH_IMAGE)
+
+    assert image.needs == [PublishJobName.BUILD]
+    assert "git describe --tags --exact-match" in push.run
+
+
+def test_the_image_is_built_at_the_release_version(workflow: PublishWorkflow):
+    """
+    The checkout copied into the build has no history, so the version is passed in.
+    """
+    push = workflow.jobs[PublishJobName.PUBLISH_IMAGE].identified_step(
+        PublishStepId.PUSH_IMAGE
+    )
+    dockerfile = RepositoryLocation.HUB_SERVER_DOCKERFILE.relative_to(
+        RepositoryLocation.ROOT
+    )
+
+    assert f"-f {dockerfile.as_posix()}" in push.run
+    assert "--build-arg VERSION=" in push.run
+
+
+def test_the_image_is_named_after_the_repository_it_is_published_from(
+    workflow: PublishWorkflow,
+):
+    """
+    A fork publishes its own image under its own name; no owner is written down.
+    """
+    push = workflow.jobs[PublishJobName.PUBLISH_IMAGE].identified_step(
+        PublishStepId.PUSH_IMAGE
+    )
+
+    assert f"ghcr.io/${{GITHUB_REPOSITORY,,}}/{Distribution.HUB_SERVER}" in push.run
+
+
+def test_only_the_job_that_pushes_the_image_may_write_packages(
+    workflow: PublishWorkflow,
+):
+    """
+    The run's own token pushes the image, and no other job gets that permission.
+    """
+    granting = {
+        name
+        for name, job in workflow.jobs.items()
+        if job.permissions.get(ContainerRegistryPermission.SCOPE)
+        == ContainerRegistryPermission.LEVEL
+    }
+
+    assert granting == {PublishJobName.PUBLISH_IMAGE}
+    assert ContainerRegistryPermission.SCOPE not in workflow.permissions

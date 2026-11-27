@@ -1,0 +1,6 @@
+# What the image's build never reads: local environments, caches and history.
+**/.venv
+**/__pycache__
+**/.pytest_cache
+.git
+.claude

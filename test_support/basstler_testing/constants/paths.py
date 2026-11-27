@@ -70,6 +70,11 @@ class RepositoryLocation(PathEnumeration):
     The workflow that publishes a release's distributions to PyPI.
     """
 
+    HUB_SERVER_DOCKERFILE = ROOT / "packages" / "hub-server" / "Dockerfile"
+    """
+    The file the plan service's image is built from, with the repository as context.
+    """
+
     TESTS_WORKFLOW = WORKFLOWS / "tests.yml"
     """
     The workflow that lints and tests every pull request and every push to main.

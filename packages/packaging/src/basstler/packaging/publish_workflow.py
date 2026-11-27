@@ -37,6 +37,16 @@ class IdentityTokenPermission(StrEnum):
     LEVEL = "write"
 
 
+class ContainerRegistryPermission(StrEnum):
+    """
+    The permission that lets a job push to the GitHub Container Registry, and the level
+    it needs.
+    """
+
+    SCOPE = "packages"
+    LEVEL = "write"
+
+
 class PublishActionInput(StrEnum):
     """
     The inputs of the publish action a release depends on.

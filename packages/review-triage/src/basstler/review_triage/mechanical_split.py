@@ -15,6 +15,7 @@ from basstler.git.commit_range import CommitRange, FileVersions
 from basstler.github.constants import MaintenanceText
 from basstler.github.pull_request_changes import PullRequestChanges, RestPullRequest
 from basstler.github.pull_request_description import PullRequestDescription
+from basstler.github.repository import Repository
 from basstler.locations import ReviewTriageLocation
 from basstler.render_common import TemplatePage
 from basstler.review_triage.comparison import (
@@ -34,6 +35,11 @@ FUTURE_MODULE = "__future__"
 """
 The module whose imports switch on features of later Python versions, kept apart above
 every other import.
+"""
+
+SHARED_SPLIT_BRANCH_PREFIX = "basstler/mechanical-split"
+"""
+The branches a split is shared on, one per pull request, below this prefix.
 """
 
 # %% the files of the mechanical commit
@@ -418,6 +424,54 @@ class MechanicalSplit:
             f"--force-with-lease={branch}:{self.pull_request.head.commit}",
             location,
             f"{self.remaining_commit}:{branch}",
+        )
+
+
+@dataclass(frozen=True)
+class SharedSplit:
+    """
+    A split pushed to a branch of its own, so a reviewer reads the pull request's
+    changes beyond the mechanical ones as one commit while the pull request stays as it
+    is.
+    """
+
+    split: MechanicalSplit
+    """
+    The split shared.
+    """
+
+    repository: Repository
+    """
+    The repository the branch is pushed to.
+    """
+
+    @property
+    def branch(self) -> str:
+        """
+        The branch holding the split, the same for every split of one pull request.
+        """
+        return f"{SHARED_SPLIT_BRANCH_PREFIX}/{self.split.pull_request.number}"
+
+    @property
+    def url(self) -> str:
+        """
+        The page showing the pull request's changes beyond the mechanical ones.
+        """
+        return self.repository.commit_url(self.split.remaining_commit)
+
+    def publish(self, git: GitCommandRunner, location: str) -> None:
+        """
+        Point :attr:`branch` at the split, replacing what it held.
+
+        :param git: The checkout holding the split.
+        :param location: The remote or URL of :attr:`repository`.
+        """
+        git.run(
+            "push",
+            "--quiet",
+            "--force",
+            location,
+            f"{self.split.remaining_commit}:refs/heads/{self.branch}",
         )
 
 

@@ -14,11 +14,13 @@ from basstler.git.commands import GitCommandFailed
 from basstler.github.constants import MaintenanceText
 from basstler.github.pull_request_changes import PullRequestChanges
 from basstler.github.pull_request_description import PullRequestDescription
+from basstler.github.repository import Repository
 from basstler.review_triage.exceptions import BaseBranchMergedError, UnprovenSplitError
 from basstler.review_triage.mechanical_split import (
     MechanicalSplit,
     MechanicalSplitter,
     MechanicalSummary,
+    SharedSplit,
 )
 from basstler.review_triage.triage import PullRequestTriager
 
@@ -307,6 +309,73 @@ def test_a_branch_moved_since_it_was_read_is_not_replaced(
     )
     with pytest.raises(GitCommandFailed):
         edited_move_split.publish(scratch_repository.git, str(published_branch))
+
+
+# %% sharing the split without changing the pull request
+
+
+@pytest.fixture
+def shared_split(edited_move_split: MechanicalSplit) -> SharedSplit:
+    """
+    :return: The edited-move sample's split, to be shared on a repository of its own.
+    """
+    return SharedSplit(edited_move_split, Repository("reviewer", "project"))
+
+
+def test_sharing_pushes_the_remaining_commit_to_a_branch_of_its_own(
+    scratch_repository: ScratchRepository,
+    shared_split: SharedSplit,
+    published_branch: Path,
+):
+    shared_split.publish(scratch_repository.git, str(published_branch))
+    published = scratch_repository.git.run(
+        "ls-remote", str(published_branch), f"refs/heads/{shared_split.branch}"
+    ).split()[0]
+    assert published == shared_split.split.remaining_commit
+
+
+def test_sharing_leaves_the_pull_request_branch_alone(
+    scratch_repository: ScratchRepository,
+    edited_move: PullRequestChanges,
+    shared_split: SharedSplit,
+    published_branch: Path,
+):
+    shared_split.publish(scratch_repository.git, str(published_branch))
+    branch = f"refs/heads/{edited_move.pull_request.head.branch}"
+    published = scratch_repository.git.run(
+        "ls-remote", str(published_branch), branch
+    ).split()[0]
+    assert published == edited_move.commits.head_commit
+
+
+def test_sharing_again_replaces_the_shared_branch(
+    scratch_repository: ScratchRepository,
+    edited_move: PullRequestChanges,
+    shared_split: SharedSplit,
+    published_branch: Path,
+):
+    scratch_repository.run_git(
+        "push",
+        "--quiet",
+        str(published_branch),
+        f"{edited_move.commits.base_commit}:refs/heads/{shared_split.branch}",
+    )
+    shared_split.publish(scratch_repository.git, str(published_branch))
+    published = scratch_repository.git.run(
+        "ls-remote", str(published_branch), f"refs/heads/{shared_split.branch}"
+    ).split()[0]
+    assert published == shared_split.split.remaining_commit
+
+
+def test_the_shared_link_is_the_page_of_the_remaining_commit(
+    shared_split: SharedSplit,
+):
+    """
+    That commit's page shows its change from the mechanical commit, its parent.
+    """
+    assert shared_split.url == shared_split.repository.commit_url(
+        shared_split.split.remaining_commit
+    )
 
 
 # %% the proof

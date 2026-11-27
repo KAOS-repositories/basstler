@@ -11,6 +11,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.pull_request_changes import (
     CommitStart,
     LastCommitsStart,
+    LastReviewStart,
     MergeBaseStart,
 )
 from basstler.review_triage.command_line import (
@@ -156,3 +157,41 @@ def test_the_split_refuses_conflicting_starts(options):
             exit_on_error=False,
             print_error=False,
         )
+
+
+# %% the shared split
+
+
+@pytest.mark.parametrize(
+    ("options", "shares"),
+    [((), False), (("--share-split",), True)],
+    ids=["by default", "--share-split"],
+)
+@pytest.mark.parametrize(
+    "command", [ReviewTriageCommand.REPORT, ReviewTriageCommand.MARK_VIEWED]
+)
+def test_the_split_is_shared_only_when_asked(command, options, shares):
+    _, bound, _ = review_triage_app.parse_args(
+        [command, "7", *options], exit_on_error=False, print_error=False
+    )
+    assert bound.arguments.get("share_split", False) is shares
+
+
+@pytest.mark.parametrize(
+    ("start", "split_start"),
+    [
+        (ViewedStateStart(), LastReviewStart()),
+        (CommitStart("abc123"), CommitStart("abc123")),
+        (LastCommitsStart(2), LastCommitsStart(2)),
+    ],
+    ids=["from the viewed files", "from a commit", "the last commits"],
+)
+def test_a_split_starts_from_the_last_review_where_the_triage_starts_per_file(
+    start, split_start
+):
+    """
+    A split needs one commit to start from, which each file's viewed state does not
+    give.
+    """
+    publication = TriagePublication(7, start=start)
+    assert publication.split_start == split_start

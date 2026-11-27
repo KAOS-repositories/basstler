@@ -7,5 +7,4 @@
 - Draft #324 opened, labelled release:minor; plan item saved.
 
 ## Next
-- Merge into claude/practical-hawking-nf0g3o: local merge 11bdfc8e (branch
-  integration-with-forwarding-fix, 459 passed) waits for the user's go-ahead to push.
+- Nothing pending; merged into claude/practical-hawking-nf0g3o at 11bdfc8e.

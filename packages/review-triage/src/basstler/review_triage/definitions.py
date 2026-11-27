@@ -11,7 +11,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
-from functools import cached_property
+from functools import cached_property, wraps
 
 from basstler.review_triage.python_source import AnnotatedType, PythonSource
 from basstler.review_triage.renames import DOTTED_NAME_SEPARATOR, RenameMap
@@ -57,6 +57,23 @@ class DataclassName(StrEnum):
     CLASS_VARIABLE = "ClassVar"
     """
     The annotation of a class attribute that is not a field.
+    """
+
+
+class FunctionWrapperName(StrEnum):
+    """
+    The names of the standard library's decorator copying a wrapped function's metadata
+    onto its wrapper.
+    """
+
+    MODULE = wraps.__module__
+    """
+    The module that provides it.
+    """
+
+    DECORATOR = wraps.__name__
+    """
+    The decorator itself.
     """
 
 
@@ -176,6 +193,13 @@ class FunctionDefinition:
     returns_its_argument: bool
     """
     Whether it is an undecorated function of one parameter that only returns it.
+    """
+
+    forwarded_parameters: tuple[str, ...] | None = None
+    """
+    The positional parameters the wrapper it returns takes before its ``*`` and ``**``
+    parameters, when it is an undecorated function of one parameter returning a
+    wrapper that calls that parameter only with every argument it got, unchanged.
     """
 
     return_type: AnnotatedType | None = None
@@ -396,13 +420,6 @@ class DefinitionReader:
             for statement in node.body
             if not PythonSource.is_documentation(statement)
         ]
-        single_parameter = (
-            not arguments.posonlyargs
-            and len(arguments.args) == 1
-            and not arguments.kwonlyargs
-            and arguments.vararg is None
-            and arguments.kwarg is None
-        )
         return FunctionDefinition(
             name=node.name,
             owner=owner,
@@ -415,7 +432,7 @@ class DefinitionReader:
             returns_its_argument=(
                 owner is None
                 and not node.decorator_list
-                and single_parameter
+                and self.takes_one_parameter(arguments)
                 and len(body) == 1
                 and isinstance(body[0], ast.Return)
                 and isinstance(body[0].value, ast.Name)
@@ -428,6 +445,7 @@ class DefinitionReader:
                     node.returns, self.generic_names(node)
                 )
             ),
+            forwarded_parameters=self.forwarded_parameters(node, owner, body),
             class_argument_parameter=self.class_argument_parameter(node),
             is_abstract=len(node.decorator_list) == 1
             and self.source.import_bindings.refers_to(
@@ -436,6 +454,162 @@ class DefinitionReader:
                 AbstractBaseClassMember.ABSTRACT_METHOD,
             ),
             node=node,
+        )
+
+    @staticmethod
+    def takes_one_parameter(arguments: ast.arguments) -> bool:
+        """
+        :param arguments: A function's parameters.
+        :return: Whether they are a single parameter.
+        """
+        return (
+            not arguments.posonlyargs
+            and len(arguments.args) == 1
+            and not arguments.kwonlyargs
+            and arguments.vararg is None
+            and arguments.kwarg is None
+        )
+
+    def forwarded_parameters(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        owner: str | None,
+        body: list[ast.stmt],
+    ) -> tuple[str, ...] | None:
+        """
+        :param node: A function definition.
+        :param owner: The name of the class whose body holds it.
+        :param body: Its statements, without its docstring.
+        :return: :attr:`FunctionDefinition.forwarded_parameters` of it.
+        """
+        if (
+            owner is not None
+            or node.decorator_list
+            or not self.takes_one_parameter(node.args)
+            or len(body) != 2
+        ):
+            return None
+        wrapper, returned = body
+        if not (
+            isinstance(wrapper, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and isinstance(returned, ast.Return)
+            and isinstance(returned.value, ast.Name)
+            and returned.value.id == wrapper.name
+        ):
+            return None
+        return self.wrapper_leading_parameters(wrapper, node.args.args[0].arg)
+
+    def wrapper_leading_parameters(
+        self, wrapper: ast.FunctionDef | ast.AsyncFunctionDef, wrapped: str
+    ) -> tuple[str, ...] | None:
+        """
+        :param wrapper: A function defined inside a decorator.
+        :param wrapped: The name of the decorator's parameter.
+        :return: The wrapper's positional parameters, when it takes no others than them
+            and a ``*`` and ``**`` parameter, rebinds none of them nor *wrapped*, uses
+            the ``*`` and ``**`` ones only to call *wrapped* with all of them, and
+            *wrapped* only so, in a ``raise`` statement, or to read its attributes.
+        """
+        arguments = wrapper.args
+        if (
+            arguments.posonlyargs
+            or arguments.defaults
+            or arguments.kwonlyargs
+            or arguments.vararg is None
+            or arguments.kwarg is None
+            or not all(
+                self.copies_metadata(decorator, wrapped)
+                for decorator in wrapper.decorator_list
+            )
+        ):
+            return None
+        leading = tuple(parameter.arg for parameter in arguments.args)
+        collected = {arguments.vararg.arg, arguments.kwarg.arg}
+        nodes = [node for statement in wrapper.body for node in ast.walk(statement)]
+        forwarding = [
+            node
+            for node in nodes
+            if isinstance(node, ast.Call)
+            and self.passes_on(node, wrapped, leading, arguments)
+        ]
+        forwarded = {id(node) for call in forwarding for node in ast.walk(call)}
+        called = {id(node.func) for node in nodes if isinstance(node, ast.Call)}
+        described = {
+            id(node.value)
+            for node in nodes
+            if isinstance(node, ast.Attribute) and id(node) not in called
+        }
+        raised = {
+            id(node)
+            for statement in nodes
+            if isinstance(statement, ast.Raise)
+            for node in ast.walk(statement)
+        }
+        uses = [node for node in nodes if isinstance(node, ast.Name)]
+        if (
+            wrapped in {*leading, *collected}
+            or not forwarding
+            or any(
+                node.id in {*leading, *collected, wrapped}
+                and not isinstance(node.ctx, ast.Load)
+                for node in uses
+            )
+            or any(node.id in collected and id(node) not in forwarded for node in uses)
+            or any(
+                node.id == wrapped and id(node) not in forwarded | described | raised
+                for node in uses
+            )
+        ):
+            return None
+        return leading
+
+    def copies_metadata(self, decorator: ast.expr, wrapped: str) -> bool:
+        """
+        :param decorator: A decorator of a wrapper.
+        :param wrapped: The name of the function the wrapper wraps.
+        :return: Whether it is :func:`functools.wraps` of that function.
+        """
+        return (
+            isinstance(decorator, ast.Call)
+            and self.source.import_bindings.refers_to(
+                decorator.func,
+                FunctionWrapperName.MODULE,
+                FunctionWrapperName.DECORATOR,
+            )
+            and len(decorator.args) == 1
+            and not decorator.keywords
+            and isinstance(decorator.args[0], ast.Name)
+            and decorator.args[0].id == wrapped
+        )
+
+    @staticmethod
+    def passes_on(
+        call: ast.Call,
+        wrapped: str,
+        leading: tuple[str, ...],
+        arguments: ast.arguments,
+    ) -> bool:
+        """
+        :param call: A call in a wrapper's body.
+        :param wrapped: The name of the function the wrapper wraps.
+        :param leading: The wrapper's positional parameters.
+        :param arguments: The wrapper's parameters.
+        :return: Whether the call calls that function with exactly the wrapper's
+            parameters, in order.
+        """
+        expected = [
+            *leading,
+            f"*{arguments.vararg.arg}",
+            f"**{arguments.kwarg.arg}",
+        ]
+        passed = [
+            *map(ast.unparse, call.args),
+            *(ast.unparse(keyword) for keyword in call.keywords),
+        ]
+        return (
+            isinstance(call.func, ast.Name)
+            and call.func.id == wrapped
+            and passed == expected
         )
 
     def generic_names(
@@ -853,6 +1027,22 @@ class DefinitionIndex:
             and definition.returns_its_argument
             for definition in definitions
         )
+
+    def forwarded_parameters(self, name: str) -> tuple[str, ...] | None:
+        """
+        :param name: The name a decorator is referred to by.
+        :return: :attr:`FunctionDefinition.forwarded_parameters` every definition of it
+            agrees on, ``None`` when none is found, they disagree or one has none.
+        """
+        forwarded = {
+            definition.forwarded_parameters
+            if isinstance(definition, FunctionDefinition)
+            else None
+            for definition in self.definitions_of(name)
+        }
+        if len(forwarded) != 1:
+            return None
+        return forwarded.pop()
 
     # %%% the class hierarchy
 

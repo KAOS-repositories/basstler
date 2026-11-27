@@ -120,13 +120,32 @@ class DecoratorPolicy:
         """
         :param definition: A function, method or class.
         :param definitions: The definitions of the commit *definition* is read from.
-        :return: Whether every decorator it carries keeps its parameters as written,
-            being known to or defined in *definitions* as returning what it decorates.
+        :return: Whether every decorator it carries keeps its parameters as written.
         """
         return all(
-            decorator in self.signature_preserving
-            or (decorator is not None and definitions.is_identity(decorator))
+            decorator is not None
+            and self.keeps_parameters(decorator, definition, definitions)
             for decorator in definition.decorators
+        )
+
+    def keeps_parameters(
+        self, decorator: str, definition: Definition, definitions: DefinitionIndex
+    ) -> bool:
+        """
+        :param decorator: The name of a decorator *definition* carries.
+        :param definition: A function, method or class.
+        :param definitions: The definitions of the commit *definition* is read from.
+        :return: Whether the decorator is known to keep the parameters, is defined in
+            *definitions* as returning what it decorates, or as returning a wrapper
+            passing its arguments on unchanged under the decorated function's own names.
+        """
+        if decorator in self.signature_preserving or definitions.is_identity(decorator):
+            return True
+        forwarded = definitions.forwarded_parameters(decorator)
+        return (
+            forwarded is not None
+            and isinstance(definition, FunctionDefinition)
+            and definition.parameters[: len(forwarded)] == forwarded
         )
 
 

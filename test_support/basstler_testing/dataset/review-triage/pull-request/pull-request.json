@@ -2,6 +2,6 @@
   "number": 7,
   "node_id": "PR_kwDOexample",
   "body": "Renames old_name.",
-  "base": {"sha": "set by the test", "ref": "main"},
-  "head": {"sha": "set by the test", "ref": "rename-helpers"}
+  "base": {"sha": "set by the test", "ref": "main", "repo": {"full_name": "example/project"}},
+  "head": {"sha": "set by the test", "ref": "rename-helpers", "repo": {"full_name": "contributor/project"}}
 }

@@ -311,6 +311,56 @@ class SubclassSubstitutionSourceLayoutSample(SampleTrees):
         return "subclass-substitution-source-layout"
 
 
+class DefinitionMoveEditedSample(SampleTrees):
+    """
+    A pull request moving two classes into another module, which rewords its module
+    docstring, gains a section header and rewords one moved class's docstring.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    MECHANICAL_TREE = "mechanical"
+    """
+    The tree making only the mechanical changes: the classes moved, unchanged, and the
+    module documentation reworded.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "definition-move-edited"
+
+
+class RenameMixedSample(SampleTrees):
+    """
+    A pull request renaming two methods across two modules, rewrapping the line the
+    longer name makes too long, and changing a default value.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+    MECHANICAL_TREE = "mechanical"
+    """
+    The tree making only the renames and the rewrap.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "rename-mixed"
+
+
+class RenameSampledSample(SampleTrees):
+    """
+    A pull request only renaming two methods across two modules, both defined in one.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "rename-sampled"
+
+
 class DefinitionMoveFromMovedModuleSample(SampleTrees):
     """
     A pull request moving a module and, out of it, one class into a module it adds.

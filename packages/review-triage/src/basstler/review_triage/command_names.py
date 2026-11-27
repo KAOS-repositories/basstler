@@ -40,3 +40,8 @@ class ReviewTriageCommand(BasstlerCommand):
     """
     Set a repository's Actions up to mark files viewed, listing the steps left.
     """
+    SPLIT_MECHANICAL = "split-mechanical"
+    """
+    Replace a pull request's commits with one making its mechanical changes and one
+    making every other change.
+    """

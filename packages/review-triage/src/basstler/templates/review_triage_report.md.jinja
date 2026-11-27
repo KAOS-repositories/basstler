@@ -26,6 +26,16 @@ Renames applied - check them once here instead of in every file:
 Nothing.
 {% endfor %}
 
+{% if outcome.samples %}
+### Left for review as samples
+
+Mechanical, but left unviewed so you see each new name once:
+
+{% for sample in outcome.samples %}
+- `{{ sample.path }}`: `{{ sample.rename.old }}` → `{{ sample.rename.new }}`
+{% endfor %}
+
+{% endif %}
 ### Mechanical
 
 {% if outcome.mechanical_files %}

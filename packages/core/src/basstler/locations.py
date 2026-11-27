@@ -557,6 +557,13 @@ class ReviewTriageLocation(PathEnumeration):
     The Markdown report of which files of a pull request need review.
     """
 
+    MECHANICAL_SUMMARY_TEMPLATE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "review_triage_mechanical_summary.md.jinja"
+    )
+    """
+    The Markdown summary of the changes a pull request's mechanical commit makes.
+    """
+
     SUMMARY_TEMPLATE = INSTALLED_PACKAGE.shipped(
         ShippedPath.TEMPLATES / "review_triage_summary.md.jinja"
     )

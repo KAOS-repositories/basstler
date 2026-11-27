@@ -1,0 +1,35 @@
+{% set renames = outcome.renames.identifier_renames | rejectattr("found_by.finds_moves") | list %}
+{% set moves = outcome.renames.identifier_renames | selectattr("found_by.finds_moves") | list %}
+{% if renames %}
+<details><summary><b>{{ renames | length }} names changed throughout</b>: check each new name once here</summary>
+
+| Old | New |
+| --- | --- |
+{% for rename in renames %}
+| `{{ rename.old }}` | `{{ rename.new }}` |
+{% endfor %}
+
+</details>
+
+{% endif %}
+{% if moves %}
+<details><summary><b>{{ moves | length }} definitions and modules moved</b>, unchanged</summary>
+
+| From | To |
+| --- | --- |
+{% for rename in moves %}
+| `{{ rename.old }}` | `{{ rename.new }}` |
+{% endfor %}
+
+</details>
+
+{% endif %}
+<details><summary><b>{{ outcome.mechanical_files | length }} files changed</b> by these alone, or by imports and formatting</summary>
+
+| File | Change |
+| --- | --- |
+{% for file in outcome.mechanical_files %}
+| `{{ file.change.path }}`{% if file.change.previous_path %} (from `{{ file.change.previous_path }}`){% endif %} | {{ file.kinds | sort | join(", ") }} |
+{% endfor %}
+
+</details>

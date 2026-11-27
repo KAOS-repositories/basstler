@@ -240,8 +240,8 @@ class ViewedFiles:
 @dataclass(frozen=True)
 class ViewedMarking(TriageOutput):
     """
-    Marks every mechanical file GitHub lists in the pull request viewed, for the account
-    whose credential the writer sends.
+    Marks every mechanical file GitHub lists in the pull request viewed, except those
+    left for review as a sample, for the account whose credential the writer sends.
 
     :raises PullRequestHeadMoved: Before marking any file, if the pull request was
         pushed to since it was triaged.
@@ -271,7 +271,7 @@ class ViewedMarking(TriageOutput):
 
     def refusals(self, outcome: TriageOutcome) -> tuple[str, ...]:
         """
-        Mark the mechanical files GitHub lists viewed, stopping at the first refusal.
+        Mark the files to mark viewed that GitHub lists, stopping at the first refusal.
 
         :param outcome: The triaged pull request.
         :return: What GitHub refused with, empty once every listed file is marked.
@@ -280,7 +280,7 @@ class ViewedMarking(TriageOutput):
         listing = self.listed_paths(outcome)
         if listing.refusals:
             return listing.refusals
-        mechanical = [file.change.path for file in outcome.mechanical_files]
+        mechanical = [file.change.path for file in outcome.files_to_mark_viewed]
         unlisted = [path for path in mechanical if path not in listing.result]
         if unlisted:
             logger.warning(

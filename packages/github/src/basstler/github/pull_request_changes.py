@@ -26,9 +26,32 @@ from basstler.json_model import ValidatedJSONModel
 # %% the pull request
 
 
+class RepositoryName(ValidatedJSONModel):
+    """
+    A repository as a pull request's end names it.
+    """
+
+    full_name: str
+    """
+    The repository as ``owner/name``.
+    """
+
+    @property
+    def repository(self) -> Repository:
+        """
+        The repository it names.
+        """
+        return Repository.parse(self.full_name)
+
+
 class BranchTip(ValidatedJSONModel):
     """
     One end of a pull request: a branch and the commit it points at.
+    """
+
+    repository: Annotated[RepositoryName | None, Field(alias="repo")]
+    """
+    The repository holding the branch, ``None`` once it is deleted.
     """
 
     commit: Annotated[str, Field(alias="sha")]

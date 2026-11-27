@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 
@@ -19,7 +19,12 @@ from basstler.github.pull_request_changes import (
     StartCommit,
     StartReason,
 )
-from basstler.review_triage.comparison import FileNeedingReview, MechanicalFile
+from basstler.review_triage.detection import RenameDetection
+from basstler.review_triage.comparison import (
+    FileNeedingReview,
+    FileVerdict,
+    MechanicalFile,
+)
 from basstler.review_triage.exceptions import PullRequestHeadMoved
 from basstler.review_triage.file_listing import (
     FileListingReader,
@@ -27,6 +32,8 @@ from basstler.review_triage.file_listing import (
     GraphQLAttempts,
 )
 from basstler.review_triage.outputs import ViewedMarking
+from basstler.review_triage.renames import Rename, RenameMap
+from basstler.review_triage.review_samples import ReviewSample, ReviewSampling
 from basstler.review_triage.triage import PullRequestTriager, TriageOutcome
 from basstler.locations import ProjectLocation
 from basstler.personal_notes.contribution import SetupPersonalNotesSkill
@@ -107,12 +114,14 @@ class ViewedHistory:
         self,
         listing_writer: FileListingWriter | RefusingWriter | None = None,
         account: dict[str, str] | None = None,
+        triager: PullRequestTriager | None = None,
     ) -> TriageOutcome:
         """
         :param listing_writer: What answers the file listing; the sample's states at
             the head by default.
         :param account: The account the credential belongs to, ``None`` for one GitHub
             names no account for.
+        :param triager: What triages each range, the default triager by default.
         :return: The sample triaged from where each file was last viewed.
         """
         payload = PullRequestSample.PAYLOAD.payload()
@@ -120,7 +129,7 @@ class ViewedHistory:
         payload["head"]["sha"] = self.commits.head_commit
         reader = ReviewedPullRequestReader(payload, account, [])
         return ViewedFilesTriage(
-            PullRequestTriager(),
+            triager or PullRequestTriager(),
             PullRequestChangesReader(self.repository.git, reader),
             SAMPLE_REPOSITORY,
             FileListingReader(GraphQLAttempts(listing_writer or self.listing())),
@@ -164,6 +173,29 @@ def viewed_history(
     )
 
 
+@dataclass(frozen=True)
+class EveryMechanicalFileSampling(ReviewSampling):
+    """
+    Leaves every mechanical file for review, as showing one rename.
+    """
+
+    rename: Rename = field(
+        default_factory=lambda: Rename("old_name", "new_name", RenameDetection())
+    )
+    """
+    The rename every sample shows.
+    """
+
+    def samples(
+        self, renames: RenameMap, files: tuple[FileVerdict, ...]
+    ) -> tuple[ReviewSample, ...]:
+        return tuple(
+            ReviewSample(self.rename, file.change.path)
+            for file in files
+            if isinstance(file, MechanicalFile)
+        )
+
+
 def verdict_of(outcome: TriageOutcome, path: PurePosixPath) -> type:
     """
     :param outcome: A triaged pull request.
@@ -174,6 +206,16 @@ def verdict_of(outcome: TriageOutcome, path: PurePosixPath) -> type:
 
 
 # %% each file's start
+
+
+def test_the_samples_are_picked_from_every_file_judged(viewed_history):
+    """
+    A file judged from where it was viewed can be a sample, as one judged from the merge
+    base can.
+    """
+    sampling = EveryMechanicalFileSampling()
+    outcome = viewed_history.triage(triager=PullRequestTriager(sampling=sampling))
+    assert outcome.samples == sampling.samples(outcome.renames, outcome.files)
 
 
 def test_a_file_viewed_at_its_current_content_is_left_out(viewed_history):

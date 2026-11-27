@@ -19,14 +19,19 @@ from basstler.github.pull_request_changes import (
     CommitStart,
     ComparisonStart,
     LastCommitsStart,
+    LastReviewStart,
     MergeBaseStart,
+    PullRequestChanges,
     PullRequestChangesReader,
 )
+from basstler.github.pull_request import PullRequestDescription
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.locations import ClaudeCodeVariable
 from basstler.review_triage.command_names import ReviewTriageCommand
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
+from basstler.review_triage.exceptions import MissingHeadRepositoryError
 from basstler.review_triage.file_listing import FileListingReader, GraphQLAttempts
+from basstler.review_triage.mechanical_split import MechanicalSplitter
 from basstler.review_triage.outputs import (
     MarkdownReport,
     TriageOutput,
@@ -34,6 +39,7 @@ from basstler.review_triage.outputs import (
     ViewedMarking,
 )
 from basstler.review_triage.recorded_plans import PlanRecord
+from basstler.review_triage.review_samples import ReviewSampling
 from basstler.review_triage.reviewed_pull_requests import ReviewedPullRequests
 from basstler.review_triage.rules import (
     ReviewTriageSettings,
@@ -123,6 +129,11 @@ class TriagePublication:
     open.
     """
 
+    leaves_samples: bool = True
+    """
+    Whether one mechanical file showing each rename is left for review.
+    """
+
     @classmethod
     def from_arguments(
         cls,
@@ -136,6 +147,7 @@ class TriagePublication:
         from_merge_base: bool = False,
         plans: tuple[str, ...] = (),
         type_checker: bool = True,
+        samples: bool = True,
     ) -> TriagePublication:
         """
         :param pull_request: The pull request's number.
@@ -148,6 +160,8 @@ class TriagePublication:
         :param from_merge_base: Whether to triage the whole change.
         :param plans: Plans commits applied, each as ``commit=plan``.
         :param type_checker: Whether Pyrefly answers the receivers left open.
+        :param samples: Whether to leave one mechanical file showing each rename for
+            review.
         :return: The publication triaging from *since*, else from before the *last*
             commits, else from the merge base if *from_merge_base*, else each file from
             where the viewer last viewed it.
@@ -170,6 +184,7 @@ class TriagePublication:
             ),
             plan_records=tuple(PlanRecord.from_argument(plan) for plan in plans),
             type_checker=type_checker,
+            leaves_samples=samples,
         )
 
     def outcome(self) -> TriageOutcome:
@@ -177,11 +192,45 @@ class TriagePublication:
         :return: The triage of the pull request.
         """
         git = GitCommandRunner(Path.cwd())
-        checkout = Path(git.run("rev-parse", "--show-toplevel"))
+        if not isinstance(self.start, ViewedStateStart):
+            return self.triager(git).triage(self.changes(git))
         repository = Repository.from_name_or_remote(self.repository, git, self.remote)
-        reader = PullRequestChangesReader(git, GitHubRestClient())
+        return ViewedFilesTriage(
+            self.triager(git),
+            PullRequestChangesReader(git, GitHubRestClient()),
+            repository,
+            FileListingReader(GraphQLAttempts(GitHubRestClient())),
+            ViewedCheckpoints.for_pull_request(git, repository, self.pull_request),
+        ).outcome(self.pull_request)
+
+    def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
+        """
+        :param outputs: Where the outcome goes, in order.
+        """
+        outcome = self.outcome()
+        for output in outputs:
+            output.publish(outcome)
+
+    def changes(self, git: GitCommandRunner) -> PullRequestChanges:
+        """
+        :param git: The checkout the pull request is read in.
+        :return: The pull request and its changes since :attr:`start`.
+        """
+        return PullRequestChangesReader(git, GitHubRestClient()).read(
+            Repository.from_name_or_remote(self.repository, git, self.remote),
+            self.pull_request,
+            self.start,
+        )
+
+    def triager(self, git: GitCommandRunner) -> PullRequestTriager:
+        """
+        :param git: The checkout whose settings choose the rules.
+        :return: The triager judging with the declared renames, the chosen rules and
+            the plans given.
+        """
+        checkout = Path(git.run("rev-parse", "--show-toplevel"))
         default = PullRequestTriager()
-        triager = replace(
+        return replace(
             default,
             rename_sources=(
                 *default.rename_sources,
@@ -192,24 +241,8 @@ class TriagePublication:
             ),
             plan_records=self.plan_records,
             type_checker=default.type_checker if self.type_checker else None,
+            sampling=ReviewSampling() if self.leaves_samples else None,
         )
-        if isinstance(self.start, ViewedStateStart):
-            return ViewedFilesTriage(
-                triager,
-                reader,
-                repository,
-                FileListingReader(GraphQLAttempts(GitHubRestClient())),
-                ViewedCheckpoints.for_pull_request(git, repository, self.pull_request),
-            ).outcome(self.pull_request)
-        return triager.triage(reader.read(repository, self.pull_request, self.start))
-
-    def publish(self, outputs: tuple[TriageOutput, ...]) -> None:
-        """
-        :param outputs: Where the outcome goes, in order.
-        """
-        outcome = self.outcome()
-        for output in outputs:
-            output.publish(outcome)
 
 
 # %% the commands
@@ -249,6 +282,7 @@ def report(
     ignore_rule: tuple[TriageRule, ...] = (),
     plan: tuple[str, ...] = (),
     type_checker: bool = True,
+    samples: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown; by default each file
@@ -273,6 +307,8 @@ def report(
         commit whose message does not record it; repeatable.
     :param type_checker: Whether Pyrefly answers the method call receivers whose class
         basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
+    :param samples: Leave one mechanical file showing each rename for review, the file
+        defining the new name where it can; ``--no-samples`` leaves none.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     TriagePublication.from_arguments(
@@ -286,6 +322,7 @@ def report(
         from_merge_base,
         plan,
         type_checker,
+        samples,
     ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
@@ -312,6 +349,7 @@ def mark_viewed(
     ignore_rule: tuple[TriageRule, ...] = (),
     plan: tuple[str, ...] = (),
     type_checker: bool = True,
+    samples: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the logged-in account, or, where
@@ -342,6 +380,8 @@ def mark_viewed(
         commit whose message does not record it; repeatable.
     :param type_checker: Whether Pyrefly answers the method call receivers whose class
         basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
+    :param samples: Leave one mechanical file showing each rename for review, the file
+        defining the new name where it can; ``--no-samples`` leaves none.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     :raises GraphQLErrorsReturned: If marking them directly, alone, fails.
     :raises FilesNotMarkedViewed: If neither way marks them.
@@ -358,6 +398,7 @@ def mark_viewed(
         from_merge_base,
         plan,
         type_checker,
+        samples,
     ).outcome()
     (TriageSummary() if summary_only else MarkdownReport()).publish(outcome)
     marked_repository = Repository.from_name_or_remote(repository, git)
@@ -387,6 +428,7 @@ def mark_viewed_in_reviews(
     select_rule: tuple[TriageRule, ...] = (),
     ignore_rule: tuple[TriageRule, ...] = (),
     type_checker: bool = True,
+    samples: bool = True,
 ) -> ReviewTriageExitCode:
     """
     Mark viewed, for the logged-in account, the mechanical files of every open pull
@@ -400,6 +442,8 @@ def mark_viewed_in_reviews(
     :param ignore_rule: A rule to turn off, outranking those settings; repeatable.
     :param type_checker: Whether Pyrefly answers the method call receivers whose class
         basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
+    :param samples: Leave one mechanical file showing each rename for review, the file
+        defining the new name where it can; ``--no-samples`` leaves none.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     :raises GraphQLErrorsReturned: Once every pull request was tried, if any was
         refused.
@@ -417,6 +461,7 @@ def mark_viewed_in_reviews(
             select_rule,
             ignore_rule,
             type_checker=type_checker,
+            samples=samples,
         ).outcome()
         for number in reviewed.numbers(github)
     )
@@ -503,4 +548,78 @@ def declare(
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
     logger.info(TriageDeclaration.from_arguments(rename, rejected_rename).comment())
+    return ReviewTriageExitCode.SUCCESS
+
+
+@review_triage_app.command(name=ReviewTriageCommand.SPLIT_MECHANICAL)
+def split_mechanical(
+    pull_request: int,
+    *,
+    repository: str | None = None,
+    rename: tuple[str, ...] = (),
+    rejected_rename: tuple[str, ...] = (),
+    since: Annotated[str | None, Parameter(group=COMPARISON_START_GROUP)] = None,
+    last: Annotated[
+        int | None,
+        Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
+    ] = None,
+    from_merge_base: Annotated[
+        bool, Parameter(group=COMPARISON_START_GROUP, negative=())
+    ] = False,
+) -> ReviewTriageExitCode:
+    """
+    Replace a pull request's commits since your last review with one making the changes
+    the triage proves mechanical and one making every other change, whose tree is the
+    former head's, and summarise the first in the description. Nothing is pushed unless
+    the proof holds.
+
+    :param pull_request: The pull request's number.
+    :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
+        default.
+    :param rename: A rename as ``old=new``, outranking the description's; repeatable.
+    :param rejected_rename: An old identifier whose rename is rejected; repeatable.
+    :param since: The commit to split from, keeping the commits up to it.
+    :param last: How many of the pull request's last commits to split.
+    :param from_merge_base: Split the whole change, not only what changed since your
+        last review.
+    :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
+    """
+    publication = TriagePublication.from_arguments(
+        pull_request,
+        repository,
+        TriageDeclaration.from_arguments(rename, rejected_rename),
+        since,
+        last,
+        from_merge_base=from_merge_base,
+        samples=False,
+    )
+    if isinstance(publication.start, ViewedStateStart):
+        publication = replace(publication, start=LastReviewStart())
+    git = GitCommandRunner(Path.cwd())
+    changes = publication.changes(git)
+    split = MechanicalSplitter(git, publication.triager(git)).split(changes)
+    if split is None:
+        logger.info(
+            f"#{pull_request} changes wholly mechanically, or nothing mechanically, "
+            f"since {changes.start.reason}; its branch is unchanged."
+        )
+        return ReviewTriageExitCode.SUCCESS
+    head_repository = changes.pull_request.head.repository
+    if head_repository is None:
+        raise MissingHeadRepositoryError(pull_request)
+    split.publish(git, head_repository.repository.clone_url)
+    base_repository = Repository.from_name_or_remote(repository, git)
+    pull_request_url = base_repository.pull_request_url(pull_request)
+    GitHubRestClient().send(
+        PullRequestDescription(
+            repository=base_repository,
+            number=pull_request,
+            body=split.description(pull_request_url),
+        )
+    )
+    logger.info(
+        f"#{pull_request} now makes its mechanical changes in {split.mechanical_commit}"
+        f" and every other change in {split.remaining_commit}; review the second: "
+        f"{pull_request_url}/commits/{split.remaining_commit}"
+    )
     return ReviewTriageExitCode.SUCCESS

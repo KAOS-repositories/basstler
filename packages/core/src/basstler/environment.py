@@ -98,6 +98,11 @@ class GitVariable(EnvironmentVariable):
     Followed by an entry's index, names the variable holding that entry's value.
     """
 
+    AUTHOR_DATE = "GIT_AUTHOR_DATE"
+    """
+    The date git records as a new commit's author date, in place of the clock's.
+    """
+
     COMMITTER_DATE = "GIT_COMMITTER_DATE"
     """
     The date git records as a new commit's committer date, in place of the clock's.

@@ -282,12 +282,15 @@ class ViewedFilesTriage:
                 for verdict in since.files
                 if verdict.change.path in paths
             }
+        files = tuple(verdicts[change.path] for change in unviewed.files)
+        sampling = self.triager.sampling
         return TriageOutcome(
             whole.pull_request,
             outcome.renames,
-            tuple(verdicts[change.path] for change in unviewed.files),
+            files,
             whole.start,
             viewed,
+            () if sampling is None else sampling.samples(outcome.renames, files),
         )
 
     def viewed_before_changing(

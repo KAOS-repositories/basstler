@@ -28,6 +28,7 @@ from .samples import (
     DefinitionMoveFromMovedModuleSample,
     DefinitionMoveSample,
     ModuleSplitSample,
+    DocumentedConstantMoveSample,
 )
 from basstler.text_file import TextFile
 
@@ -482,3 +483,21 @@ def test_the_modules_a_module_is_split_into_are_mechanical(
     mechanical, an assignment moving with the docstring below it.
     """
     assert PullRequestTriager().triage(module_split).files_needing_review == ()
+
+
+# %% a documented assignment moved
+
+
+def test_a_moved_constant_takes_its_docstring_along(
+    scratch_repository: ScratchRepository,
+):
+    """
+    The module a documented constant leaves, the module it moves into and the file
+    importing it from there are mechanical.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DocumentedConstantMoveSample.BASE_TREE,
+        DocumentedConstantMoveSample.HEAD_TREE,
+    )
+    assert PullRequestTriager().triage(changes).files_needing_review == ()

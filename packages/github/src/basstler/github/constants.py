@@ -117,6 +117,12 @@ class MaintenanceText(StrEnum):
     under, in the fork pull request's own description.
     """
 
+    MECHANICAL_CHANGES_HEADING = "## Mechanical changes"
+    """
+    Heads the section of a pull request's description summarising the commit
+    ``basstler review-triage split-mechanical`` made of its mechanical changes.
+    """
+
     FULL_DETAIL = "Full detail:"
     """
     Opens the line an upstream pull request's description ends with, linking back to the

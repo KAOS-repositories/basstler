@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import PurePosixPath
 
 from basstler.git.commit_range import FileVersions
@@ -46,6 +46,7 @@ from basstler.review_triage.plan_replay import PlanReplay, ReplayingFileTriager
 from basstler.review_triage.receiver_probes import RevealedReceivers
 from basstler.review_triage.recorded_plans import PlanRecord
 from basstler.review_triage.rename_sources import RenameSource
+from basstler.review_triage.review_samples import ReviewSample, ReviewSampling
 from basstler.review_triage.rule_fixes import RuleFixComparison
 from basstler.review_triage.subclass_substitutions import SubclassSubstitutionDetection
 from basstler.review_triage.type_checkers import Pyrefly, TypeChecker
@@ -87,6 +88,11 @@ class TriageOutcome:
     The files left out of the triage because the viewer viewed them as they are.
     """
 
+    samples: tuple[ReviewSample, ...] = ()
+    """
+    The mechanical files left for review to show a rename.
+    """
+
     @property
     def mechanical_files(self) -> tuple[MechanicalFile, ...]:
         """
@@ -100,6 +106,16 @@ class TriageOutcome:
         The files a reviewer has to read.
         """
         return tuple(file for file in self.files if isinstance(file, FileNeedingReview))
+
+    @property
+    def files_to_mark_viewed(self) -> tuple[MechanicalFile, ...]:
+        """
+        The mechanical files not left for review as a sample.
+        """
+        sampled = {sample.path for sample in self.samples}
+        return tuple(
+            file for file in self.mechanical_files if file.change.path not in sampled
+        )
 
 
 # %% triaging
@@ -167,6 +183,11 @@ class PullRequestTriager:
     ``None`` to leave them open.
     """
 
+    sampling: ReviewSampling | None = None
+    """
+    Picks the mechanical files left for review to show a rename, ``None`` to leave none.
+    """
+
     def triage(self, changes: PullRequestChanges) -> TriageOutcome:
         """
         :param changes: A pull request and the files it changes.
@@ -175,28 +196,35 @@ class PullRequestTriager:
             judged against the plan's replay.
         """
         separated = BaseBranchMergeDetection().separate(changes)
-        own_changes = separated.own
-        context = self.context(own_changes)
-        triager = ReplayingFileTriager(
-            context,
-            self.judgments,
-            PlanReplay.from_records(
-                (*PlanRecord.recorded_in(own_changes.commits), *self.plan_records),
-                own_changes.commits,
-            ),
-        )
+        triager = self.file_triager(separated.own)
         verdicts: dict[PurePosixPath, FileVerdict] = {
             change.path: MechanicalFile(
                 change, frozenset({MechanicalChange.BASE_BRANCH_MERGE})
             )
             for change in separated.merged
         }
-        verdicts |= self.judged_files(triager, own_changes.files)
-        return TriageOutcome(
-            changes.pull_request,
-            context.renames,
-            tuple(verdicts[change.path] for change in changes.files),
-            changes.start,
+        verdicts |= self.judged_files(triager, separated.own.files)
+        renames = triager.context.renames
+        files = tuple(verdicts[change.path] for change in changes.files)
+        outcome = TriageOutcome(changes.pull_request, renames, files, changes.start)
+        if self.sampling is None:
+            return outcome
+        return replace(outcome, samples=self.sampling.samples(renames, files))
+
+    def file_triager(self, changes: PullRequestChanges) -> ReplayingFileTriager:
+        """
+        :param changes: A pull request's own changes, those of base branch merges
+            aside.
+        :return: What judges each of its files, with its renames, moves and
+            substitutions, and the replays of the plans its commits record.
+        """
+        return ReplayingFileTriager(
+            self.context(changes),
+            self.judgments,
+            PlanReplay.from_records(
+                (*PlanRecord.recorded_in(changes.commits), *self.plan_records),
+                changes.commits,
+            ),
         )
 
     def judged_files(

@@ -1,10 +1,12 @@
 ## Plan
-- Move each name one distribution uses (source and tests) into its own locations/environment/exceptions module; shared and shell-only names stay in core
+- Resolve the conflicts between this branch and `main` (0a166f91): merge `main` in, keeping the split of locations, environment and exceptions.
 
 ## Done
-- Bases in core declare each split enum's meaning once (ProjectFile, ActionsWorkflowFile, ...); renames REUSABLE_MARK_VIEWED and README; WORKFLOWS unified with WorkflowLocation.DIRECTORY; shell-only clause in the rule (ccc60b55)
-- CI-like per-distribution run passes (hub's Playwright errors are sandbox-only); CI passed on 362ce59e
+- Merge probe at ccc60b55 found 5 conflicting files (locations.py, actions_budget.py, plan_site/workflows.py, two tests); all resolved in the working tree.
+- ruff check and format, `code-rules check` and `new-crossings origin/main` pass. Tests pass for rules, github, core, git, reviews, stack, notes, plan, review-triage, packaging, build.
+- Upstream review state: not checked, no upstream is named for this clone. No review threads or comments on the pull request.
 
 ## Next
-- Read CI on ccc60b55
-- Owner to answer: point WorkspacePart / PackageSourceFile at WorkspaceLocation (keeps LOCK); further members repeating their subject
+- Finish the basstler and hub test runs, commit the merge, push with `maintenance push`.
+- Update the pull request description and the plan item's record; return the PR to draft.
+- Ask the owner the two open questions in the PR description.

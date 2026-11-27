@@ -112,8 +112,8 @@ items:
   status: in progress
   recommended_model: sonnet
   notes: >
-    Draft #324 at b92c710e on #322; not yet merged into claude/practical-hawking-nf0g3o (a clean
-    merge passing 459 tests waits locally for approval to push). DecoratorPolicy.reads passes a
+    Draft #324 at b92c710e on #322, merged into claude/practical-hawking-nf0g3o at 11bdfc8e
+    (review-triage 459 passed there). DecoratorPolicy.reads passes a
     decorator returning a wrapper that forwards *args and **kwargs unchanged under the decorated
     function's leading names. Turns the 92 CRAM 1072 add(part=...) calls under
     synchronized_attribute_modification mechanical: 51 files needing review down to 34.

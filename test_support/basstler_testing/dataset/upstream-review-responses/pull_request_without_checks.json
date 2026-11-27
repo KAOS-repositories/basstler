@@ -8,6 +8,7 @@
         "nodes": [{"commit": {"statusCheckRollup": null}}]
       },
       "reviews": {
+        "pageInfo": {"hasNextPage": false, "endCursor": "REVIEWS_CURSOR_PAGE_TWO"},
         "nodes": [
           {
             "author": {"login": "first-reviewer"},

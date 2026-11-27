@@ -33,7 +33,7 @@ def test_a_snapshot_keeps_the_pull_request_it_was_assembled_from():
         UPSTREAM
     ).pull_request
 
-    snapshot = UpstreamPullRequestSnapshot.assemble(pull_request, [])
+    snapshot = UpstreamPullRequestSnapshot.assemble(pull_request, [], [])
 
     assert snapshot.reference == PullRequestReference(
         UPSTREAM, pull_request.reference.number

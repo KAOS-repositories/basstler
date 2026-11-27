@@ -161,7 +161,9 @@ class UpstreamPullRequestReader(PullRequestSource):
         See :meth:`PullRequestSource.read_current_state`.
         """
         threads: list[ReviewThread] = []
-        cursor: str | None = None
+        reviews: list[Review] = []
+        thread_cursor: str | None = None
+        review_cursor: str | None = None
         while True:
             pull_request = ReviewThreadsPageResult.from_json(
                 self.client.execute(
@@ -169,17 +171,24 @@ class UpstreamPullRequestReader(PullRequestSource):
                     {
                         **self._repository_variables,
                         QueryVariable.NUMBER: pull_request_number,
-                        QueryVariable.THREAD_CURSOR: cursor,
+                        QueryVariable.THREAD_CURSOR: thread_cursor,
+                        QueryVariable.REVIEW_CURSOR: review_cursor,
                     },
                 ),
                 HasRepository(self.upstream_repository),
             ).pull_request
-            page = pull_request.review_threads
-            threads.extend(page.threads)
-            if not page.page_info.has_next_page:
+            thread_page = pull_request.review_threads
+            review_page = pull_request.reviews
+            threads.extend(thread_page.threads)
+            reviews.extend(review_page.reviews)
+            if not (
+                thread_page.page_info.has_next_page
+                or review_page.page_info.has_next_page
+            ):
                 break
-            cursor = page.page_info.end_cursor
-        return UpstreamPullRequestSnapshot.assemble(pull_request, threads)
+            thread_cursor = thread_page.page_info.end_cursor
+            review_cursor = review_page.page_info.end_cursor
+        return UpstreamPullRequestSnapshot.assemble(pull_request, threads, reviews)
 
 
 @dataclass(frozen=True)

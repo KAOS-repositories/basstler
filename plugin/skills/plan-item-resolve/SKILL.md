@@ -60,10 +60,12 @@ already exists**, which is where the cause of a stall almost always is:
   and the `base_commit` and `head_commit` it merged. Exit 0 (`success`) is clean and 13
   (`merge-conflicts`) is conflicting; any other status means the conflict state is *not
   checked* - stderr says why - so say so, and never report the pull request as mergeable. Then read its review threads
-  (`method: "get_review_comments"`) and plain comments
-  (`method: "get_comments"`) — read every one, not just the most recent,
-  since an older unresolved thread is exactly the kind of thing this skill
-  exists to surface. A failing check or a requested-changes review is
+  (`method: "get_review_comments"`), its reviews (`method: "get_reviews"`) and
+  plain comments (`method: "get_comments"`) — read every one, not just the most
+  recent, since an older unresolved thread is exactly the kind of thing this
+  skill exists to surface. A review submitted with a body and no inline
+  comment appears only among the reviews: page through all of them and read
+  every body, newest included, past the empty ones each inline reply files. A failing check or a requested-changes review is
   usually the actual blocker; state exactly which one and why, don't just
   say "CI is failing."
 - If the item has a `branch`, invoke `/upstream-reviews` for it and read every
@@ -213,7 +215,7 @@ the pull request itself. Every step above runs, with these differences:
 
 - **Step 1** skips the plan-reading parts [`plan-item-gathering.md`](../plan-item-kickoff/plan-item-gathering.md)
   names, and the tracking-issue bullet above. Everything about the pull
-  request's live state - checks, review threads, comments, `/upstream-reviews`,
+  request's live state - checks, review threads, reviews, comments, `/upstream-reviews`,
   the diff - is read exactly as for a tracked item, and the branch's
   PR-progress note on the personal-notes branch, if it has one, stands in for
   the item's `notes`.

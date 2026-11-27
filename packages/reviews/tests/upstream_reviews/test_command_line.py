@@ -125,6 +125,23 @@ class ThreadCursor(StrEnum):
     PAGE_ONE = "CURSOR_PAGE_ONE"
 
 
+class ReviewCursor(StrEnum):
+    """
+    The cursors the recorded pages hand back for their reviews.
+    """
+
+    PAGE_ONE = "REVIEWS_CURSOR_PAGE_ONE"
+
+
+class Reviewer(StrEnum):
+    """
+    Who submitted the recorded reviews, one review on each page.
+    """
+
+    ON_PAGE_ONE = "first-reviewer"
+    ON_PAGE_TWO = "second-reviewer"
+
+
 class StubEnvironmentVariable(StrEnum):
     """
     The knobs the ``gh`` stub reads.
@@ -311,11 +328,13 @@ def test_the_snapshot_is_assembled_from_the_parsed_pull_request():
     ).pull_request
 
     snapshot = UpstreamPullRequestSnapshot.assemble(
-        pull_request, pull_request.review_threads.threads
+        pull_request,
+        pull_request.review_threads.threads,
+        pull_request.reviews.reviews,
     )
 
     assert snapshot.reference == pull_request.reference
-    assert snapshot.reviews == pull_request.reviews
+    assert snapshot.reviews == pull_request.reviews.reviews
     assert snapshot.threads == pull_request.review_threads.threads
     assert snapshot.checks == pull_request.checks
 
@@ -464,6 +483,100 @@ def test_paging_stops_once_a_page_reports_no_successor(paginated_client):
     make_reader(paginated_client).read_current_state(RECORDED_PULL_REQUEST_NUMBER)
 
     assert paginated_client.responses == []
+
+
+# %% review pagination
+
+
+def test_reviews_are_read_from_every_page(paginated_client):
+    """
+    A pull request with more reviews than one page holds keeps its newest ones.
+    """
+    snapshot = make_reader(paginated_client).read_current_state(
+        RECORDED_PULL_REQUEST_NUMBER
+    )
+
+    assert [review.author.login for review in snapshot.reviews] == [
+        Reviewer.ON_PAGE_ONE,
+        Reviewer.ON_PAGE_TWO,
+    ]
+
+
+def test_the_second_request_carries_the_first_pages_review_cursor(paginated_client):
+    make_reader(paginated_client).read_current_state(RECORDED_PULL_REQUEST_NUMBER)
+
+    assert paginated_client.calls[0].variables[QueryVariable.REVIEW_CURSOR] is None
+    assert (
+        paginated_client.calls[1].variables[QueryVariable.REVIEW_CURSOR]
+        == ReviewCursor.PAGE_ONE
+    )
+
+
+def test_paging_goes_on_while_only_the_reviews_have_a_next_page():
+    """
+    The threads may fit on one page while the reviews do not.
+    """
+    first_page = RecordedResponse.PULL_REQUEST_PAGE_ONE.load()
+    first_page["repository"]["pullRequest"]["reviewThreads"]["pageInfo"][
+        "hasNextPage"
+    ] = False
+    client = ReplayingClient(
+        [first_page, RecordedResponse.PULL_REQUEST_PAGE_TWO.load()]
+    )
+
+    snapshot = make_reader(client).read_current_state(RECORDED_PULL_REQUEST_NUMBER)
+
+    assert client.responses == []
+    assert [review.author.login for review in snapshot.reviews] == [
+        Reviewer.ON_PAGE_ONE,
+        Reviewer.ON_PAGE_TWO,
+    ]
+
+
+# %% the reviews section
+
+
+def test_the_report_lists_a_review_that_says_something(paginated_client):
+    snapshot = make_reader(paginated_client).read_current_state(
+        RECORDED_PULL_REQUEST_NUMBER
+    )
+
+    rendered = UpstreamPullRequestReport(snapshot).render()
+
+    assert f"- **{Reviewer.ON_PAGE_ONE}** — " in rendered
+
+
+def test_the_report_counts_a_review_without_a_body_instead_of_listing_it(
+    paginated_client,
+):
+    """
+    Every inline reply files a review with no body; listing them buries the one that
+    says something.
+    """
+    snapshot = make_reader(paginated_client).read_current_state(
+        RECORDED_PULL_REQUEST_NUMBER
+    )
+
+    report = UpstreamPullRequestReport(snapshot)
+
+    assert f"- **{Reviewer.ON_PAGE_TWO}** — " not in report.render()
+    assert report.silent_review_count == 1
+
+
+def test_every_line_of_a_review_body_is_quoted(paginated_client):
+    snapshot = make_reader(paginated_client).read_current_state(
+        RECORDED_PULL_REQUEST_NUMBER
+    )
+    review = snapshot.reviews[0]
+    lines_of_the_body = ("What about the rotation?", "And the vector?")
+    multi_line_review = dataclasses.replace(review, body="\n".join(lines_of_the_body))
+
+    rendered = UpstreamPullRequestReport(
+        dataclasses.replace(snapshot, reviews=[multi_line_review])
+    ).render()
+
+    for line in lines_of_the_body:
+        assert f"  > {line}" in rendered.splitlines()
 
 
 # %% resolved filtering
@@ -746,12 +859,12 @@ def test_a_pull_request_without_checks_says_so(current_state):
     assert ReportText.NO_CHECKS in rendered
 
 
-def test_every_reviewer_and_verdict_is_listed(current_state):
+def test_every_review_that_says_something_is_listed_with_its_verdict(current_state):
     rendered = UpstreamPullRequestReport(current_state).render()
 
     for review in current_state.reviews:
-        assert review.author.login in rendered
-        assert review.state in rendered
+        if review.says_something:
+            assert f"- **{review.author.login}** — {review.state}" in rendered
 
 
 def test_a_verdict_reads_as_words_rather_than_as_github_spells_it(current_state):

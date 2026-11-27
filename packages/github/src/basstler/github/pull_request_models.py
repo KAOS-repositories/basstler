@@ -16,6 +16,7 @@ from basstler.github.graphql import GraphQLConnection
 from basstler.github.review_models import (
     BranchPullRequest,
     Review,
+    ReviewPage,
     ReviewThread,
     ReviewThreadPage,
 )
@@ -201,9 +202,9 @@ class PullRequest(ValidatedJSONModel):
     The commits the query selected, which is the head commit alone.
     """
 
-    reviews: GraphQLConnection[Review]
+    reviews: ReviewPage
     """
-    Every submitted review, oldest first.
+    The page of submitted reviews this response carried.
     """
 
     review_threads: Annotated[ReviewThreadPage, Field(alias="reviewThreads")]
@@ -258,19 +259,23 @@ class UpstreamPullRequestSnapshot:
 
     @classmethod
     def assemble(
-        cls, pull_request: PullRequest, threads: list[ReviewThread]
+        cls,
+        pull_request: PullRequest,
+        threads: list[ReviewThread],
+        reviews: list[Review],
     ) -> UpstreamPullRequestSnapshot:
         """
-        Combine a parsed pull request with every thread its pages carried.
+        Combine a parsed pull request with every thread and review its pages carried.
 
         :param pull_request: The pull request, as the last page read it.
         :param threads: Every thread gathered across the paged reads.
+        :param reviews: Every review gathered across the paged reads.
         :return: The assembled snapshot.
         """
         return cls(
             reference=pull_request.reference,
             title=pull_request.title,
-            reviews=pull_request.reviews,
+            reviews=reviews,
             threads=threads,
             checks=pull_request.checks,
         )

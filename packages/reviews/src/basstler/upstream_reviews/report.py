@@ -120,17 +120,30 @@ class UpstreamPullRequestReport:
             lines.extend(["```", ""])
         return lines
 
+    @property
+    def silent_review_count(self) -> int:
+        """
+        How many reviews carry neither a body nor a verdict, which the report counts
+        instead of listing.
+        """
+        return sum(not review.says_something for review in self.snapshot.reviews)
+
     def _render_reviews(self) -> list[str]:
         """:return: The submitted-reviews section."""
         if not self.snapshot.reviews:
             return [ReportText.REVIEWS_HEADING, "", ReportText.NO_REVIEWS, ""]
         lines = [ReportText.REVIEWS_HEADING, ""]
         for review in self.snapshot.reviews:
+            if not review.says_something:
+                continue
             lines.append(
                 f"- **{review.author.login}** — {review.state} ({review.submitted_at})"
             )
-            if review.body.strip():
-                lines.append(f"  > {review.body.strip()}")
+            lines.extend(f"  > {line}" for line in review.body.strip().splitlines())
+        if self.silent_review_count:
+            lines.append(
+                f"- {self.silent_review_count} more reviews without a body or verdict"
+            )
         lines.append("")
         return lines
 

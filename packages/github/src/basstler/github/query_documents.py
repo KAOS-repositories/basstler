@@ -22,6 +22,7 @@ class QueryVariable(StrEnum):
     HEAD_REF_NAME = "headRefName"
     NUMBER = "number"
     THREAD_CURSOR = "threadCursor"
+    REVIEW_CURSOR = "reviewCursor"
 
 
 class GraphQLDocument(StrEnum):

@@ -11,8 +11,15 @@ Values a program derives for itself belong beside the code that derives them, no
 
 from __future__ import annotations
 
-import re
-from enum import Enum, StrEnum
+from enum import Enum, IntEnum, StrEnum
+
+from basstler.regular_expression import (
+    Anchor,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+    Separator,
+)
 
 
 class GitHubExecutable(StrEnum):
@@ -33,25 +40,72 @@ class GitHubExecutable(StrEnum):
     """
 
 
+class ClaudeCodeSessionLink(StrEnum):
+    """
+    The link to a Claude Code session.
+    """
+
+    URL_PREFIX = "https://claude.ai/code/session_"
+    """
+    Starts the link, before the session's identifier.
+    """
+
+
+class HeadingLevel(IntEnum):
+    """
+    The levels a Markdown heading may have, which is how many markers it starts with.
+    """
+
+    DEEPEST = 6
+    """
+    The most markers a heading may have.
+    """
+
+
 class DescriptionPattern(Enum):
     """
     What the tooling looks for in a pull request description.
     """
 
-    SESSION_LINK = re.compile(r"https://claude\.ai/code/session_[A-Za-z0-9_-]+")
+    SESSION_LINK = RegularExpression.sequence(
+        ClaudeCodeSessionLink.URL_PREFIX,
+        CharacterSet.any_of(
+            CharacterRange.ASCII_ALPHANUMERIC,
+            "_-",
+        ).one_or_more(),
+    ).compiled()
     """
     The session link a pull request description carries, which is the only channel for
     telling a branch's owner that their branch needs them.
+
+    >>> pattern = DescriptionPattern.SESSION_LINK.value
+    >>> pattern.search("Session: https://claude.ai/code/session_01Ab-c.")[0]
+    'https://claude.ai/code/session_01Ab-c'
     """
 
-    HEADING = re.compile(r"^#{1,6} ", re.MULTILINE)
-    """
+    HEADING = RegularExpression.sequence(
+        Anchor.LINE_START,
+        RegularExpression.literal("#").repeated(1, HeadingLevel.DEEPEST),
+        Separator.SPACE,
+    ).compiled()
+    r"""
     The start of a Markdown heading line, which ends the section before it.
+
+    >>> DescriptionPattern.HEADING.value.findall("## Done\n#hashtag\n### Next")
+    ['## ', '### ']
     """
 
-    LINK_TARGET = re.compile(r"(?<=\]\()[^)\s]+(?=\))")
+    LINK_TARGET = RegularExpression.sequence(
+        RegularExpression.lookbehind("]("),
+        CharacterSet.any_except(")", Separator.WHITESPACE).one_or_more(),
+        RegularExpression.lookahead(")"),
+    ).compiled()
     """
     The URL a Markdown hyperlink points at.
+
+    >>> pattern = DescriptionPattern.LINK_TARGET.value
+    >>> pattern.findall("[pull request](https://github.com/o/r/pull/1)")
+    ['https://github.com/o/r/pull/1']
     """
 
     def first_in(self, text: str | None) -> str | None:

@@ -10,6 +10,7 @@ from http import HTTPStatus
 import pytest
 
 import basstler.plan_site.build_start
+from basstler.markdown_code_block import CodeBlockLanguage
 from basstler.github.credential import GitHubCommand
 from basstler.github.repository import Repository
 from basstler.session_tool import BuiltInTool, CloudSessionTool
@@ -20,7 +21,6 @@ from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.plan_site.build_start import (
     BUILD_START_COMMAND,
     BuildStart,
-    CodeFence,
     PlanSiteRebuild,
     SiteAccess,
 )
@@ -121,7 +121,7 @@ def test_a_local_session_is_shown_the_command_in_a_bash_block_of_its_own():
     description = BuildStart.attempt(SITE, client).describe(in_cloud_session=False)
 
     assert description.endswith(
-        "\n".join(["", CodeFence.BASH, GitHubCommand.LOG_IN, CodeFence.CLOSE])
+        "\n" + CodeBlockLanguage.BASH.fenced(GitHubCommand.LOG_IN)
     )
 
 

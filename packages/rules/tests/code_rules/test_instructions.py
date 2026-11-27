@@ -105,6 +105,7 @@ def test_the_checkers_are_those_of_the_checked_rules():
     """
     assert RuleModule(rules).checkers == (
         code_quality.DesignPrinciplesRules.ADDRESSES_ON_THEIR_SUBJECT.checker,
+        code_quality.StructuredDataRules.NO_PATTERN_TEXT.checker,
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_DOCSTRINGS.checker,
         PackageAndPluginRules.IMPORT_ONLY_LISTED_PACKAGES.checker,

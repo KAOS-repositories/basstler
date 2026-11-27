@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
+from basstler.class_property import classproperty
 from basstler.github.pull_request_record import PullRequestField
 from basstler.github.states import CombinedCheckState
 from basstler.github.pull_request_state import (
@@ -21,6 +22,7 @@ from basstler.github.pull_request_state import (
 )
 from basstler.plan_site.__main__ import RepositorySite
 from basstler.plan_site.cards import PromotionAttribute
+from basstler.regular_expression import Wildcard
 from basstler.stack.promotability import PromotionBlocker
 
 from basstler_testing.constants.stack import StackLabel
@@ -28,6 +30,29 @@ from basstler_testing.github.pull_request_api import api_pull_request
 from basstler_testing.recorded_pull_requests import RecordedPullRequestSource
 from basstler_testing.plan.first_plan import OPEN_PULL_REQUEST, PLAN_REPOSITORY
 from .test_live_states import answers_with, open_first_plan_page, open_item_card
+
+# %% what a link attribute holds
+
+
+class LinkAttribute:
+    """
+    The values an attribute holding a link may have, as the page tests expect them.
+    """
+
+    @classproperty
+    def present(cls) -> re.Pattern[str]:
+        """
+        An attribute value that holds something, which a button with a link has.
+        """
+        return Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().compiled()
+
+    @classproperty
+    def any_value(cls) -> re.Pattern[str]:
+        """
+        Any attribute value at all, which only a button without the attribute lacks.
+        """
+        return Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more().compiled()
+
 
 # %% a plan in a fork
 
@@ -61,8 +86,8 @@ def a_fork_source(
     pull_request_source: RecordedPullRequestSource,
 ) -> RecordedPullRequestSource:
     """
-    The first plan's pull request source, whose repository is a fork and whose open
-    pull request is stacked on the fork's default branch.
+    The first plan's pull request source, whose repository is a fork and whose open pull
+    request is stacked on the fork's default branch.
     """
     pull_request_source.fork_lineages[PLAN_REPOSITORY] = LINEAGE
     pull_request_source.records[OPEN_PULL_REQUEST] = PullRequestRecord(
@@ -80,6 +105,9 @@ def test_a_pull_request_marked_ready_since_the_build_enables_its_button(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    The live state the page reads, not the built one, decides the button.
+    """
     site.build(tmp_path)
     ready = api_pull_request(OPEN_PULL_REQUEST, {PullRequestField.DRAFT: False})
 
@@ -87,7 +115,7 @@ def test_a_pull_request_marked_ready_since_the_build_enables_its_button(
 
     button = open_item_card(browser_page).locator(CONTRIBUTE)
     expect(button).not_to_have_class("promote-button promote-button-disabled")
-    expect(button).to_have_attribute("href", re.compile(".+"))
+    expect(button).to_have_attribute("href", LinkAttribute.present)
     expect(open_item_card(browser_page).locator(PROMOTION_REASON)).to_have_text("")
 
 
@@ -165,12 +193,15 @@ def test_overriding_failed_checks_enables_the_button(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    Failed checks are the only blocker, so overriding them leaves none.
+    """
     site.build(tmp_path)
     card = open_failing_item_card(browser_page, tmp_path)
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", re.compile(".+"))
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LinkAttribute.present)
     expect(card.locator(PROMOTION_REASON)).to_have_text("")
 
 
@@ -180,13 +211,18 @@ def test_withdrawing_the_override_disables_the_button_again(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    Unticking the override brings failed checks back as the blocker.
+    """
     site.build(tmp_path)
     card = open_failing_item_card(browser_page, tmp_path)
 
     card.locator(CHECKS_OVERRIDE).check()
     card.locator(CHECKS_OVERRIDE).uncheck()
 
-    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", re.compile(".*"))
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute(
+        "href", LinkAttribute.any_value
+    )
     expect(card.locator(PROMOTION_REASON)).to_have_text(
         PromotionBlocker.CHECKS_FAILED.value
     )
@@ -198,6 +234,9 @@ def test_overriding_failed_checks_leaves_every_other_blocker(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    The override lifts failed checks alone.
+    """
     a_failing_fork_source.records[OPEN_PULL_REQUEST].labels.append(
         StackLabel.NEEDS_RESOLUTION.value
     )
@@ -206,7 +245,9 @@ def test_overriding_failed_checks_leaves_every_other_blocker(
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).not_to_have_attribute("href", re.compile(".*"))
+    expect(card.locator(CONTRIBUTE)).not_to_have_attribute(
+        "href", LinkAttribute.any_value
+    )
     expect(card.locator(PROMOTION_REASON)).to_have_text(PromotionBlocker.WITHHELD.value)
 
 
@@ -232,6 +273,9 @@ def test_overriding_failed_checks_works_when_github_refuses_the_recheck(
     browser_page: Page,
     tmp_path: Path,
 ):
+    """
+    A recheck GitHub answers as not found still lets the override enable the button.
+    """
     site.build(tmp_path)
     open_first_plan_page(
         browser_page, tmp_path, answers_with((HTTPStatus.NOT_FOUND, {}))
@@ -240,4 +284,4 @@ def test_overriding_failed_checks_works_when_github_refuses_the_recheck(
 
     card.locator(CHECKS_OVERRIDE).check()
 
-    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", re.compile(".+"))
+    expect(card.locator(CONTRIBUTE)).to_have_attribute("href", LinkAttribute.present)

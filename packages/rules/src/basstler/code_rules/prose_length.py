@@ -17,9 +17,16 @@ from typing import override
 import libcst
 from libcst.metadata import CodeRange
 
+from basstler.class_property import classproperty
 from basstler.code_modification.positions import PositionedModule
 from basstler.code_modification.syntax import BodySyntax, ExpressionSyntax
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
+from basstler.regular_expression import (
+    Anchor,
+    CharacterSet,
+    RegularExpression,
+    Separator,
+)
 from basstler.text_file import TextFile
 
 # %% what is measured
@@ -41,20 +48,45 @@ class ProseKind(StrEnum):
     """
 
 
-FIELD_LIST_ITEM = re.compile(r"^:[^:\s][^:]*:")
-"""
-A reStructuredText field such as ``:param name:``, which starts a docstring's field list.
-"""
+class ToolDirective(StrEnum):
+    """
+    What a comment addressed to a tool starts with, after its comment marker.
+    """
 
-SECTION_HEADER = "# %%"
-"""
-The start of a section header comment, which is a label, not prose.
-"""
+    LINT_SUPPRESSION = "noqa"
+    """
+    Silences a linter finding on its line.
+    """
 
-TOOL_DIRECTIVE = re.compile(r"^#\s*(noqa|type:|pragma|fmt:|ruff:|!|-\*-)")
-"""
-A comment addressed to a tool rather than a reader.
-"""
+    TYPE_COMMENT = "type:"
+    """
+    Gives a type checker a type or silences it.
+    """
+
+    PRAGMA = "pragma"
+    """
+    Instructs a coverage or other tool.
+    """
+
+    FORMATTER = "fmt:"
+    """
+    Switches the formatter off or on.
+    """
+
+    RUFF = "ruff:"
+    """
+    Configures ruff for the file.
+    """
+
+    INTERPRETER = "!"
+    """
+    Names the interpreter, in a script's first line.
+    """
+
+    ENCODING = "-*-"
+    """
+    Declares the file's encoding.
+    """
 
 
 @dataclass(frozen=True)
@@ -81,7 +113,8 @@ class ProseBlock:
     prose_lines: int
     """
     How many of its lines are prose: for a docstring, the non-blank lines before its
-    field list that are not indented below its own margin, such as a literal block.
+    field list that are neither indented below its own margin, such as a literal block,
+    nor part of an example, from its ``>>>`` to the next blank line.
     """
 
 
@@ -95,6 +128,39 @@ class SourceProse:
     """
     The text of the Python source.
     """
+
+    @classproperty
+    def field_list_item(cls) -> re.Pattern[str]:
+        """
+        A reStructuredText field, which starts a docstring's field list.
+
+        >>> SourceProse.field_list_item.match(":param name: The name.")[0]
+        ':param name:'
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            ":",
+            CharacterSet.any_except(":", Separator.WHITESPACE),
+            CharacterSet.any_except(":").zero_or_more(),
+            ":",
+        ).compiled()
+
+    @classproperty
+    def tool_directive(cls) -> re.Pattern[str]:
+        """
+        A comment addressed to a tool rather than a reader.
+
+        >>> pattern = SourceProse.tool_directive
+        >>> comments = ("# noqa: E501", "# the noqa rule")
+        >>> [bool(pattern.match(comment)) for comment in comments]
+        [True, False]
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            "#",
+            Separator.WHITESPACE.zero_or_more(),
+            RegularExpression.either(*ToolDirective),
+        ).compiled()
 
     @property
     def blocks(self) -> list[ProseBlock]:
@@ -147,11 +213,13 @@ class SourceProse:
         :return: It, measured as a docstring.
         """
         prose_lines = 0
+        in_example = False
         text = ExpressionSyntax(statement.value).literal_text
         for line in inspect.cleandoc(text or "").splitlines():
-            if FIELD_LIST_ITEM.match(line):
+            if SourceProse.field_list_item.match(line):
                 break
-            if line.strip() and not line[0].isspace():
+            in_example = bool(line.strip()) and (in_example or line.startswith(">>>"))
+            if line.strip() and not line[0].isspace() and not in_example:
                 prose_lines += 1
         return ProseBlock(
             ProseKind.DOCSTRING, location.start.line, location.end.line, prose_lines
@@ -166,7 +234,7 @@ class SourceProse:
         for token in tokenize.generate_tokens(io.StringIO(self.source).readline):
             if token.type != tokenize.COMMENT or token.line.strip() != token.string:
                 continue
-            if token.string.startswith(SECTION_HEADER) or TOOL_DIRECTIVE.match(
+            if token.string.startswith("# %%") or self.tool_directive.match(
                 token.string
             ):
                 continue

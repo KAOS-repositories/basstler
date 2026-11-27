@@ -5,12 +5,12 @@ built from each.
 
 from __future__ import annotations
 
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from basstler.class_name import ClassNameWords
 from basstler.class_property import classproperty
 from basstler.generated_file import GeneratedFile
 from basstler.locations import InstructionsTemplate, PluginSkillLocation, SkillLocation
@@ -52,9 +52,7 @@ class Skill(PlaybookComponent, ABC):
         The words of the topic as the class name spells them, an acronym such as ``PR``
         counting as one word.
         """
-        return re.findall(
-            r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*", cls.__name__.removesuffix("Skill")
-        )
+        return ClassNameWords.split(cls.__name__.removesuffix("Skill"))
 
     @classproperty
     def skill_name(cls) -> str:

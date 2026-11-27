@@ -10,6 +10,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from basstler.markdown_code_block import CodeBlockLanguage
 from basstler.class_property import classproperty
 from basstler.environment import GitHubCredentialVariable
 from basstler.github.client import (
@@ -30,7 +31,6 @@ from basstler.github.token_form import (
     TokenUse,
 )
 from basstler.plan_site import token_storage
-from basstler.plan_site.build_start import CodeFence
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.workflows import (
     GitHubCommandLineOption,
@@ -149,7 +149,7 @@ class PendingStep:
         if self.line is None:
             lines.append("  GitHub offers no command for this; in the browser:")
         else:
-            command = "\n".join([CodeFence.BASH, self.line, CodeFence.CLOSE])
+            command = CodeBlockLanguage.BASH.fenced(self.line)
             lines.extend([textwrap.indent(command, "    "), "  Or in the browser:"])
         lines.append(numbered)
         return "\n".join(lines)

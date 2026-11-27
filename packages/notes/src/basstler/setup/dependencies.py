@@ -26,6 +26,7 @@ from typing import Any
 from basstler.class_property import classproperty
 from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.locations import PackageLocation, WorkspaceLocation
+from basstler.regular_expression import CharacterSet, Separator
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -79,6 +80,48 @@ class PyprojectKey(StrEnum):
     SIBLING_PINS = "basstler-sibling-pins"
     """
     The hook holding a distribution's requirements, its basstler ones unpinned.
+    """
+
+
+class ConstraintStart(StrEnum):
+    """
+    The characters that end a distribution's name in a PEP 508 specifier, each
+    beginning what constrains it; a space may end it too.
+    """
+
+    LESS_THAN = "<"
+    """
+    Begins an upper version bound.
+    """
+
+    GREATER_THAN = ">"
+    """
+    Begins a lower version bound.
+    """
+
+    EQUALS = "="
+    """
+    Begins an exact version.
+    """
+
+    EXCLUSION = "!"
+    """
+    Begins a version left out.
+    """
+
+    COMPATIBLE_RELEASE = "~"
+    """
+    Begins a compatible release.
+    """
+
+    MARKER_SEPARATOR = ";"
+    """
+    Begins an environment marker.
+    """
+
+    EXTRAS_START = "["
+    """
+    Begins the extras.
     """
 
 
@@ -165,11 +208,16 @@ class Dependency:
     """
 
     constraint_start: re.Pattern[str] = field(
-        default=re.compile(r"[<>=!~;\[ ]"), repr=False, compare=False
+        default=CharacterSet.any_of(*ConstraintStart, Separator.SPACE).compiled(),
+        repr=False,
+        compare=False,
     )
     """
-    The first character that ends a distribution's name and begins a version bound, an extra
-    or an environment marker, in a PEP 508 specifier.
+    The first character that ends a distribution's name and begins a version bound, an
+    extra or an environment marker, in a PEP 508 specifier.
+
+    >>> Dependency.constraint_start.search("pydantic[email]>=2")[0]
+    '['
     """
 
     @property

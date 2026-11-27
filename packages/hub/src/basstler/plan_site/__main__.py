@@ -35,6 +35,8 @@ from typing import Any
 
 import yaml
 
+from basstler.class_property import classproperty
+
 from basstler.github.pull_request_source import (
     GitHubPullRequestSource,
     PullRequestSource,
@@ -64,6 +66,11 @@ from basstler.plan_site.hub_page import (
 from basstler.plan_site.item_classifier import ItemClassifier
 from basstler.plan_site.plan_page import PlanPage, RenderedPlanPage
 from basstler.plan_site.plan_page_header import PlanPageHeader
+from basstler.regular_expression import (
+    CharacterSet,
+    MarkupElement,
+    RegularExpression,
+)
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
 
@@ -99,14 +106,6 @@ class SiteFile(StrEnum):
     """
 
 
-BUILD_TIME_PATTERN = re.compile(
-    rf"<time [^>]*{PlanTimeAttribute.REFRESHED}[^>]*>[^<]*</time>".encode()
-)
-"""
-The element a plan page shows the build time in.
-"""
-
-
 @dataclass(frozen=True)
 class SiteDigest:
     """
@@ -118,6 +117,24 @@ class SiteDigest:
     """
     The root directory the site was built into.
     """
+
+    @classproperty
+    def build_time_pattern(cls) -> re.Pattern[bytes]:
+        """
+        The element a plan page shows the build time in.
+
+        >>> pattern = SiteDigest.build_time_pattern
+        >>> pattern.search(b'<p><time data-refreshed-at="1">12:00</time></p>')[0]
+        b'<time data-refreshed-at="1">12:00</time>'
+        """
+        any_other_attributes = CharacterSet.any_except(">").zero_or_more()
+        return MarkupElement(
+            "time",
+            CharacterSet.any_except("<").zero_or_more(),
+            attributes=RegularExpression.sequence(
+                any_other_attributes, PlanTimeAttribute.REFRESHED, any_other_attributes
+            ),
+        ).compiled_for_bytes()
 
     @property
     def value(self) -> str:
@@ -140,7 +157,7 @@ class SiteDigest:
         :return: Its content without the build time, so a build that changed nothing
             else has the published digest and skips the deploy.
         """
-        return BUILD_TIME_PATTERN.sub(b"", path.read_bytes())
+        return SiteDigest.build_time_pattern.sub(b"", path.read_bytes())
 
     def write(self) -> None:
         """

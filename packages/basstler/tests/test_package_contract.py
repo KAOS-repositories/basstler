@@ -17,11 +17,15 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
 
+from basstler.github.basstler_project import BasstlerWorkflowInput
 from basstler.bash import Bash
+from basstler.class_property import classproperty
+from basstler.document_references import PACKAGE_NAME
 from basstler.environment import GitBashVariable
 from basstler.package_map import Workspace
 from basstler.locations import (
@@ -29,11 +33,22 @@ from basstler.locations import (
     PackageLocation,
     PluginLocation,
     ProjectLocation,
+    WorkflowLocation,
 )
 from basstler.package_layout import (
     PackageModule,
     command_line_entry_points,
     package_modules,
+)
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    DoubleQuoted,
+    RegularExpression,
+    Separator,
+    Wildcard,
 )
 from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import FetchedBranchReference
@@ -43,6 +58,7 @@ from basstler_testing.constants.environment import (
     SearchPathVariable,
 )
 from basstler_testing.constants.paths import DatasetLocation, RepositoryLocation
+from basstler_testing.constants.patterns import DocumentGroup
 from basstler_testing.plugin_manifest import PluginManifestKey
 from basstler_testing.project_declaration import HatchVersionSource, ProjectDeclaration
 from basstler_testing.scratch_repository import ScratchRepository
@@ -103,16 +119,126 @@ def run_as_a_caller(*arguments: str) -> subprocess.CompletedProcess[str]:
     ).run(*arguments)
 
 
-MODULE_VARIABLE = re.compile(r'^([A-Z_]+)="(basstler(?:\.[a-z_]+)+)"', re.MULTILINE)
-"""
-One ``NAME="basstler.module"`` assignment in the shell configuration.
-"""
+class ContractGroup(StrEnum):
+    """
+    The parts the contract's patterns read back.
+    """
 
-DEPENDENCY_INSTALL = re.compile(r"(pip install|uv pip install|uv sync)[^\n]*basstler")
-"""
-A step that installs this package, and with it the dependencies its metadata declares,
-however the caller spells the directory.
-"""
+    MODULE_PATH = "module_path"
+    """
+    The dotted path of a module of the package.
+    """
+
+
+class InstallCommand(StrEnum):
+    """
+    The commands that install a package and the dependencies its metadata declares.
+    """
+
+    PIP = "pip install"
+    """
+    pip's own install.
+    """
+
+    UV_PIP = "uv pip install"
+    """
+    uv's pip-compatible install.
+    """
+
+    UV_SYNC = "uv sync"
+    """
+    uv's install of a project's environment.
+    """
+
+
+class ContractPattern:
+    """
+    The patterns that read the shell configuration, the workflows and the skill documents.
+    """
+
+    @classproperty
+    def module_variable(cls) -> re.Pattern[str]:
+        """
+        One assignment of a module's path in the shell configuration, as
+        ``MODULE="basstler.plan_manifest_tools"``.
+        """
+        lowercase_name = CharacterSet.any_of(CharacterRange.ASCII_LOWERCASE_LETTER, "_")
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            CharacterSet.any_of(CharacterRange.ASCII_UPPERCASE_LETTER, "_")
+            .one_or_more()
+            .captured_as(DocumentGroup.VARIABLE),
+            "=",
+            DoubleQuoted(
+                RegularExpression.sequence(
+                    PACKAGE_NAME,
+                    RegularExpression.sequence(
+                        ".", lowercase_name.one_or_more()
+                    ).one_or_more(),
+                ).captured_as(ContractGroup.MODULE_PATH)
+            ),
+        ).compiled()
+
+    @classproperty
+    def dependency_install(cls) -> re.Pattern[str]:
+        """
+        A step that installs this package, and with it the dependencies its metadata
+        declares, however the caller spells the directory, as ``uv sync --package``.
+        """
+        return RegularExpression.sequence(
+            RegularExpression.either(*InstallCommand),
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            PACKAGE_NAME,
+        ).compiled()
+
+    @classproperty
+    def workspace_sync(cls) -> re.Pattern[str]:
+        """
+        A step that installs this package from a clone of the workspace, as
+        ``uv sync --package basstler``.
+        """
+        return RegularExpression.sequence(
+            InstallCommand.UV_SYNC,
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.zero_or_more(),
+            "--package",
+            Separator.WHITESPACE,
+            PACKAGE_NAME,
+        ).compiled()
+
+    @classproperty
+    def basstler_reference(cls) -> re.Pattern[str]:
+        """
+        The ``@<branch or tag>`` the caller uses basstler's workflow at, or the
+        ``basstler_branch_or_tag: <branch or tag>`` it installs the package at.
+        """
+        return RegularExpression.sequence(
+            RegularExpression.either(
+                f"{PACKAGE_NAME}/{WorkflowLocation.UPSTREAM_REVIEWS.as_posix()}@",
+                f"{BasstlerWorkflowInput.BRANCH_OR_TAG}: ",
+            ),
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+                BasstlerWorkflowInput.BRANCH_OR_TAG
+            ),
+        ).compiled()
+
+    @classproperty
+    def shell_variable_reference(cls) -> re.Pattern[str]:
+        """
+        A ``${NAME}`` reference to an upper-case shell variable, as a skill document
+        writes one.
+        """
+        return RegularExpression.sequence(
+            "${",
+            RegularExpression.sequence(
+                CharacterRange.ASCII_UPPERCASE_LETTER,
+                CharacterSet.any_of(
+                    CharacterRange.ASCII_UPPERCASE_LETTER,
+                    CharacterRange.ASCII_DIGIT,
+                    "_",
+                ).zero_or_more(),
+            ).captured_as(DocumentGroup.VARIABLE),
+            "}",
+        ).compiled()
 
 
 def invocation_of(module: PackageModule) -> re.Pattern[str]:
@@ -124,17 +250,28 @@ def invocation_of(module: PackageModule) -> re.Pattern[str]:
     :param module: The module to invoke.
     :return: A pattern matching any of those invocations.
     """
-    assignments = MODULE_VARIABLE.findall(
+    assignments = ContractPattern.module_variable.findall(
         SHELL_CONFIGURATION.read_text(encoding="utf-8")
     )
     variables = [
-        rf"\$\{{?{variable}\b"
+        RegularExpression.sequence(
+            "$",
+            RegularExpression.literal("{").optional(),
+            variable,
+            Anchor.WORD_BOUNDARY,
+        )
         for variable, path in assignments
         if path == module.command_path
     ]
-    return re.compile(
-        "|".join([rf"-m\s+{re.escape(module.command_path)}(?![\w.])", *variables])
+    module_run = RegularExpression.sequence(
+        "-m",
+        Separator.WHITESPACE.one_or_more(),
+        module.command_path,
+        RegularExpression.negative_lookahead(
+            CharacterSet.any_of(CharacterClass.WORD_CHARACTER, ".")
+        ),
     )
+    return RegularExpression.either(module_run, *variables).compiled()
 
 
 def installs_the_dependencies(caller_source: str) -> bool:
@@ -142,7 +279,7 @@ def installs_the_dependencies(caller_source: str) -> bool:
     :param caller_source: A caller's own file.
     :return: Whether it installs this package's dependencies before running anything.
     """
-    return DEPENDENCY_INSTALL.search(caller_source) is not None
+    return ContractPattern.dependency_install.search(caller_source) is not None
 
 
 # %% a caller imports the checkout's own source
@@ -288,12 +425,6 @@ def test_every_workflow_that_runs_a_module_installs_the_dependencies_first():
     ] == []
 
 
-WORKSPACE_SYNC = re.compile(r"uv sync[^\n]*--package basstler")
-"""
-A step that installs this package from a clone of the workspace.
-"""
-
-
 def test_every_workflow_that_installs_the_package_syncs_it_from_the_workspace():
     """
     The repository root is a virtual workspace with no package of its own, and the
@@ -302,14 +433,18 @@ def test_every_workflow_that_installs_the_package_syncs_it_from_the_workspace():
     installing = [
         workflow_path
         for workflow_path in sorted(WORKFLOWS_DIRECTORY.glob("*.yml"))
-        if DEPENDENCY_INSTALL.search(workflow_path.read_text(encoding="utf-8"))
+        if ContractPattern.dependency_install.search(
+            workflow_path.read_text(encoding="utf-8")
+        )
     ]
 
     assert installing != []
     assert [
         workflow_path.name
         for workflow_path in installing
-        if not WORKSPACE_SYNC.search(workflow_path.read_text(encoding="utf-8"))
+        if not ContractPattern.workspace_sync.search(
+            workflow_path.read_text(encoding="utf-8")
+        )
     ] == []
 
 
@@ -325,15 +460,6 @@ def test_the_windows_workflow_accepts_a_shard_holding_none_of_a_distributions_te
     assert f"-ne {int(pytest.ExitCode.NO_TESTS_COLLECTED)}" in workflow_text
 
 
-BASSTLER_REFERENCE = re.compile(
-    r"(?:basstler/\.github/workflows/upstream-reviews\.yml@|basstler_branch_or_tag: )(\S+)"
-)
-"""
-The ``@<branch or tag>`` the caller uses basstler's workflow at, or the
-``basstler_branch_or_tag: <branch or tag>`` it installs the package at.
-"""
-
-
 def test_the_example_caller_uses_one_branch_or_tag_throughout():
     """
     A project copies the example caller as it stands, so the workflow it uses and the
@@ -341,7 +467,9 @@ def test_the_example_caller_uses_one_branch_or_tag_throughout():
     """
     caller = RepositoryLocation.ROOT / "docs" / "examples" / "upstream-reviews.yml"
 
-    references = BASSTLER_REFERENCE.findall(caller.read_text(encoding="utf-8"))
+    references = ContractPattern.basstler_reference.findall(
+        caller.read_text(encoding="utf-8")
+    )
 
     assert len(references) == 2
     assert len(set(references)) == 1
@@ -441,12 +569,6 @@ def test_git_bash_passes_a_notes_branch_argument_to_git_as_written(
 # %% what the skill documents name
 
 
-SHELL_VARIABLE_REFERENCE = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
-"""
-A ``${NAME}`` reference to an upper-case shell variable, as a skill document writes one.
-"""
-
-
 def variables_the_configuration_defines() -> frozenset[str]:
     """
     :return: Every variable set once the shell configuration is sourced, in an environment
@@ -480,7 +602,7 @@ def test_every_variable_a_skill_document_names_is_defined():
     named = {
         variable_name
         for document in RepositoryLocation.PLUGIN.value.rglob("*.md")
-        for variable_name in SHELL_VARIABLE_REFERENCE.findall(
+        for variable_name in ContractPattern.shell_variable_reference.findall(
             document.read_text(encoding="utf-8")
         )
     }

@@ -8,6 +8,7 @@ import base64
 import binascii
 import json
 import re
+from enum import StrEnum
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +20,12 @@ from basstler.github.repository import Repository
 from basstler.github.rest_models import RestResponse
 from basstler.json_model import JSONModel
 from basstler.locations import ClaudeCodeVariable
+from basstler.regular_expression import (
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 from basstler.upstream_reviews.clients import JobLogReader
 from basstler.upstream_reviews.exceptions import (
     HelperOutputIncomplete,
@@ -212,6 +219,27 @@ class HelperRecording(JSONModel):
         )
 
 
+class ChunkGroup(StrEnum):
+    """
+    The parts of a chunk's line read back from its match.
+    """
+
+    INDEX = "index"
+    """
+    The chunk's position.
+    """
+
+    COUNT = "count"
+    """
+    How many chunks there are.
+    """
+
+    TEXT = "text"
+    """
+    The chunk's share of the output.
+    """
+
+
 @dataclass(frozen=True)
 class HelperChunk:
     """
@@ -250,13 +278,23 @@ class HelperChunk:
     @classmethod
     def pattern(cls, request_identifier: str) -> re.Pattern[str]:
         """
+        >>> pattern = HelperChunk.pattern("7")
+        >>> pattern.search("> BASSTLER-UPSTREAM-REVIEWS-7-1-3:QUJD")[ChunkGroup.TEXT]
+        'QUJD'
+
         :param request_identifier: The request's identifier.
         :return: What one chunk looks like, wherever it is quoted.
         """
-        return re.compile(
-            rf"{re.escape(cls.marker(request_identifier))}-(?P<index>\d+)-(?P<count>\d+)"
-            r":(?P<text>[A-Za-z0-9+/=]+)"
-        )
+        return RegularExpression.sequence(
+            f"{cls.marker(request_identifier)}-",
+            CharacterClass.DIGIT.one_or_more().captured_as(ChunkGroup.INDEX),
+            "-",
+            CharacterClass.DIGIT.one_or_more().captured_as(ChunkGroup.COUNT),
+            ":",
+            CharacterSet.any_of(CharacterRange.ASCII_ALPHANUMERIC, "+/=")
+            .one_or_more()
+            .captured_as(ChunkGroup.TEXT),
+        ).compiled()
 
     @classmethod
     def found_in(cls, request_identifier: str, text: str) -> list[HelperChunk]:
@@ -266,7 +304,11 @@ class HelperChunk:
         :return: Every chunk quoted there, repeats included.
         """
         return [
-            cls(int(match["index"]), int(match["count"]), match["text"])
+            cls(
+                int(match[ChunkGroup.INDEX]),
+                int(match[ChunkGroup.COUNT]),
+                match[ChunkGroup.TEXT],
+            )
             for match in cls.pattern(request_identifier).finditer(text)
         ]
 

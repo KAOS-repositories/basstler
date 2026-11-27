@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from basstler.code_rules.prose_length import ProseLengthChecker, SourceProse
 
+from basstler.text_file import TextFile
+
 from basstler_testing.constants.paths import ProseSnippet
 
 # %% measuring
@@ -43,6 +45,17 @@ def test_field_lists_and_literal_blocks_are_not_prose():
     ).blocks
 
     assert block.prose_lines == summary_and_literal_block_introduction_lines
+
+
+def test_examples_are_not_prose():
+    """
+    Only the summary counts: each example line and its output line are left out.
+    """
+    summary_lines = 1
+
+    (block,) = SourceProse(TextFile(ProseSnippet.DOCSTRING_EXAMPLES).read()).blocks
+
+    assert block.prose_lines == summary_lines
 
 
 def test_an_attribute_docstring_is_measured():

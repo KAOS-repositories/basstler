@@ -783,6 +783,43 @@ class AddressSnippet(PathEnumeration):
     """
 
 
+class PatternSnippet(PathEnumeration):
+    """
+    Python sources the pattern check reads.
+    """
+
+    DIRECTORY = DatasetLocation.DIRECTORY / "regular-expressions"
+    """
+    The directory holding them.
+    """
+
+    HAND_WRITTEN = DIRECTORY / "hand-written-patterns.py"
+    """
+    A pattern compiled from text, and one passed as text to a function imported by name.
+    """
+
+    FROM_NAMED_PARTS = DIRECTORY / "patterns-from-named-parts.py"
+    """
+    A pattern built from a named part, annotated with the pattern type of ``re``.
+    """
+
+    ALIASED_MODULE = DIRECTORY / "aliased-module.py"
+    """
+    A pattern text passed to a function of ``re``, through the module's other name.
+    """
+
+    ALIASED_FUNCTION = DIRECTORY / "function-imported-under-another-name.py"
+    """
+    A pattern compiled by a function imported from ``re`` under another name.
+    """
+
+    SAME_NAMES = DIRECTORY / "functions-of-the-same-names.py"
+    """
+    Functions named as the ones of ``re``, and the builtin ``compile``, none of which
+    take a pattern.
+    """
+
+
 class ProseSnippet(PathEnumeration):
     """
     Python sources the prose length check measures.
@@ -801,6 +838,11 @@ class ProseSnippet(PathEnumeration):
     FIELDS_AND_LITERAL_BLOCKS = DIRECTORY / "fields-and-literal-blocks.py"
     """
     A function docstring of two prose lines, a literal block and a field list.
+    """
+
+    DOCSTRING_EXAMPLES = DIRECTORY / "docstring-examples.py"
+    """
+    A module whose docstring holds a summary and two examples, one with output.
     """
 
     OVERLONG_ATTRIBUTE_DOCSTRING = DIRECTORY / "overlong-attribute-docstring.py"

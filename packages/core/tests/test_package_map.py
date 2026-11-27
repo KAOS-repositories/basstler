@@ -347,3 +347,33 @@ def test_a_module_claimed_twice_is_refused():
         )
 
     assert raised.value.inconsistency is PackageMapInconsistency.MODULE_CLAIMED_TWICE
+
+
+# %% the name a requirement starts with
+
+
+@pytest.mark.parametrize(
+    ("specifier", "name"),
+    [
+        ("pydantic>=2", "pydantic"),
+        ("basstler-core", "basstler-core"),
+        ("ruamel.yaml==0.18", "ruamel.yaml"),
+        ("Jinja2", "Jinja2"),
+        ("typing_extensions>=4.9 ; python_version<'3.13'", "typing_extensions"),
+    ],
+)
+def test_a_requirement_specifier_starts_with_its_distribution_name(
+    specifier: str, name: str
+):
+    """
+    Each specifier is listed beside the name read off its start.
+    """
+    assert REQUIREMENT_NAME.match(specifier).group() == name
+
+
+@pytest.mark.parametrize("specifier", ["-pydantic", "_name", ">=2", ""])
+def test_a_specifier_not_starting_with_a_letter_or_digit_has_no_name(specifier: str):
+    """
+    A distribution name starts with a letter or a digit.
+    """
+    assert REQUIREMENT_NAME.match(specifier) is None

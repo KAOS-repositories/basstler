@@ -5,8 +5,10 @@ rendering (delegated to the `markdown` library, plus a heading-level shift on to
 
 from __future__ import annotations
 
+import pytest
 
 from basstler.render_common import (
+    HeadingShift,
     create_template_environment,
     render_markdown_to_html,
     sanitize_http_url,
@@ -141,3 +143,29 @@ def test_sanitize_http_url_rejects_a_data_url():
 
 def test_sanitize_http_url_passes_through_none():
     assert sanitize_http_url(None) is None
+
+
+# %% the heading tag pattern
+
+
+@pytest.mark.parametrize(
+    ("text", "tag"),
+    [
+        ("<h1>Title</h1>", "<h1>"),
+        ("text </h6>", "</h6>"),
+        ("<h3 id", None),
+        ("<h7>", None),
+        ("<h0>", None),
+        ("<hr>", None),
+        ("<p>", None),
+    ],
+)
+def test_a_heading_tag_from_one_to_six_is_found_and_nothing_else(
+    text: str, tag: str | None
+):
+    """
+    Each text is listed beside the heading tag found in it.
+    """
+    found = HeadingShift.tag_pattern().search(text)
+
+    assert (found.group() if found else None) == tag

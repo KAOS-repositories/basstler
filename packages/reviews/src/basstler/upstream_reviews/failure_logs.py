@@ -16,6 +16,13 @@ from basstler.github.pull_request_models import (
 )
 from basstler.github.repository import Repository
 from basstler.github.states import CheckOutcome
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    CharacterRange,
+    CharacterSet,
+    RegularExpression,
+)
 from basstler.upstream_reviews.clients import (
     JobLogReader,
 )
@@ -28,14 +35,28 @@ class LogFormatting(Enum):
     What gets written around a log line's text that does not survive being quoted.
     """
 
-    TERMINAL_ESCAPE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
-    """
+    TERMINAL_ESCAPE = RegularExpression.sequence(
+        "\x1b[",
+        CharacterSet.any_of(CharacterRange.ASCII_DIGIT, ";").zero_or_more(),
+        CharacterRange.ASCII_LETTER,
+    ).compiled()
+    r"""
     The colour a test runner writes around its own output.
+
+    >>> LogFormatting.TERMINAL_ESCAPE.value.findall("\x1b[31;1mFAILED\x1b[0m")
+    ['\x1b[31;1m', '\x1b[0m']
     """
 
-    TIMESTAMP = re.compile(r"^\S+Z ")
+    TIMESTAMP = RegularExpression.sequence(
+        Anchor.LINE_START,
+        CharacterClass.NON_WHITESPACE.one_or_more(),
+        "Z ",
+    ).compiled()
     """
     The timestamp a runner writes in front of every line it records.
+
+    >>> LogFormatting.TIMESTAMP.value.findall("2026-11-23T00:11:26.1Z FAILED")
+    ['2026-11-23T00:11:26.1Z ']
     """
 
     @classmethod
@@ -88,10 +109,19 @@ class FailedJob:
     def link_pattern(cls) -> re.Pattern[str]:
         """
         Where a check's own output link carries the job that produced it.
+
+        >>> pattern = FailedJob.link_pattern
+        >>> link = pattern.search("https://github.com/o/r/actions/runs/123/job/456")
+        >>> link[FailedJob.identifier_group]
+        '456'
         """
-        return re.compile(
-            rf"/actions/runs/[0-9]+/job/(?P<{cls.identifier_group}>[0-9]+)"
-        )
+        digits = CharacterSet.any_of(CharacterRange.ASCII_DIGIT).one_or_more()
+        return RegularExpression.sequence(
+            "/actions/runs/",
+            digits,
+            "/job/",
+            digits.captured_as(cls.identifier_group),
+        ).compiled()
 
     @classmethod
     def behind(cls, result: CheckResult) -> FailedJob | None:

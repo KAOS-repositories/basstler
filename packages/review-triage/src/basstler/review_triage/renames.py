@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import TYPE_CHECKING
 
+from basstler.regular_expression import Anchor, RegularExpression
+
 if TYPE_CHECKING:
     from basstler.review_triage.rename_sources import RenameSource
 
@@ -104,7 +106,11 @@ class RenameMap:
         if not self.renames:
             return None
         alternatives = sorted(self.replacements, key=len, reverse=True)
-        return re.compile(r"\b(?:" + "|".join(map(re.escape, alternatives)) + r")\b")
+        return RegularExpression.sequence(
+            Anchor.WORD_BOUNDARY,
+            RegularExpression.either(*alternatives),
+            Anchor.WORD_BOUNDARY,
+        ).compiled()
 
     def renamed_identifier(self, identifier: str) -> str:
         """

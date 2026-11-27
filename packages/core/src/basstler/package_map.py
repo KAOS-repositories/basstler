@@ -5,7 +5,6 @@ each one ships.
 
 from __future__ import annotations
 
-import re
 import tomllib
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -25,6 +24,7 @@ from basstler.exceptions import (
 )
 from basstler.json_model import ValidatedJSONModel
 from basstler.locations import NamespacePackage, WorkspaceLocation
+from basstler.regular_expression import CharacterRange, CharacterSet, RegularExpression
 
 # %% layers and distributions
 
@@ -356,9 +356,18 @@ class PackageMap(Mapping[Distribution, DistributionDeclaration]):
 
 # %% the distributions' metadata
 
-REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+REQUIREMENT_NAME = RegularExpression.sequence(
+    CharacterRange.ASCII_ALPHANUMERIC,
+    CharacterSet.any_of(
+        CharacterRange.ASCII_ALPHANUMERIC,
+        "._-",
+    ).zero_or_more(),
+).compiled()
 """
 The distribution name a requirement specifier starts with.
+
+>>> REQUIREMENT_NAME.match("pydantic>=2")[0]
+'pydantic'
 """
 
 

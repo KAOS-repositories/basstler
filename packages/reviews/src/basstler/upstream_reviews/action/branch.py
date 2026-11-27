@@ -17,8 +17,14 @@ from basstler.class_property import classproperty
 from basstler.git.branch import Branch
 from basstler.git.commands import CommitTrailer, GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    RegularExpression,
+    Separator,
+)
 from basstler.render_common import create_template_environment
-from basstler.github.basstler_project import BasstlerProject
+from basstler.github.basstler_project import BasstlerProject, BasstlerWorkflowInput
 
 # %% the Action branch's names
 
@@ -149,12 +155,25 @@ class ActionInstallation:
 
     @classproperty
     def branch_or_tag_line(cls) -> re.Pattern[str]:
-        """
+        r"""
         The line of an installed workflow naming the basstler branch or tag it runs.
+
+        >>> pattern = ActionInstallation.branch_or_tag_line
+        >>> line = pattern.search("      basstler_branch_or_tag: v4.2.2\n")
+        >>> line[BasstlerWorkflowInput.BRANCH_OR_TAG]
+        'v4.2.2'
         """
-        return re.compile(
-            r"^\s*basstler_branch_or_tag:\s*(?P<branch_or_tag>\S+)\s*$", re.MULTILINE
-        )
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            Separator.WHITESPACE.zero_or_more(),
+            f"{BasstlerWorkflowInput.BRANCH_OR_TAG}:",
+            Separator.WHITESPACE.zero_or_more(),
+            CharacterClass.NON_WHITESPACE.one_or_more().captured_as(
+                BasstlerWorkflowInput.BRANCH_OR_TAG
+            ),
+            Separator.WHITESPACE.zero_or_more(),
+            Anchor.LINE_END,
+        ).compiled()
 
     @property
     def workflow(self) -> str:
@@ -192,7 +211,7 @@ class ActionInstallation:
         if workflow is None:
             return InstallationState.MISSING, None
         match = self.branch_or_tag_line.search(workflow)
-        installed = match["branch_or_tag"] if match else None
+        installed = match[BasstlerWorkflowInput.BRANCH_OR_TAG] if match else None
         if workflow == self.workflow:
             return InstallationState.CURRENT, installed
         return InstallationState.STALE, installed

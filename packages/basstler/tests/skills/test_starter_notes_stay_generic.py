@@ -10,12 +10,23 @@ later is covered without this file being edited.
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 import re
 
 import pytest
 
+from basstler.class_property import classproperty
 from basstler.document_references import PACKAGE_NAME, CitedNames
+from basstler.slash_command import SlashCommand
 from basstler.locations import PluginLocation
+from basstler.regular_expression import (
+    Anchor,
+    CharacterClass,
+    CharacterSet,
+    RegularExpression,
+    Wildcard,
+)
 
 from basstler_testing.constants.paths import (
     PersonalNotesPath,
@@ -39,10 +50,44 @@ PULL_REQUEST_RULES = (
 The pull-request rules as shipped, which hold only while a skill linking them runs.
 """
 
-SECTION_HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
-"""
-Matches a second-level markdown heading, capturing its title.
-"""
+
+class SectionGroup(StrEnum):
+    """
+    The part of a section heading read back from its match.
+    """
+
+    TITLE = "title"
+    """
+    The heading's text.
+    """
+
+
+class SectionHeading:
+    """
+    How a document's second-level sections are headed.
+    """
+
+    @classproperty
+    def prefix(cls) -> str:
+        """
+        What a second-level Markdown heading starts with, as ``## ``.
+        """
+        return "#" * 2 + " "
+
+    @classproperty
+    def pattern(cls) -> re.Pattern[str]:
+        """
+        A second-level Markdown heading, capturing its title, as ``## Notes``.
+        """
+        return RegularExpression.sequence(
+            Anchor.LINE_START,
+            cls.prefix,
+            Wildcard.ANY_CHARACTER_EXCEPT_LINE_BREAK.one_or_more().captured_as(
+                SectionGroup.TITLE
+            ),
+            Anchor.LINE_END,
+        ).compiled()
+
 
 HOOK_SCRIPT_NAMES = sorted(
     script.name for script in RepositoryLocation.HOOKS.glob("*.sh")
@@ -67,9 +112,17 @@ def test_the_starter_notes_name_no_script_of_the_plugin():
 
 @pytest.mark.parametrize("skill_name", SKILL_NAMES)
 def test_the_starter_notes_invoke_no_skill_of_the_plugin(skill_name: str):
-    assert not re.search(
-        rf"(?<![\w-])/?{re.escape(skill_name)}(?![\w-])", STARTER_NOTES
+    """
+    A skill's name appears neither as a slash command nor bare.
+    """
+    name_boundary = CharacterSet.any_of(CharacterClass.WORD_CHARACTER, "-")
+    skill_mention = RegularExpression.sequence(
+        RegularExpression.negative_lookbehind(name_boundary),
+        RegularExpression.literal(SlashCommand.PREFIX).optional(),
+        skill_name,
+        RegularExpression.negative_lookahead(name_boundary),
     )
+    assert skill_mention.compiled().search(STARTER_NOTES) is None
 
 
 def test_the_starter_notes_cite_no_module_of_the_package():
@@ -109,7 +162,7 @@ def test_the_starter_notes_carry_no_section_of_the_pull_request_rules():
     sessions that run no skill acting on pull requests.
     """
     assert (
-        set(SECTION_HEADING.findall(STARTER_NOTES))
-        & set(SECTION_HEADING.findall(PULL_REQUEST_RULES))
+        set(SectionHeading.pattern.findall(STARTER_NOTES))
+        & set(SectionHeading.pattern.findall(PULL_REQUEST_RULES))
         == set()
     )

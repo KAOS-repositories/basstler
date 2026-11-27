@@ -96,6 +96,11 @@ class ShippedPath(PathEnumeration):
     address within a repository.
     """
 
+    REGULAR_EXPRESSION_MODULE = Path("regular_expression.py")
+    """
+    The module that builds every regular expression from named parts.
+    """
+
     PULL_REQUEST_FILES = Path("review_triage") / "pull_request_files.graphql"
     """
     The GraphQL query reading one page of the files GitHub lists in a pull request,
@@ -238,6 +243,13 @@ class PackageLocation(PathEnumeration):
     )
     """
     :attr:`ShippedPath.GITHUB_REPOSITORY_MODULE`, where the github distribution ships it.
+    """
+
+    REGULAR_EXPRESSION_MODULE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.REGULAR_EXPRESSION_MODULE
+    )
+    """
+    :attr:`ShippedPath.REGULAR_EXPRESSION_MODULE`, where the core distribution ships it.
     """
 
 
@@ -805,6 +817,11 @@ class WorkflowLocation(PathEnumeration):
     """
     The workflow on a notes repository's default branch that starts :attr:`PLAN_SITE`
     whenever a pull request merges.
+    """
+
+    UPSTREAM_REVIEWS = DIRECTORY / "upstream-reviews.yml"
+    """
+    basstler's reusable workflow a project calls to read its upstream's reviews.
     """
 
     REVIEW_TRIAGE_MARK_VIEWED = DIRECTORY / "review-triage-mark-viewed.yml"

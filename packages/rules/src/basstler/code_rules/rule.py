@@ -7,7 +7,6 @@ light core is released, with :attr:`AgentRule.checker` added.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -15,6 +14,7 @@ from pathlib import PurePosixPath
 from types import ModuleType
 from typing import Any
 
+from basstler.class_name import ClassNameWords
 from basstler.class_property import classproperty
 from basstler.code_rules.checker import CodeRuleChecker
 
@@ -100,10 +100,11 @@ class Section(AgentRule, Enum):
     def title(cls) -> str:
         """
         The text of the section's heading: the words of the topic in sentence case,
-        keeping acronyms such as ``CI`` in capitals.
+        keeping acronyms such as ``CI`` in capitals, as ``CI pipeline`` for
+        ``CIPipelineRules``.
         """
-        first_word, *other_words = re.findall(
-            r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*", cls.__name__.removesuffix("Rules")
+        first_word, *other_words = ClassNameWords.split(
+            cls.__name__.removesuffix("Rules")
         )
         return " ".join(
             [

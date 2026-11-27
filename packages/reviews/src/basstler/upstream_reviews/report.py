@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from basstler.markdown_code_block import CodeBlockLanguage
 from basstler.github.pull_request_models import (
     UpstreamPullRequestSnapshot,
 )
@@ -115,9 +116,9 @@ class UpstreamPullRequestReport:
             return []
         lines = [ReportText.FAILURE_LOGS_HEADING, ""]
         for failure in self.failure_logs:
-            lines.extend([f"### {failure.check_name}", "", "```"])
+            lines.extend([f"### {failure.check_name}", "", CodeBlockLanguage.fence])
             lines.extend(failure.lines)
-            lines.extend(["```", ""])
+            lines.extend([CodeBlockLanguage.fence, ""])
         return lines
 
     def _render_reviews(self) -> list[str]:

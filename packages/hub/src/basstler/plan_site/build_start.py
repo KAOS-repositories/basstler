@@ -12,11 +12,11 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
 from cyclopts import App
 
+from basstler.markdown_code_block import CodeBlockLanguage
 from basstler.git.remote import Remote
 from basstler.exit_codes import StackExitCode
 from basstler.git.commands import GitCommandRunner
@@ -49,22 +49,6 @@ BUILD_START_COMMAND = f'"${{{BasstlerVariable.PYTHON}}}" -m {__spec__.name}'
 """
 The command line that starts the build again, once this session can.
 """
-
-
-class CodeFence(StrEnum):
-    """
-    The Markdown lines a command is set between, so it shows as a copyable block.
-    """
-
-    BASH = "```bash"
-    """
-    Opens a block of bash.
-    """
-
-    CLOSE = "```"
-    """
-    Closes the block.
-    """
 
 
 @dataclass(frozen=True)
@@ -128,9 +112,7 @@ class SiteAccess:
                     f"Log gh in with an account that can run workflows in "
                     f"{repository.full_name}, then run {self.retry_command}:",
                     "",
-                    CodeFence.BASH,
-                    GitHubCommand.LOG_IN,
-                    CodeFence.CLOSE,
+                    CodeBlockLanguage.BASH.fenced(GitHubCommand.LOG_IN),
                 ]
             )
         return RepositoryAttachment(

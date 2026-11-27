@@ -141,20 +141,6 @@ items:
     Pure refactor, no release label.
 
     '
-- id: split-shared-modules
-  title: Give each distribution its own locations, environment and exceptions
-  track: package-split
-  branch: claude/keen-ritchie-hqevxv
-  pull_request_number: 297
-  session: https://claude.ai/code/session_018wfiv554FAYoaJU67UauCW
-  depends_on: []
-  status: in progress
-  recommended_model: opus
-  notes: 'Split from break-remaining-cycles at its kickoff. Move every name in locations,
-    environment and exceptions that one distribution alone uses into that distribution''s
-    own module; the rule becomes "once, in its own package''s locations". Pure moves.
-
-    '
 - id: workflow-model
   title: One validated model of a GitHub Actions workflow
   branch: null
@@ -191,22 +177,21 @@ items:
     from one index with a table of contents on every page. The existing docs/ pages (SETUP,
     plan-handover, review-triage, stack) become pages of it. Asked in review of PR 290. Docs
     only, so a patch release.
-
 - id: regular-expression-distribution
-  title: "basstler-regular-expression: the pattern builder installable on its own"
+  title: 'basstler-regular-expression: the pattern builder installable on its own'
   branch: null
   track: package-split
-  notes: >
-    After KAOS-repositories/basstler#260 lands. Move basstler.regular_expression and
-    basstler.markdown_code_block from basstler-core into packages/regular-expression
-    (basstler-regular-expression), which core depends on, with their doctests and tests. Add the
-    workspace member, uv.lock entry, sibling-pin hook and package_map layer; move
-    REGULAR_EXPRESSION_MODULE's shipped path so HandWrittenPatternChecker's exemption holds. Ask:
-    keep the name basstler.regular_expression or a standalone one. release:minor.
+  notes: 'After KAOS-repositories/basstler#260 lands. Move basstler.regular_expression and
+    basstler.markdown_code_block from basstler-core into packages/regular-expression (basstler-regular-expression),
+    which core depends on, with their doctests and tests. Add the workspace member, uv.lock
+    entry, sibling-pin hook and package_map layer; move REGULAR_EXPRESSION_MODULE''s shipped
+    path so HandWrittenPatternChecker''s exemption holds. Ask: keep the name basstler.regular_expression
+    or a standalone one. release:minor.
+
+    '
   depends_on: []
   status: not started
   recommended_model: sonnet
-
 - id: notes-unused-stack-dependency
   title: Drop basstler-notes' unused dependency on basstler-stack
   track: package-split
@@ -215,5 +200,6 @@ items:
   depends_on: []
   status: in progress
   recommended_model: haiku
-  notes: '#298 at 57339bfc, off main, ready for review: nothing in packages/notes imports basstler.stack.'
-landed_item_count: 8
+  notes: '#298 at 57339bfc, off main, ready for review: nothing in packages/notes imports
+    basstler.stack.'
+landed_item_count: 9

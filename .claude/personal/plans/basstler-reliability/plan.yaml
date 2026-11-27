@@ -154,15 +154,4 @@ items:
   depends_on: []
   status: not started
   recommended_model: sonnet
-
-- id: entry-point-approval-wrappers
-  title: Allow a directory change and status report around the entry point
-  track: guards
-  branch: claude/entry-point-approval-status-echo
-  pull_request_number: 260
-  depends_on: []
-  status: in progress
-  recommended_model: sonnet
-  notes: 'Draft #260 at 61fcb02f, off main, labelled needs-resolution: the entry-point hook also allows
-    a leading cd and a trailing echo of $?, so the setup gate is approved.'
-landed_item_count: 2
+landed_item_count: 3

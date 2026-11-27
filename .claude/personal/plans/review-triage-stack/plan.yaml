@@ -187,6 +187,7 @@ items:
     Draft #326 at 3e0a9df7 on #312, merged into claude/practical-hawking-nf0g3o. Over https the
     triage clone answers git with the GitHub token and never prompts; BASSTLER_GIT_PROTOCOL or gh's
     git_protocol picks an SSH origin. NotesPushRejectedError carries git's output.
-  depends_on: []
+  depends_on:
+  - viewed-checkpoints-in-notes
   status: in progress
   recommended_model: sonnet

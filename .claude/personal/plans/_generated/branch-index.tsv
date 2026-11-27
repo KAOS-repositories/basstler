@@ -48,4 +48,5 @@ review-triage-reviewer-workflow	review-triage-stack
 review-triage-reexported-imports	review-triage-stack
 review-triage-viewed-checkpoints-in-notes	review-triage-stack
 review-triage-pyrefly-receivers	review-triage-stack
+claude/sleepy-goldberg-lcfjhi	review-triage-stack
 fix-sync-never-pushes-to-notes-repository	separate-notes-repository

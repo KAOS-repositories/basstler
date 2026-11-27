@@ -179,8 +179,14 @@ items:
 
 - id: notes-push-credential
   title: "Push the triage's viewed checkpoints with the GitHub credential or over SSH"
-  branch: null
+  branch: claude/sleepy-goldberg-lcfjhi
   track: stack
+  pull_request_number: 326
+  session: https://claude.ai/code/session_018wfiv5XxFcccCrwMdrdp3W
+  notes: >
+    Draft #326 at 3e0a9df7 on #312, merged into claude/practical-hawking-nf0g3o. Over https the
+    triage clone answers git with the GitHub token and never prompts; BASSTLER_GIT_PROTOCOL or gh's
+    git_protocol picks an SSH origin. NotesPushRejectedError carries git's output.
   depends_on: []
   status: in progress
   recommended_model: sonnet

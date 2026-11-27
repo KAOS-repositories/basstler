@@ -1197,11 +1197,13 @@ class PythonSource:
     def definition_span(self, name: str) -> LineSpan:
         """
         :param name: A name a top-level statement of the file defines.
-        :return: The lines of that statement, its decorators included.
+        :return: The lines of that statement, its decorators and, for an assignment,
+            the docstring right below it included.
         """
-        statement = next(
-            statement
-            for statement in self.tree.body
+        body = self.tree.body
+        index, statement = next(
+            (index, statement)
+            for index, statement in enumerate(body)
             if name in self.names_defined_by(statement)
         )
         decorators = (
@@ -1212,7 +1214,14 @@ class PythonSource:
             else []
         )
         first = min([statement.lineno, *(node.lineno for node in decorators)])
-        return LineSpan(first, statement.end_lineno or statement.lineno)
+        last = statement
+        if (
+            isinstance(statement, ast.Assign | ast.AnnAssign)
+            and index + 1 < len(body)
+            and self.is_documentation(body[index + 1])
+        ):
+            last = body[index + 1]
+        return LineSpan(first, last.end_lineno or last.lineno)
 
     @cached_property
     def lines(self) -> tuple[str, ...]:

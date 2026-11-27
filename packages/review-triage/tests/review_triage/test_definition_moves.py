@@ -27,6 +27,7 @@ from .samples import (
     SECTIONED_BOARD,
     DefinitionMoveFromMovedModuleSample,
     DefinitionMoveSample,
+    ModuleSplitSample,
 )
 from basstler.text_file import TextFile
 
@@ -439,3 +440,45 @@ def test_the_files_of_a_definition_moved_under_a_new_name_are_mechanical(
         DefinitionMoveAndRenameSample.HEAD_TREE,
     )
     assert PullRequestTriager().triage(changes).files_needing_review == ()
+
+
+# %% a module split into several
+
+
+@pytest.fixture
+def module_split(scratch_repository: ScratchRepository) -> PullRequestChanges:
+    """
+    :return: The sample splitting a module into several, committed.
+    """
+    return committed_pull_request(
+        scratch_repository, ModuleSplitSample.BASE_TREE, ModuleSplitSample.HEAD_TREE
+    )
+
+
+def test_a_definition_renamed_as_it_moves_out_of_a_split_module_is_found(
+    module_split: PullRequestChanges,
+):
+    """
+    A class moved and renamed is a rename of its dotted path, though only the code of a
+    definition moving with it uses the new name.
+    """
+    detection = DefinitionMoveDetection()
+    assert detection.decisions(module_split) == RenameDecisions(
+        (
+            Rename("package.storage.ROW_LIMIT", "package.limits.ROW_LIMIT", detection),
+            Rename("package.storage.Reader", "package.reading.Reader", detection),
+            MemberRename(
+                "package.storage._SessionKey", "package.sessions.SessionKey", detection
+            ),
+        )
+    )
+
+
+def test_the_modules_a_module_is_split_into_are_mechanical(
+    module_split: PullRequestChanges,
+):
+    """
+    The split module, each module it is split into and the file importing from them are
+    mechanical, an assignment moving with the docstring below it.
+    """
+    assert PullRequestTriager().triage(module_split).files_needing_review == ()

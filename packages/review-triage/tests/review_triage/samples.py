@@ -396,6 +396,20 @@ class DefinitionMoveAndRenameSample(SampleTrees):
         return "definition-move-and-rename"
 
 
+class ModuleSplitSample(SampleTrees):
+    """
+    A pull request splitting a module into several, one definition moving under a new
+    name that the definitions moving with it take on.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "module-split"
+
+
 class DefinitionMovePackageRootSample(SampleTrees):
     """
     A pull request moving a class into a new module of a package moved out of ``src/``,

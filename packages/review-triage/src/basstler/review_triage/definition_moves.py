@@ -40,6 +40,60 @@ from basstler.review_triage.renames import (
     RenameMap,
 )
 
+# %% one definition of a module
+
+
+@dataclass(frozen=True)
+class ModuleDefinition:
+    """
+    A top-level definition one version of a module makes.
+    """
+
+    module: str
+    """
+    The module's dotted path.
+    """
+
+    name: str
+    """
+    The name the module defines it by.
+    """
+
+    module_source: PythonSource
+    """
+    The version of the module making it.
+    """
+
+    @property
+    def dotted_path(self) -> str:
+        """
+        Its dotted path.
+        """
+        return f"{self.module}{DOTTED_NAME_SEPARATOR}{self.name}"
+
+    @property
+    def code(self) -> PythonSource:
+        """
+        Its statement alone.
+        """
+        source = self.module_source
+        return PythonSource.from_text(
+            source.lines_of(source.definition_span(self.name))
+        )
+
+    def sole_namesake(
+        self, gained: dict[str, list[ModuleDefinition]]
+    ) -> ModuleDefinition | None:
+        """
+        :param gained: The definitions modules newly make, by name.
+        :return: The one among them of its name, ``None`` when there is none or more.
+        """
+        namesakes = gained.get(self.name, [])
+        if len(namesakes) != 1:
+            return None
+        return namesakes[0]
+
+
 # %% detection
 
 
@@ -64,24 +118,27 @@ class DefinitionMoveDetection(RenameSource):
             and PythonSource.every_version_parses(change)
         ]
         succession = DefinitionSuccession.from_changes(changes)
-        gained: dict[str, list[str]] = {}
+        gained: dict[str, list[ModuleDefinition]] = {}
         for change in modules:
             for name in self.added_names(change):
-                gained.setdefault(name, []).append(head.module_path(change.path))
+                gained.setdefault(name, []).append(
+                    ModuleDefinition(
+                        head.module_path(change.path),
+                        name,
+                        PythonSource.from_text(change.head_text),
+                    )
+                )
         removed = [
-            (old_module, name)
+            ModuleDefinition(old_module, name, PythonSource.from_text(change.base_text))
             for change in modules
             for old_module, name in self.removed_names(change, base)
             if DOTTED_NAME_SEPARATOR in old_module
         ]
         renames: list[Rename] = [
-            Rename(old, new, self)
-            for old_module, name in removed
-            if len(new_modules := gained.get(name, [])) == 1
-            and succession.is_uncontested(
-                old := f"{old_module}{DOTTED_NAME_SEPARATOR}{name}",
-                new := f"{new_modules[0]}{DOTTED_NAME_SEPARATOR}{name}",
-            )
+            Rename(definition.dotted_path, namesake.dotted_path, self)
+            for definition in removed
+            if (namesake := definition.sole_namesake(gained)) is not None
+            and succession.is_uncontested(definition.dotted_path, namesake.dotted_path)
         ]
         renames.extend(self.renamed_moves(changes, removed, gained, succession))
         return RenameDecisions(tuple(sorted(renames, key=lambda rename: rename.old)))
@@ -89,18 +146,18 @@ class DefinitionMoveDetection(RenameSource):
     def renamed_moves(
         self,
         changes: PullRequestChanges,
-        removed: list[tuple[str, str]],
-        gained: dict[str, list[str]],
+        removed: list[ModuleDefinition],
+        gained: dict[str, list[ModuleDefinition]],
         succession: DefinitionSuccession,
     ) -> Iterator[MemberRename]:
         """
         :param changes: A pull request and the files it changes.
-        :param removed: Each module the head commit keeps with a name it no longer
-            defines.
-        :param gained: The modules newly defining each name.
+        :param removed: The definitions modules the head commit keeps no longer make.
+        :param gained: The definitions modules newly make, by name.
         :param succession: Which added definition carries on each removed one.
         :return: The moves of a definition to another module under a new name, where
-            its successor's code and the diff's substitutions both say so.
+            its successor's code and the substitutions of the diff, or of the code of
+            the definitions moving under their own name, both say so.
         """
         candidates = RenameCandidates()
         for change in changes.files:
@@ -110,17 +167,23 @@ class DefinitionMoveDetection(RenameSource):
                     PythonSource.from_text(change.head_text),
                     candidates,
                 )
+        for definition in removed:
+            namesake = definition.sole_namesake(gained)
+            if namesake is not None:
+                RenameDetection.collect(definition.code, namesake.code, candidates)
         names = candidates.dominant_pairs(
-            frozenset(name for _, name in removed), frozenset(gained)
+            frozenset(definition.name for definition in removed), frozenset(gained)
         )
-        for old_module, name in removed:
-            old = f"{old_module}{DOTTED_NAME_SEPARATOR}{name}"
-            new = succession.successors.get(old)
+        for definition in removed:
+            new = succession.successors.get(definition.dotted_path)
             if new is None:
                 continue
             new_module, _, new_name = new.rpartition(DOTTED_NAME_SEPARATOR)
-            if new_module != old_module and names.get(name) == new_name:
-                yield MemberRename(old, new, self)
+            if (
+                new_module != definition.module
+                and names.get(definition.name) == new_name
+            ):
+                yield MemberRename(definition.dotted_path, new, self)
 
     def moved_definitions(
         self, changes: PullRequestChanges, renames: RenameMap
@@ -339,7 +402,7 @@ class DefinitionMoveComparison(FileJudgment):
             refer to a renamed member renamed.
         """
         renamer = context.member_renamer
-        if renamer is None or definition.old_name == definition.new_name:
+        if renamer is None:
             return definition.source
         renamed = renamer.renamed_code(
             definition.source_text,
@@ -364,7 +427,8 @@ class DefinitionMoveComparison(FileJudgment):
         :param leaving: The definitions moving out of it.
         :param renames: The renames the pull request makes throughout.
         :return: Whether each name only the head version imports is a definition that
-            left it, or is bound as the module an arriving definition left binds it.
+            left it, or is bound as the module an arriving definition left binds it,
+            or names where a definition of that module moved under a new name.
         """
         base_names = {
             binding.bound_name for binding in base_rest.imports(renames).bindings
@@ -381,10 +445,16 @@ class DefinitionMoveComparison(FileJudgment):
             for definition in arriving:
                 source = definition.source
                 allowed |= source.imports(renames).sources_of(name)
-                if name in source.defined_names:
-                    allowed.add(
-                        renames.renamed_identifier(f"{definition.source_module}.{name}")
-                    )
+                allowed |= {
+                    renamed
+                    for defined in source.defined_names
+                    if (
+                        renamed := renames.renamed_identifier(
+                            f"{definition.source_module}.{defined}"
+                        )
+                    ).rpartition(DOTTED_NAME_SEPARATOR)[2]
+                    == name
+                }
             if binding.source not in allowed:
                 return False
         return True

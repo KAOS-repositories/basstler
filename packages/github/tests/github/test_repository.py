@@ -141,10 +141,6 @@ def test_a_workflow_run_url_is_the_run_s_page_under_the_repository_s_actions():
     assert REPOSITORY.workflow_run_url(7) == f"{REPOSITORY.url}/actions/runs/7"
 
 
-def test_a_commit_url_is_the_commit_s_page_under_the_repository():
-    assert REPOSITORY.commit_url("abc123") == f"{REPOSITORY.url}/commit/abc123"
-
-
 def test_the_settings_url_is_the_settings_page_under_the_repository():
     """
     The settings page is under the repository's page.

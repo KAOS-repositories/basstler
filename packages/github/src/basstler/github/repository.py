@@ -270,13 +270,6 @@ class Repository(GitRepository):
         """
         return f"{self.url}/pull/{number}"
 
-    def commit_url(self, commit: str) -> str:
-        """
-        :param commit: A commit of the repository.
-        :return: The commit's page on GitHub, showing its change from its first parent.
-        """
-        return f"{self.url}/commit/{commit}"
-
     def issue_url(self, number: int) -> str:
         """
         :param number: The issue's number.

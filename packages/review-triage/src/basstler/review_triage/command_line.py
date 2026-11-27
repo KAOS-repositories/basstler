@@ -31,7 +31,7 @@ from basstler.review_triage.command_names import ReviewTriageCommand
 from basstler.review_triage.declaration import ArgumentDeclaration, TriageDeclaration
 from basstler.review_triage.exceptions import MissingHeadRepositoryError
 from basstler.review_triage.file_listing import FileListingReader, GraphQLAttempts
-from basstler.review_triage.mechanical_split import MechanicalSplitter, SharedSplit
+from basstler.review_triage.mechanical_split import MechanicalSplitter
 from basstler.review_triage.outputs import (
     MarkdownReport,
     TriageOutput,
@@ -222,47 +222,6 @@ class TriagePublication:
             self.start,
         )
 
-    @property
-    def split_start(self) -> ComparisonStart:
-        """
-        Where a split of the change starts: the last review when the triage starts
-        each file from where it was last viewed, :attr:`start` otherwise.
-        """
-        if isinstance(self.start, ViewedStateStart):
-            return LastReviewStart()
-        return self.start
-
-    def share_split(self, git: GitCommandRunner, repository: Repository) -> str:
-        """
-        Push the split of the change since :attr:`split_start` to a branch of its own,
-        the pull request left as it is.
-
-        :param git: The checkout the pull request is read in.
-        :param repository: The repository the branch is pushed to.
-        :return: The link to the changes beyond the mechanical ones, or why there is no
-            split.
-        :raises BaseBranchMergedError: If the base branch was merged into the pull
-            request since the split's start.
-        :raises UnprovenSplitError: If the mechanical commit cannot be proven
-            mechanical.
-        """
-        changes = replace(self, start=self.split_start).changes(git)
-        split = MechanicalSplitter(
-            git, replace(self, leaves_samples=False).triager(git)
-        ).split(changes)
-        if split is None:
-            return (
-                f"#{self.pull_request} changes wholly mechanically, or nothing "
-                f"mechanically, since {changes.start.reason}; there is no split to "
-                f"share."
-            )
-        shared = SharedSplit(split, repository)
-        shared.publish(git, repository.clone_url)
-        return (
-            f"The changes of #{self.pull_request} since {changes.start.reason} beyond "
-            f"the mechanical ones, as one commit: {shared.url}"
-        )
-
     def triager(self, git: GitCommandRunner) -> PullRequestTriager:
         """
         :param git: The checkout whose settings choose the rules.
@@ -324,8 +283,6 @@ def report(
     plan: tuple[str, ...] = (),
     type_checker: bool = True,
     samples: bool = True,
-    share_split: bool = False,
-    split_repository: str | None = None,
 ) -> ReviewTriageExitCode:
     """
     Print which files of a pull request need review, as Markdown; by default each file
@@ -352,14 +309,9 @@ def report(
         basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
     :param samples: Leave one mechanical file showing each rename for review, the file
         defining the new name where it can; ``--no-samples`` leaves none.
-    :param share_split: Also push the change since your last review, or since the
-        start given, split into its mechanical changes and the rest, to a branch of its
-        own, and print the link to the rest; the pull request is left as it is.
-    :param split_repository: The repository that branch is pushed to, as
-        ``owner/name``; the checkout's ``origin`` by default.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
-    publication = TriagePublication.from_arguments(
+    TriagePublication.from_arguments(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
@@ -371,15 +323,7 @@ def report(
         plan,
         type_checker,
         samples,
-    )
-    publication.publish((MarkdownReport(),))
-    if share_split:
-        git = GitCommandRunner(Path.cwd())
-        logger.info(
-            publication.share_split(
-                git, Repository.from_name_or_remote(split_repository, git)
-            )
-        )
+    ).publish((MarkdownReport(),))
     return ReviewTriageExitCode.SUCCESS
 
 
@@ -406,8 +350,6 @@ def mark_viewed(
     plan: tuple[str, ...] = (),
     type_checker: bool = True,
     samples: bool = True,
-    share_split: bool = False,
-    split_repository: str | None = None,
 ) -> ReviewTriageExitCode:
     """
     Mark a pull request's mechanical files viewed for the logged-in account, or, where
@@ -440,17 +382,12 @@ def mark_viewed(
         basstler's own inference leaves open; ``--no-type-checker`` leaves them open.
     :param samples: Leave one mechanical file showing each rename for review, the file
         defining the new name where it can; ``--no-samples`` leaves none.
-    :param share_split: Also push the change since your last review, or since the
-        start given, split into its mechanical changes and the rest, to a branch of its
-        own, and print the link to the rest; the pull request is left as it is.
-    :param split_repository: The repository that branch is pushed to, as
-        ``owner/name``; the checkout's ``origin`` by default.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     :raises GraphQLErrorsReturned: If marking them directly, alone, fails.
     :raises FilesNotMarkedViewed: If neither way marks them.
     """
     git = GitCommandRunner(Path.cwd())
-    publication = TriagePublication.from_arguments(
+    outcome = TriagePublication.from_arguments(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
@@ -462,15 +399,8 @@ def mark_viewed(
         plan,
         type_checker,
         samples,
-    )
-    outcome = publication.outcome()
+    ).outcome()
     (TriageSummary() if summary_only else MarkdownReport()).publish(outcome)
-    if share_split:
-        logger.info(
-            publication.share_split(
-                git, Repository.from_name_or_remote(split_repository, git)
-            )
-        )
     marked_repository = Repository.from_name_or_remote(repository, git)
     routes = ViewedMarkingRoutes(
         ViewedMarking(
@@ -663,7 +593,8 @@ def split_mechanical(
         from_merge_base=from_merge_base,
         samples=False,
     )
-    publication = replace(publication, start=publication.split_start)
+    if isinstance(publication.start, ViewedStateStart):
+        publication = replace(publication, start=LastReviewStart())
     git = GitCommandRunner(Path.cwd())
     changes = publication.changes(git)
     split = MechanicalSplitter(git, publication.triager(git)).split(changes)

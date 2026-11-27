@@ -215,6 +215,17 @@ class DatasetLocation(PathEnumeration):
     ``workflow`` scope.
     """
 
+    PUSH_REFUSING_HOOKS = DIRECTORY / "push-refusing-hooks"
+    """
+    A hooks directory whose pre-receive hook refuses every push, printing
+    :attr:`PUSH_REFUSAL`.
+    """
+
+    PUSH_REFUSAL = PUSH_REFUSING_HOOKS / "refusal.txt"
+    """
+    What :attr:`PUSH_REFUSING_HOOKS` prints refusing a push.
+    """
+
     PUSH_REFUSED_WITHOUT_CREDENTIAL = DIRECTORY / "push-refusals" / "no-credential.txt"
     """
     What git prints when it has no credential to push to GitHub over HTTPS.

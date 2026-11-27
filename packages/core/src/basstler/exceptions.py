@@ -105,8 +105,16 @@ class NotesPushRejectedError(DataclassException, RuntimeError):
     How many pushes were made.
     """
 
+    push_error_output: str
+    """
+    What git printed refusing the last push.
+    """
+
     def error_message(self) -> str:
-        return f"every one of {self.attempts} pushes to '{self.branch}' was rejected"
+        return (
+            f"every one of {self.attempts} pushes to '{self.branch}' was rejected; "
+            f"git printed:\n{self.push_error_output}"
+        )
 
     def suggest_correction(self) -> str:
         return "check that this credential may push to the branch, then run it again"

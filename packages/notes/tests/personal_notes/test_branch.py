@@ -26,6 +26,7 @@ from basstler.personal_notes.branch import (
     PersonalNotesLocation,
 )
 from basstler.shell_configuration import PersonalNotesSetting
+from basstler.text_file import TextFile
 
 from basstler_testing.constants.notes import ScratchBranch
 from basstler_testing.constants.paths import DatasetLocation
@@ -253,3 +254,22 @@ def test_a_push_rejected_every_time_is_refused(notes_repository):
         writer.write(edit, "Save notes")
 
     assert raised.value.attempts == writer.push_attempts
+
+
+def test_a_refused_push_reports_what_git_printed(notes_repository):
+    """
+    The error carries the remote's refusal, which names why the push failed.
+    """
+    GitCommandRunner(notes_repository.notes_remote_path).run(
+        "config", "core.hooksPath", str(DatasetLocation.PUSH_REFUSING_HOOKS)
+    )
+    writer = NotesBranchWriter(notes_branch(notes_repository))
+
+    with pytest.raises(NotesPushRejectedError) as raised:
+        writer.write(NotesFileChanges({NOTES_FILE: "- the edit\n"}), "Save notes")
+
+    refusal = TextFile(DatasetLocation.PUSH_REFUSAL).read().strip()
+    printed_lines = [
+        line.rstrip() for line in raised.value.push_error_output.splitlines()
+    ]
+    assert f"remote: {refusal}" in printed_lines

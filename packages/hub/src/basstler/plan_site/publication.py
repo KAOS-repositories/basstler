@@ -35,11 +35,11 @@ from basstler.github.repository import GitHubAddress, Repository
 from basstler.github.repository_details import RepositoryDetails, RepositoryDetailsRead
 from basstler.github.run_listing import RunListing
 from basstler.locations import (
-    BasstlerVariable,
     ClaudeCodeVariable,
     ProjectLocation,
-    WorkflowLocation,
 )
+from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
+from basstler.plan_site.environment import SiteBasstlerVariable
 from basstler.plan.model import PlanDocument, PlanManifest
 from basstler.plan_site.build_start import SiteAccess
 from basstler.plan_site.exceptions import (
@@ -81,7 +81,7 @@ logger = StandardStreamHandler.logger_for(__name__)
 This module's logger, which is also what its command prints through.
 """
 
-PUBLICATION_COMMAND = f'"${{{BasstlerVariable.PYTHON}}}" -m {__spec__.name}'
+PUBLICATION_COMMAND = f'"${{{SiteBasstlerVariable.PYTHON}}}" -m {__spec__.name}'
 """
 The command line that publishes again, once this session reaches the site repository.
 """
@@ -270,7 +270,7 @@ class PlanSitePublication:
         Why a fork gets no merge workflow.
         """
         return (
-            f"{WorkflowLocation.PLAN_SITE_MERGE}, because the repository is a fork and "
+            f"{SiteWorkflowLocation.PLAN_SITE_MERGE}, because the repository is a fork and "
             "its default branch has to stay as its upstream's; merges show at the next "
             "push to the notes branch"
         )
@@ -558,7 +558,7 @@ class PlanSitePublication:
             each once.
         """
         hub = PlanHub.from_yaml(
-            self.notes_branch_of(registry).read_latest(ProjectLocation.PLAN_HUB)
+            self.notes_branch_of(registry).read_latest(SiteProjectLocation.PLAN_HUB)
         )
         already_on_site = [
             repository
@@ -712,7 +712,7 @@ class PlanSitePublication:
         :return: The hub file as written.
         """
         notes_repository = self.dispatch_workflow.notes_repository
-        path = ProjectLocation.PLAN_HUB.as_posix()
+        path = SiteProjectLocation.PLAN_HUB.as_posix()
         hub = PlanHub.from_yaml(self.notes_branch_of(registry).read_latest(path))
         if hub is None:
             hub = PlanHub(registry=registry.full_name)

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from basstler.bash import Bash
 from basstler.exit_codes import SetupCheckExitCode
-from basstler.locations import PluginLocation
+from basstler.setup.locations import SetupPluginLocation
 from basstler.plugin_root import PluginRoot
 from basstler.setup.exceptions import CheckSetupFailedError
 
@@ -337,7 +337,8 @@ class SetupCheckScript:
         """
         return subprocess.run(
             Bash.locate(self.environment).command(
-                self.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT), *arguments
+                self.plugin_root.path_of(SetupPluginLocation.SETUP_CHECK_SCRIPT),
+                *arguments,
             ),
             cwd=self.project_root,
             env=dict(self.environment),

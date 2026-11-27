@@ -33,8 +33,11 @@ from basstler.locations import (
     PackageLocation,
     PluginLocation,
     ProjectLocation,
-    WorkflowLocation,
 )
+from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
+from basstler.setup.locations import SetupPluginLocation
+from basstler.plan.locations import PlanPluginLocation
+from basstler.plan_site.environment import SiteBasstlerVariable
 from basstler.personal_notes import access
 from basstler.plan.merged_items import __main__ as merged_items_command
 from basstler.plan.merged_items.every_plan import (
@@ -220,8 +223,8 @@ def session_start_repository(
         PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
         PluginLocation.SESSION_START_SCRIPT.name,
         PluginLocation.SESSION_RULES.name,
-        PluginLocation.SETUP_CHECK_SCRIPT.name,
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
     )
     scratch_repository.install_package()
     scratch_repository.replace_package_module(
@@ -990,7 +993,7 @@ def test_names_every_check_that_needs_setup(
     detail = next(
         row.split("\t")[2]
         for row in session_start_repository.run_hook_script(
-            PluginLocation.SETUP_CHECK_SCRIPT.name
+            SetupPluginLocation.SETUP_CHECK_SCRIPT.name
         ).stdout.splitlines()
         if row.split("\t")[0] == failing_check
     )
@@ -1005,7 +1008,7 @@ def test_names_every_check_that_could_not_be_verified(
 ):
     result = publish_and_run(
         session_start_repository,
-        {WorkflowLocation.PLAN_SITE_DISPATCH: "name: Plan site dispatch\n"},
+        {SiteWorkflowLocation.PLAN_SITE_DISPATCH: "name: Plan site dispatch\n"},
     )
 
     unverified_check, detail = next(
@@ -1013,7 +1016,7 @@ def test_names_every_check_that_could_not_be_verified(
         for check, status, detail in (
             row.split("\t")
             for row in session_start_repository.run_hook_script(
-                PluginLocation.SETUP_CHECK_SCRIPT.name
+                SetupPluginLocation.SETUP_CHECK_SCRIPT.name
             ).stdout.splitlines()
         )
         if status == CheckStatus.UNVERIFIED
@@ -1890,7 +1893,7 @@ def test_tells_the_session_which_interpreter_runs_the_package(
     exported = subprocess.run(
         Bash.locate(os.environ).command(
             "-c",
-            f'source "$0" && printf "%s" "${{{BasstlerVariable.PYTHON}}}"',
+            f'source "$0" && printf "%s" "${{{SiteBasstlerVariable.PYTHON}}}"',
             environment_file,
         ),
         capture_output=True,
@@ -2257,7 +2260,7 @@ def test_links_a_tracked_branch_to_its_plan_on_the_site(
                 {ScratchBranch.WORK: PLAN_IDENTIFIER}
             ),
             MANIFEST_PATH: PLAN_MANIFEST,
-            ProjectLocation.PLAN_HUB: HUB_FILE,
+            SiteProjectLocation.PLAN_HUB: HUB_FILE,
         },
     )
 
@@ -2283,7 +2286,7 @@ def test_links_the_plan_under_the_notes_repository_the_site_lists(
                 {ScratchBranch.WORK: PLAN_IDENTIFIER}
             ),
             MANIFEST_PATH: PLAN_MANIFEST,
-            ProjectLocation.PLAN_HUB: HUB_FILE,
+            SiteProjectLocation.PLAN_HUB: HUB_FILE,
         },
     )
 
@@ -2309,7 +2312,7 @@ def publish_hub_and_run(
     :return: The finished session-start.sh process.
     """
     return publish_and_run(
-        repository, {ProjectLocation.PLAN_HUB: HUB_FILE}, environment
+        repository, {SiteProjectLocation.PLAN_HUB: HUB_FILE}, environment
     )
 
 

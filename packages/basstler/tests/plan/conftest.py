@@ -11,6 +11,7 @@ import pytest
 
 from basstler.github.repository import Repository
 from basstler.locations import PluginLocation, ProjectLocation
+from basstler.plan.locations import PlanProjectLocation, PlanPluginLocation
 from basstler.plan.handover import PlanHandover
 from basstler.plan.merged_items import __main__ as merged_items_command
 from basstler.plan.model import PlanDocument
@@ -42,7 +43,7 @@ def notes_branch_files(handover: PlanHandover) -> dict[Path, str]:
     :return: Its plans, progress notes and rules at the paths a notes branch holds them.
     """
     files = {
-        ProjectLocation.PULL_REQUEST_PROGRESS
+        PlanProjectLocation.PULL_REQUEST_PROGRESS
         / handover.progress_note_path(branch): note
         for branch, note in handover.progress_notes.items()
     }
@@ -71,7 +72,7 @@ def handover_repository(
     """
     repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
     )
     repository.install_package()
     repository.replace_package_module(build_start, DatasetLocation.BUILD_START_STUB)
@@ -98,7 +99,7 @@ def exporting_repository(
     """
     notes = notes_branch_files(dataset_handover)
     notes[
-        ProjectLocation.PULL_REQUEST_PROGRESS
+        PlanProjectLocation.PULL_REQUEST_PROGRESS
         / PlanHandover.progress_note_path(UNRELATED_BRANCH)
     ] = TextFile(DatasetLocation.UNRELATED_PROGRESS_NOTE).read()
     return handover_repository(scratch_repository, notes, plans_repository())

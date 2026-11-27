@@ -14,6 +14,7 @@ from pathlib import PurePosixPath
 from urllib.parse import quote
 
 from basstler.environment import GitHubActionsVariable
+from basstler.github.environment import GitHubActionsOutputVariable
 from basstler.github.actions_budget import ActionsBudget, WorkflowLimits
 from basstler.github.client import GitHubReader, GitHubRestClient
 from basstler.github.repository import Repository
@@ -285,7 +286,7 @@ def main() -> None:
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as summary:
             summary.write(report.markdown())
-    output_path = GitHubActionsVariable.OUTPUT.read()
+    output_path = GitHubActionsOutputVariable.OUTPUT.read()
     if output_path:
         with open(output_path, "a", encoding="utf-8") as output:
             output.write(

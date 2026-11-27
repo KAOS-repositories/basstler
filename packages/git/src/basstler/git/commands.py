@@ -17,11 +17,12 @@ from enum import StrEnum
 from pathlib import Path, PurePath, PurePosixPath
 
 from basstler.class_property import classproperty
-from basstler.environment import GitVariable
+from basstler.git.environment import GitVariable
 from basstler.exceptions import ExternalCallFailed, UnresolvableReferenceError
 from basstler.exit_codes import CommandFailure, StackExitCode
-from basstler.locations import CommitScratchFile, RepositoryStateLocation
+from basstler.git.locations import CommitScratchFile
 from basstler.text_file import TextFile
+from basstler.locations import RepositoryStateFile
 
 # %% running git
 
@@ -231,7 +232,7 @@ class GitCommandRunner:
             self.attempt(*arguments, environment=environment).raise_if_failed().output
         )
 
-    def repository_state_path(self, location: RepositoryStateLocation) -> Path:
+    def repository_state_path(self, location: RepositoryStateFile) -> Path:
         """
         :param location: Scratch state kept per repository.
         :return: Where it lives for this checkout's repository, the same from every

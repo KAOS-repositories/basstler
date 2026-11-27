@@ -22,7 +22,7 @@ from basstler.plan.handover import PlanHandover
 from basstler.plan.handover_originals import OriginalPullRequest
 from basstler.render_common import TemplatePage
 from basstler.class_property import classproperty
-from basstler.locations import PlanHandoverLocation
+from basstler.plan.locations import PlanHandoverLocation
 
 # %% what was continued
 

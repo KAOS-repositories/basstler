@@ -5,6 +5,8 @@ a colleague who shares the notes branch without owning its repository.
 
 from __future__ import annotations
 
-from basstler.locations import ProjectLocation
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
 
-print((ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES / "a-colleague").as_posix())
+print(
+    (PersonalNotesProjectLocation.CONTRIBUTOR_GIT_IDENTITIES / "a-colleague").as_posix()
+)

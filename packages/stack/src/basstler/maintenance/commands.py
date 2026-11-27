@@ -24,7 +24,7 @@ from basstler.github.remote import GitHubRemote
 from basstler.github.client import GitHubRestClient
 from basstler.github.constants import MaintenanceNotice
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
-from basstler.locations import RepositoryStateLocation
+from basstler.stack.locations import StackStateLocation
 from basstler.maintenance.board import BoardExport
 from basstler.maintenance.check_overview import CheckOverview
 from basstler.maintenance.fast_forward import fast_forward
@@ -112,7 +112,7 @@ class MaintenancePass:
         """
         Where a whole pass writes everything it did, beside :attr:`board`.
         """
-        return self.board.with_name(RepositoryStateLocation.MAINTENANCE_REPORT.name)
+        return self.board.with_name(StackStateLocation.MAINTENANCE_REPORT.name)
 
     def fork(self) -> GitHubRepository:
         """:return: The fork, as this run's credential can read and write it."""

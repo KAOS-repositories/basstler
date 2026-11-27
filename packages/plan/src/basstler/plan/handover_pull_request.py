@@ -24,7 +24,7 @@ from basstler.github.pull_request import NewPullRequest, PullRequestDescription
 from basstler.github.pull_request_changes import RestPullRequest
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.github.repository_access import PullRequestListState
-from basstler.locations import PlanHandoverLocation
+from basstler.plan.locations import PlanHandoverLocation
 from basstler.personal_notes.branch import PersonalNotesLocation
 from basstler.plan.exceptions import HandoverPullRequestNotChosenError
 from basstler.plan.handover import PlanHandover

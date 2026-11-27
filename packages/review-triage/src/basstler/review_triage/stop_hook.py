@@ -20,7 +20,8 @@ from basstler.git.commands import GitCommandRunner
 from basstler.github.client import GitHubReader, GitHubRestClient
 from basstler.github.repository import HasRepository, Repository
 from basstler.github.rest_models import PullRequestAtHead, RestPullRequestSummary
-from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
+from basstler.locations import ClaudeCodeVariable
+from basstler.review_triage.locations import ReviewTriageStateLocation
 from basstler.review_triage.command_line import mark_viewed
 
 # %% the pull request of the session
@@ -49,7 +50,7 @@ class SessionPullRequest(HasRepository):
         The file recording the head the files were last marked viewed at.
         """
         return self.git.repository_state_path(
-            RepositoryStateLocation.VIEWED_MARKING_STAMP
+            ReviewTriageStateLocation.VIEWED_MARKING_STAMP
         )
 
     def unmarked(self) -> RestPullRequestSummary | None:

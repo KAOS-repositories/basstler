@@ -14,6 +14,7 @@ from typing import override
 
 from basstler.code_rules.checker import CodeRuleChecker, CodeRuleViolation
 from basstler.locations import PackageLocation
+from basstler.code_rules.locations import CodeRulesPackageLocation
 from basstler.text_file import TextFile
 
 # %% what is an address
@@ -47,7 +48,7 @@ class RepositoryAddress(StrEnum):
 class HandBuiltAddressChecker(CodeRuleChecker):
     """
     Reports every f-string of the package that starts with a repository's address and
-    appends a path to it, outside :attr:`PackageLocation.GITHUB_REPOSITORY_MODULE`;
+    appends a path to it, outside :attr:`CodeRulesPackageLocation.GITHUB_REPOSITORY_MODULE`;
     tests spell the addresses they pin.
     """
 
@@ -59,7 +60,7 @@ class HandBuiltAddressChecker(CodeRuleChecker):
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
         source = path.resolve()
-        if source == PackageLocation.GITHUB_REPOSITORY_MODULE.resolve():
+        if source == CodeRulesPackageLocation.GITHUB_REPOSITORY_MODULE.resolve():
             return
         if not source.is_relative_to(self.package_directory.resolve()):
             return

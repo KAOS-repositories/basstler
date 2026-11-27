@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from basstler.locations import SiteTemplate
+from basstler.plan_site.locations import SiteTemplate
 from basstler.plan.model import ItemStatus
 from basstler.plan.structure import Item
 from basstler.text_file import TextFile

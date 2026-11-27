@@ -19,6 +19,8 @@ from basstler.plan.exceptions import PlanInAnotherRepository
 from basstler.exit_codes import ManifestToolsExitCode
 from basstler.github.repository import Repository
 from basstler.locations import PluginLocation, ProjectLocation
+from basstler.plan.locations import PlanPluginLocation
+from basstler.plan_site.locations import SiteProjectLocation
 from basstler.personal_notes import access
 from basstler.plan.item_bootstrap.vocabulary import PlanSavingOption
 from basstler.plan.merge import PlanVersion
@@ -87,7 +89,7 @@ def save_plan_repository(scratch_repository: ScratchRepository) -> ScratchReposi
     """
     scratch_repository.install_hook_scripts(
         PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
     )
     scratch_repository.install_package()
     scratch_repository.replace_package_module(
@@ -117,7 +119,7 @@ def run_save_plan(
     :return: The finished subprocess.
     """
     return repository.run_hook_script(
-        PluginLocation.PLAN_SAVING_SCRIPT.name, *arguments
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name, *arguments
     )
 
 
@@ -531,7 +533,7 @@ def test_a_save_drops_an_item_github_reports_merged(
     in_progress = plan.item_with_status(ItemStatus.IN_PROGRESS)
 
     result = save_plan_repository.run_hook_script(
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
         *save_from_files_arguments(
             DatasetLocation.PLAN_WITH_LANDED_ITEMS,
             DatasetLocation.ROADMAP_OF_STANDING_RULES,
@@ -565,7 +567,7 @@ def test_a_save_whose_pull_requests_could_not_be_read_saves_the_plan_unchanged(
     plan = LandedItemsPlan.read()
 
     result = save_plan_repository.run_hook_script(
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
         *save_from_files_arguments(
             DatasetLocation.PLAN_WITH_LANDED_ITEMS,
             DatasetLocation.ROADMAP_OF_STANDING_RULES,
@@ -589,7 +591,7 @@ def test_a_save_prints_the_plan_s_page_on_the_plan_site(
     """
     save_plan_repository.serve_notes_remote_as(SiteRepository.NOTES.value.clone_url)
     save_plan_repository.update_notes_branch_file(
-        ProjectLocation.PLAN_HUB,
+        SiteProjectLocation.PLAN_HUB,
         PlanHub(
             registry=str(SiteRepository.NOTES.value),
             site_url=SiteSampleText.SITE_URL.value,
@@ -614,7 +616,7 @@ def test_a_save_starts_the_plan_site_build(save_plan_repository: ScratchReposito
     A save to a repository the plan site lists starts the site's build itself.
     """
     save_plan_repository.update_notes_branch_file(
-        ProjectLocation.PLAN_HUB,
+        SiteProjectLocation.PLAN_HUB,
         PlanHub(
             registry=str(SiteRepository.NOTES.value),
             site_url=SiteSampleText.SITE_URL.value,
@@ -640,7 +642,7 @@ def test_a_save_reports_a_failed_page_lookup_as_a_failure_not_as_no_site(
     error on, rather than saying no site lists the repository.
     """
     save_plan_repository.update_notes_branch_file(
-        ProjectLocation.PLAN_HUB,
+        SiteProjectLocation.PLAN_HUB,
         yaml.safe_dump({HubFileKey.SITE_URL.value: SiteSampleText.SITE_URL.value}),
     )
 
@@ -856,7 +858,7 @@ def test_a_rejected_push_is_retried_onto_the_other_writer_s_save(
     writer = prepare_concurrent_writer(save_plan_repository, writes=1, version=latest)
 
     result = save_plan_repository.run_hook_script(
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
         *save_arguments(
             save_plan_repository,
             blocked(read_version(), FIRST_ITEM),
@@ -877,7 +879,7 @@ def test_a_save_without_its_read_point_still_retries_a_rejected_push(
     session = blocked(read_version(), FIRST_ITEM)
 
     result = save_plan_repository.run_hook_script(
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
         *save_arguments(save_plan_repository, session),
         **{ConcurrentWriterVariable.CHECKOUT: writer},
     )
@@ -893,7 +895,7 @@ def test_a_save_stops_after_its_attempts(
     writer = prepare_concurrent_writer(save_plan_repository, writes=attempts)
 
     result = save_plan_repository.run_hook_script(
-        PluginLocation.PLAN_SAVING_SCRIPT.name,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT.name,
         *save_arguments(
             save_plan_repository,
             blocked(read_version(), FIRST_ITEM),

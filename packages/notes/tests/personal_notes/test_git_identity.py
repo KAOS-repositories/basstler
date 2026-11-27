@@ -20,8 +20,9 @@ from basstler.github.exceptions import GitHubRequestFailed
 from basstler.github.pull_request_record import AccountField
 from basstler.github.repository import Repository
 from basstler.github.repository_access import GitHubPath
-from basstler.locations import ProjectLocation
+from basstler.personal_notes.locations import PersonalNotesProjectLocation
 from basstler.personal_notes.git_identity import GitIdentityRecord
+from basstler.locations import ProjectLocation
 
 from basstler_testing.scratch_repository import ScratchRepository
 
@@ -95,7 +96,8 @@ def test_a_colleague_gets_a_file_named_after_their_login():
     record = GitIdentityRecord(notes_repository=SHARED_NOTES, login=COLLEAGUE)
 
     assert record.path == (
-        PurePosixPath(ProjectLocation.CONTRIBUTOR_GIT_IDENTITIES) / COLLEAGUE
+        PurePosixPath(PersonalNotesProjectLocation.CONTRIBUTOR_GIT_IDENTITIES)
+        / COLLEAGUE
     )
 
 

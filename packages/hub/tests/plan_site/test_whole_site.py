@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from basstler.locations import ProjectLocation
+from basstler.plan_site.locations import SiteProjectLocation
 from basstler.plan_site.__main__ import HubSite, SiteFile, main
 from basstler.plan_site.exceptions import RegistryUnreadableError
 from basstler.plan_site.hub import PlanHub, SiteAddress
@@ -43,7 +44,7 @@ def remotes(tmp_path: Path) -> Path:
         for path in DatasetLocation.SITE_PLANS.value.rglob("*")
         if path.is_file()
     }
-    hub_path = ProjectLocation.PLAN_HUB.relative_to(ProjectLocation.PLANS)
+    hub_path = SiteProjectLocation.PLAN_HUB.relative_to(ProjectLocation.PLANS)
     publish_notes(
         remote_root, SiteRepository.NOTES.value, {**plans, hub_path: hub.to_text()}
     )

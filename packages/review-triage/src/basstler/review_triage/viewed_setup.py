@@ -49,10 +49,14 @@ from basstler.github.user_steps import (
     UserStep,
 )
 from basstler.github.workflows import Workflow
-from basstler.locations import ReviewTriageLocation, WorkflowLocation
+from basstler.review_triage.locations import (
+    ReviewTriageWorkflowLocation,
+    ReviewTriageLocation,
+)
 from basstler.render_common import TemplatePage
 from basstler.review_triage.exceptions import MarkViewedWorkflowRefused
 from basstler.review_triage.viewed_request import ReviewTriageSecret
+from basstler.locations import WorkflowLocation
 
 # %% what each step came to
 
@@ -171,11 +175,11 @@ class MarkViewedSetup(TemplatePage):
         if self.workflow_repository == BasstlerProject.repository:
             return (
                 f"{Workflow.local_reference_prefix}"
-                f"{WorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.name}"
+                f"{ReviewTriageWorkflowLocation.REUSABLE_MARK_VIEWED.name}"
             )
         return (
             f"{BasstlerProject.repository.full_name}/"
-            f"{WorkflowLocation.REVIEW_TRIAGE_MARK_VIEWED.as_posix()}@{self.branch_or_tag}"
+            f"{ReviewTriageWorkflowLocation.REUSABLE_MARK_VIEWED.as_posix()}@{self.branch_or_tag}"
         )
 
     def run(self, client: GitHubAttemptClient) -> str:
@@ -199,7 +203,8 @@ class MarkViewedSetup(TemplatePage):
             self.enable_workflow(client, details)
         self.check_secret(client, details)
         return self.render_template(
-            setup=self, workflow_location=WorkflowLocation.MARK_VIEWED.as_posix()
+            setup=self,
+            workflow_location=WorkflowLocation.MARK_VIEWED.as_posix(),
         )
 
     # %% the workflow file

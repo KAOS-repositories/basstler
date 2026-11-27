@@ -18,8 +18,9 @@ import pytest
 
 from basstler.class_property import classproperty
 from basstler.document_references import PACKAGE_NAME, CitedNames
+from basstler.locations import PluginLocation, PluginFile
+from basstler.plan.locations import PlanPluginLocation
 from basstler.slash_command import SlashCommand
-from basstler.locations import PluginLocation
 from basstler.regular_expression import (
     Anchor,
     CharacterClass,
@@ -142,12 +143,12 @@ def test_the_starter_notes_do_not_name_the_package_or_its_local_file(name: str):
 @pytest.mark.parametrize(
     "script",
     [
-        PluginLocation.PLAN_SAVING_SCRIPT,
+        PlanPluginLocation.PLAN_SAVING_SCRIPT,
         PluginLocation.PULL_REQUEST_PROGRESS_SAVING_SCRIPT,
     ],
 )
 def test_the_session_rules_carry_the_instruction_that_names_each_script(
-    script: PluginLocation,
+    script: PluginFile,
 ):
     rules = (RepositoryLocation.PLUGIN / PluginLocation.SESSION_RULES).read_text(
         encoding="utf-8"

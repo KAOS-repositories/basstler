@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from basstler.exceptions import (
+from basstler.github.exceptions import (
     BudgetFileExists,
     JobTimeoutOverCeiling,
     MissingBudgetFunction,

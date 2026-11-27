@@ -39,7 +39,7 @@ from pathlib import Path
 from basstler.exit_codes import CommandFailure, ExitCode, StackExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.github.exceptions import GraphQLErrorsReturned, UpstreamReadError
-from basstler.locations import RepositoryStateLocation
+from basstler.stack.locations import StackStateLocation
 from basstler.maintenance.commands import MaintenanceCommand, MaintenancePass
 from basstler.maintenance.landed_closing_follow_up import LandedClosingFollowUps
 from basstler.maintenance.upstream_read_route import UpstreamReadRoute
@@ -111,7 +111,7 @@ def _dispatch() -> ExitCode:
         maintenance = MaintenancePass(
             configuration=Configuration.load(),
             git=git,
-            board=git.repository_state_path(RepositoryStateLocation.BOARD),
+            board=git.repository_state_path(StackStateLocation.BOARD),
             upstream_read=UpstreamReadRoute(arguments.upstream_read),
             closing_follow_ups=LandedClosingFollowUps.installed(),
         )

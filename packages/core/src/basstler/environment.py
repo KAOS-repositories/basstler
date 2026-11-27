@@ -73,37 +73,6 @@ class GitBashVariable(EnvironmentVariable):
     """
 
 
-class GitVariable(EnvironmentVariable):
-    """
-    The variables git reads that this package, or its tests, set for the commands run.
-    """
-
-    INDEX_FILE = "GIT_INDEX_FILE"
-    """
-    The index git stages into, in place of the clone's own.
-    """
-
-    CONFIGURATION_COUNT = "GIT_CONFIG_COUNT"
-    """
-    How many configuration entries the environment passes to git.
-    """
-
-    CONFIGURATION_KEY_PREFIX = "GIT_CONFIG_KEY_"
-    """
-    Followed by an entry's index, names the variable holding that entry's key.
-    """
-
-    CONFIGURATION_VALUE_PREFIX = "GIT_CONFIG_VALUE_"
-    """
-    Followed by an entry's index, names the variable holding that entry's value.
-    """
-
-    COMMITTER_DATE = "GIT_COMMITTER_DATE"
-    """
-    The date git records as a new commit's committer date, in place of the clock's.
-    """
-
-
 class GitHubCredentialVariable(CredentialOrigin, EnvironmentVariable):
     """
     The variables a GitHub token is read from, in the order they are tried.
@@ -151,9 +120,15 @@ class GitHubCredentialVariable(CredentialOrigin, EnvironmentVariable):
         return None if variable is None else variable.read()
 
 
-class GitHubActionsVariable(EnvironmentVariable):
+class GitHubActionsRunnerVariable(EnvironmentVariable):
     """
-    The variables a GitHub Actions runner sets for the steps it runs.
+    An environment variable a GitHub Actions runner sets for the steps it runs.
+    """
+
+
+class GitHubActionsVariable(GitHubActionsRunnerVariable):
+    """
+    The runner's variables several distributions read.
     """
 
     STEP_SUMMARY = "GITHUB_STEP_SUMMARY"
@@ -161,17 +136,7 @@ class GitHubActionsVariable(EnvironmentVariable):
     The file a step appends its Markdown job summary to.
     """
 
-    OUTPUT = "GITHUB_OUTPUT"
-    """
-    The file a step appends its ``<key>=<value>`` outputs to.
-    """
-
     RUNNER_TEMPORARY_DIRECTORY = "RUNNER_TEMP"
     """
     A directory the runner empties for each job, which steps hand files through.
-    """
-
-    REPOSITORY_OWNER = "GITHUB_REPOSITORY_OWNER"
-    """
-    The owner of the repository the workflow runs in.
     """

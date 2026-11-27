@@ -14,7 +14,7 @@ import pytest
 
 from basstler import exceptions
 from basstler.exceptions import PluginRootNotADirectoryError, PluginRootUnsetError
-from basstler.locations import BasstlerVariable, PluginLocation, PluginSkillLocation
+from basstler.locations import BasstlerVariable, PluginFile, PluginLocation
 from basstler.plugin_root import PluginRoot
 
 from basstler_testing.constants.environment import ScrubbedEnvironmentPrefix
@@ -44,12 +44,10 @@ def test_the_suite_runs_this_checkouts_plugin_whatever_the_session_exports():
 
 @pytest.mark.parametrize(
     "location",
-    [PluginLocation.SESSION_START_SCRIPT, PluginSkillLocation.STARTER_NOTES],
+    [PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT, PluginLocation.SESSION_RULES],
     ids=lambda member: member._name_,
 )
-def test_a_plugin_file_is_found_under_the_root(
-    tmp_path: Path, location: PluginLocation | PluginSkillLocation
-):
+def test_a_plugin_file_is_found_under_the_root(tmp_path: Path, location: PluginFile):
     """
     Each of the plugin's files is named relative to its root, and found under it.
     """

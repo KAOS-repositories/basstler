@@ -36,11 +36,8 @@ from basstler.github.permission_level import PermissionLevel
 from basstler.github.repository_access import GitHubRepository
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.tooling_labels import GitHubLabel
-from basstler.locations import (
-    ClaudeCodeVariable,
-    PluginLocation,
-    PluginSkillLocation,
-)
+from basstler.locations import ClaudeCodeVariable, PluginLocation, PluginFile
+from basstler.setup.locations import SetupPluginLocation, SetupPluginSkillLocation
 from basstler.plugin_root import PluginRoot
 from basstler.setup.exceptions import ForeignNotesRemoteError, HookScriptFailedError
 from basstler.setup.report import (
@@ -369,7 +366,7 @@ class PersonalNotesSetup:
         self.run_hook_script(
             PluginLocation.PERSONAL_NOTES_WRITER_SCRIPT,
             "--source",
-            str(self.plugin_root.path_of(PluginSkillLocation.STARTER_NOTES)),
+            str(self.plugin_root.path_of(SetupPluginSkillLocation.STARTER_NOTES)),
             "--destination",
             PersonalNotesSetting.PATH.resolve(self.project_root, self.environment),
             "--message",
@@ -383,7 +380,7 @@ class PersonalNotesSetup:
         if self.request.identity is None:
             return
         self.run_hook_script(
-            PluginLocation.GIT_IDENTITY_SAVING_SCRIPT,
+            SetupPluginLocation.GIT_IDENTITY_SAVING_SCRIPT,
             "--name",
             self.request.identity.name,
             "--email",
@@ -430,7 +427,7 @@ class PersonalNotesSetup:
             environment |= setting.variables(environment)
         return SetupCheckScript(self.project_root, environment, self.plugin_root).run()
 
-    def run_hook_script(self, script: PluginLocation, *arguments: str) -> None:
+    def run_hook_script(self, script: PluginFile, *arguments: str) -> None:
         """
         Run one hook script, its output going to this process's own.
 

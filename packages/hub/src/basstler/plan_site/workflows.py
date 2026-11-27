@@ -21,7 +21,8 @@ from basstler.github.repository import Repository
 from basstler.github.basstler_project import BasstlerWorkflowInput
 from basstler.github.workflows import ActivityType, TriggerEvent
 from basstler.json_model import JSONModel
-from basstler.locations import WorkflowLocation
+from basstler.locations import ActionsWorkflowFile, WorkflowLocation
+from basstler.plan_site.locations import SiteWorkflowLocation
 from basstler.plan_site.exceptions import PlanSiteTokenNotEnteredError
 from basstler.render_common import create_template_environment
 from basstler.upstream_reviews.action.branch import BasstlerSource
@@ -103,7 +104,7 @@ class GitHubCommandLineOption(StrEnum):
 
 class BuildInput(StrEnum):
     """
-    The inputs of basstler's reusable build, :attr:`WorkflowLocation.PLAN_SITE_BUILD`,
+    The inputs of basstler's reusable build, :attr:`SiteWorkflowLocation.PLAN_SITE_BUILD`,
     beside :class:`BasstlerWorkflowInput`.
     """
 
@@ -115,7 +116,7 @@ class BuildInput(StrEnum):
 
 class BuildSecret(StrEnum):
     """
-    The secrets basstler's reusable build, :attr:`WorkflowLocation.PLAN_SITE_BUILD`,
+    The secrets basstler's reusable build, :attr:`SiteWorkflowLocation.PLAN_SITE_BUILD`,
     accepts.
     """
 
@@ -342,7 +343,7 @@ class PlanSiteWorkflow(ABC):
 
     @classproperty
     @abstractmethod
-    def location(cls) -> WorkflowLocation:
+    def location(cls) -> ActionsWorkflowFile:
         """
         Where the workflow is written, relative to its branch's root.
         """
@@ -384,7 +385,7 @@ class SiteWorkflow(PlanSiteWorkflow):
     """
 
     @classproperty
-    def location(cls) -> WorkflowLocation:
+    def location(cls) -> ActionsWorkflowFile:
         return WorkflowLocation.PLAN_SITE
 
     @classproperty
@@ -409,7 +410,7 @@ class SiteWorkflow(PlanSiteWorkflow):
             "job": PlanSiteJob.BUILD,
             "called_workflow": (
                 f"{BasstlerSource.REPOSITORY}/"
-                f"{WorkflowLocation.PLAN_SITE_BUILD.as_posix()}@{self.branch_or_tag}"
+                f"{SiteWorkflowLocation.PLAN_SITE_BUILD.as_posix()}@{self.branch_or_tag}"
             ),
             "inputs": {
                 BasstlerWorkflowInput.BRANCH_OR_TAG: self.branch_or_tag,
@@ -443,8 +444,8 @@ class DispatchWorkflow(PlanSiteWorkflow):
     """
 
     @classproperty
-    def location(cls) -> WorkflowLocation:
-        return WorkflowLocation.PLAN_SITE_DISPATCH
+    def location(cls) -> ActionsWorkflowFile:
+        return SiteWorkflowLocation.PLAN_SITE_DISPATCH
 
     @classproperty
     def template(cls) -> PlanSiteTemplate:
@@ -480,8 +481,8 @@ class MergeWorkflow(PlanSiteWorkflow):
     """
 
     @classproperty
-    def location(cls) -> WorkflowLocation:
-        return WorkflowLocation.PLAN_SITE_MERGE
+    def location(cls) -> ActionsWorkflowFile:
+        return SiteWorkflowLocation.PLAN_SITE_MERGE
 
     @classproperty
     def template(cls) -> PlanSiteTemplate:

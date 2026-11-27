@@ -14,6 +14,7 @@ import pytest
 from basstler.git.commands import GitCommandRunner
 from basstler.github.repository import Repository
 from basstler.locations import ProjectLocation
+from basstler.plan_site.locations import SiteProjectLocation
 from basstler.plan.model import PlanDocument
 from basstler.plan_site.exceptions import RegistryUnreadableError
 from basstler.plan_site.hub import (
@@ -97,20 +98,20 @@ def test_the_hub_file_round_trips(tmp_path: Path):
         repositories=[str(REGISTRY)],
         site_url=SiteSampleText.SITE_URL.value,
     )
-    path = tmp_path / ProjectLocation.PLAN_HUB.name
+    path = tmp_path / SiteProjectLocation.PLAN_HUB.name
     path.write_text(hub.to_text(), encoding="utf-8")
 
     assert PlanHub.load(path) == hub
 
 
 def test_a_missing_hub_file_loads_as_none(tmp_path: Path):
-    assert PlanHub.load(tmp_path / ProjectLocation.PLAN_HUB.name) is None
+    assert PlanHub.load(tmp_path / SiteProjectLocation.PLAN_HUB.name) is None
 
 
 def test_the_hub_file_is_read_off_the_registry_notes_branch(tmp_path: Path):
     hub = PlanHub(registry=str(REGISTRY), repositories=[str(REGISTRY)])
     publish_notes(
-        tmp_path, REGISTRY, {Path(ProjectLocation.PLAN_HUB.name): hub.to_text()}
+        tmp_path, REGISTRY, {Path(SiteProjectLocation.PLAN_HUB.name): hub.to_text()}
     )
 
     assert PlanHub.from_registry(REGISTRY, str(tmp_path)) == hub
@@ -290,7 +291,7 @@ def write_hub(directory: Path, site_url: str | None) -> Path:
     :param site_url: The site address it names.
     :return: The written hub file.
     """
-    path = directory / ProjectLocation.PLAN_HUB.name
+    path = directory / SiteProjectLocation.PLAN_HUB.name
     path.write_text(
         PlanHub(registry=str(REGISTRY), site_url=site_url).to_text(), encoding="utf-8"
     )

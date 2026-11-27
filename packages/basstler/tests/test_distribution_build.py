@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 from basstler.bash import Bash
-from basstler.environment import GitHubActionsVariable
+from basstler.github.environment import GitHubActionsOutputVariable
 from basstler.git.commands import GitCommandRunner
 from basstler.packaging.publish_workflow import (
     ArtifactActionInput,
@@ -229,7 +229,7 @@ def test_the_build_lists_every_distribution_it_built(
     run_step(
         step.run,
         built_release.directory.parent,
-        {GitHubActionsVariable.OUTPUT: str(output)},
+        {GitHubActionsOutputVariable.OUTPUT: str(output)},
     )
 
     name, _, value = TextFile(output).read().strip().partition("=")

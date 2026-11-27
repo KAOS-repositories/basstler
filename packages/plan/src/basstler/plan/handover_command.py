@@ -18,7 +18,7 @@ from basstler.github.client import GitHubRestClient
 from basstler.git.branch import Branch
 from basstler.github.repository_details import RepositoryDetailsRead
 from basstler.github.repository_option import RepositoryArgument
-from basstler.locations import PlanHandoverLocation
+from basstler.plan.locations import PlanHandoverLocation
 from basstler.plan.handover import PlanHandover
 from basstler.plan.handover_continuation import HandoverImport
 from basstler.plan.handover_options import PlanHandoverCommand, PlanHandoverOption

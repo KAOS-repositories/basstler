@@ -22,9 +22,10 @@ from basstler.exit_codes import CommandFailure, ExitCode
 from basstler.git.commands import GitCommandRunner
 from basstler.github.basstler_project import BasstlerProject
 from basstler.json_model import ValidatedJSONModel
-from basstler.locations import BasstlerRepositoryLocation
 from basstler.standard_streams import StandardStreamHandler
 from basstler.text_file import TextFile
+from basstler.locations import BasstlerRepositoryLocation
+from basstler.github.locations import ReleaseRepositoryLocation
 
 logger = StandardStreamHandler.logger_for(__name__)
 """
@@ -455,7 +456,7 @@ class PluginRelease:
             f"--prefix={BasstlerRepositoryLocation.PLUGIN}",
             "HEAD",
         )
-        manifest_path = BasstlerRepositoryLocation.PLUGIN_MANIFEST.path_in_plugin
+        manifest_path = ReleaseRepositoryLocation.PLUGIN_MANIFEST.path_in_plugin
         manifest = json.loads(git.file_at(plugin, manifest_path))
         manifest["version"] = str(self.version)
         previous = git.commit_or_none(self.previous)

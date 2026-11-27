@@ -13,6 +13,7 @@ import yaml
 
 from basstler.bash import Bash
 from basstler.locations import PluginLocation, ProjectLocation
+from basstler.plan_site.locations import SiteProjectLocation
 from basstler.plan.item_bootstrap.exceptions import (
     BranchAlreadyPublishedError,
     IncompleteNewItemError,
@@ -165,7 +166,7 @@ def test_the_plans_directory_matches_the_shell_configuration_that_owns_it(
 ):
     """
     ``ProjectLocation.PLANS`` mirrors ``PLANS_DIR`` in the shell configuration, and
-    ``ProjectLocation.PLAN_HUB`` mirrors ``PLAN_HUB_PATH``; this is what stops the
+    ``SiteProjectLocation.PLAN_HUB`` mirrors ``PLAN_HUB_PATH``; this is what stops the
     mirrors drifting, since each pair is edited in different files.
     """
     resolved = subprocess.run(
@@ -184,7 +185,7 @@ def test_the_plans_directory_matches_the_shell_configuration_that_owns_it(
     )
     plans_directory, manifest_path, hub_path = resolved.stdout.strip().split("\n")
     assert plans_directory == (ProjectLocation.PLANS).as_posix()
-    assert hub_path == (ProjectLocation.PLAN_HUB).as_posix()
+    assert hub_path == (SiteProjectLocation.PLAN_HUB).as_posix()
     assert manifest_path == PlanDocument.MANIFEST.path_within_notes_branch(
         PLAN_IDENTIFIER
     )

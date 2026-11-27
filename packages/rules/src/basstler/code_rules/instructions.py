@@ -13,7 +13,10 @@ from pathlib import Path
 from basstler.code_rules.commands import CodeRulesCommand
 from basstler.code_rules.rule import Section
 from basstler.code_rules.ruleset import ProjectCodeRules
-from basstler.locations import InstructionsTemplate, ProjectLocation
+from basstler.code_rules.locations import (
+    CodeRulesProjectLocation,
+    CodeRulesInstructionsTemplate,
+)
 from basstler.render_common import create_template_environment
 from basstler.text_file import TextFile
 
@@ -50,7 +53,7 @@ class AgentsInstructions:
         """
         The path of the repository's ``AGENTS.md``.
         """
-        return self.repository_root / ProjectLocation.AGENTS_INSTRUCTIONS
+        return self.repository_root / CodeRulesProjectLocation.AGENTS_INSTRUCTIONS
 
     @property
     def text(self) -> str:
@@ -59,7 +62,7 @@ class AgentsInstructions:
         headings, in the order they are declared.
         """
         template = create_template_environment().get_template(
-            InstructionsTemplate.AGENTS.name
+            CodeRulesInstructionsTemplate.AGENTS.name
         )
         return template.render(
             sections=self.sections,

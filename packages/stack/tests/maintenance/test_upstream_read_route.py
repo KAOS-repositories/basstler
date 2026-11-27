@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import pytest
 
-from basstler.locations import ClaudeCodeVariable, RepositoryStateLocation
+from basstler.locations import ClaudeCodeVariable
+from basstler.stack.locations import StackStateLocation
 from basstler.maintenance.commands import MaintenancePass
 from basstler.maintenance.upstream_read_route import UpstreamReadRoute
 from basstler.upstream_reviews.exceptions import ActionNotInstalled
@@ -26,7 +27,7 @@ def test_a_pass_reading_through_the_action_asks_the_fork_s_action_branch(
     maintenance = MaintenancePass(
         configuration=make_configuration(),
         git=fork_checkout.git,
-        board=fork_checkout.project_root / RepositoryStateLocation.BOARD.name,
+        board=fork_checkout.project_root / StackStateLocation.BOARD.name,
         upstream_read=UpstreamReadRoute.ACTION,
     )
 

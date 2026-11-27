@@ -31,12 +31,8 @@ from basstler.github.repository_access import (
     GitHubRepository,
 )
 from basstler.github.tooling_labels import GitHubLabel
-from basstler.locations import (
-    ClaudeCodeVariable,
-    PluginLocation,
-    PluginSkillLocation,
-    ProjectLocation,
-)
+from basstler.locations import ClaudeCodeVariable, PluginLocation, ProjectLocation
+from basstler.setup.locations import SetupPluginLocation, SetupPluginSkillLocation
 from basstler.plugin_root import PluginRoot
 from basstler.setup.exceptions import CheckSetupFailedError, ForeignNotesRemoteError
 from basstler.setup.personal_notes import (
@@ -68,10 +64,10 @@ from basstler_testing.scratch_repository import (
 
 SCRIPTS_UNDER_TEST = (
     PluginLocation.PERSONAL_NOTES_CONFIGURATION_SCRIPT.name,
-    PluginLocation.SETUP_CHECK_SCRIPT.name,
+    SetupPluginLocation.SETUP_CHECK_SCRIPT.name,
     PluginLocation.PERSONAL_NOTES_BRANCH_CREATION_SCRIPT.name,
     PluginLocation.PERSONAL_NOTES_WRITER_SCRIPT.name,
-    PluginLocation.GIT_IDENTITY_SAVING_SCRIPT.name,
+    SetupPluginLocation.GIT_IDENTITY_SAVING_SCRIPT.name,
     PluginLocation.SESSION_START_SCRIPT.name,
     PluginLocation.SESSION_START_MESSAGES_SCRIPT.name,
 )
@@ -170,12 +166,12 @@ def setup_repository(scratch_repository: ScratchRepository) -> ScratchRepository
     scratch_repository.install_package_environment()
     scratch_repository.write_setup_prerequisites()
     starter_notes = PluginRoot(scratch_repository.plugin_root).path_of(
-        PluginSkillLocation.STARTER_NOTES
+        SetupPluginSkillLocation.STARTER_NOTES
     )
     starter_notes.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(
         PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
-            PluginSkillLocation.STARTER_NOTES
+            SetupPluginSkillLocation.STARTER_NOTES
         ),
         starter_notes,
     )
@@ -225,7 +221,7 @@ def check_setup_report(repository: ScratchRepository) -> SetupReport:
     :return: What check-setup.sh reports there now.
     """
     return SetupReport.from_completed_process(
-        repository.run_hook_script(PluginLocation.SETUP_CHECK_SCRIPT.name)
+        repository.run_hook_script(SetupPluginLocation.SETUP_CHECK_SCRIPT.name)
     )
 
 
@@ -332,7 +328,7 @@ def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     )
     setup.run()
     scripts_before_the_sync = [
-        PluginLocation.SETUP_CHECK_SCRIPT,
+        SetupPluginLocation.SETUP_CHECK_SCRIPT,
         PluginLocation.PERSONAL_NOTES_BRANCH_CREATION_SCRIPT,
         PluginLocation.SESSION_START_SCRIPT,
     ]
@@ -341,7 +337,7 @@ def test_runs_every_hook_script_in_the_bash_claude_code_is_configured_with(
     assert call_log.read_text(encoding="utf-8").splitlines() == [
         *(str(setup.plugin_root.path_of(script)) for script in scripts_before_the_sync),
         "-c",
-        str(setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT)),
+        str(setup.plugin_root.path_of(SetupPluginLocation.SETUP_CHECK_SCRIPT)),
     ]
 
 
@@ -380,7 +376,7 @@ def test_seeds_a_new_notes_file_from_the_starter_notes_when_asked(
     assert (checkout / ProjectLocation.PERSONAL_NOTES_DOCUMENT).read_text(
         encoding="utf-8"
     ) == PluginRoot(RepositoryLocation.PLUGIN.value).path_of(
-        PluginSkillLocation.STARTER_NOTES
+        SetupPluginSkillLocation.STARTER_NOTES
     ).read_text(encoding="utf-8")
 
 
@@ -457,7 +453,7 @@ def test_stops_with_check_setup_failed_when_check_setup_sh_reports_nothing(
     )
     shutil.copy(
         DatasetLocation.FAILING_CHECK_SETUP_STUB,
-        setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT),
+        setup.plugin_root.path_of(SetupPluginLocation.SETUP_CHECK_SCRIPT),
     )
 
     with pytest.raises(CheckSetupFailedError) as refusal:
@@ -485,7 +481,7 @@ def test_a_failed_first_check_leaves_the_clone_s_git_config_unchanged(
     )
     shutil.copy(
         DatasetLocation.FAILING_CHECK_SETUP_STUB,
-        setup.plugin_root.path_of(PluginLocation.SETUP_CHECK_SCRIPT),
+        setup.plugin_root.path_of(SetupPluginLocation.SETUP_CHECK_SCRIPT),
     )
 
     with pytest.raises(CheckSetupFailedError):

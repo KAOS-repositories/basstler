@@ -16,7 +16,7 @@ from basstler.exit_codes import StackExitCode
 from basstler.github.constants import MaintenanceNotice
 from basstler.github.pull_request_state import PullRequestState
 from basstler.github.repository_access import ForkPullRequests, PullRequestListState
-from basstler.locations import RepositoryStateLocation
+from basstler.stack.locations import StackStateLocation
 from basstler.maintenance.board import BoardExport
 from basstler.upstream_reviews.action.open_pull_requests import UpstreamPullRequests
 from basstler.maintenance.commands import (
@@ -203,7 +203,7 @@ def test_each_stack_is_derived_from_an_export_made_for_it_never_from_the_board_f
     a_parent_and_child(fork_checkout)
     fork_checkout.name_the_upstream()
     monkeypatch.chdir(fork_checkout.project_root)
-    board = fork_checkout.project_root / RepositoryStateLocation.BOARD.name
+    board = fork_checkout.project_root / StackStateLocation.BOARD.name
     board.write_text("not a board", encoding="utf-8")
     maintenance = PassCountingItsExports(
         configuration=make_configuration(),
@@ -309,7 +309,7 @@ def test_a_board_in_a_repository_naming_no_upstream_reads_no_upstream(
     maintenance = MaintenancePass(
         configuration=configuration,
         git=fork_checkout.git,
-        board=fork_checkout.project_root / RepositoryStateLocation.BOARD.name,
+        board=fork_checkout.project_root / StackStateLocation.BOARD.name,
         upstream_read=UpstreamReadRoute.ACTION,
     )
 

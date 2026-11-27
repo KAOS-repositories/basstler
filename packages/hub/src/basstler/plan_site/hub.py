@@ -40,6 +40,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.git.remote_branch import RemoteBranch
 from basstler.github.repository import GitHubAddress, HasRepository, Repository
 from basstler.locations import ProjectLocation
+from basstler.plan_site.locations import SiteProjectLocation
 from basstler.plan.structure import Item
 from basstler.plan_site.exceptions import (
     PlansCheckoutFailedError,
@@ -244,7 +245,7 @@ class PlanHub:
                     notes_branch,
                     PlanSiteSecret.private_repository_correction,
                 )
-            text = notes.read(ProjectLocation.PLAN_HUB)
+            text = notes.read(SiteProjectLocation.PLAN_HUB)
         return cls.from_yaml(text)
 
     def to_text(self) -> str:
@@ -275,7 +276,7 @@ class PlanHub:
             file lists.
         """
         # Only the registry's copy lists every repository; this one names the registry.
-        own_copy = cls.from_yaml(notes_branch.read_latest(ProjectLocation.PLAN_HUB))
+        own_copy = cls.from_yaml(notes_branch.read_latest(SiteProjectLocation.PLAN_HUB))
         if own_copy is None:
             return [notes_repository]
         hub = (

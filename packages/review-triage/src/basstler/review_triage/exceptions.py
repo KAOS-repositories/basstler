@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from basstler.class_property import classproperty
 from basstler.exceptions import DataclassException
-from basstler.locations import BasstlerRepositoryLocation
+from basstler.review_triage.locations import ReviewTriageRepositoryLocation
 from basstler.github.basstler_project import BasstlerProject
 from basstler.github.repository import PullRequestReference, Repository
 from basstler.review_triage.command_names import ReviewTriageCommand
@@ -28,7 +28,7 @@ class MarkingRoutes:
         """
         return BasstlerProject.repository.file_url(
             BasstlerProject.default_branch,
-            BasstlerRepositoryLocation.REVIEW_TRIAGE_README.as_posix(),
+            ReviewTriageRepositoryLocation.README.as_posix(),
         )
 
     @classproperty

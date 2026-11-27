@@ -70,41 +70,14 @@ class ShippedPath(PathEnumeration):
     user's overrides.
     """
 
-    QUERIES = Path("github") / "queries"
-    """
-    The GraphQL documents the upstream review reader sends.
-    """
-
     UPSTREAM_REVIEWS_FETCH = Path("upstream_reviews") / "helper" / "fetch.py"
     """
     The program a helper session runs without ``basstler``, so it imports nothing of it.
     """
 
-    MARK_FILE_AS_VIEWED = Path("review_triage") / "mark_file_as_viewed.graphql"
-    """
-    The GraphQL mutation marking one file of a pull request viewed.
-    """
-
-    PLAN_ITEM_MODE_DEFAULTS = Path("plan") / "plan-item-modes.toml"
-    """
-    The shipped plan-item execution modes.
-    """
-
-    GITHUB_REPOSITORY_MODULE = Path("github") / "repository.py"
-    """
-    The module whose :class:`basstler.github.repository.Repository` builds every
-    address within a repository.
-    """
-
     REGULAR_EXPRESSION_MODULE = Path("regular_expression.py")
     """
     The module that builds every regular expression from named parts.
-    """
-
-    PULL_REQUEST_FILES = Path("review_triage") / "pull_request_files.graphql"
-    """
-    The GraphQL query reading one page of the files GitHub lists in a pull request,
-    with its head commit.
     """
 
 
@@ -180,10 +153,17 @@ class WorkspaceLocation(PathEnumeration):
     """
 
 
-class PackageLocation(PathEnumeration):
+class PackageFile(PathEnumeration):
     """
-    The core distribution's own directory, the files the distributions ship, and the
-    checkout they are imported from, as absolute paths.
+    A file of the installed package or of the checkout it is imported from, as an absolute
+    path.
+    """
+
+
+class PackageLocation(PackageFile):
+    """
+    The core distribution's own directory, the checkout it is imported from, and the
+    files several distributions read.
     """
 
     DIRECTORY = Path(__file__).parent
@@ -203,6 +183,18 @@ class PackageLocation(PathEnumeration):
     :attr:`ShippedPath.STACK_CONFIGURATION`, where the github distribution ships it.
     """
 
+    LICENSE = SOURCE_TREE / "LICENSE"
+    """
+    The licence text of a checkout.
+    """
+
+    UPSTREAM_REVIEWS_FETCH = INSTALLED_PACKAGE.shipped(
+        ShippedPath.UPSTREAM_REVIEWS_FETCH
+    )
+    """
+    :attr:`ShippedPath.UPSTREAM_REVIEWS_FETCH`, where the reviews distribution ships it.
+    """
+
     META_PACKAGE_METADATA = (
         SOURCE_TREE
         / WorkspaceLocation.PACKAGES
@@ -214,37 +206,6 @@ class PackageLocation(PathEnumeration):
     it supports and where its version is read from.
     """
 
-    LICENSE = SOURCE_TREE / "LICENSE"
-    """
-    The licence text of a checkout.
-    """
-
-    QUERIES = INSTALLED_PACKAGE.shipped(ShippedPath.QUERIES)
-    """
-    :attr:`ShippedPath.QUERIES`, where the github distribution ships them.
-    """
-
-    UPSTREAM_REVIEWS_FETCH = INSTALLED_PACKAGE.shipped(
-        ShippedPath.UPSTREAM_REVIEWS_FETCH
-    )
-    """
-    :attr:`ShippedPath.UPSTREAM_REVIEWS_FETCH`, where the reviews distribution ships it.
-    """
-
-    PLAN_ITEM_MODE_DEFAULTS = INSTALLED_PACKAGE.shipped(
-        ShippedPath.PLAN_ITEM_MODE_DEFAULTS
-    )
-    """
-    :attr:`ShippedPath.PLAN_ITEM_MODE_DEFAULTS`, where the plan distribution ships them.
-    """
-
-    GITHUB_REPOSITORY_MODULE = INSTALLED_PACKAGE.shipped(
-        ShippedPath.GITHUB_REPOSITORY_MODULE
-    )
-    """
-    :attr:`ShippedPath.GITHUB_REPOSITORY_MODULE`, where the github distribution ships it.
-    """
-
     REGULAR_EXPRESSION_MODULE = INSTALLED_PACKAGE.shipped(
         ShippedPath.REGULAR_EXPRESSION_MODULE
     )
@@ -253,10 +214,16 @@ class PackageLocation(PathEnumeration):
     """
 
 
-class RepositoryStateLocation(PathEnumeration):
+class RepositoryStateFile(PathEnumeration):
     """
     Scratch state kept per repository, relative to its common git directory, which every
     worktree of the repository shares and no checkout or install of the package holds.
+    """
+
+
+class RepositoryStateLocation(RepositoryStateFile):
+    """
+    The scratch state several distributions keep, and the directory all of it lives in.
     """
 
     DIRECTORY = Path("basstler")
@@ -264,26 +231,10 @@ class RepositoryStateLocation(PathEnumeration):
     Everything this package keeps there.
     """
 
-    BOARD = DIRECTORY / "board.json"
-    """
-    The exported snapshot of the fork's open pull requests.
-    """
-
-    MAINTENANCE_REPORT = DIRECTORY / "maintenance-report.json"
-    """
-    Everything the last maintenance pass did, in full.
-    """
-
     PLAN_STATE_SYNC_STAMP = DIRECTORY / "plan-state-sync-sha"
     """
     The personal-notes commit this clone last read plan state at. The shell
     configuration's ``PLAN_STATE_SYNC_STAMP`` spells the same name.
-    """
-
-    VIEWED_MARKING_STAMP = DIRECTORY / "viewed-marked-head"
-    """
-    The pull request the files were last marked viewed on, and the head commit they
-    were marked at.
     """
 
     PERSONAL_SETTINGS_SYNC_STAMP = DIRECTORY / "personal-settings-sync-hash"
@@ -294,104 +245,20 @@ class RepositoryStateLocation(PathEnumeration):
     """
 
 
-class CommitScratchFile(PathEnumeration):
+class BasstlerShellVariable(EnvironmentVariable):
     """
-    The files a commit built outside the working tree is staged through, relative to a
-    scratch directory of its own.
-    """
-
-    INDEX = Path("index")
-    """
-    The index the commit's tree is staged in, leaving the clone's own untouched.
-    """
-
-    BLOB = Path("blob")
-    """
-    One file's content, written out to be stored as a blob.
+    An environment variable this package's own shell configuration sets.
     """
 
 
-class SiteTemplate(PathEnumeration):
+class BasstlerVariable(BasstlerShellVariable):
     """
-    The templates the plan site's pages and stylesheet are rendered from.
-    """
-
-    STYLESHEET = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site.css")
-    """
-    The one stylesheet every page of the site links.
-    """
-
-    LAYOUT = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_layout.html")
-    """
-    The document every page of the site fills in.
-    """
-
-    PARTS = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_parts.html")
-    """
-    The markup the site's pages share: progress cards, the health banner, dependency
-    chips and action buttons.
-    """
-
-    HUB = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "hub.html")
-    """
-    The hub: a card per repository.
-    """
-
-    REPOSITORY_INDEX = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "site_index.html"
-    )
-    """
-    One repository's index: a card per plan.
-    """
-
-    PLAN = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_plan.html")
-    """
-    One plan's page: a column per wave, a card per item.
-    """
-
-    PLAN_SCRIPT = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "site_plan.js")
-    """
-    A plan page's behaviour: copying commands, choosing a model, revealing an item.
-    """
-
-    LIVE_STATE_SCRIPT = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "site_live_state.js"
-    )
-    """
-    The script every site page reads a pull request's live state from GitHub's answer
-    with, and re-checks with when the tab is shown again.
-    """
-
-    LIVE_PROGRESS_SCRIPT = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "site_live_progress.js"
-    )
-    """
-    The hub's and repository indexes' script that recounts every progress card from
-    each repository's pull request listing.
-    """
-
-    PLAN_PULL_REQUEST_RECHECK_SCRIPT = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "site_plan_pull_request_recheck.js"
-    )
-    """
-    The plan page's script that reads every pull request's state from GitHub in the
-    browser, and shows when the page was last refreshed.
-    """
-
-
-class BasstlerVariable(EnvironmentVariable):
-    """
-    The environment variables this package's own shell configuration sets.
+    The variables of this package's own shell configuration several distributions read.
     """
 
     PLUGIN_ROOT = "BASSTLER_PLUGIN_ROOT"
     """
     The root of the Claude Code plugin whose hooks and skills run this package.
-    """
-
-    PYTHON = "BASSTLER_PYTHON"
-    """
-    The interpreter whose environment holds this package, for running its modules.
     """
 
     ENVIRONMENT_DIRECTORY = "BASSTLER_ENVIRONMENT_DIRECTORY"
@@ -401,129 +268,15 @@ class BasstlerVariable(EnvironmentVariable):
     """
 
 
-class InstructionsTemplate(PathEnumeration):
+class PluginFile(PathEnumeration):
     """
-    The templates the agent instruction files are rendered from.
-    """
-
-    AGENTS = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "agents.md.jinja")
-    """
-    The content of ``AGENTS.md``: rules under the headings of their sections.
-    """
-
-    SKILL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "skill.md.jinja")
-    """
-    The content of a skill's ``SKILL.md``: its frontmatter and title above its body.
+    A file of the plugin, relative to the plugin's root.
     """
 
 
-class PlanHandoverLocation(PathEnumeration):
+class PluginLocation(PluginFile):
     """
-    The files a plan handover holds, relative to its directory.
-    """
-
-    GUIDE = Path("HANDOVER.md")
-    """
-    The instructions a coding agent continues the handed-over plans from without basstler.
-    """
-
-    PLANS = Path("plans")
-    """
-    One directory per plan, holding its documents as the notes branch does.
-    """
-
-    PULL_REQUEST_PROGRESS = Path("pr-progress")
-    """
-    The progress note of each handed-over item's branch, named after the branch.
-    """
-
-    REPOSITORY_RULES = Path("repository-rules.yaml")
-    """
-    The rules every plan of the repository follows, in the notes branch's format.
-    """
-
-    GUIDE_TEMPLATE = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "plan_handover_guide.md.jinja"
-    )
-    """
-    The template :attr:`GUIDE` is rendered from.
-    """
-
-    TAKEN_OVER_TEMPLATE = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "plan_handover_taken_over.md.jinja"
-    )
-    """
-    The template of the comment a handover pull request is closed with.
-    """
-
-    PULL_REQUEST_DIRECTORY = Path("plan-handover")
-    """
-    Where a handover pull request's commit holds the handover, relative to its root.
-    """
-
-    PULL_REQUEST_TEMPLATE = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "plan_handover_pull_request.md.jinja"
-    )
-    """
-    The template a handover pull request's description is rendered from.
-    """
-
-
-class ReviewTriageLocation(PathEnumeration):
-    """
-    The files the review triage reads beside its modules.
-    """
-
-    MARK_FILE_AS_VIEWED = INSTALLED_PACKAGE.shipped(ShippedPath.MARK_FILE_AS_VIEWED)
-    """
-    The GraphQL mutation marking one file of a pull request viewed.
-    """
-
-    REPORT_TEMPLATE = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "review_triage_report.md.jinja"
-    )
-    """
-    The Markdown report of which files of a pull request need review.
-    """
-
-    PULL_REQUEST_FILES = INSTALLED_PACKAGE.shipped(ShippedPath.PULL_REQUEST_FILES)
-    """
-    The GraphQL query reading one page of the files GitHub lists in a pull request,
-    with its head commit.
-    """
-
-    MARK_VIEWED_SETUP_TEMPLATE = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "review_triage_mark_viewed_setup.md.jinja"
-    )
-    """
-    The report of setting a repository's Actions up to mark files viewed.
-    """
-
-    MARK_VIEWED_CALLER_TEMPLATE = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "review_triage_mark_viewed_caller.yml"
-    )
-    """
-    The workflow installed on a user's repository that calls basstler's reusable
-    workflow marking files viewed.
-    """
-
-
-class GitHubTemplate(PathEnumeration):
-    """
-    The templates the GitHub client's models render.
-    """
-
-    SHARED_TOKEN_STORE_COMMAND = INSTALLED_PACKAGE.shipped(
-        ShippedPath.TEMPLATES / "shared_token_store_command.sh"
-    )
-    """
-    The command storing one token, read once at a hidden prompt, as several secrets.
-    """
-
-
-class PluginLocation(PathEnumeration):
-    """
-    The plugin's files this package runs, relative to the plugin's root.
+    The plugin's files several distributions run, relative to the plugin's root.
     """
 
     HOOKS = Path("hooks")
@@ -581,16 +334,6 @@ class PluginLocation(PathEnumeration):
     personal-notes branch.
     """
 
-    SETUP_CHECK_SCRIPT = HOOKS / "check-setup.sh"
-    """
-    Reports, one row per prerequisite, what the personal-notes setup still lacks.
-    """
-
-    PLAN_SAVING_SCRIPT = HOOKS / "save-plan.sh"
-    """
-    Pushes an edited plan manifest and roadmap to the personal-notes branch.
-    """
-
     PULL_REQUEST_PROGRESS_SAVING_SCRIPT = HOOKS / "save-pr-progress.sh"
     """
     Saves a branch's pull-request progress notes to the personal-notes branch.
@@ -599,11 +342,6 @@ class PluginLocation(PathEnumeration):
     PLAN_UPDATES_SINCE_SCRIPT = HOOKS / "plan-updates-since.sh"
     """
     Reports what changed in the plans since this clone last read them.
-    """
-
-    GIT_IDENTITY_SAVING_SCRIPT = HOOKS / "save-git-identity.sh"
-    """
-    Saves the user's git identity to the personal-notes branch.
     """
 
     PERSONAL_SETTINGS_SAVING_SCRIPT = HOOKS / "save-personal-settings.sh"
@@ -620,9 +358,15 @@ class PluginLocation(PathEnumeration):
         return f"${BasstlerVariable.PLUGIN_ROOT}/{self}"
 
 
-class BasstlerRepositoryLocation(PathEnumeration):
+class BasstlerRepositoryFile(PathEnumeration):
     """
-    The directories of basstler's own repository a release reads, relative to its root.
+    A file or directory of basstler's own repository, relative to its root.
+    """
+
+
+class BasstlerRepositoryLocation(BasstlerRepositoryFile):
+    """
+    The directories of basstler's own repository several distributions read.
     """
 
     PLUGIN = Path("plugin")
@@ -630,25 +374,8 @@ class BasstlerRepositoryLocation(PathEnumeration):
     The Claude Code plugin.
     """
 
-    PLUGIN_MANIFEST = PLUGIN / ".claude-plugin" / "plugin.json"
-    """
-    The plugin's manifest: its name, description and, once released, version.
-    """
 
-    REVIEW_TRIAGE_README = Path("docs") / "review-triage" / "README.md"
-    """
-    How to use the review triage and set up marking files viewed.
-    """
-
-    @property
-    def path_in_plugin(self) -> Path:
-        """
-        :return: This file's path from the plugin's root, as the released plugin holds it.
-        """
-        return self.relative_to(BasstlerRepositoryLocation.PLUGIN)
-
-
-class PluginSkillLocation(PathEnumeration):
+class PluginSkillLocation(PluginFile):
     """
     The files of the plugin's skills this package reads, relative to the plugin's root.
     """
@@ -658,9 +385,21 @@ class PluginSkillLocation(PathEnumeration):
     The directory holding one directory per skill.
     """
 
-    STARTER_NOTES = SKILLS / "setup-personal-notes" / "starter-notes.md"
+
+class InstructionsTemplateFile(PathEnumeration):
     """
-    The conventions a new personal-notes file can be seeded with.
+    A template an agent instruction file is rendered from.
+    """
+
+
+class InstructionsTemplate(InstructionsTemplateFile):
+    """
+    The template of every skill's ``SKILL.md``.
+    """
+
+    SKILL = INSTALLED_PACKAGE.shipped(ShippedPath.TEMPLATES / "skill.md.jinja")
+    """
+    The content of a skill's ``SKILL.md``: its frontmatter and title above its body.
     """
 
 
@@ -675,12 +414,18 @@ class SkillLocation(PathEnumeration):
     """
 
 
-class ProjectLocation(PathEnumeration):
+class ProjectFile(PathEnumeration):
     """
-    The files this package reads, runs or writes in a project, relative to its root.
+    A file in a project, relative to its root.
 
-    Those on the personal-notes branch are relative to that branch's root, which is the
+    One on the personal-notes branch is relative to that branch's root, which is the
     same tree.
+    """
+
+
+class ProjectLocation(ProjectFile):
+    """
+    The files several distributions read, run or write in a project.
     """
 
     CLAUDE_CODE_DIRECTORY = Path(".claude")
@@ -699,23 +444,6 @@ class ProjectLocation(PathEnumeration):
     :attr:`PackageLocation.STACK_CONFIGURATION`.
     """
 
-    GIT_IDENTITY = PERSONAL_NOTES / "git-identity"
-    """
-    The git identity of the notes repository's owner, which a clone with none of its
-    own is given.
-
-    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
-    """
-
-    CONTRIBUTOR_GIT_IDENTITIES = PERSONAL_NOTES / "git-identities"
-    """
-    The git identities of everyone else who shares the notes branch, one file per GitHub
-    login.
-
-    Mirrors ``CONTRIBUTOR_GIT_IDENTITIES_DIRECTORY`` in
-    ``resolve-personal-notes-config.sh``.
-    """
-
     PERSONAL_NOTES_DOCUMENT = PERSONAL_NOTES / "notes.md"
     """
     The notes file itself, unless a clone's settings put it elsewhere.
@@ -729,11 +457,19 @@ class ProjectLocation(PathEnumeration):
     half of the same tooling; a test holds the two equal so the mirror cannot drift.
     """
 
-    PLAN_HUB = PLANS / "_hub.yaml"
+    PLAN_RULES = PLANS / "_rules.yaml"
     """
-    The plan hub file: the site's address and every repository it publishes.
+    The rules every plan of the repository follows, one entry per rule.
+    """
 
-    Mirrors ``PLAN_HUB_PATH`` in ``resolve-personal-notes-config.sh``.
+    PERSONAL_STACK_CONFIGURATION = PERSONAL_NOTES / "stack.toml"
+    """
+    The per-user override of :attr:`PROJECT_STACK_CONFIGURATION`.
+    """
+
+    PLAYBOOK = Path("basstler_playbook.py")
+    """
+    The module declaring the project's own playbook, where it has one.
     """
 
     PLAN_BRANCH_INDEX = PLANS / "_generated" / "branch-index.tsv"
@@ -743,54 +479,25 @@ class ProjectLocation(PathEnumeration):
     Mirrors ``PLAN_BRANCH_INDEX_PATH`` in ``resolve-personal-notes-config.sh``.
     """
 
-    PLAN_RULES = PLANS / "_rules.yaml"
+    GIT_IDENTITY = PERSONAL_NOTES / "git-identity"
     """
-    The rules every plan of the repository follows, one entry per rule.
-    """
+    The git identity of the notes repository's owner, which a clone with none of its own
+    is given.
 
-    PULL_REQUEST_PROGRESS = PERSONAL_NOTES / "pr-progress"
-    """
-    Where the personal-notes branch keeps each branch's progress note, named after the
-    branch.
-
-    Mirrors ``PR_PROGRESS_DIRECTORY`` in ``resolve-personal-notes-config.sh``.
-    """
-
-    PERSONAL_STACK_CONFIGURATION = PERSONAL_NOTES / "stack.toml"
-    """
-    The per-user override of :attr:`PROJECT_STACK_CONFIGURATION`.
-    """
-
-    WORKFLOWS = Path(".github") / "workflows"
-    """
-    Where GitHub reads a repository's workflows from - the top level only.
-    """
-
-    ACTIONS_BUDGET = Path(".github") / "actions_budget.py"
-    """
-    The repository's Actions budget: the limits basstler holds every workflow to.
-    """
-
-    PERSONAL_PLAN_ITEM_MODES = PERSONAL_NOTES / "plan-item-modes.toml"
-    """
-    The per-user override of :attr:`PackageLocation.PLAN_ITEM_MODE_DEFAULTS`.
-    """
-
-    AGENTS_INSTRUCTIONS = Path("AGENTS.md")
-    """
-    The instructions agents read, generated from :mod:`basstler.code_rules.rules`.
-    """
-
-    PLAYBOOK = Path("basstler_playbook.py")
-    """
-    The module declaring the project's own playbook, where it has one.
+    Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
     """
 
 
-class WorkflowLocation(PathEnumeration):
+class ActionsWorkflowFile(PathEnumeration):
     """
-    The GitHub Actions workflows basstler runs or starts, relative to the root of the
-    branch that holds each.
+    A GitHub Actions workflow basstler runs or starts, relative to the root of the branch
+    that holds it.
+    """
+
+
+class WorkflowLocation(ActionsWorkflowFile):
+    """
+    The workflows several distributions name, and the directory GitHub reads them from.
     """
 
     DIRECTORY = Path(".github") / "workflows"
@@ -798,41 +505,20 @@ class WorkflowLocation(PathEnumeration):
     Where GitHub reads a branch's workflows from.
     """
 
-    PLAN_SITE_BUILD = DIRECTORY / "plan-site-build.yml"
+    MARK_VIEWED = DIRECTORY / "mark-viewed.yml"
     """
-    basstler's reusable workflow that builds and deploys the plan site.
+    The workflow on the user's repository that calls :attr:`~basstler.review_triage.locations.ReviewTriageWorkflowLocation.REUSABLE_MARK_VIEWED`
+    with the user's own token.
     """
 
     PLAN_SITE = DIRECTORY / "plan-site.yml"
     """
-    The workflow on the user's site repository that calls :attr:`PLAN_SITE_BUILD`.
-    """
-
-    PLAN_SITE_DISPATCH = DIRECTORY / "plan-site-dispatch.yml"
-    """
-    The workflow on a notes branch that starts :attr:`PLAN_SITE` on every push to it.
-    """
-
-    PLAN_SITE_MERGE = DIRECTORY / "plan-site-merge.yml"
-    """
-    The workflow on a notes repository's default branch that starts :attr:`PLAN_SITE`
-    whenever a pull request merges.
+    The workflow on the user's site repository that calls :attr:`~basstler.plan_site.locations.SiteWorkflowLocation.PLAN_SITE_BUILD`.
     """
 
     UPSTREAM_REVIEWS = DIRECTORY / "upstream-reviews.yml"
     """
     basstler's reusable workflow a project calls to read its upstream's reviews.
-    """
-
-    REVIEW_TRIAGE_MARK_VIEWED = DIRECTORY / "review-triage-mark-viewed.yml"
-    """
-    basstler's reusable workflow that marks a pull request's mechanical files viewed.
-    """
-
-    MARK_VIEWED = DIRECTORY / "mark-viewed.yml"
-    """
-    The workflow on the user's repository that calls :attr:`REVIEW_TRIAGE_MARK_VIEWED`
-    with the user's own token.
     """
 
 

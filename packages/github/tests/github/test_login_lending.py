@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from basstler.environment import GitVariable
+from basstler.git.environment import GitVariable
 from basstler.github.login_lending import GitHubLoginLendingRunner
 from basstler.github.repository import GitHubAddress
 

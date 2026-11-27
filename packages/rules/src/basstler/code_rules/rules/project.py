@@ -20,7 +20,7 @@ from basstler.code_rules.rule import CodeReference, Section
 from basstler.code_rules.text_file_usage import TextFileChecker
 from basstler.code_rules.tree_removal import TreeRemovalChecker
 from basstler.directory_tree import DirectoryTree
-from basstler.locations import BasstlerRepositoryLocation, PluginLocation, SkillLocation
+from basstler.locations import PluginLocation, SkillLocation, BasstlerRepositoryLocation
 from basstler.playbook.contribution import (
     ContributionEntryPointGroup,
     PackageContribution,
@@ -70,8 +70,12 @@ class PackageAndPluginRules(Section):
     )
 
     NAME_FILES_AND_VARIABLES_ONCE = (
-        f"Name every file and directory once, in {CodeReference(locations).path}; "
-        f"every environment variable once, in {CodeReference(environment).path}"
+        "Name every file and directory once, in the `locations` module of the "
+        "distribution whose code alone names it, or in "
+        f"{CodeReference(locations).path} when several distributions name it or only "
+        "the plugin's shell scripts and the tests that check them do; every environment "
+        "variable once, in that distribution's `environment` module, or in "
+        f"{CodeReference(environment).path} on the same terms"
     )
 
     ONLY_DECLARED_DEPENDENCIES = (

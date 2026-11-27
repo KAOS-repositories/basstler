@@ -31,7 +31,9 @@ from basstler.github.release_version import (
 )
 from basstler.github.workflows import ActivityType, Trigger, TriggerEvent, WorkflowKey
 from basstler.github.workflows import Workflow as DeclaredWorkflow
-from basstler.locations import BasstlerRepositoryLocation, PathEnumeration
+from basstler.locations import PathEnumeration, BasstlerRepositoryLocation
+from basstler.github.environment import GitHubActionsOutputVariable
+from basstler.github.locations import ReleaseRepositoryLocation
 
 from basstler_testing.constants.environment import SearchPathVariable
 from basstler_testing.constants.paths import RepositoryLocation
@@ -145,7 +147,7 @@ class ReleaseSampleFile(PathEnumeration):
     Documentation, which no install runs but which still makes a new release.
     """
 
-    PLUGIN_MANIFEST = BasstlerRepositoryLocation.PLUGIN_MANIFEST.value
+    PLUGIN_MANIFEST = ReleaseRepositoryLocation.PLUGIN_MANIFEST.value
     """
     The scratch checkout's plugin manifest, a copy of this repository's.
     """
@@ -542,7 +544,7 @@ def run_release_step(
                 ]
             ),
             GitHubActionsVariable.STEP_SUMMARY: str(files.summary),
-            GitHubActionsVariable.OUTPUT: str(files.output),
+            GitHubActionsOutputVariable.OUTPUT: str(files.output),
             GitHubActionsVariable.RUNNER_TEMPORARY_DIRECTORY: str(files.directory),
             ReleaseWorkflowVariable.RELEASE_BRANCH: release_branch(),
             ReleaseWorkflowVariable.PLUGIN_RELEASE_BRANCH: plugin_release_branch(),
@@ -664,7 +666,7 @@ def test_the_release_step_moves_the_plugin_release_branch_to_the_released_plugin
         plugin_commit,
     )
     assert (
-        changed == BasstlerRepositoryLocation.PLUGIN_MANIFEST.path_in_plugin.as_posix()
+        changed == ReleaseRepositoryLocation.PLUGIN_MANIFEST.path_in_plugin.as_posix()
     )
 
 
@@ -676,7 +678,7 @@ def released_manifest(checkout: PublishedCheckout, commit: str) -> dict[str, Any
     """
     return json.loads(
         checkout.runner.file_at(
-            commit, BasstlerRepositoryLocation.PLUGIN_MANIFEST.path_in_plugin
+            commit, ReleaseRepositoryLocation.PLUGIN_MANIFEST.path_in_plugin
         )
     )
 

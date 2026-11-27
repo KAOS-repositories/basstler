@@ -22,7 +22,7 @@ from basstler.github.pull_request_record import (
 )
 from basstler.github.pull_request_state import LiveState, PullRequestState
 from basstler.github.repository import PullRequestReference, Repository
-from basstler.locations import SiteTemplate
+from basstler.plan_site.locations import SiteTemplate
 from basstler.plan.model import ItemStatus
 from basstler.plan_site.__main__ import HubSite, SiteFile
 from basstler.plan_site.hub import PlanHub, SiteAddress

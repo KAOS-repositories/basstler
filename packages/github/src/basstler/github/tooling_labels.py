@@ -74,9 +74,8 @@ class GitHubLabel(StrEnum):
         "Split the changes basstler proves mechanical into a commit of their own",
     )
     """
-    Applied by a pull request's author to have the split workflow rewrite its branch
-    into a commit making its mechanical changes and one making the rest; the workflow
-    removes it again.
+    Applied by a pull request's author to have the split workflow add commits splitting
+    its branch into its mechanical changes and the rest, on every push while it stays.
     """
 
     def creation_command(self, repository: Repository) -> str:

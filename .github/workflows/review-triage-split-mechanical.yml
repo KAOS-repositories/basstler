@@ -1,12 +1,13 @@
 name: Review triage split mechanical
 
-# Replaces a pull request's commits with one making the changes basstler review-triage
-# proves mechanical and one making every other change, whose tree is the former head's,
-# so every reviewer reads only the second commit. It rewrites the pull request's branch,
-# so only the pull request's author may start it.
+# Adds commits on top of a pull request's branch splitting it into the changes basstler
+# review-triage proves mechanical and the rest: one showing every other change of the
+# pull request, and one showing every other change pushed since the previous split.
+# Nothing is rewritten; the author's next pull fast-forwards.
 #
 # Reusable: a repository calls it from a workflow of its own, as basstler's
-# split-mechanical.yml does when the author adds the split-mechanical label.
+# split-mechanical.yml does on every push once the author adds the split-mechanical
+# label.
 
 on:
   workflow_call:
@@ -23,6 +24,11 @@ on:
         description: "The owner/name repository the pull request is opened on"
         required: true
         type: string
+      requested_by_label:
+        description: "Whether adding the label started the run, which only the pull request's author may do"
+        required: false
+        default: false
+        type: boolean
     secrets:
       push_token:
         description: "A token that may push to the pull request's branch, also one in a fork; a push with the Actions token starts no checks"
@@ -38,10 +44,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # The split force-pushes the author's branch, so whoever else started the run is
-      # refused before anything is checked out.
-      - name: Check the pull request's author started the run
+      # Splitting is the author's choice, so only the author may switch it on by adding
+      # the label; a push to a branch it is on is split for whoever pushed.
+      - name: Check the pull request's author added the label
         id: author
+        if: inputs.requested_by_label
         env:
           GH_TOKEN: ${{ github.token }}
           PULL_REQUEST: ${{ inputs.pull_request }}
@@ -49,15 +56,12 @@ jobs:
         run: |
           set -euo pipefail
           AUTHOR="$(gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST" --jq .user.login)"
-          AUTHOR_ID="$(gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST" --jq .user.id)"
           if [ "$AUTHOR" != "$GITHUB_ACTOR" ]; then
-            MESSAGE="Only $AUTHOR, the pull request's author, may split it; $GITHUB_ACTOR started this run, so its branch is unchanged."
+            MESSAGE="Only $AUTHOR, the pull request's author, may switch splitting on; $GITHUB_ACTOR added the label, so its branch is unchanged."
             echo "$MESSAGE" >> "$GITHUB_STEP_SUMMARY"
             echo "::error::$MESSAGE"
             exit 1
           fi
-          echo "login=$AUTHOR" >> "$GITHUB_OUTPUT"
-          echo "id=$AUTHOR_ID" >> "$GITHUB_OUTPUT"
 
       # The split reads the pull request's commits with history and runs none of their
       # code, so a pull_request_target caller is safe.
@@ -84,29 +88,31 @@ jobs:
             uv sync --frozen --package basstler --no-dev --no-editable \
             --project "${RUNNER_TEMP}/basstler"
 
-      # The two commits are the author's, who asked for them.
+      # The commits are made by whoever started the run: the author who added the
+      # label, or whoever pushed.
       - name: Split
         id: split
         env:
           GH_TOKEN: ${{ secrets.push_token || github.token }}
-          AUTHOR: ${{ steps.author.outputs.login }}
-          AUTHOR_ID: ${{ steps.author.outputs.id }}
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
           PULL_REQUEST: ${{ inputs.pull_request }}
           REPOSITORY: ${{ inputs.repository }}
         run: |
           set -euo pipefail
-          git config user.name "$AUTHOR"
-          git config user.email "${AUTHOR_ID}+${AUTHOR}@users.noreply.github.com"
+          git config user.name "$ACTOR"
+          git config user.email "${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
           python -m basstler review-triage split-mechanical "$PULL_REQUEST" \
-            --repository "$REPOSITORY" --from-merge-base >> "$GITHUB_STEP_SUMMARY"
+            --repository "$REPOSITORY" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Remove the label, so adding it again splits again
+      # A label someone else added would split every later push, so it goes.
+      - name: Remove a label the author did not add
         id: label
-        if: always()
+        if: failure() && steps.author.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
           PULL_REQUEST: ${{ inputs.pull_request }}
           REPOSITORY: ${{ inputs.repository }}
         run: |
           gh api -X DELETE "repos/$REPOSITORY/issues/$PULL_REQUEST/labels/split-mechanical" \
-            --silent || true
+            --silent

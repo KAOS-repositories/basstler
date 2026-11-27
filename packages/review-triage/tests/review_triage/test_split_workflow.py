@@ -49,11 +49,6 @@ CHECKOUT_ACTION = "actions/checkout"
 The action that checks the repository out.
 """
 
-START_OPTION = "--from-merge-base"
-"""
-The option making the split start where the pull request's change starts.
-"""
-
 
 @pytest.fixture
 def split_job() -> WorkflowJob:
@@ -73,48 +68,50 @@ def test_the_split_is_a_reusable_workflow_taking_an_optional_push_token():
     assert workflow.called_secrets == {SplitSecret.PUSH_TOKEN: False}
 
 
-def test_only_the_pull_request_s_author_is_checked_before_anything_is_checked_out(
-    split_job: WorkflowJob,
-):
+def test_only_the_pull_request_s_author_may_add_the_label(split_job: WorkflowJob):
     """
-    The split replaces the author's branch, so nobody else may start it.
+    Splitting is the author's choice; a push to a branch carrying the label is split
+    for whoever pushed.
     """
+    author = split_job.step_identified_as(SplitStep.AUTHOR)
+    assert author.condition == "inputs.requested_by_label"
+    assert "$GITHUB_ACTOR" in (author.command or "")
+
+
+def test_the_author_is_checked_before_anything_is_checked_out(split_job: WorkflowJob):
     author = split_job.steps.index(split_job.step_identified_as(SplitStep.AUTHOR))
     checkout = split_job.steps.index(split_job.step_using(CHECKOUT_ACTION))
     assert author < checkout
-    assert "$GITHUB_ACTOR" in (
-        split_job.step_identified_as(SplitStep.AUTHOR).command or ""
-    )
 
 
-def test_the_split_runs_the_command_from_where_the_change_starts(
-    split_job: WorkflowJob,
-):
+def test_the_split_runs_the_command_reading_the_whole_change(split_job: WorkflowJob):
     """
-    Starting from the merge base splits the same pull request into the same commits,
-    whichever token runs it.
+    The command finds where the previous split ended itself, so no start is given.
     """
     command = split_job.step_identified_as(SplitStep.SPLIT).command or ""
     assert f"review-triage {ReviewTriageCommand.SPLIT_MECHANICAL} " in command
-    assert START_OPTION in command
+    assert "--since" not in command
+    assert "--from-merge-base" not in command
 
 
-def test_the_label_is_removed_however_the_split_ends(split_job: WorkflowJob):
+def test_a_label_someone_else_added_is_removed(split_job: WorkflowJob):
     """
-    So the author can add it again to split again.
+    Left on, it would split every later push.
     """
     removal = split_job.step_identified_as(SplitStep.LABEL)
-    assert removal.condition == "always()"
+    assert removal.condition == "failure() && steps.author.outcome == 'failure'"
     assert GitHubLabel.SPLIT_MECHANICAL in (removal.command or "")
 
 
 # %% the calling workflow
 
 
-def test_the_split_starts_when_the_split_label_is_added():
+def test_the_split_runs_when_the_label_is_added_and_on_every_push_it_stays_on():
     workflow = Workflow.read(RepositoryLocation.SPLIT_MECHANICAL_WORKFLOW)
     assert workflow.triggers == {TriggerEvent.PULL_REQUEST_TARGET}
-    assert (
-        workflow.jobs[SplitJob.SPLIT].condition
-        == f"github.event.label.name == '{GitHubLabel.SPLIT_MECHANICAL}'"
+    assert workflow.jobs[SplitJob.SPLIT].condition == (
+        f"(github.event.action == 'labeled' && github.event.label.name == "
+        f"'{GitHubLabel.SPLIT_MECHANICAL}') || (github.event.action == 'synchronize' && "
+        f"contains(github.event.pull_request.labels.*.name, "
+        f"'{GitHubLabel.SPLIT_MECHANICAL}'))"
     )

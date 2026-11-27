@@ -156,6 +156,7 @@ def test_the_mechanical_commit_follows_the_start_commit(
     )
     assert git.parents_of(edited_move_split.remaining_commit) == (
         edited_move_split.mechanical_commit,
+        edited_move.commits.head_commit,
     )
 
 

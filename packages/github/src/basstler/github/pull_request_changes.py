@@ -167,6 +167,12 @@ class StartReason(StrEnum):
     The commit is the head the viewer's last submitted review was made against.
     """
 
+    PREVIOUS_SPLIT = "the previous split"
+    """
+    The commit is the last one a split of the pull request into its mechanical changes
+    and the rest added.
+    """
+
     VIEWED_FILES = "where you last viewed each file"
     """
     Each file is read from the head the viewer last viewed it at, else the merge base.

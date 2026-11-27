@@ -19,7 +19,6 @@ from basstler.github.pull_request_changes import (
     CommitStart,
     ComparisonStart,
     LastCommitsStart,
-    LastReviewStart,
     MergeBaseStart,
     PullRequestChanges,
     PullRequestChangesReader,
@@ -558,50 +557,35 @@ def split_mechanical(
     repository: str | None = None,
     rename: tuple[str, ...] = (),
     rejected_rename: tuple[str, ...] = (),
-    since: Annotated[str | None, Parameter(group=COMPARISON_START_GROUP)] = None,
-    last: Annotated[
-        int | None,
-        Parameter(group=COMPARISON_START_GROUP, validator=validators.Number(gte=1)),
-    ] = None,
-    from_merge_base: Annotated[
-        bool, Parameter(group=COMPARISON_START_GROUP, negative=())
-    ] = False,
 ) -> ReviewTriageExitCode:
     """
-    Replace a pull request's commits since your last review with one making the changes
-    the triage proves mechanical and one making every other change, whose tree is the
-    former head's, and summarise the first in the description. Nothing is pushed unless
-    the proof holds.
+    Add commits on top of a pull request's branch that split it into the changes the
+    triage proves mechanical and the rest, and link them in the description: one
+    commit showing every other change of the pull request and, after an earlier split,
+    one showing every other change pushed since. Nothing is pushed unless the proof
+    holds.
 
     :param pull_request: The pull request's number.
     :param repository: Its repository as ``owner/name``; the checkout's ``origin`` by
         default.
     :param rename: A rename as ``old=new``, outranking the description's; repeatable.
     :param rejected_rename: An old identifier whose rename is rejected; repeatable.
-    :param since: The commit to split from, keeping the commits up to it.
-    :param last: How many of the pull request's last commits to split.
-    :param from_merge_base: Split the whole change, not only what changed since your
-        last review.
     :return: :attr:`ReviewTriageExitCode.SUCCESS`; a failure raises instead.
     """
-    publication = TriagePublication.from_arguments(
+    publication = TriagePublication(
         pull_request,
         repository,
         TriageDeclaration.from_arguments(rename, rejected_rename),
-        since,
-        last,
-        from_merge_base=from_merge_base,
-        samples=False,
+        MergeBaseStart(),
+        leaves_samples=False,
     )
-    if isinstance(publication.start, ViewedStateStart):
-        publication = replace(publication, start=LastReviewStart())
     git = GitCommandRunner(Path.cwd())
     changes = publication.changes(git)
     split = MechanicalSplitter(git, publication.triager(git)).split(changes)
     if split is None:
         logger.info(
-            f"#{pull_request} changes wholly mechanically, or nothing mechanically, "
-            f"since {changes.start.reason}; its branch is unchanged."
+            f"#{pull_request} is split already, or changes wholly mechanically or "
+            f"nothing mechanically; its branch is unchanged."
         )
         return ReviewTriageExitCode.SUCCESS
     head_repository = changes.pull_request.head.repository
@@ -617,9 +601,16 @@ def split_mechanical(
             body=split.description(pull_request_url),
         )
     )
+    since = (
+        ""
+        if split.push_remaining_commit is None
+        else (
+            f"; the changes pushed since the previous split: "
+            f"{pull_request_url}/commits/{split.push_remaining_commit}"
+        )
+    )
     logger.info(
-        f"#{pull_request} now makes its mechanical changes in {split.mechanical_commit}"
-        f" and every other change in {split.remaining_commit}; review the second: "
-        f"{pull_request_url}/commits/{split.remaining_commit}"
+        f"#{pull_request} is split; every change beyond the mechanical ones: "
+        f"{pull_request_url}/commits/{split.remaining_commit}{since}"
     )
     return ReviewTriageExitCode.SUCCESS

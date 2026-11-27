@@ -7,13 +7,19 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import PurePosixPath
 
 from basstler.class_property import classproperty
-from basstler.git.commands import GitCommandRunner
+from basstler.git.commands import CommitTrailer, GitCommandRunner
 from basstler.git.commit_range import CommitRange, FileVersions
 from basstler.github.constants import MaintenanceText
-from basstler.github.pull_request_changes import PullRequestChanges, RestPullRequest
+from basstler.github.pull_request_changes import (
+    PullRequestChanges,
+    RestPullRequest,
+    StartCommit,
+    StartReason,
+)
 from basstler.github.pull_request_description import PullRequestDescription
 from basstler.locations import ReviewTriageLocation
 from basstler.render_common import TemplatePage
@@ -359,12 +365,79 @@ class MechanicalSummary(TemplatePage):
 # %% the split
 
 
+class SplitCommitRole(StrEnum):
+    """
+    The part a commit plays in a split, as its :attr:`CommitTrailer.SPLIT` trailer
+    names it.
+    """
+
+    WHOLE_MECHANICAL = "whole-mechanical"
+    """
+    Makes every mechanical change of the pull request, on the previous such commit or
+    on the merge base.
+    """
+    WHOLE_REMAINING = "whole-remaining"
+    """
+    Merges the head into the whole mechanical commit, so its own change is every other
+    change of the pull request.
+    """
+    PUSH_MECHANICAL = "push-mechanical"
+    """
+    Makes the mechanical changes pushed since the previous split, on that split.
+    """
+    PUSH_REMAINING = "push-remaining"
+    """
+    Merges the head into the push's mechanical commit, so its own change is every other
+    change pushed since the previous split.
+    """
+
+    def message(self, number: int, details: str) -> str:
+        """
+        :param number: The pull request's number.
+        :param details: The paragraphs below the title.
+        :return: The message of a commit playing this part in a split of the pull
+            request, ending in the trailer naming the part.
+        """
+        match self:
+            case SplitCommitRole.WHOLE_MECHANICAL:
+                title = f"Make the mechanical changes of #{number}"
+            case SplitCommitRole.WHOLE_REMAINING:
+                title = f"Make the changes of #{number} beyond the mechanical ones"
+            case SplitCommitRole.PUSH_MECHANICAL:
+                title = f"Make the mechanical changes of #{number} since the last split"
+            case SplitCommitRole.PUSH_REMAINING:
+                title = (
+                    f"Make the changes of #{number} since the last split beyond the "
+                    f"mechanical ones"
+                )
+        return f"{title}\n\n{details}\n\n{CommitTrailer.SPLIT}: {self}"
+
+
+@dataclass(frozen=True)
+class ProvenMechanicalTree:
+    """
+    The tree of a commit making a change's mechanical changes, with the triage proving
+    it.
+    """
+
+    tree: str
+    """
+    The tree.
+    """
+
+    outcome: TriageOutcome
+    """
+    The triage proving every change it makes mechanical.
+    """
+
+
 @dataclass(frozen=True)
 class MechanicalSplit:
     """
-    A pull request's change as two commits on the commit its triage starts from: one
-    making its mechanical changes, then one making every other change and holding its
-    head's tree.
+    The commits a split adds on top of a pull request's head, the last of them its new
+    head: one whose own change is every change of the pull request beyond the mechanical
+    ones and, after an earlier split, one whose own change is every such change pushed
+    since.
     """
 
     pull_request: RestPullRequest
@@ -374,30 +447,56 @@ class MechanicalSplit:
 
     mechanical_commit: str
     """
-    The commit making its mechanical changes.
+    The commit making every mechanical change of the pull request.
     """
 
     remaining_commit: str
     """
-    The commit making every other change, whose tree is the pull request's head tree.
+    The merge of the head into :attr:`mechanical_commit`, holding the head's tree.
     """
 
-    outcome: TriageOutcome = field(compare=False)
+    outcome: TriageOutcome | None = field(compare=False)
     """
-    The triage proving :attr:`mechanical_commit` mechanical.
+    The triage proving :attr:`mechanical_commit` mechanical, ``None`` when the pull
+    request has no mechanical change left.
+    """
+
+    push_mechanical_commit: str | None = None
+    """
+    The commit making the mechanical changes pushed since the previous split, ``None``
+    when there are none or the split is the first.
+    """
+
+    push_remaining_commit: str | None = None
+    """
+    The merge of the head into the commit making the mechanical changes pushed since
+    the previous split, holding the head's tree; ``None`` when the split is the first
+    or a push merged the base branch in.
     """
 
     def description(self, pull_request_url: str) -> str:
         """
         :param pull_request_url: The pull request's page.
-        :return: Its description with the summary of the mechanical commit as its
-            mechanical changes section, replacing any section already there.
+        :return: Its description with the split's links and summary as its mechanical
+            changes section, replacing any section already there.
         """
+        since = (
+            ""
+            if self.push_remaining_commit is None
+            else (
+                f" Since the previous split, review [the changes pushed]"
+                f"({pull_request_url}/commits/{self.push_remaining_commit})."
+            )
+        )
+        summary = (
+            ""
+            if self.outcome is None
+            else f"\n\n{MechanicalSummary().render(self.outcome)}"
+        )
         content = (
             f"{self.mechanical_commit} makes only changes `basstler review-triage` "
-            f"proves mechanical; review [the remaining changes]({pull_request_url}/"
-            f"commits/{self.remaining_commit}).\n\n"
-            f"{MechanicalSummary().render(self.outcome)}"
+            f"proves mechanical; review [every other change]({pull_request_url}/"
+            f"commits/{self.remaining_commit}).{since}{summary}"
         )
         return PullRequestDescription(self.pull_request.description).with_section(
             MaintenanceText.MECHANICAL_CHANGES_HEADING, content
@@ -405,8 +504,9 @@ class MechanicalSplit:
 
     def publish(self, git: GitCommandRunner, location: str) -> None:
         """
-        Replace the pull request's branch with the split, refused when the branch has
-        moved since the pull request was read.
+        Advance the pull request's branch to :attr:`remaining_commit`, which descends
+        from its head, refused when the branch has moved since the pull request was
+        read.
 
         :param git: The checkout holding the split.
         :param location: The remote or URL of the repository holding the branch.
@@ -424,8 +524,8 @@ class MechanicalSplit:
 @dataclass(frozen=True)
 class MechanicalSplitter:
     """
-    Splits pull requests into their mechanical changes and the rest, proving the first
-    commit mechanical.
+    Splits pull requests into their mechanical changes and the rest by adding commits on
+    top of their heads, proving each mechanical commit mechanical.
     """
 
     git: GitCommandRunner
@@ -435,27 +535,150 @@ class MechanicalSplitter:
 
     triager: PullRequestTriager = field(default_factory=PullRequestTriager)
     """
-    Judges the files and proves the mechanical commit mechanical.
+    Judges the files and proves the mechanical commits mechanical.
     """
 
     def split(self, changes: PullRequestChanges) -> MechanicalSplit | None:
         """
-        :param changes: A pull request's change since the commit its triage starts
-            from.
-        :return: Its split, dated as its head commit so the same pull request always
-            splits into the same commits; ``None`` when its change is wholly
-            mechanical or has nothing mechanical.
-        :raises BaseBranchMergedError: If the base branch was merged into it since that
-            commit.
-        :raises UnprovenSplitError: If the mechanical commit changes a file the triage
+        :param changes: A pull request's whole change, from its merge base.
+        :return: Its split, dated as its head commit so the same branch always splits
+            into the same commits; ``None`` when its head is a split already, or when no
+            split was made before and its change is wholly mechanical or has nothing
+            mechanical.
+        :raises BaseBranchMergedError: If the base branch was merged into it since the
+            commit its change starts from.
+        :raises UnprovenSplitError: If a mechanical commit changes a file the triage
             cannot prove mechanical.
         """
-        start = changes.commits.base_commit
         head = changes.commits.head_commit
+        previous = self.git.newest_commit_with_trailer(
+            head,
+            changes.commits.base_commit,
+            CommitTrailer.SPLIT,
+            SplitCommitRole.WHOLE_REMAINING,
+        )
+        if previous == head:
+            return None
+        whole = self.proven_tree(changes)
+        if previous is not None:
+            return self.later_split(changes, previous, whole)
+        if whole is None or whole.tree == self.git.tree_of(head):
+            return None
+        mechanical = self.commit(
+            changes,
+            whole.tree,
+            (changes.commits.base_commit,),
+            SplitCommitRole.WHOLE_MECHANICAL,
+            MechanicalSummary().render(whole.outcome),
+        )
+        return MechanicalSplit(
+            changes.pull_request,
+            mechanical,
+            self.merged_head(
+                changes, mechanical, head, SplitCommitRole.WHOLE_REMAINING
+            ),
+            whole.outcome,
+        )
+
+    def later_split(
+        self,
+        changes: PullRequestChanges,
+        previous: str,
+        whole: ProvenMechanicalTree | None,
+    ) -> MechanicalSplit:
+        """
+        :param changes: A pull request's whole change, from its merge base.
+        :param previous: The last commit the previous split added.
+        :param whole: The proven tree making every mechanical change of the pull
+            request, ``None`` when it has none.
+        :return: The split adding, on the previous split, the commits making the
+            mechanical changes pushed since and merging the head into them, unless a push
+            merged the base branch in; then the whole mechanical commit, unless it is
+            unchanged, and the merge of those into it.
+        """
+        head = changes.commits.head_commit
+        previous_mechanical = self.git.parents_of(previous)[0]
+        tree = (
+            self.git.tree_of(changes.commits.base_commit)
+            if whole is None
+            else whole.tree
+        )
+        mechanical = (
+            previous_mechanical
+            if tree == self.git.tree_of(previous_mechanical)
+            else self.commit(
+                changes,
+                tree,
+                (previous_mechanical,),
+                SplitCommitRole.WHOLE_MECHANICAL,
+                "" if whole is None else MechanicalSummary().render(whole.outcome),
+            )
+        )
+        outcome = None if whole is None else whole.outcome
+        if self.base_branch_merged_since(changes, previous):
+            return MechanicalSplit(
+                changes.pull_request,
+                mechanical,
+                self.merged_head(
+                    changes, mechanical, head, SplitCommitRole.WHOLE_REMAINING
+                ),
+                outcome,
+            )
+        pushed = PullRequestChanges(
+            changes.pull_request,
+            CommitRange(self.git, previous, head),
+            CommitRange(self.git, previous, head).file_versions(),
+            StartCommit(previous, StartReason.PREVIOUS_SPLIT),
+        )
+        push = self.proven_tree(pushed)
+        push_mechanical = (
+            None
+            if push is None
+            else self.commit(
+                changes,
+                push.tree,
+                (previous,),
+                SplitCommitRole.PUSH_MECHANICAL,
+                MechanicalSummary().render(push.outcome),
+            )
+        )
+        push_remaining = self.merged_head(
+            changes, push_mechanical or previous, head, SplitCommitRole.PUSH_REMAINING
+        )
+        return MechanicalSplit(
+            changes.pull_request,
+            mechanical,
+            self.merged_head(
+                changes, mechanical, push_remaining, SplitCommitRole.WHOLE_REMAINING
+            ),
+            outcome,
+            push_mechanical,
+            push_remaining,
+        )
+
+    def base_branch_merged_since(self, changes: PullRequestChanges, start: str) -> bool:
+        """
+        :param changes: A pull request's change.
+        :param start: A commit of its history.
+        :return: Whether the base branch was merged into its head since *start*.
+        """
         base_branch = changes.pull_request.base.commit
-        if self.git.merge_base(base_branch, start) != self.git.merge_base(
-            base_branch, head
-        ):
+        return self.git.merge_base(base_branch, start) != self.git.merge_base(
+            base_branch, changes.commits.head_commit
+        )
+
+    def proven_tree(self, changes: PullRequestChanges) -> ProvenMechanicalTree | None:
+        """
+        :param changes: A pull request's change since a commit.
+        :return: The proven tree making that change's mechanical changes on that
+            commit, ``None`` when it has none.
+        :raises BaseBranchMergedError: If the base branch was merged into the pull
+            request since that commit.
+        :raises UnprovenSplitError: If the tree changes a file the triage cannot prove
+            mechanical.
+        """
+        start = changes.commits.base_commit
+        if self.base_branch_merged_since(changes, start):
             raise BaseBranchMergedError(changes.pull_request.number, start)
         file_triager = self.triager.file_triager(changes)
         files = MechanicalTree(changes, file_triager).files()
@@ -465,27 +688,55 @@ class MechanicalSplitter:
             start, files.texts, "Make the mechanical changes", copied=files.copied
         )
         tree = self.git.tree_of(draft)
-        if tree == self.git.tree_of(head):
+        if tree == self.git.tree_of(start):
             return None
-        outcome = self.prove(changes, draft, file_triager)
-        date = self.git.run("show", "--no-patch", "--format=%cI", head)
-        number = changes.pull_request.number
-        mechanical_commit = self.git.commit_tree(
+        return ProvenMechanicalTree(tree, self.prove(changes, draft, file_triager))
+
+    def commit(
+        self,
+        changes: PullRequestChanges,
+        tree: str,
+        parents: tuple[str, ...],
+        role: SplitCommitRole,
+        details: str,
+    ) -> str:
+        """
+        :param changes: The pull request's change.
+        :param tree: The tree the commit records.
+        :param parents: Its parents, its first parent first.
+        :param role: The part it plays in the split.
+        :param details: The paragraphs of its message below the title.
+        :return: The commit, dated as the pull request's head commit.
+        """
+        head = changes.commits.head_commit
+        return self.git.commit_tree(
             tree,
-            (start,),
-            f"Make the mechanical changes of #{number}\n\n"
-            f"{MechanicalSummary().render(outcome)}",
-            date,
+            parents,
+            role.message(changes.pull_request.number, details),
+            self.git.run("show", "--no-patch", "--format=%cI", head),
         )
-        remaining_commit = self.git.commit_tree(
+
+    def merged_head(
+        self,
+        changes: PullRequestChanges,
+        mechanical: str,
+        merged: str,
+        role: SplitCommitRole,
+    ) -> str:
+        """
+        :param changes: The pull request's change.
+        :param mechanical: A commit making mechanical changes, the merge's first parent.
+        :param merged: The commit merged in, holding the head's tree.
+        :param role: The part the merge plays in the split.
+        :return: The merge, holding the pull request's head tree.
+        """
+        head = changes.commits.head_commit
+        return self.commit(
+            changes,
             self.git.tree_of(head),
-            (mechanical_commit,),
-            f"Make the changes of #{number} beyond the mechanical ones\n\n"
-            f"Its tree is that of the former head {head}.",
-            date,
-        )
-        return MechanicalSplit(
-            changes.pull_request, mechanical_commit, remaining_commit, outcome
+            (mechanical, merged),
+            role,
+            f"Its tree is that of the head {head}.",
         )
 
     @staticmethod

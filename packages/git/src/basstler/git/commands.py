@@ -680,6 +680,30 @@ class GitCommandRunner:
             commit,
         )
 
+    def newest_commit_with_trailer(
+        self, head: str, excluded: str, trailer: CommitTrailer, value: str
+    ) -> str | None:
+        """
+        :param head: The commit whose history is searched.
+        :param excluded: A commit whose history is left out of the search.
+        :param trailer: The trailer key read.
+        :param value: The value the trailer has to give.
+        :return: The commit of that history giving the trailer the value that no other
+            such commit descends from, ``None`` when none gives it.
+        """
+        listing = self.run(
+            "log",
+            "--topo-order",
+            f"--format=%H %(trailers:key={trailer},valueonly,separator=%x2C)",
+            head,
+            f"^{excluded}",
+        )
+        for line in listing.splitlines():
+            commit, _, values = line.partition(" ")
+            if value in values.split(","):
+                return commit
+        return None
+
     def rebase(self, reference: str) -> GitCommandResult:
         """:param reference: The reference to rebase onto.
         :return: The finished rebase, whose failure is a conflict only when it left
@@ -786,6 +810,11 @@ class CommitTrailer(StrEnum):
     """
     The commit of the parent a restack merged in, which a restack's own merge records as
     its second parent.
+    """
+    SPLIT = "Basstler-split"
+    """
+    The part a commit plays in a split of a pull request into its mechanical changes
+    and the rest, marking it as the split's own rather than one a person made.
     """
     ACTION_REQUEST = "Basstler-request"
     """

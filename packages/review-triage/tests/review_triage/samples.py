@@ -608,6 +608,64 @@ class RenameMixedSample(SampleTrees):
         return "rename-mixed"
 
 
+class SplitPushesSample(SampleTrees):
+    """
+    A pull request pushed several times, each tree a head one push leaves or the
+    mechanical tree a split of it makes.
+    """
+
+    BASE_TREE = "base"
+    FIRST_PUSH = "first"
+    """
+    Renames two methods, rewraps the line the longer name makes too long and changes a
+    default value.
+    """
+    FIRST_MECHANICAL = "first-mechanical"
+    """
+    The first push's renames and rewrap only.
+    """
+    SECOND_PUSH = "second"
+    """
+    On the first push: renames a method again and rewords the report's text.
+    """
+    SECOND_PUSH_MECHANICAL = "second-push-mechanical"
+    """
+    The first push with only the second push's rename.
+    """
+    SECOND_WHOLE_MECHANICAL = "second-whole-mechanical"
+    """
+    The base with every rename of both pushes and the rewrap.
+    """
+    LOGIC_ONLY_PUSH = "logic-only"
+    """
+    On the second push: rewords the report's text again, nothing mechanical.
+    """
+    RENAME_ONLY_PUSH = "rename-only"
+    """
+    On the second push: renames a method, nothing else.
+    """
+    RENAME_ONLY_WHOLE_MECHANICAL = "rename-only-whole-mechanical"
+    """
+    The base with every rename up to the rename-only push and the rewrap.
+    """
+    BASE_ADVANCED = "base-advanced"
+    """
+    The base branch once it gains a module.
+    """
+    MERGED_BASE_PUSH = "merged-base"
+    """
+    The second push with the advanced base branch merged in.
+    """
+    MERGED_BASE_WHOLE_MECHANICAL = "merged-base-whole-mechanical"
+    """
+    The advanced base with every rename of both pushes and the rewrap.
+    """
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "split-pushes"
+
+
 class RenameSampledSample(SampleTrees):
     """
     A pull request only renaming two methods across two modules, both defined in one.

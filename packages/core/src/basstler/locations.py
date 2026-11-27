@@ -961,6 +961,18 @@ class WorkflowLocation(PathEnumeration):
     with the user's own token.
     """
 
+    REVIEW_TRIAGE_SPLIT_MECHANICAL = DIRECTORY / "review-triage-split-mechanical.yml"
+    """
+    Basstler's reusable workflow that splits a pull request into a commit making its
+    mechanical changes and one making the rest, for the pull request's author.
+    """
+
+    SPLIT_MECHANICAL = DIRECTORY / "split-mechanical.yml"
+    """
+    The workflow on a repository that calls :attr:`REVIEW_TRIAGE_SPLIT_MECHANICAL`
+    when a pull request's author labels it.
+    """
+
 
 class ClaudeCodeVariable(EnvironmentVariable):
     """

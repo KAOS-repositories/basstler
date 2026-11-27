@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from basstler.git.commands import GitCommandFailed, GitCommandRunner
+from basstler.git.commands import CommitTrailer, GitCommandFailed, GitCommandRunner
 from basstler.git.commit_tree import CommitTree
 
 from basstler_testing.constants.paths import DatasetLocation
@@ -151,4 +151,74 @@ def test_mentioned_words_are_those_a_whole_word_search_finds(tmp_path: Path) -> 
 
     assert tree.mentioned_words(words) == frozenset(
         word for word in words if tree.mentions(word)
+    )
+
+
+# %% finding the newest commit carrying a trailer
+
+
+@pytest.fixture
+def trailer_history(tmp_path: Path) -> dict[str, str]:
+    """
+    :return: Commits by role: ``root``, then ``old`` and ``new`` each carrying the
+        split trailer, a ``plain`` commit on ``new``, and ``other`` carrying another
+        value.
+    """
+    git = committing_repository(tmp_path)
+    root = git.commit_files(None, {"a.txt": "root"}, "Root")
+    old = git.commit_files(
+        root, {"a.txt": "old"}, f"Old\n\n{CommitTrailer.SPLIT}: chosen"
+    )
+    other = git.commit_files(
+        old, {"a.txt": "other"}, f"Other\n\n{CommitTrailer.SPLIT}: different"
+    )
+    new = git.commit_files(
+        other, {"a.txt": "new"}, f"New\n\n{CommitTrailer.SPLIT}: chosen"
+    )
+    plain = git.commit_files(new, {"a.txt": "plain"}, "Plain")
+    return {"root": root, "old": old, "other": other, "new": new, "plain": plain}
+
+
+def test_the_newest_commit_with_the_trailer_value_is_found(
+    tmp_path: Path, trailer_history: dict[str, str]
+):
+    git = GitCommandRunner(tmp_path)
+    assert (
+        git.newest_commit_with_trailer(
+            trailer_history["plain"],
+            trailer_history["root"],
+            CommitTrailer.SPLIT,
+            "chosen",
+        )
+        == trailer_history["new"]
+    )
+
+
+def test_commits_up_to_the_excluded_one_are_not_searched(
+    tmp_path: Path, trailer_history: dict[str, str]
+):
+    git = GitCommandRunner(tmp_path)
+    assert (
+        git.newest_commit_with_trailer(
+            trailer_history["plain"],
+            trailer_history["new"],
+            CommitTrailer.SPLIT,
+            "chosen",
+        )
+        is None
+    )
+
+
+def test_a_commit_with_another_value_is_not_found(
+    tmp_path: Path, trailer_history: dict[str, str]
+):
+    git = GitCommandRunner(tmp_path)
+    assert (
+        git.newest_commit_with_trailer(
+            trailer_history["other"],
+            trailer_history["old"],
+            CommitTrailer.SPLIT,
+            "chosen",
+        )
+        is None
     )

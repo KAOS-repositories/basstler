@@ -85,6 +85,19 @@ class RepositoryLocation(PathEnumeration):
     The reusable workflow that builds the plan site and deploys a changed one.
     """
 
+    REVIEW_TRIAGE_SPLIT_MECHANICAL_WORKFLOW = (
+        WORKFLOWS / "review-triage-split-mechanical.yml"
+    )
+    """
+    The reusable workflow that splits a pull request into its mechanical changes and
+    the rest, for its author.
+    """
+
+    SPLIT_MECHANICAL_WORKFLOW = WORKFLOWS / "split-mechanical.yml"
+    """
+    The workflow that starts the split when a pull request's author labels it.
+    """
+
     WINDOWS_SETUP_WORKFLOW = WORKFLOWS / "windows-setup.yml"
     """
     The workflow that runs the personal-notes setup on Windows for a pull request

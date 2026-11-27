@@ -143,13 +143,12 @@ def test_a_publication_without_samples_leaves_none(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "options",
-    [
-        ("--since", "abc123", "--last", "2"),
-        ("--since", "abc123", "--from-merge-base"),
-    ],
+    "options", [("--since", "abc123"), ("--last", "2"), ("--from-merge-base",)]
 )
-def test_the_split_refuses_conflicting_starts(options):
+def test_the_split_takes_no_start_since_it_reads_the_whole_change(options):
+    """
+    Each split finds where the previous one ended in the branch's history.
+    """
     with pytest.raises(CycloptsError):
         review_triage_app.parse_args(
             [ReviewTriageCommand.SPLIT_MECHANICAL, "7", *options],

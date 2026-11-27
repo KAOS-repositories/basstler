@@ -1,0 +1,11 @@
+{
+  "id": 424242,
+  "slug": "example-basstlerhub",
+  "node_id": "A_kwHOexample",
+  "name": "example-basstlerhub",
+  "client_id": "Iv1.exampleclientid",
+  "client_secret": "example-client-secret",
+  "webhook_secret": "example-webhook-secret",
+  "pem": "-----BEGIN RSA PRIVATE KEY-----\nexample\n-----END RSA PRIVATE KEY-----\n",
+  "html_url": "https://github.com/apps/example-basstlerhub"
+}

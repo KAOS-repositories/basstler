@@ -19,6 +19,7 @@ basstler-stack = { workspace = true }
 basstler-notes = { workspace = true }
 basstler-plan = { workspace = true }
 basstler-hub = { workspace = true }
+basstler-hub-server = { workspace = true }
 
 [dependency-groups]
 dev = [

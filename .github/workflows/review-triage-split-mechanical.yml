@@ -1,0 +1,112 @@
+name: Review triage split mechanical
+
+# Replaces a pull request's commits with one making the changes basstler review-triage
+# proves mechanical and one making every other change, whose tree is the former head's,
+# so every reviewer reads only the second commit. It rewrites the pull request's branch,
+# so only the pull request's author may start it.
+#
+# Reusable: a repository calls it from a workflow of its own, as basstler's
+# split-mechanical.yml does when the author adds the split-mechanical label.
+
+on:
+  workflow_call:
+    inputs:
+      basstler_branch_or_tag:
+        description: "The basstler branch or tag to run, the same one the caller uses this workflow at"
+        required: true
+        type: string
+      pull_request:
+        description: "The number of the pull request to split"
+        required: true
+        type: string
+      repository:
+        description: "The owner/name repository the pull request is opened on"
+        required: true
+        type: string
+    secrets:
+      push_token:
+        description: "A token that may push to the pull request's branch, also one in a fork; a push with the Actions token starts no checks"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  split:
+    name: Split off the mechanical changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # The split force-pushes the author's branch, so whoever else started the run is
+      # refused before anything is checked out.
+      - name: Check the pull request's author started the run
+        id: author
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          REPOSITORY: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+          AUTHOR="$(gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST" --jq .user.login)"
+          AUTHOR_ID="$(gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST" --jq .user.id)"
+          if [ "$AUTHOR" != "$GITHUB_ACTOR" ]; then
+            MESSAGE="Only $AUTHOR, the pull request's author, may split it; $GITHUB_ACTOR started this run, so its branch is unchanged."
+            echo "$MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::$MESSAGE"
+            exit 1
+          fi
+          echo "login=$AUTHOR" >> "$GITHUB_OUTPUT"
+          echo "id=$AUTHOR_ID" >> "$GITHUB_OUTPUT"
+
+      # The split reads the pull request's commits with history and runs none of their
+      # code, so a pull_request_target caller is safe.
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          token: ${{ secrets.push_token || github.token }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Every distribution of that branch or tag, at the versions its uv.lock names,
+      # into the interpreter setup-python put on PATH.
+      - name: Install basstler
+        run: |
+          set -euo pipefail
+          python -m pip install uv
+          git clone --quiet --depth 1 --branch "${{ inputs.basstler_branch_or_tag }}" \
+            https://github.com/KAOS-repositories/basstler "${RUNNER_TEMP}/basstler"
+          UV_PROJECT_ENVIRONMENT="$(python -c 'import sys; print(sys.prefix)')" \
+            uv sync --frozen --package basstler --no-dev --no-editable \
+            --project "${RUNNER_TEMP}/basstler"
+
+      # The two commits are the author's, who asked for them.
+      - name: Split
+        id: split
+        env:
+          GH_TOKEN: ${{ secrets.push_token || github.token }}
+          AUTHOR: ${{ steps.author.outputs.login }}
+          AUTHOR_ID: ${{ steps.author.outputs.id }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          REPOSITORY: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+          git config user.name "$AUTHOR"
+          git config user.email "${AUTHOR_ID}+${AUTHOR}@users.noreply.github.com"
+          python -m basstler review-triage split-mechanical "$PULL_REQUEST" \
+            --repository "$REPOSITORY" --from-merge-base >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the label, so adding it again splits again
+        id: label
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          REPOSITORY: ${{ inputs.repository }}
+        run: |
+          gh api -X DELETE "repos/$REPOSITORY/issues/$PULL_REQUEST/labels/split-mechanical" \
+            --silent || true

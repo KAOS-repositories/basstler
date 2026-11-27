@@ -69,6 +69,15 @@ class GitHubLabel(StrEnum):
     Applied by a maintenance pass to a fork pull request whose link it has built, so a
     later pass does not rebuild it.
     """
+    SPLIT_MECHANICAL = (
+        "split-mechanical",
+        "Split the changes basstler proves mechanical into a commit of their own",
+    )
+    """
+    Applied by a pull request's author to have the split workflow rewrite its branch
+    into a commit making its mechanical changes and one making the rest; the workflow
+    removes it again.
+    """
 
     def creation_command(self, repository: Repository) -> str:
         """

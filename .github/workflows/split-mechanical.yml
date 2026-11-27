@@ -1,0 +1,29 @@
+name: Split mechanical
+
+# When a pull request's author adds the split-mechanical label, replace its commits with
+# one making the changes basstler proves mechanical and one making the rest. Storing a
+# REVIEW_TRIAGE_SPLIT_TOKEN that may push to the pull request's branch lets it split a
+# pull request from a fork, and starts the checks on the new head.
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+concurrency:
+  group: split-mechanical-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  split:
+    if: github.event.label.name == 'split-mechanical'
+    uses: ./.github/workflows/review-triage-split-mechanical.yml
+    with:
+      basstler_branch_or_tag: main
+      pull_request: ${{ github.event.pull_request.number }}
+      repository: ${{ github.repository }}
+    secrets:
+      push_token: ${{ secrets.REVIEW_TRIAGE_SPLIT_TOKEN }}

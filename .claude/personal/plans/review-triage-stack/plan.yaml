@@ -176,3 +176,11 @@ items:
   status: in progress
   recommended_model: opus
   notes: 'Draft #313 at 40e10177: pyrefly-receiver-fallback (#240) ported onto the stack.'
+
+- id: notes-push-credential
+  title: "Push the triage's viewed checkpoints with the GitHub credential or over SSH"
+  branch: null
+  track: stack
+  depends_on: []
+  status: in progress
+  recommended_model: sonnet

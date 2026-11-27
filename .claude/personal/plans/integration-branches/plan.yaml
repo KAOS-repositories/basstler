@@ -1,0 +1,101 @@
+schema_version: 1
+id: integration-branches
+title: 'Integration branches: every plan''s items merged into one branch that stays green'
+description: Every plan has an integration branch, integration/<plan-id>, that holds all of its items'
+  work together. A session merges each item push into it, CI keeps it green, and a failure is routed to
+  the item that can fix it or is fixed on the branch itself. A plan's features are then used anywhere
+  by merging that one branch.
+default_repository: KAOS-repositories/basstler
+tracking_issue: 325
+waves:
+- id: branch
+  name: The integration branch and what feeds it
+- id: green
+  name: Keeping it green and current
+tracks:
+- id: feeding
+  name: Created, fed on every push, shown on the plan page
+  wave: branch
+- id: health
+  name: CI, failure routing and default-branch sync
+  wave: green
+- id: adoption
+  name: Existing plans move onto it
+  wave: green
+items:
+- id: integration-branch-field
+  recommended_model: sonnet
+  title: Every plan has an integration branch, integration/<plan-id>, created with the plan
+  branch: null
+  pull_request_number: null
+  track: feeding
+  depends_on: []
+  status: not started
+  notes: 'The branch name is derived from the plan id (one per plan, never shared), modelled once in
+    the plan package, not a free plan.yaml field. plan-create and a save of a plan without one create
+    it from the default branch. The plan page shows it with how to use it: git merge, and the curl
+    review-triage.sh one-liner with BASSTLER_REF.'
+- id: merge-on-push
+  recommended_model: opus
+  title: A session merges every push of an item's branch into its plan's integration branch
+  branch: null
+  pull_request_number: null
+  track: feeding
+  depends_on:
+  - integration-branch-field
+  status: not started
+  notes: 'A basstler command, run by a PostToolUse hook after a session''s git push, finds the pushed
+    branch''s item and merges it into integration/<plan-id> with a merge commit, using the session''s
+    own credential; never a force push. stack merge-probe decides first: a conflict is reported in the
+    session and on the item''s PR, never skipped. A push made outside a session is caught up on the
+    next session push of that branch.'
+- id: integration-ci
+  recommended_model: sonnet
+  title: Tests run on every push to an integration branch, and a red run opens an issue for its plan
+  branch: null
+  pull_request_number: null
+  track: health
+  depends_on:
+  - integration-branch-field
+  status: not started
+  notes: 'tests.yml runs on pushes to integration/**. Generalise main-failure.yml so one issue per
+    failing branch stays open while it fails, is commented on by later failures and closed by the next
+    green push. Event-driven via workflow_run, no schedule.'
+- id: failure-routing
+  recommended_model: opus
+  title: Route an integration failure to the item that introduced it, or fix it on the branch
+  branch: null
+  pull_request_number: null
+  track: health
+  depends_on:
+  - integration-ci
+  - merge-on-push
+  status: not started
+  notes: 'The failing run''s first red merge commit names the item whose merge introduced it; a comment
+    on that item''s PR links the run. The fix may land on the item branch, which merge-on-push carries
+    over, or directly on the integration branch, or both; a direct fix is cherry-picked back to the
+    owning item''s branch when one is open.'
+- id: default-branch-sync
+  recommended_model: sonnet
+  title: Merge the default branch into each integration branch when an item lands
+  branch: null
+  pull_request_number: null
+  track: health
+  depends_on:
+  - merge-on-push
+  status: not started
+  notes: 'When an item''s PR merges, the default branch is merged into its plan''s integration branch
+    so it carries the landed form. Once every item of a plan is done, the integration branch is deleted
+    with the plan.'
+- id: adopt-existing
+  recommended_model: haiku
+  title: Move review-triage-coverage and review-triage-stack onto integration branches
+  branch: null
+  pull_request_number: null
+  track: adoption
+  depends_on:
+  - merge-on-push
+  status: not started
+  notes: 'Both plans feed claude/practical-hawking-nf0g3o today, against one branch per plan. Ask the
+    user whether one plan absorbs the other or each gets its own integration branch, then move the
+    branch, update the curl one-liners, and drop review-triage-coverage''s merge rule from its roadmap.'

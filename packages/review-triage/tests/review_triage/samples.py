@@ -311,6 +311,19 @@ class SubclassSubstitutionSourceLayoutSample(SampleTrees):
         return "subclass-substitution-source-layout"
 
 
+class DocumentedConstantMoveSample(SampleTrees):
+    """
+    A pull request moving a constant and the docstring below it into a module it adds.
+    """
+
+    BASE_TREE = "base"
+    HEAD_TREE = "head"
+
+    @classproperty
+    def directory_name(cls) -> str:
+        return "documented-constant-move"
+
+
 class DefinitionMoveEditedSample(SampleTrees):
     """
     A pull request moving two classes into another module, which rewords its module

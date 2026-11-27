@@ -24,6 +24,7 @@ from .samples import (
     SECTIONED_BOARD,
     DefinitionMoveFromMovedModuleSample,
     DefinitionMoveSample,
+    DocumentedConstantMoveSample,
 )
 from basstler.text_file import TextFile
 
@@ -309,3 +310,21 @@ def test_a_definition_moved_between_files_of_one_dotted_path_is_mechanical(
             {MechanicalChange.DEFINITIONS_MOVED_IN}
         ),
     }
+
+
+# %% a documented assignment moved
+
+
+def test_a_moved_constant_takes_its_docstring_along(
+    scratch_repository: ScratchRepository,
+):
+    """
+    The module a documented constant leaves, the module it moves into and the file
+    importing it from there are mechanical.
+    """
+    changes = committed_pull_request(
+        scratch_repository,
+        DocumentedConstantMoveSample.BASE_TREE,
+        DocumentedConstantMoveSample.HEAD_TREE,
+    )
+    assert PullRequestTriager().triage(changes).files_needing_review == ()

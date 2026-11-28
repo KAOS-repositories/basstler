@@ -104,6 +104,8 @@ items:
   title: "A fresh clone finds its separate notes repository from a pointer committed on origin's notes branch"
   branch: null
   track: notes-setup
-  depends_on: []
+  depends_on:
+  - sync-never-pushes-to-notes-repository
   status: not started
   recommended_model: opus
+  notes: 'Found 2026-11-28: a fresh business_consulting clone read origin''s plan-less notes branch, as the notes repository was only in per-clone git config. Choose the pointer after reading the notes-location hooks and Python code; every notes read and write follows it and notes_remote says where it came from. Lets a cloud session pasting a site command find the plans. Tests: pointer from a fresh clone, config overrides it, cycle refused. Pilot merges the two notes branches; nothing deleted or force-pushed without the owner.'

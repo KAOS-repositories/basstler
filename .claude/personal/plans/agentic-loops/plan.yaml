@@ -1,33 +1,30 @@
 schema_version: 1
 id: agentic-loops
-title: 'Agentic loops: plan items reviewed and resolved in loops the user designs'
-description: A finished plan-item stage starts the next stage's session by itself - kickoff, review,
-  resolve and review again - within a loop contract the user sets once as their default and can change
-  per item. A guided setup has the user decide every checkpoint (goal, checks, intent, budgets, autonomy,
-  acceptance) with suggestions from the repository, and keep, modify or extend the seven default guardrails,
-  which hooks and computed stop rules enforce. Every hand-over is reported on the pull request.
+title: 'Agentic loops: plan items reviewed and fixed in a loop until they pass'
+description: Loops for plan items. When one stage of an item finishes, it starts the next stage's session
+  by itself - kickoff, review, resolve, then review again - until the checks pass and the review finds
+  nothing blocking. Seven built-in guardrails, enforced by hooks and stop rules, stop the loop and hand
+  it to the user when something needs their judgement, and every step is reported on the pull request.
+  A loop over a whole plan, with checkpoints the user sets, is deferred.
 default_repository: KAOS-repositories/basstler
 tracking_issue: 316
 waves:
 - id: first-loop
   name: First loop
-  description: Kickoff, review and resolve chained, then proven on a real run.
-- id: contract
-  name: The loop contract
-  description: The checkpoints and guardrails the user sets, and the guided setup that asks for them.
+  description: The loop chained for one item, then proven on a real run.
 - id: hardening
   name: Hardening before the first run
-  description: The stop rule, hand-overs, loop state, budgets and guardrails a real run needs.
+  description: The stop rule, step reports, loop state, limits and guardrails a real run needs.
 - id: acceptance
   name: After the loop
-  description: What each loop did, and loops capped at what the user can review.
+  description: What each loop did, shown to the user.
+- id: whole-plan
+  name: Whole-plan loop (deferred)
+  description: One loop over a whole plan, and the checkpoints the user sets for it.
 tracks:
 - id: loops
   name: Loops
   wave: first-loop
-- id: contract
-  name: Contract and guided setup
-  wave: contract
 - id: loop-safety
   name: Loop safety
   wave: hardening
@@ -37,187 +34,179 @@ tracks:
 - id: loop-acceptance
   name: Acceptance
   wave: acceptance
+- id: whole-plan
+  name: Whole-plan loop
+  wave: whole-plan
 items:
 - id: review-resolve-loop
-  title: Kickoff, review and resolve start each other's sessions until a review finds nothing
-  branch: ccr-a129c995-gp0fm8
-  status: in progress
-  recommended_model: opus
+  title: Chain kickoff, review and resolve sessions until a review finds nothing
   track: loops
   depends_on: []
+  status: in progress
+  recommended_model: opus
+  branch: ccr-a129c995-gp0fm8
   pull_request_number: 315
   session: https://claude.ai/code/session_01JxHGiLtj9SNPjpaC8bZNCS
-  notes: 'Draft #315: basstler.plan.agentic_loop with a Stop hook starting the next session (claude --print
-    locally, create_session in the cloud), /plan-item-review, /plan-item-loop, and the review-triage Stop
-    hook marking every open pull request at a local branch tip viewed. Not yet run end to end. Its LoopSettings
-    is replaced by loop-contract; the contract and hardening items stack on its branch.'
+  notes: 'Built in draft #315, not yet run end to end. When a stage ends, a Stop hook starts the next
+    one - kickoff, review, resolve, review again. Locally it runs claude --print; in the cloud it calls
+    create_session. Adds /plan-item-review and /plan-item-loop, and the review-triage Stop hook marks
+    every pushed pull request as viewed. The on switch and the round limit live in LoopSettings on the
+    notes branch. Every other item here builds on this branch.'
 - id: loop-end-to-end
-  title: Run one loop end to end, locally and in the cloud, and fix what the run shows
-  branch: null
-  status: not started
-  recommended_model: sonnet
+  title: Run one real loop, locally and in the cloud, and fix what breaks
   track: loops
   depends_on:
-  - guided-loop-setup
-  - contract-stop-rule
+  - stop-rule
   - loud-handover
   - github-loop-state
   - headless-session-limits
+  - no-progress-stop
   - checker-tamper-guard
   - scope-action-guard
-  - no-progress-stop
-  notes: Set a contract through the guided setup, kick off a small item, and follow it through review and
-    resolve in both environments; fix what breaks in the hand-over, the guardrails, the prompts or the skills'
-    instructions. Record the round where the loop ended and why, every hand-over comment and each stage's
-    cost; loop-review-quality is reprioritised from that.
-- id: loud-handover
-  title: Report every hand-over on the pull request, and fail it where the agent can still act
-  branch: null
   status: not started
-  recommended_model: opus
+  recommended_model: sonnet
+  notes: Turn the loop on, start a small item, and follow it through review and resolve on a computer
+    and in the cloud. Fix whatever breaks - hand-overs, guardrails, prompts or skill instructions. Write
+    down the round the loop ended in and why, every hand-over comment, and each stage's cost. loop-review-quality
+    is reordered from these results.
+- id: loud-handover
+  title: Post every loop step on the pull request, and fail early when the next session cannot start
   track: loop-safety
   depends_on:
   - review-resolve-loop
-  notes: finish-changes and finish-review check that the next session can start (claude on the path locally)
-    before the turn ends, and fail with the fix if not. One pull request comment per transition - started
-    (stage, round, session), ended (why) or handed over (the guardrail, what the user decides, the command
-    that resumes it). Tests cover a missing claude, a cloud turn that never calls create_session, and a retried
-    stop starting one session only.
-- id: github-loop-state
-  title: Read the findings count, round and head SHA back from GitHub, and notice a moved head
-  branch: null
   status: not started
   recommended_model: opus
+  notes: Before a stage ends, finish-changes and finish-review check that the next session can start (for
+    example, that claude is installed locally). If it cannot, they fail and say how to fix it. Each step
+    gets one pull request comment - started (stage, round, session), ended (why), or handed over (which
+    guardrail, what the user must decide, the command that resumes it). Tests - claude missing, a cloud
+    turn that never calls create_session, and a repeated stop that must start only one session.
+- id: github-loop-state
+  title: Read the loop's state from GitHub, not from what the model reports
   track: loop-safety
   depends_on:
-  - contract-stop-rule
+  - stop-rule
   - loud-handover
-  notes: finish-review counts the unresolved threads its review posted at the reviewed head SHA instead
-    of trusting a typed --findings, and the transition comment carries the round and SHA in a machine-readable
-    marker the next stage parses into a model. NextSession carries that SHA; a stage that finds a different
-    head re-reads the threads against it and says so. Tests on mocked GitHub payloads, including a failed
-    review post and a head moved between stages.
+  status: not started
+  recommended_model: opus
+  notes: finish-review counts the open threads its review posted at the reviewed commit instead of trusting
+    a --findings number. Each step comment carries the round and the commit in a marker the next stage
+    reads. If the next stage finds a newer commit, it re-reads the threads for that commit and says so.
+    Tests on mocked GitHub data, including a review that failed to post and a commit pushed between stages.
 - id: headless-session-limits
-  title: Start every loop session within the contract's budgets, and hand over before they run out
-  branch: null
+  title: Give every loop session turn and budget limits, and hand over before they run out
+  track: loop-safety
+  depends_on:
+  - review-resolve-loop
+  - loud-handover
   status: not started
   recommended_model: sonnet
-  track: loop-safety
-  depends_on:
-  - loop-contract
-  - loud-handover
-  notes: LocalSessionStarter passes --permission-mode, the stage skill's allowed tools, --max-turns and
-    --max-budget-usd from the contract's budgets, and --output-format stream-json to the log; the session
-    id goes in the transition comment. Guardrail 2 - once the loop's spend passes the warning share (default
-    80%), it hands over instead of starting the next stage. Tests on the exact command line against a mocked
-    claude.
+  notes: Local sessions start with --permission-mode, the stage's allowed tools, --max-turns and --max-budget-usd
+    from new LoopSettings fields with defaults, and --output-format stream-json into the log. The session
+    id goes in the step comment. Guardrail 2 - once the loop has spent 80% of its budget, it hands over
+    instead of starting the next stage. Tests check the exact command line against a mocked claude.
 - id: no-progress-stop
   title: Hand over when a round makes no progress
-  branch: null
-  status: not started
-  recommended_model: sonnet
   track: loop-safety
   depends_on:
   - github-loop-state
-  notes: Guardrail 1. A new LoopEnd member when round n's blocking findings are not fewer than round n-1's,
-    a finding repeats a rule on a line an earlier round flagged, or the head is unchanged; the hand-over comment
-    says which. Thresholds come from the contract. Tests over sequences of round states read from the transition
-    markers.
-- id: loop-metrics
-  title: Show each loop's rounds, ending and cost, and cap loops at the user's review capacity
-  branch: null
   status: not started
   recommended_model: sonnet
+  notes: Guardrail 1. The loop stops and hands over when a round has as many blocking findings as the
+    round before, repeats a finding on a line an earlier round flagged, or leaves the commit unchanged.
+    The comment says which. Tests over sequences of round states read from the step markers.
+- id: loop-metrics
+  title: Show what each loop did on the plan site
   track: loop-acceptance
   depends_on:
   - github-loop-state
-  notes: From the transition markers, per pull request - rounds used, how the loop ended, blocking findings
-    per round, findings dismissed by hand and cost - shown on the plan site. Kickoff refuses to start a loop
-    while the user's loop pull requests awaiting their review reach the contract's output cap, and at its
-    audit cadence lists merged loop output to sample. Tests on fixture comment streams and mocked pull request
-    lists.
-
-- id: loop-contract
-  title: Model the loop contract - the user's checkpoints and guardrails, a default with per-item changes
-  branch: null
-  status: not started
-  recommended_model: opus
-  track: contract
-  depends_on:
-  - review-resolve-loop
-  notes: LoopContract replaces the LoopSettings of review-resolve-loop (enabled and maximum_review_rounds become an on switch
-    and a budget). Holds the before-run checkpoints (goal, checks, intent, budgets, autonomy) and after-run
-    ones (merge policy, review, output cap, audit cadence) with no defaults, so a contract without the user's
-    answers cannot be built, plus the seven guardrails with defaults. The user's default and per-item changes
-    live on the notes branch; the item's contract is resolved from both.
-
-- id: checkpoint-suggestions
-  title: Suggest answers for each checkpoint from the repository and the item
-  branch: null
   status: not started
   recommended_model: sonnet
-  track: contract
+  notes: From the step markers, for each pull request - rounds used, how the loop ended, blocking findings
+    per round, findings the user dismissed by hand (the false-positive rate), and cost. Shown on the plan
+    site. Tests on sample comment streams.
+- id: loop-contract
+  title: Let the user set the loop's checkpoints - goal, checks, intent, budgets, autonomy and acceptance
+  track: whole-plan
+  depends_on:
+  - whole-plan-loop
+  status: deferred
+  recommended_model: opus
+  notes: Deferred with whole-plan-loop. A LoopContract holds what only the user decides - before the run,
+    the goal, checks, intent, budgets and autonomy; after it, the merge policy, the review, the most loop
+    pull requests awaiting review (output cap) and how often to audit. None has a default, so a contract
+    without the user's answers cannot be built. It also lets the user change or add guardrails. One default
+    per user, changeable per plan.
+- id: checkpoint-suggestions
+  title: Suggest an answer for each checkpoint from the repository and the plan
+  track: whole-plan
   depends_on:
   - loop-contract
-  notes: plan.agentic_loop suggest prints, per checkpoint, suggestions read deterministically - test and
-    lint commands from pyproject.toml, basstler code-rules check, the CI workflows' checks, the checker's
-    own paths (tests, CI and linter config, rule files) as protected paths, the dependency files, and for
-    an item its notes and the repository rules. A suggestion is an offer, never an answer. Tests on fixture
-    repositories and plans.
-
+  status: deferred
+  recommended_model: sonnet
+  notes: Deferred with loop-contract. For each checkpoint, suggest answers read from the repository -
+    test and lint commands from pyproject.toml, code-rules check, the CI checks, the paths to protect,
+    the dependency files - and from the plan's items and the repository rules. A suggestion is only an
+    offer; the user still chooses. Tests on sample repositories and plans.
 - id: guided-loop-setup
-  title: /plan-item-loop walks the user through every checkpoint and the default guardrails
-  branch: null
-  status: not started
-  recommended_model: opus
-  track: contract
+  title: Walk the user through every checkpoint and the guardrails before a whole-plan loop starts
+  track: whole-plan
   depends_on:
   - loop-contract
   - checkpoint-suggestions
-  notes: Turning the loop on sets the default contract; naming an item changes it for that item. One checkpoint
-    at a time via AskUserQuestion with the suggestions; answers the user's questions before moving on and
-    never fills one itself. Shows the seven guardrails to keep, modify or append, shows the result, then
-    saves. checkpoints.md explains each checkpoint and the rule of thumb (automate checks, escalate judgement
-    and irreversible steps, keep done, checks and acceptance for humans).
-
-- id: contract-stop-rule
-  title: End the loop as done only when the contract's checks pass and the review finds nothing blocking
-  branch: null
-  status: not started
-  recommended_model: sonnet
-  track: loop-safety
-  depends_on:
-  - loop-contract
-  notes: Folds blocking-findings-stop and ci-gate. Findings are blocking (a /code-review bug, a code-rules
-    violation, a check the contract marks blocking) or advisory; only blocking ones start a resolve. The deterministic
-    checks are the contract's commands and the head commit's check runs. Both pass and no blocking finding
-    ends the loop with its own LoopEnd; when they disagree it hands over (guardrail 6). Tests first, on mocked
-    check runs.
+  status: deferred
+  recommended_model: opus
+  notes: Deferred with loop-contract. Asks one checkpoint at a time with the suggestions, answers the
+    user's questions before moving on, and never fills in an answer itself. Then shows the seven guardrails
+    and their defaults to keep, change or add to, shows the final contract, and saves it. checkpoints.md
+    explains each checkpoint and the rule of thumb - automate checks, escalate judgement and risky steps,
+    leave done, checks and acceptance to the user.
 
 - id: checker-tamper-guard
-  title: Keep loop sessions from changing the checks that judge them
-  branch: null
-  status: not started
-  recommended_model: sonnet
+  title: Stop loop sessions from changing the checks that judge them
   track: guardrail-hooks
   depends_on:
-  - contract-stop-rule
+  - stop-rule
   - loud-handover
-  notes: Guardrail 3, widened from test-tamper-guard. A PreToolUse hook, active only in a loop session, denies
-    an edit to the contract's protected paths (tests, CI and linter config, rule files) and the session hands
-    over instead of working around it. The review marks any protected file the commits changed as blocking
-    unless the thread asked for it. Tests on recorded hook payloads and fixture diffs.
-
+  status: not started
+  recommended_model: sonnet
+  notes: Guardrail 3, wider than the old test-tamper-guard. A PreToolUse hook, active only in loop sessions,
+    blocks edits to a fixed list of protected paths - tests, CI config, linter config and rule files.
+    The session then hands over instead of working around it. The review also marks any protected file
+    the commits changed as blocking, unless the thread asked for that change. Tests on recorded hook calls
+    and sample diffs.
 - id: scope-action-guard
-  title: Hand over on scope growth, irreversible actions and denied permissions
-  branch: null
-  status: not started
-  recommended_model: sonnet
+  title: Hand over when a loop session adds dependencies, takes a risky action, or is refused a permission
   track: guardrail-hooks
   depends_on:
-  - loop-contract
   - loud-handover
-  notes: Guardrails 4, 5 and 7 as a PreToolUse hook, active only in a loop session. It denies a dependency
-    or out-of-scope change (4) and an action the contract's autonomy does not allow - merge, release, delete,
-    secrets, upstream comments (5) - and a denied permission ends the stage with a hand-over, never a workaround
-    (7). Guardrails the user appended are matched the same way. Tests on recorded hook payloads.
+  status: not started
+  recommended_model: sonnet
+  notes: Guardrails 4, 5 and 7, as a PreToolUse hook with fixed rules, active only in loop sessions. It
+    blocks changes to the dependency files, pyproject.toml and uv.lock (4), and merge, release, delete,
+    secrets and upstream comments (5). A refused permission ends the stage with a hand-over, never a workaround
+    (7). Changes outside an item's files wait for the loop contract. Tests on recorded hook calls.
+
+- id: stop-rule
+  title: End the loop only when the checks pass and the review finds nothing blocking
+  track: loop-safety
+  depends_on:
+  - review-resolve-loop
+  status: not started
+  recommended_model: sonnet
+  notes: Replaces blocking-findings-stop and ci-gate. Each finding is blocking (a /code-review bug, a
+    code-rules violation, a failing check) or advisory; only blocking findings start a resolve. The deterministic
+    checks are code-rules check and the head commit's CI runs. Done needs both - the checks pass and no
+    blocking finding - and ends with its own LoopEnd. If they disagree, the loop hands over to the user
+    (guardrail 6). Write the tests first, on mocked check runs.
+
+- id: whole-plan-loop
+  title: Run one loop over a whole plan instead of one item at a time
+  track: whole-plan
+  depends_on:
+  - loop-end-to-end
+  status: deferred
+  recommended_model: opus
+  notes: Deferred until the per-item loop has proven itself. One loop works through a plan's items in
+    dependency order. A loop this large needs the user to set its goal, checks and limits, which is why
+    the checkpoint items wait for it. Design it on the tracking issue first.

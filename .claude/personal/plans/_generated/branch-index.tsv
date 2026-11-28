@@ -14,6 +14,7 @@ review-triage-inference-experiments	experiments
 experiment/goal-paths	goal-paths
 claude/loving-johnson-gb3ura	plan-site-publication-fixes
 claude/plan-site-ui-themes-8hqtdk	plan-site-ui
+claude/plan-site-ui-local-site-open	plan-site-ui
 ccr-37402cb7-cls5ht-keyword-arguments	review-triage
 claude/youthful-babbage-btoebw	review-triage
 review-triage-split-moves	review-triage

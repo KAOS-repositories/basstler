@@ -112,11 +112,13 @@ items:
 - id: local-site-open
   title: The plan site runs on your computer and stays in sync, private repositories included
   track: lifecycle
+  branch: claude/plan-site-ui-local-site-open
+  pull_request_number: 330
   depends_on:
   - plan-site-publication-fixes/private-repositories-link-only
-  status: not started
+  status: in progress
   recommended_model: sonnet
-  session: https://claude.ai/code/session_018wfiv7jmDwVqQj2xLpXnwJ
+  session: https://claude.ai/code/session_018wfiv8Q3LnSawpSqXsYsWJ
   notes: 'Pages on a personal Free account is public. plan-site serve serves HubSite''s site on 127.0.0.1 with the gh login, private and link-only repositories in full, never deployed: every readable repository whose notes hold plans plus the hub''s; --repository narrows. A page view rebuilds past a staleness default, a Refresh button forces it, no timer (owner, 2026-11-28). install-service enables a systemd user unit; setup recommends it for private repositories. No remote access: phones wait for basstler-service/github-sign-in.'
 - id: desktop-launcher
   title: Setup installs a desktop launcher that opens the up-to-date plan site in one click

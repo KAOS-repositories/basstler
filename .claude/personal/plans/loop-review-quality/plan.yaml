@@ -27,9 +27,11 @@ items:
   recommended_model: opus
   track: review-quality
   depends_on:
-  - agentic-loops/github-loop-state
+  - agentic-loops/loop-end-to-end
   notes: /plan-item-review runs a Claude Code dynamic workflow - one finder per changed file, an agent that
     tries to refute each finding at the head SHA, then a ranking - returning a schema-checked {blocking, findings}.
+    It replaces only the /code-review and AGENTS.md judgement steps; basstler code-rules check keeps running
+    deterministically on the changed lines.
     Shipping a workflows/ folder in the plugin needs the AGENTS.md package rule changed first; ask before.
     Test the skill's handling of the workflow's JSON with fixtures.
 - id: delta-review
@@ -39,7 +41,7 @@ items:
   recommended_model: sonnet
   track: review-quality
   depends_on:
-  - agentic-loops/github-loop-state
+  - agentic-loops/loop-end-to-end
   notes: From round 2 the review reads the diff from the previous round's reviewed SHA, plus whether each
     earlier thread was addressed, judged with the resolve's reply on it. Test that unchanged code accepted
     in round 1 gets no new finding in round 2.
@@ -50,7 +52,7 @@ items:
   recommended_model: sonnet
   track: review-quality
   depends_on:
-  - agentic-loops/headless-session-limits
+  - agentic-loops/loop-end-to-end
   notes: An optional review model in the loop contract, passed as create_session's model in the cloud and
     --model locally; unset keeps today's behaviour. Tests on the rendered cloud request and the local command
     line.

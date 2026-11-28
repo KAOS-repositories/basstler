@@ -10,7 +10,11 @@ from pathlib import Path, PureWindowsPath
 
 import pytest
 
-from basstler.locations import PluginLocation, ProjectLocation
+from basstler.locations import (
+    PluginLocation,
+    ProjectLocation,
+    RepositoryStateLocation,
+)
 from basstler.text_file import TextFile
 from basstler.shell_configuration import (
     FetchedBranchReference,
@@ -23,6 +27,11 @@ from basstler_testing.constants.paths import RepositoryLocation
 FORK_REMOTE_URL = "https://github.com/some-user/some-repository.git"
 """
 The GitHub URL the fork's ``origin`` names.
+"""
+
+SEPARATE_NOTES_REPOSITORY_URL = "https://github.com/some-user/some-repository-notes"
+"""
+The separate notes repository origin's pointer names.
 """
 
 RESOLVE_CONFIG_SCRIPT = (
@@ -102,6 +111,18 @@ def test_a_value_git_does_answer_comes_back_trimmed(
     assert git_value(root, "remote", "get-url", "origin") == FORK_REMOTE_URL
 
 
+@pytest.fixture
+def clone_that_followed_a_pointer(clone: Path) -> Path:
+    """
+    :param clone: The clone session start ran in.
+    :return: The same clone, recording the notes repository origin's pointer named.
+    """
+    record = clone / ".git" / RepositoryStateLocation.NOTES_REPOSITORY_RECORD
+    record.parent.mkdir(parents=True)
+    TextFile(record).write(f"{SEPARATE_NOTES_REPOSITORY_URL}\n")
+    return clone
+
+
 # %% the personal-notes settings
 
 
@@ -138,3 +159,65 @@ def test_the_settings_are_the_ones_the_hooks_resolve() -> None:
         if value not in configuration
     ]
     assert missing == []
+
+
+# %% the notes repository origin's pointer named
+
+
+def test_the_remote_is_the_repository_origin_s_pointer_named(
+    clone_that_followed_a_pointer: Path,
+) -> None:
+    """
+    With no setting naming the remote, the package reads the one session start recorded.
+    """
+    resolved = PersonalNotesSetting.REMOTE.resolve(clone_that_followed_a_pointer, {})
+    assert resolved == SEPARATE_NOTES_REPOSITORY_URL
+
+
+def test_the_environment_outranks_the_pointer(
+    clone_that_followed_a_pointer: Path,
+) -> None:
+    """
+    An explicit variable wins over the recorded pointer.
+    """
+    resolved = PersonalNotesSetting.REMOTE.resolve(
+        clone_that_followed_a_pointer,
+        {PersonalNotesSetting.REMOTE.environment_variable: FORK_REMOTE_URL},
+    )
+    assert resolved == FORK_REMOTE_URL
+
+
+def test_git_config_outranks_the_pointer(
+    clone_that_followed_a_pointer: Path,
+) -> None:
+    """
+    An explicit git config value wins over the recorded pointer.
+    """
+    run_git(
+        clone_that_followed_a_pointer,
+        "config",
+        PersonalNotesSetting.REMOTE.git_config_key,
+        FORK_REMOTE_URL,
+    )
+    resolved = PersonalNotesSetting.REMOTE.resolve(clone_that_followed_a_pointer, {})
+    assert resolved == FORK_REMOTE_URL
+
+
+def test_a_clone_that_followed_no_pointer_keeps_its_notes_on_origin(
+    clone: Path,
+) -> None:
+    """
+    Without a setting or a recorded pointer, the notes stay on the default remote.
+    """
+    resolved = PersonalNotesSetting.REMOTE.resolve(clone, {})
+    assert resolved == PersonalNotesSetting.REMOTE.default
+
+
+def test_only_the_remote_follows_the_pointer(
+    clone_that_followed_a_pointer: Path,
+) -> None:
+    """
+    The pointer names a repository, never the branch or the file the notes are on.
+    """
+    resolved = PersonalNotesSetting.BRANCH.resolve(clone_that_followed_a_pointer, {})
+    assert resolved == PersonalNotesSetting.BRANCH.default

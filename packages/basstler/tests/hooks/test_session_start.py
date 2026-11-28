@@ -33,6 +33,7 @@ from basstler.locations import (
     PackageLocation,
     PluginLocation,
     ProjectLocation,
+    RepositoryStateLocation,
 )
 from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.setup.locations import SetupPluginLocation
@@ -48,7 +49,11 @@ from basstler.plan.model import ItemStatus, ManifestKey, PlanDocument, PlanManif
 from basstler.plan_site import merge_workflow_refresh
 from basstler.plan_site.hub import SiteAddress
 from basstler.setup.report import CheckStatus, SetupCheck
-from basstler.shell_configuration import ShellConfigurationFunction
+from basstler.shell_configuration import (
+    PersonalNotesSetting,
+    ShellConfigurationFunction,
+)
+from basstler.text_file import TextFile
 from basstler.upstream_reviews.action.branch import InstallationState
 from basstler_testing.constants.environment import (
     ConfigurationVariable,
@@ -81,6 +86,7 @@ from basstler_testing.project_declaration import ProjectDeclaration
 from basstler_testing.scratch_repository import (
     SCRATCH_IDENTITY,
     ScratchRepository,
+    initialize_bare_repository,
     write_interpreter_wrapper,
 )
 from basstler_testing.script_runner import configuration_value
@@ -457,6 +463,231 @@ def test_a_notes_branch_it_cannot_fetch_from_an_unreachable_repository_is_report
         SummaryMessage.NOTES_NOT_REACHED
     )
     assert f"    {access.__name__}" in result.stdout.splitlines()
+
+
+# %% a notes repository the pointer on origin's notes branch names
+
+POINTED_NOTES = "the notes the separate repository holds\n"
+"""
+The personal notes the separate notes repository holds.
+"""
+
+
+@pytest.fixture
+def pointing_origin(session_start_repository: ScratchRepository) -> ScratchRepository:
+    """
+    The scratch repository as a fresh clone of a project whose notes live in a separate
+    repository: no setting names the notes remote, and origin's notes branch holds only
+    a pointer to the repository holding the notes.
+
+    :param session_start_repository: The scratch repository and notes remote.
+    :return: The same repository.
+    """
+    repository = session_start_repository
+    repository.run_git("config", "--unset", PersonalNotesSetting.REMOTE.git_config_key)
+    repository.publish_notes_branch(
+        {
+            ProjectLocation.PERSONAL_NOTES_DOCUMENT: POINTED_NOTES,
+            ProjectLocation.GIT_IDENTITY: SCRATCH_IDENTITY.as_git_config_file(),
+        }
+    )
+    point_origin_at(repository, str(repository.notes_remote_path))
+    return repository
+
+
+def point_origin_at(repository: ScratchRepository, notes_repository: str) -> None:
+    """
+    :param repository: The scratch repository.
+    :param notes_repository: The repository origin's pointer is to name.
+    """
+    repository.publish_origin_notes_branch(
+        {
+            ProjectLocation.NOTES_REPOSITORY_POINTER: (
+                repository.notes_repository_pointer(notes_repository)
+            )
+        }
+    )
+
+
+def loaded_notes(repository: ScratchRepository) -> str:
+    """
+    :param repository: The scratch repository session start ran in.
+    :return: The personal notes it loaded into the local instructions.
+    """
+    return ClaudeLocalSection.PERSONAL_NOTES.within(
+        TextFile(repository.project_root / PersonalNotesPath.LOCAL_INSTRUCTIONS).read()
+    )
+
+
+def test_a_fresh_clone_loads_the_notes_of_the_repository_origin_points_to(
+    pointing_origin: ScratchRepository,
+):
+    """
+    A clone no setting points anywhere reads the notes from the repository origin's
+    pointer names, and says so.
+    """
+    result = run_session_start(pointing_origin)
+
+    assert result.returncode == 0, result.stderr
+    assert loaded_notes(pointing_origin) == POINTED_NOTES
+    assert summary_value(
+        result.stdout, SummaryLine.NOTES_REPOSITORY
+    ) == summary_message(
+        SummaryMessage.NOTES_REPOSITORY_FOLLOWED, str(pointing_origin.notes_remote_path)
+    )
+
+
+def test_every_later_notes_read_and_write_goes_to_the_repository_origin_points_to(
+    pointing_origin: ScratchRepository,
+):
+    """
+    Every hook sourcing the shell configuration after session start resolves the
+    remote session start followed, without reading the pointer again.
+    """
+    run_session_start(pointing_origin)
+
+    assert pointing_origin.configuration_value(
+        ConfigurationVariable.NOTES_REMOTE
+    ) == str(pointing_origin.notes_remote_path)
+
+
+def test_the_followed_pointer_is_recorded_where_the_package_reads_it(
+    pointing_origin: ScratchRepository,
+):
+    """
+    The shell records the followed pointer in the file the package reads it from.
+    """
+    common_directory = pointing_origin.run_git(
+        "rev-parse", "--path-format=absolute", "--git-common-dir"
+    ).stdout.strip()
+
+    assert (
+        Path(
+            pointing_origin.configuration_value(
+                ConfigurationVariable.NOTES_REPOSITORY_RECORD
+            )
+        )
+        == Path(common_directory) / RepositoryStateLocation.NOTES_REPOSITORY_RECORD
+    )
+
+
+def test_a_configured_notes_remote_wins_over_origin_s_pointer(
+    pointing_origin: ScratchRepository,
+):
+    """
+    A clone that names its notes remote never reads the pointer, so the pointer naming
+    an empty repository changes nothing.
+    """
+    point_origin_at(
+        pointing_origin,
+        str(initialize_bare_repository(pointing_origin.project_root.parent / "empty")),
+    )
+    pointing_origin.resolve_notes_remote_to()
+
+    result = run_session_start(pointing_origin)
+
+    assert result.returncode == 0, result.stderr
+    assert loaded_notes(pointing_origin) == POINTED_NOTES
+    assert f"  {SummaryLine.NOTES_REPOSITORY}:" not in result.stdout
+
+
+def test_a_pointer_naming_origin_itself_is_refused(
+    pointing_origin: ScratchRepository,
+):
+    """
+    A pointer naming origin itself is a cycle: refused, reported, and the notes stay on
+    origin.
+    """
+    assert pointing_origin.work_remote_path is not None
+    point_origin_at(pointing_origin, str(pointing_origin.work_remote_path))
+
+    result = run_session_start(pointing_origin)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.NOTES_REPOSITORY
+    ) == summary_message(
+        SummaryMessage.NOTES_REPOSITORY_POINTER_NAMES_ORIGIN,
+        str(pointing_origin.work_remote_path),
+    )
+    assert (
+        pointing_origin.configuration_value(ConfigurationVariable.NOTES_REMOTE)
+        == PersonalNotesSetting.REMOTE.default
+    )
+
+
+def test_a_pointer_naming_no_repository_is_reported(
+    pointing_origin: ScratchRepository,
+):
+    """
+    An empty pointer is refused and reported, and the notes stay on origin.
+    """
+    pointing_origin.publish_origin_notes_branch(
+        {ProjectLocation.NOTES_REPOSITORY_POINTER: ""}
+    )
+
+    result = run_session_start(pointing_origin)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.NOTES_REPOSITORY
+    ) == summary_message(
+        SummaryMessage.NOTES_REPOSITORY_POINTER_UNREADABLE,
+        ProjectLocation.NOTES_REPOSITORY_POINTER,
+    )
+    assert (
+        pointing_origin.configuration_value(ConfigurationVariable.NOTES_REMOTE)
+        == PersonalNotesSetting.REMOTE.default
+    )
+
+
+def test_a_pointer_back_to_origin_from_the_notes_repository_is_never_followed(
+    pointing_origin: ScratchRepository,
+):
+    """
+    One hop only: a notes repository whose own notes branch points back to origin is a
+    cycle, reported rather than followed.
+    """
+    assert pointing_origin.work_remote_path is not None
+    pointing_origin.update_notes_branch_file(
+        ProjectLocation.NOTES_REPOSITORY_POINTER,
+        pointing_origin.notes_repository_pointer(str(pointing_origin.work_remote_path)),
+    )
+
+    result = run_session_start(pointing_origin)
+
+    assert result.returncode == 0, result.stderr
+    assert summary_value(
+        result.stdout, SummaryLine.NOTES_REPOSITORY
+    ) == summary_message(
+        SummaryMessage.NOTES_REPOSITORY_SECOND_POINTER,
+        str(pointing_origin.notes_remote_path),
+    )
+    assert pointing_origin.configuration_value(
+        ConfigurationVariable.NOTES_REMOTE
+    ) == str(pointing_origin.notes_remote_path)
+
+
+def test_a_pointer_removed_from_origin_returns_the_notes_to_origin(
+    pointing_origin: ScratchRepository,
+):
+    """
+    Each session start reads the pointer again, so removing it forgets the repository
+    it named.
+    """
+    run_session_start(pointing_origin)
+    pointing_origin.publish_origin_notes_branch(
+        {ProjectLocation.PERSONAL_NOTES_DOCUMENT: "origin's own notes\n"}
+    )
+
+    result = run_session_start(pointing_origin)
+
+    assert result.returncode == 0, result.stderr
+    assert loaded_notes(pointing_origin) == "origin's own notes\n"
+    assert (
+        pointing_origin.configuration_value(ConfigurationVariable.NOTES_REMOTE)
+        == PersonalNotesSetting.REMOTE.default
+    )
 
 
 # %% the plan line

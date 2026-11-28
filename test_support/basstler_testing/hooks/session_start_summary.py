@@ -42,6 +42,12 @@ class SummaryLine(StrEnum):
     Whether the personal notes were loaded, and from where.
     """
 
+    NOTES_REPOSITORY = "notes repository"
+    """
+    Which separate notes repository the pointer on origin's notes branch named, or why
+    it was not followed.
+    """
+
     CITED_NAMES = "cited names"
     """
     Whether every module and skill the personal notes name is still shipped.
@@ -127,6 +133,27 @@ class SummaryMessage(StrEnum):
     Named for the situation rather than for that function: a test reads as the case it
     exercises, while the shell file keeps grouping its own definitions by which summary
     line they belong to.
+    """
+
+    NOTES_REPOSITORY_FOLLOWED = "notes_repository_line_followed"
+    """
+    Origin's pointer named a separate notes repository, which the notes are read from.
+    """
+
+    NOTES_REPOSITORY_POINTER_NAMES_ORIGIN = "notes_repository_line_names_origin"
+    """
+    Origin's pointer named origin itself, so it was refused.
+    """
+
+    NOTES_REPOSITORY_POINTER_UNREADABLE = "notes_repository_line_unreadable"
+    """
+    Origin's pointer names no repository.
+    """
+
+    NOTES_REPOSITORY_SECOND_POINTER = "notes_repository_line_second_pointer"
+    """
+    The notes repository the pointer named holds a pointer of its own, which is never
+    followed.
     """
 
     PLAN_NOT_APPLICABLE = "plan_line_not_applicable"

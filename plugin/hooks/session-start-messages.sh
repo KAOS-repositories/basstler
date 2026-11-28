@@ -21,6 +21,34 @@ notes_line_not_reached() {
   printf 'not loaded - this session cannot reach the notes repository yet'
 }
 
+# %% the notes repository line, printed only when origin's notes branch holds a pointer
+
+# notes_repository_line_followed: the notes are read from the repository the pointer
+# on origin's notes branch names.
+notes_repository_line_followed() {
+  local repository="$1"
+  printf "'%s', named by the pointer on origin's notes branch" "${repository}"
+}
+
+# notes_repository_line_names_origin: the pointer names origin itself, a cycle.
+notes_repository_line_names_origin() {
+  local repository="$1"
+  printf "origin's pointer names origin itself ('%s') - refused, so the notes stay on origin; point it at the notes repository or remove it" "${repository}"
+}
+
+# notes_repository_line_unreadable: the pointer names no repository.
+notes_repository_line_unreadable() {
+  local pointer_path="$1"
+  printf "origin's pointer (%s) names no repository - refused, so the notes stay on origin; fix or remove it" "${pointer_path}"
+}
+
+# notes_repository_line_second_pointer: the notes repository points on again, which is
+# never followed.
+notes_repository_line_second_pointer() {
+  local repository="$1"
+  printf "'%s', named by origin's pointer, holds a pointer of its own - not followed, since a pointer is followed one hop; remove that one" "${repository}"
+}
+
 # %% the plan line
 
 # plan_line_not_applicable: for a branch no plan item could ever track - the

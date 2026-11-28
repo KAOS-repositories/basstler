@@ -244,6 +244,12 @@ class RepositoryStateLocation(RepositoryStateFile):
     the same name.
     """
 
+    NOTES_REPOSITORY_RECORD = DIRECTORY / "notes-repository"
+    """
+    The notes repository origin's pointer named when session start last followed it.
+    The shell configuration's ``NOTES_REPOSITORY_RECORD`` spells the same name.
+    """
+
 
 class BasstlerShellVariable(EnvironmentVariable):
     """
@@ -485,6 +491,14 @@ class ProjectLocation(ProjectFile):
     is given.
 
     Mirrors ``PERSONAL_GIT_IDENTITY_PATH`` in ``resolve-personal-notes-config.sh``.
+    """
+
+    NOTES_REPOSITORY_POINTER = PERSONAL_NOTES / "notes-repository"
+    """
+    The pointer origin's notes branch holds when the notes live in a separate
+    repository, naming that repository in git's config format.
+
+    Mirrors ``NOTES_REPOSITORY_POINTER_PATH`` in ``resolve-personal-notes-config.sh``.
     """
 
 

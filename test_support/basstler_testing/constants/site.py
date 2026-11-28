@@ -61,6 +61,11 @@ class SiteRepository(Enum):
     A project repository whose notes are kept in :attr:`NOTES`.
     """
 
+    PRIVATE = Repository("owner", "private-notes")
+    """
+    A private repository whose notes hold :attr:`DatasetLocation.SITE_PRIVATE_PLANS`.
+    """
+
 
 class SiteSampleText(StrEnum):
     """

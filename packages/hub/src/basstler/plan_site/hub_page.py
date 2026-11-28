@@ -470,9 +470,9 @@ class RepositorySummary(ProgressCard):
     The repository's plans the build left out.
     """
 
-    error: str | None = None
+    left_out_reason: str | None = None
     """
-    Why the repository's notes could not be read, if they could not.
+    Why the build left the whole repository out, ``None`` when it published it.
     """
 
     @classmethod
@@ -499,13 +499,13 @@ class RepositorySummary(ProgressCard):
         )
 
     @classmethod
-    def unreadable(cls, name: str, error: str) -> RepositorySummary:
+    def left_out(cls, name: str, reason: str) -> RepositorySummary:
         """
         :param name: The repository, as ``owner/repo``.
-        :param error: Why its notes could not be read.
+        :param reason: Why the build left it out.
         :return: The repository's card, with no plans and no index to open.
         """
-        return cls(name=name, index_url=None, error=error)
+        return cls(name=name, index_url=None, left_out_reason=reason)
 
     @property
     def progress_label_format(self) -> str:
@@ -515,11 +515,11 @@ class RepositorySummary(ProgressCard):
     def skipped_pages(self) -> list[SkippedPage]:
         """
         Every part of this repository the build left out: its plans that failed
-        validation, or the whole repository when its notes could not be read.
+        validation, or the whole repository when the build left it out.
         """
-        if self.error is None:
+        if self.left_out_reason is None:
             return self.skipped_plans
-        return [SkippedPage(site_path=self.name, reason=self.error)]
+        return [SkippedPage(site_path=self.name, reason=self.left_out_reason)]
 
 
 @dataclass(kw_only=True)

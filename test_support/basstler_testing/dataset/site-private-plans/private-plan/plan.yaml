@@ -1,0 +1,19 @@
+schema_version: 1
+id: private-plan
+title: Confidential Pricing Overhaul
+description: A plan kept in a private repository, which no public build may publish.
+default_repository: owner/private-notes
+waves:
+- id: wave-1
+  name: Wave 1
+tracks:
+- id: track-1
+  name: Track 1
+  wave: wave-1
+items:
+- id: confidential-item
+  title: Confidential Item
+  branch: confidential-item
+  track: track-1
+  status: not started
+  recommended_model: sonnet

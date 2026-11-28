@@ -6,63 +6,10 @@ from.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
-from basstler.github.client import (
-    GitHubAttemptReader,
-    GitHubResponse,
-    GitHubRestClient,
-    HttpMethod,
-)
-from basstler.github.exceptions import GitHubUnreachableError
+from basstler.github.client import GitHubAttemptReader
 from basstler.github.repository import Repository
-from basstler.github.repository_details import RepositoryDetailsRead
-
-
-class RepositoryVisibility(StrEnum):
-    """
-    Who can read a repository, as far as this run could tell.
-    """
-
-    PUBLIC = "public"
-    """
-    Anybody can read it.
-    """
-
-    PRIVATE = "private"
-    """
-    Only the people and tokens granted access can read it.
-    """
-
-    UNREADABLE = "unreadable"
-    """
-    GitHub refused to say, or could not be reached.
-    """
-
-
-@dataclass(frozen=True)
-class ReaderWithoutCredential(GitHubAttemptReader):
-    """
-    Stands in for GitHub when no token is available, answering every read as unreachable
-    so visibility reads as unknown.
-    """
-
-    def attempt_get(self, path: str) -> GitHubResponse:
-        return GitHubResponse(
-            None,
-            failure=GitHubUnreachableError(
-                HttpMethod.GET, path, "no GitHub token is available"
-            ),
-        )
-
-    @classmethod
-    def or_client_from_environment(cls) -> GitHubAttemptReader:
-        """
-        :return: A client with the environment's credential, or this stand-in when the
-            environment has none.
-        """
-        client = GitHubRestClient()
-        return client if client.found_credential is not None else cls()
+from basstler.github.repository_visibility import RepositoryVisibility
 
 
 @dataclass(frozen=True)
@@ -94,24 +41,14 @@ class PushVisibilityGuard:
         """
         if self.source == self.target:
             return None
-        if self.visibility_of(self.source) is RepositoryVisibility.PUBLIC:
+        visibility_of_source = RepositoryVisibility.read_from(self.github, self.source)
+        if visibility_of_source is RepositoryVisibility.PUBLIC:
             return None
-        if self.visibility_of(self.target) is RepositoryVisibility.PRIVATE:
+        visibility_of_target = RepositoryVisibility.read_from(self.github, self.target)
+        if visibility_of_target is RepositoryVisibility.PRIVATE:
             return None
         return (
             f"{self.target.full_name} is not known to be private, while "
             f"{self.source.full_name} is not known to be public, so pushing there could "
             f"publish private commits; push by hand once the target is confirmed"
         )
-
-    def visibility_of(self, repository: Repository) -> RepositoryVisibility:
-        """
-        :param repository: The repository to look up.
-        :return: Who can read it.
-        """
-        answer = self.github.attempt_get(repository.api_path)
-        if answer.failure is not None:
-            return RepositoryVisibility.UNREADABLE
-        if RepositoryDetailsRead(repository).parse(answer.body).is_private:
-            return RepositoryVisibility.PRIVATE
-        return RepositoryVisibility.PUBLIC

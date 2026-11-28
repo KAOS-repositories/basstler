@@ -13,6 +13,7 @@ from basstler.locations import ProjectLocation
 from basstler.plan.model import PlanDocument
 from basstler.plan_site.__main__ import HubSite
 from basstler.plan_site.exceptions import PlansCheckoutFailedError
+from basstler.plan_site.publication_scope import EveryRepository
 from basstler.plan_site.hub import (
     NotesBranch,
     PlanHub,
@@ -119,8 +120,11 @@ def test_a_repository_whose_plans_cannot_be_checked_out_says_so_on_its_card(
             repositories=[str(REGISTRY)],
             site_url=SiteSampleText.SITE_URL.value,
         ),
+        publication_scope=EveryRepository(),
         remote_root=str(tmp_path / "remotes"),
     ).build(tmp_path / "site")
 
     [card] = summary.repositories
-    assert card.error == "cannot check out its plans: unable to read sha1 file"
+    assert (
+        card.left_out_reason == "cannot check out its plans: unable to read sha1 file"
+    )

@@ -34,6 +34,7 @@ from basstler.plan_site.__main__ import (
 )
 from basstler.plan_site.cards import LiveStateAttribute, PlanTimeAttribute
 from basstler.plan_site.chip_tone import ChipTone
+from basstler.plan_site.publication_scope import EveryRepository
 from basstler.plan_site.hub import NotesBranch, PlanHub, SiteAddress
 from basstler.plan_site.hub_page import PlanSummary, SiteStylesheet, SkippedPage
 from basstler.plan_site.item_classifier import ItemClassifier
@@ -379,6 +380,7 @@ def hub_site(
         address=SiteAddress(SiteSampleText.SITE_URL),
         pull_request_source=pull_request_source,
         hub=hub,
+        publication_scope=EveryRepository(),
         remote_root=str(dataset_remotes),
     )
 
@@ -395,7 +397,7 @@ def test_the_hub_links_every_repository_and_reports_one_it_cannot_fetch(
         len(PUBLISHED_PLANS),
         0,
     ]
-    assert repositories[1].error
+    assert repositories[1].left_out_reason
     assert summary.done == sum(repository.done for repository in repositories)
     assert summary.total == sum(repository.total for repository in repositories)
     assert summary.started == sum(repository.started for repository in repositories)
@@ -411,7 +413,7 @@ def test_the_site_reports_every_plan_and_repository_it_left_out(
     readable, unreadable = summary.repositories
     assert summary.skipped_pages == [
         *readable.skipped_plans,
-        SkippedPage(site_path=unreadable.name, reason=unreadable.error),
+        SkippedPage(site_path=unreadable.name, reason=unreadable.left_out_reason),
     ]
 
 

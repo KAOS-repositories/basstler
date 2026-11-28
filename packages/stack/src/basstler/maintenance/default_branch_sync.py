@@ -19,10 +19,8 @@ from basstler.maintenance.fast_forward import (
     ForkBaseFastForward,
     RefusedPushHandling,
 )
-from basstler.maintenance.push_visibility import (
-    PushVisibilityGuard,
-    ReaderWithoutCredential,
-)
+from basstler.github.repository_visibility import ReaderWithoutCredential
+from basstler.maintenance.push_visibility import PushVisibilityGuard
 from basstler.stack.settings import Configuration
 
 FOLLOW_UP_ROW_INDENT = "    "
@@ -476,7 +474,7 @@ def main() -> int:
     """
     print(
         DefaultBranchSync.catch_up_checkout(
-            Path.cwd(), ReaderWithoutCredential.or_client_from_environment()
+            Path.cwd(), ReaderWithoutCredential.client_from_environment_or_this()
         ).render()
     )
     return 0

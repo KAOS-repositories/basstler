@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 from abc import abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
@@ -21,7 +21,7 @@ from basstler.command_line import Command
 from basstler.exit_codes import StackExitCode
 from basstler.git.commands import GitCommandRunner, ProposedPush
 from basstler.github.remote import GitHubRemote
-from basstler.github.client import GitHubRestClient
+from basstler.github.client import GitHubAttemptReader, GitHubRestClient
 from basstler.github.constants import MaintenanceNotice
 from basstler.github.repository_access import GitHubRepository, PullRequestReader
 from basstler.stack.locations import StackStateLocation
@@ -105,6 +105,12 @@ class MaintenancePass:
     closing_follow_ups: LandedClosingFollowUps = LandedClosingFollowUps()
     """
     What a whole pass runs after closing pull requests whose work landed.
+    """
+
+    visibility_reader: GitHubAttemptReader = field(default_factory=GitHubRestClient)
+    """
+    How the visibility of the repositories the fork's base is pushed between is
+    read.
     """
 
     @property
@@ -309,7 +315,11 @@ class FastForwardCommand(MaintenanceCommand):
         :param arguments: The parsed command line.
         :return: The process exit code."""
         report = MaintenanceReport(
-            fast_forward=fast_forward(maintenance.configuration, maintenance.git)
+            fast_forward=fast_forward(
+                maintenance.configuration,
+                maintenance.git,
+                maintenance.visibility_reader,
+            )
         )
         report.print_summary()
         return report.exit_code
@@ -562,7 +572,9 @@ class RunReportCommand(StackScopeArgument, MaintenanceCommand):
         """
         stack = maintenance.fresh_stack().scoped_to(stacked_on)
         fork = maintenance.fork()
-        fast_forward_report = fast_forward(stack.configuration, maintenance.git)
+        fast_forward_report = fast_forward(
+            stack.configuration, maintenance.git, maintenance.visibility_reader
+        )
         restacked = restack(stack, maintenance.git, fork)
         promoted = promote(stack, fork, summaries)
         labels_cleared = clear_spent_promotion_labels(stack, fork)

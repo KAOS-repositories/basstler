@@ -332,11 +332,11 @@ class GitHubRestClient(GitHubFullClient):
     """
 
     @cached_property
-    def credential(self) -> GitHubCredential:
+    def found_credential(self) -> GitHubCredential | None:
         """
-        :return: The token the requests authenticate with, and where it came from.
-        :raises GitHubCredentialUnavailableError: If no token was given and neither the
-            environment nor ``gh`` has one.
+        :return: The token the requests authenticate with, and where it came from;
+            ``None`` if no token was given and neither the environment nor ``gh`` has
+            one.
         """
         if self.token:
             return GitHubCredential(self.token, CredentialProvider.CALLER)
@@ -345,13 +345,24 @@ class GitHubRestClient(GitHubFullClient):
             return GitHubCredential(variable.read(), variable)
         executable = shutil.which(GitHubExecutable.COMMAND_LINE)
         if executable is None:
-            raise GitHubCredentialUnavailableError(tuple(GitHubCredentialVariable))
+            return None
         login = subprocess.run(
             [executable, "auth", "token"], capture_output=True, encoding="utf-8"
         )
         if login.returncode != 0 or not login.stdout.strip():
-            raise GitHubCredentialUnavailableError(tuple(GitHubCredentialVariable))
+            return None
         return GitHubCredential(login.stdout.strip(), CredentialProvider.GH_LOGIN)
+
+    @property
+    def credential(self) -> GitHubCredential:
+        """
+        :return: The token the requests authenticate with, and where it came from.
+        :raises GitHubCredentialUnavailableError: If no token was given and neither the
+            environment nor ``gh`` has one.
+        """
+        if self.found_credential is None:
+            raise GitHubCredentialUnavailableError(tuple(GitHubCredentialVariable))
+        return self.found_credential
 
     def get(self, path: str) -> Any:
         return self.attempt_get(path).raise_if_failed()

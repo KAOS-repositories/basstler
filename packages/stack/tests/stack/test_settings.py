@@ -130,6 +130,25 @@ def test_load_configuration_resolves_the_fork_whatever_the_remote_is_called(
     assert configuration.fork_remote == RemoteName.UNEXPECTED
 
 
+def test_load_configuration_never_takes_the_separate_notes_remote_as_the_fork(
+    scratch_repository: ScratchRepository, monkeypatch
+):
+    """
+    A remote added for the notes repository sits beside the fork without making it
+    ambiguous, and is not the fork either.
+    """
+    configuration_path = _committed_configuration_path(scratch_repository)
+    scratch_repository.add_remote(
+        RemoteName.NOTES, StackRepository.NOTES.value.clone_url
+    )
+    scratch_repository.resolve_notes_remote_to(Path(RemoteName.NOTES))
+    monkeypatch.chdir(scratch_repository.project_root)
+
+    configuration = Configuration.load(configuration_path)
+
+    assert configuration.fork_remote == RemoteName.UNEXPECTED
+
+
 def test_load_configuration_takes_the_fork_from_a_personal_notes_override(
     scratch_repository: ScratchRepository, monkeypatch
 ):
@@ -161,12 +180,17 @@ def test_load_configuration_takes_the_fork_from_a_personal_notes_override(
 # %% resolving which remote is the fork
 
 
-def resolve(remote_urls: dict[str, str], fork_repository: Repository | None = None):
+def resolve(
+    remote_urls: dict[str, str],
+    fork_repository: Repository | None = None,
+    notes_repository: Repository | None = None,
+):
     return RemoteResolution.resolve(
         remote_urls,
         StackRepository.UPSTREAM.value,
         RemoteName.PREFERRED_UPSTREAM,
         fork_repository,
+        notes_repository,
     )
 
 
@@ -243,6 +267,36 @@ def test_a_checkout_with_only_the_upstream_is_rejected_rather_than_guessed():
     """
     with pytest.raises(ForkRemoteNotFoundError):
         resolve({RemoteName.ORIGIN: StackRepository.UPSTREAM.value.clone_url})
+
+
+def test_a_separate_notes_repository_is_never_taken_as_the_fork():
+    """
+    A notes repository holds only notes branches, so it is no candidate for the fork even
+    when it is the only remote besides the upstream.
+    """
+    with pytest.raises(ForkRemoteNotFoundError):
+        resolve(
+            {
+                RemoteName.ORIGIN: StackRepository.UPSTREAM.value.clone_url,
+                RemoteName.NOTES: StackRepository.NOTES.value.clone_url,
+            },
+            notes_repository=StackRepository.NOTES.value,
+        )
+
+
+def test_a_separate_notes_repository_does_not_make_the_fork_ambiguous():
+    resolution = resolve(
+        {
+            RemoteName.ORIGIN: StackRepository.UPSTREAM.value.clone_url,
+            RemoteName.MINE: StackRepository.SAME_NAMED_FORK.value.clone_url,
+            RemoteName.NOTES: StackRepository.NOTES.value.clone_url,
+        },
+        notes_repository=StackRepository.NOTES.value,
+    )
+
+    assert resolution.fork == Remote(
+        repository=StackRepository.SAME_NAMED_FORK.value, name=RemoteName.MINE
+    )
 
 
 def test_two_possible_forks_are_rejected_rather_than_guessed():

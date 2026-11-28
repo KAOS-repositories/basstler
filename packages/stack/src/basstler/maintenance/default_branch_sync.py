@@ -12,11 +12,16 @@ from pathlib import Path
 
 from basstler.exit_codes import CommandFailure
 from basstler.git.commands import GitCommandRunner
-from basstler.github.repository import MalformedRepositoryError
+from basstler.github.client import GitHubAttemptReader
+from basstler.github.repository import MalformedRepositoryError, Repository
 from basstler.maintenance.fast_forward import (
     FastForwardOutcome,
     ForkBaseFastForward,
     RefusedPushHandling,
+)
+from basstler.maintenance.push_visibility import (
+    PushVisibilityGuard,
+    ReaderWithoutCredential,
 )
 from basstler.stack.settings import Configuration
 
@@ -169,6 +174,12 @@ class DefaultBranchReport:
                     f"pushing it to '{self.fork_remote}' was refused - the fork is "
                     f"still behind, so the next clone starts stale"
                 )
+            case FastForwardOutcome.REFUSED_WIDER_VISIBILITY:
+                rows.append(
+                    f"'{self.fork_remote}' is not known to be as private as "
+                    f"{self.upstream}, so the base was not pushed there - push it by "
+                    f"hand once that is confirmed"
+                )
             case FastForwardOutcome.REFUSED_NOT_FAST_FORWARD:
                 rows.append(
                     f"'{self.fork_remote}' has commits {self.upstream} does not - left "
@@ -234,10 +245,23 @@ class BaseSource:
     The fork's remote, or the clone's own remote when no upstream is named.
     """
 
-    publishes_to_fork: bool
+    fork_repository: Repository
     """
-    Whether the fork's copy is a separate copy that needs bringing level too.
+    The repository :attr:`fork_remote` points at.
     """
+
+    upstream_repository: Repository | None
+    """
+    The upstream, absent when the project names none.
+    """
+
+    @property
+    def publishes_to_fork(self) -> bool:
+        """
+        :return: Whether the fork's copy is a separate copy that needs bringing
+            level too.
+        """
+        return self.upstream_repository is not None
 
     @classmethod
     def from_configuration(cls, configuration: Configuration) -> BaseSource:
@@ -254,7 +278,8 @@ class BaseSource:
                 configuration.upstream_repository or configuration.fork_repository
             ).full_name,
             fork_remote=configuration.fork_remote,
-            publishes_to_fork=configuration.has_upstream,
+            fork_repository=configuration.fork_repository,
+            upstream_repository=configuration.upstream_repository,
         )
 
 
@@ -274,19 +299,27 @@ class DefaultBranchSync:
     The runner every git command against the clone goes through.
     """
 
+    github: GitHubAttemptReader
+    """
+    How the visibility of the repositories the base is published between is read.
+    """
+
     @classmethod
-    def catch_up_checkout(cls, project_root: Path) -> DefaultBranchReport:
+    def catch_up_checkout(
+        cls, project_root: Path, github: GitHubAttemptReader
+    ) -> DefaultBranchReport:
         """
         Resolve this checkout's upstream - or, when it names none, its own remote - and
         catch its base up, reporting rather than raising whatever stops it.
 
         :param project_root: The clone to catch up, which must be the current directory,
             since the configuration resolves the project from it.
+        :param github: How repository visibility is read.
         :return: What was done.
         """
         try:
             source = BaseSource.from_configuration(Configuration.load())
-            return cls(source, GitCommandRunner(project_root)).run()
+            return cls(source, GitCommandRunner(project_root), github).run()
         except (CommandFailure, MalformedRepositoryError) as refusal:
             return DefaultBranchReport(BaseOutcome.NOT_SYNCED, reason=str(refusal))
 
@@ -423,6 +456,11 @@ class DefaultBranchSync:
                 self.git,
                 self.source.fork_remote,
                 self.base_branch,
+                PushVisibilityGuard(
+                    self.github,
+                    self.source.upstream_repository or self.source.fork_repository,
+                    self.source.fork_repository,
+                ),
                 RefusedPushHandling.REPORTED,
             )
             .onto(self.upstream_tracking_reference)
@@ -436,7 +474,11 @@ def main() -> int:
 
     :return: The process exit code, 0 whatever the outcome.
     """
-    print(DefaultBranchSync.catch_up_checkout(Path.cwd()).render())
+    print(
+        DefaultBranchSync.catch_up_checkout(
+            Path.cwd(), ReaderWithoutCredential.or_client_from_environment()
+        ).render()
+    )
     return 0
 
 

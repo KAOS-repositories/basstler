@@ -223,6 +223,11 @@ class RemoteName(StrEnum):
     A fork remote under a name no default or setting mentions.
     """
 
+    NOTES = "my-notes"
+    """
+    A remote pointing at a separate notes repository.
+    """
+
     PERSONAL_UPSTREAM = "my-own-upstream-name"
     """
     The upstream remote name a personal-notes override picks.

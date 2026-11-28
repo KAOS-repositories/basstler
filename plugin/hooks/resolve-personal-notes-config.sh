@@ -635,6 +635,12 @@ plan_site_page_url() {
   return "${status}"
 }
 
+# personal_notes_remote: the remote name or URL the notes branch lives on.
+personal_notes_remote() {
+  printf '%s
+' "${NOTES_REMOTE}"
+}
+
 # repository_name: the repository remote $1 (a name or a URL, default origin)
 # configures, as owner/repo whatever URL form it takes, or "this repository" for none.
 repository_name() {

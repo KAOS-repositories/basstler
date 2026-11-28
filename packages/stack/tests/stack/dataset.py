@@ -53,6 +53,11 @@ class StackRepository(Enum):
     The upstream every fork here is forked from.
     """
 
+    NOTES = Repository("a-fork-owner", "a-notes")
+    """
+    A separate repository holding only notes branches, never a fork of the upstream.
+    """
+
     DIFFERENT_UPSTREAM = Repository("a-different-upstream", "a-project")
     """
     An upstream named on the command line in place of the committed one.

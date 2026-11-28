@@ -25,6 +25,8 @@ from basstler.stack.model import (
 )
 from basstler.stack.settings import Configuration
 
+from ..github.path_answering_client import PathAnsweringClient
+from ..github.visibility_client import visibility_client
 from ..constants.stack import RemoteName, StackBranch, StackLabel
 from ..fork_checkout import UPSTREAM_BASE, ForkCheckout
 from ..github.listed_repository import ChecksReportedOn
@@ -87,6 +89,14 @@ def make_configuration() -> Configuration:
         upstream_base=UPSTREAM_BASE,
         upstream_location=RemoteName.UPSTREAM,
     )
+
+
+def client_seeing_a_public_upstream() -> PathAnsweringClient:
+    """
+    :return: A GitHub client that says the scratch fork's upstream is public, so
+        the base may be pushed to the fork.
+    """
+    return visibility_client(public=[make_configuration().upstream_repository])
 
 
 def make_own_remote_configuration() -> Configuration:

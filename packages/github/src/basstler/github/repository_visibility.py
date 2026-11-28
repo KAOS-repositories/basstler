@@ -38,6 +38,20 @@ class RepositoryVisibility(StrEnum):
     GitHub refused to say, or could not be reached.
     """
 
+    @classmethod
+    def read_from(
+        cls, github: GitHubAttemptReader, repository: Repository
+    ) -> RepositoryVisibility:
+        """
+        :param github: What answers the repository's resource.
+        :param repository: The repository to look up.
+        :return: Who can read it.
+        """
+        details = RepositoryDetailsRead(repository).attempt(github).resource
+        if details is None:
+            return cls.UNREADABLE
+        return cls.PRIVATE if details.is_private else cls.PUBLIC
+
 
 @dataclass(frozen=True)
 class ReaderWithoutCredential(GitHubAttemptReader):
@@ -55,34 +69,10 @@ class ReaderWithoutCredential(GitHubAttemptReader):
         )
 
     @classmethod
-    def or_client_from_environment(cls) -> GitHubAttemptReader:
+    def client_from_environment_or_this(cls) -> GitHubAttemptReader:
         """
         :return: A client with the environment's credential, or this stand-in when the
             environment has none.
         """
         client = GitHubRestClient()
         return client if client.found_credential is not None else cls()
-
-
-@dataclass(frozen=True)
-class RepositoryVisibilityReader:
-    """
-    Reads each repository's :class:`RepositoryVisibility` from GitHub.
-    """
-
-    github: GitHubAttemptReader
-    """
-    What answers the repositories' resources.
-    """
-
-    def visibility_of(self, repository: Repository) -> RepositoryVisibility:
-        """
-        :param repository: The repository to look up.
-        :return: Who can read it.
-        """
-        answer = self.github.attempt_get(repository.api_path)
-        if answer.failure is not None:
-            return RepositoryVisibility.UNREADABLE
-        if RepositoryDetailsRead(repository).parse(answer.body).is_private:
-            return RepositoryVisibility.PRIVATE
-        return RepositoryVisibility.PUBLIC

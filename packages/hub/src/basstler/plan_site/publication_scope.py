@@ -5,12 +5,13 @@ Which of the repositories a hub file lists a site build may publish.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from basstler.github.client import GitHubAttemptReader
 from basstler.github.repository import Repository
 from basstler.github.repository_visibility import (
+    ReaderWithoutCredential,
     RepositoryVisibility,
-    RepositoryVisibilityReader,
 )
 
 
@@ -34,13 +35,15 @@ class PublicRepositoriesOnly(PublicationScope):
     read.
     """
 
-    visibility: RepositoryVisibilityReader
+    github: GitHubAttemptReader = field(
+        default_factory=ReaderWithoutCredential.client_from_environment_or_this
+    )
     """
-    How each repository's visibility is read.
+    What answers each repository's resource, which says who can read it.
     """
 
     def exclusion_of(self, repository: Repository) -> str | None:
-        visibility = self.visibility.visibility_of(repository)
+        visibility = RepositoryVisibility.read_from(self.github, repository)
         if visibility is RepositoryVisibility.PUBLIC:
             return None
         return f"its visibility is {visibility}, and the site publishes only public repositories"

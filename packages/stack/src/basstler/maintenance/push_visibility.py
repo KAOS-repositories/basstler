@@ -7,11 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from basstler.github.client import GitHubAttemptReader
 from basstler.github.repository import Repository
-from basstler.github.repository_visibility import (
-    RepositoryVisibility,
-    RepositoryVisibilityReader,
-)
+from basstler.github.repository_visibility import RepositoryVisibility
 
 
 @dataclass(frozen=True)
@@ -20,7 +18,7 @@ class PushVisibilityGuard:
     Decides whether commits of one repository may be pushed into another.
     """
 
-    visibility: RepositoryVisibilityReader
+    github: GitHubAttemptReader
     """
     How the repositories' visibility is read.
     """
@@ -43,9 +41,11 @@ class PushVisibilityGuard:
         """
         if self.source == self.target:
             return None
-        if self.visibility.visibility_of(self.source) is RepositoryVisibility.PUBLIC:
+        visibility_of_source = RepositoryVisibility.read_from(self.github, self.source)
+        if visibility_of_source is RepositoryVisibility.PUBLIC:
             return None
-        if self.visibility.visibility_of(self.target) is RepositoryVisibility.PRIVATE:
+        visibility_of_target = RepositoryVisibility.read_from(self.github, self.target)
+        if visibility_of_target is RepositoryVisibility.PRIVATE:
             return None
         return (
             f"{self.target.full_name} is not known to be private, while "

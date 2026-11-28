@@ -10,7 +10,6 @@ from basstler.github.repository import Repository
 from basstler.github.repository_visibility import (
     ReaderWithoutCredential,
     RepositoryVisibility,
-    RepositoryVisibilityReader,
 )
 
 from basstler_testing.github.visibility_client import visibility_client
@@ -44,12 +43,12 @@ A repository GitHub refuses to describe.
 def test_reads_each_repository_s_visibility(
     repository: Repository, visibility: RepositoryVisibility
 ):
-    reader = RepositoryVisibilityReader(
-        visibility_client(public=[PUBLIC_REPOSITORY], private=[PRIVATE_REPOSITORY])
-    )
-    assert reader.visibility_of(repository) is visibility
+    github = visibility_client(public=[PUBLIC_REPOSITORY], private=[PRIVATE_REPOSITORY])
+    assert RepositoryVisibility.read_from(github, repository) is visibility
 
 
 def test_reads_visibility_as_unknown_without_a_credential():
-    reader = RepositoryVisibilityReader(ReaderWithoutCredential())
-    assert reader.visibility_of(PUBLIC_REPOSITORY) is RepositoryVisibility.UNREADABLE
+    visibility = RepositoryVisibility.read_from(
+        ReaderWithoutCredential(), PUBLIC_REPOSITORY
+    )
+    assert visibility is RepositoryVisibility.UNREADABLE

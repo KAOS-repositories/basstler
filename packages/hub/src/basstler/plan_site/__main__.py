@@ -42,10 +42,6 @@ from basstler.github.pull_request_source import (
     PullRequestSource,
 )
 from basstler.github.repository import GitHubAddress, Repository
-from basstler.github.repository_visibility import (
-    ReaderWithoutCredential,
-    RepositoryVisibilityReader,
-)
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
 from basstler.plan.exceptions import PlanValidationError
@@ -562,11 +558,7 @@ def main() -> int:
             reads_mergeable_states=True
         ),
         hub=hub,
-        publication_scope=PublicRepositoriesOnly(
-            RepositoryVisibilityReader(
-                ReaderWithoutCredential.or_client_from_environment()
-            )
-        ),
+        publication_scope=PublicRepositoriesOnly(),
         remote_root=arguments.remote_root,
     )
     summary = site.build(arguments.output)

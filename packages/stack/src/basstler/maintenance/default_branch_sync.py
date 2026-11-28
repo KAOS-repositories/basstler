@@ -19,10 +19,7 @@ from basstler.maintenance.fast_forward import (
     ForkBaseFastForward,
     RefusedPushHandling,
 )
-from basstler.github.repository_visibility import (
-    ReaderWithoutCredential,
-    RepositoryVisibilityReader,
-)
+from basstler.github.repository_visibility import ReaderWithoutCredential
 from basstler.maintenance.push_visibility import PushVisibilityGuard
 from basstler.stack.settings import Configuration
 
@@ -458,7 +455,7 @@ class DefaultBranchSync:
                 self.source.fork_remote,
                 self.base_branch,
                 PushVisibilityGuard(
-                    RepositoryVisibilityReader(self.github),
+                    self.github,
                     self.source.upstream_repository or self.source.fork_repository,
                     self.source.fork_repository,
                 ),
@@ -477,7 +474,7 @@ def main() -> int:
     """
     print(
         DefaultBranchSync.catch_up_checkout(
-            Path.cwd(), ReaderWithoutCredential.or_client_from_environment()
+            Path.cwd(), ReaderWithoutCredential.client_from_environment_or_this()
         ).render()
     )
     return 0

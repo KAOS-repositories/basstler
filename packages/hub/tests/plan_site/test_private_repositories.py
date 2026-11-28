@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-from basstler.github.repository_visibility import RepositoryVisibilityReader
 from basstler.plan.structure import Plan
 from basstler.plan_site.__main__ import HubSite, PlanSource, SiteFile
 from basstler.plan_site.hub import PlanHub, SiteAddress
@@ -95,10 +94,8 @@ def files_holding(text: str, site: Path) -> list[Path]:
 
 
 PUBLIC_ONLY = PublicRepositoriesOnly(
-    RepositoryVisibilityReader(
-        visibility_client(
-            public=[SiteRepository.NOTES.value], private=[SiteRepository.PRIVATE.value]
-        )
+    visibility_client(
+        public=[SiteRepository.NOTES.value], private=[SiteRepository.PRIVATE.value]
     )
 )
 """
@@ -107,7 +104,7 @@ other private.
 """
 
 VISIBILITY_UNKNOWN = PublicRepositoriesOnly(
-    RepositoryVisibilityReader(visibility_client(public=[SiteRepository.NOTES.value]))
+    visibility_client(public=[SiteRepository.NOTES.value])
 )
 """
 The public build's scope, over GitHub refusing to describe the private repository.

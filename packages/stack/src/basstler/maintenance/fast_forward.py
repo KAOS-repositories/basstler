@@ -13,7 +13,6 @@ from enum import StrEnum
 
 from basstler.git.commands import GitCommandRunner, ProposedPush
 from basstler.github.client import GitHubAttemptReader
-from basstler.github.repository_visibility import RepositoryVisibilityReader
 from basstler.maintenance.push_visibility import PushVisibilityGuard
 from basstler.stack.settings import Configuration
 
@@ -241,7 +240,7 @@ def fast_forward(
         configuration.fork_remote,
         configuration.upstream_base,
         PushVisibilityGuard(
-            RepositoryVisibilityReader(github),
+            github,
             configuration.upstream_repository or configuration.fork_repository,
             configuration.fork_repository,
         ),

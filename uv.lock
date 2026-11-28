@@ -304,7 +304,6 @@ dependencies = [
     { name = "basstler-git" },
     { name = "basstler-github" },
     { name = "basstler-reviews" },
-    { name = "basstler-stack" },
     { name = "cyclopts" },
 ]
 
@@ -314,7 +313,6 @@ dev = [
     { name = "basstler-git" },
     { name = "basstler-github" },
     { name = "basstler-reviews" },
-    { name = "basstler-stack" },
     { name = "pytest" },
     { name = "pytest-xdist" },
 ]
@@ -325,7 +323,6 @@ requires-dist = [
     { name = "basstler-git", editable = "packages/git" },
     { name = "basstler-github", editable = "packages/github" },
     { name = "basstler-reviews", editable = "packages/reviews" },
-    { name = "basstler-stack", editable = "packages/stack" },
     { name = "cyclopts", specifier = ">=5.3" },
 ]
 
@@ -335,7 +332,6 @@ dev = [
     { name = "basstler-git", editable = "packages/git" },
     { name = "basstler-github", editable = "packages/github" },
     { name = "basstler-reviews", editable = "packages/reviews" },
-    { name = "basstler-stack", editable = "packages/stack" },
     { name = "pytest" },
     { name = "pytest-xdist" },
 ]
@@ -399,7 +395,6 @@ dev = [
     { name = "basstler-github" },
     { name = "basstler-notes" },
     { name = "basstler-reviews" },
-    { name = "basstler-stack" },
     { name = "pytest" },
     { name = "pytest-xdist" },
 ]
@@ -423,7 +418,6 @@ dev = [
     { name = "basstler-github", editable = "packages/github" },
     { name = "basstler-notes", editable = "packages/notes" },
     { name = "basstler-reviews", editable = "packages/reviews" },
-    { name = "basstler-stack", editable = "packages/stack" },
     { name = "pytest" },
     { name = "pytest-xdist" },
 ]

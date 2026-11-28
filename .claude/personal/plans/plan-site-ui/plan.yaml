@@ -116,23 +116,19 @@ items:
   pull_request_number: 330
   depends_on:
   - plan-site-publication-fixes/private-repositories-link-only
-  status: in progress
+  status: deferred
   recommended_model: sonnet
   session: https://claude.ai/code/session_018wfiv8Q3LnSawpSqXsYsWJ
-  notes: 'Pages on a personal Free account is public. plan-site serve serves HubSite''s site on 127.0.0.1 with the gh login, private and link-only repositories in full, never deployed: every readable repository whose notes hold plans plus the hub''s; --repository narrows. A page view rebuilds past a staleness default, a Refresh button forces it, no timer (owner, 2026-11-28). install-service enables a systemd user unit; setup recommends it for private repositories. No remote access: phones wait for basstler-service/github-sign-in.'
+  notes: 'Deferred (owner, 2026-11-28): basstler-service/github-sign-in serves private plans to any device, so this bridge would be retired. Draft #330 stays open, parked, to resume if the service slips. Scope then: plan-site serve on 127.0.0.1 with the gh login, every readable repository whose notes hold plans plus the hub''s; a page view rebuilds past a staleness default, a Refresh button forces it, no timer; install-service enables a systemd user unit; setup recommends it for private repositories.'
 - id: desktop-launcher
   title: Setup installs a desktop launcher that opens the up-to-date plan site in one click
   track: lifecycle
   depends_on:
   - local-site-open
-  status: not started
+  status: deferred
   recommended_model: sonnet
   session: https://claude.ai/code/session_018wfiv7jmDwVqQj2xLpXnwJ
-  notes: 'Setup installs a launcher that runs plan-site open: a .desktop entry on Linux, an
-    app in ~/Applications on macOS, a Start-menu and desktop shortcut on Windows (windows-support).
-    It runs the latest release through uvx, so it needs no update; removing it is one command.
-    No phone access (owner, 2026-11-09): phones cannot run it, and private hosting waits until
-    phone access matters.'
+  notes: 'Deferred with local-site-open (owner, 2026-11-28), superseded by basstler-service/github-sign-in. Scope then: setup installs a launcher that runs the local site: a .desktop entry on Linux, an app in ~/Applications on macOS, a Start-menu and desktop shortcut on Windows, through uvx so it needs no update; removing it is one command.'
 - id: rules-and-notes-comments
   title: Highlight and comment on any rule or note on the site, then ask Claude or commit
     the change

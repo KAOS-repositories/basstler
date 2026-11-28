@@ -4,11 +4,12 @@
 - Owner reviews draft PR #331 (bug, patch)
 
 ### Done
-- `RepositoryVisibilityReader` moved into basstler-github; the push guard holds it
-- `HubSite.publication_scope`: `PublicRepositoriesOnly` in the public build, `EveryRepository` elsewhere
-- `RepositorySummary.unreadable` renamed to `left_out` (owner approved)
-- Tests: private plan marker in no built file, digest included; reader unit tests; pushed at 28b633cf
+- `RepositoryVisibility.read_from` in basstler-github, through `RepositoryDetailsRead`; the push guard holds the client
+- `HubSite.publication_scope`: `PublicRepositoriesOnly()` (client from environment) in the public build, `EveryRepository` elsewhere
+- Renames: `unreadable` to `left_out`, `or_client_from_environment` to `client_from_environment_or_this` (owner chose both)
+- Review round 1: 3 threads done and resolved at 48941392; krrood `Role` thread answered, left open
 
 ### Next
-- CI on 28b633cf, then review comments
+- Owner decides on the krrood `Role` thread (krrood-core is not on PyPI)
+- CI on 48941392
 - local-site-open branch: pass `EveryRepository()` to its `HubSite` once this lands

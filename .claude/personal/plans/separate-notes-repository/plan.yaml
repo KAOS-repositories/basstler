@@ -95,10 +95,12 @@ items:
 - id: notes-repository-pointer
   title: A fresh clone finds its separate notes repository from a pointer committed on origin's
     notes branch
-  branch: null
+  branch: claude/separate-notes-repository-notes-repository-pointer
   track: notes-setup
+  pull_request_number: 333
+  session: https://claude.ai/code/session_018wfiv8Q3LnSawpSqXsYsWJ
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'Found 2026-11-28: a fresh business_consulting clone read origin''s plan-less notes
     branch, as the notes repository was only in per-clone git config. Choose the pointer after

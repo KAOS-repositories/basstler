@@ -58,12 +58,15 @@ items:
   pull_request_number: 295
   session: https://claude.ai/code/session_018wfiv88vVrkdbjKuCfFcU5
   depends_on: []
-  notes: A Starlette app in the basstler-hub-server distribution of this repository, beside
-    basstler-hub; githubkit for App tokens. The release workflow publishes its image to GHCR
-    from the same tag. It reads its key and secrets from environment variables or mounted
-    files, so docker run or any container host works; one command deploys to Cloud Run, the
-    first target, with Secret Manager. Docs cover self-hosting and local webhooks via gh webhook
-    forward. One instance at first. Served by uvicorn (approved).
+  notes: A Starlette app in the basstler-hub-server distribution of this repository, beside basstler-hub;
+    githubkit for App tokens. The release workflow publishes its image to GHCR from the same tag. It reads
+    its key and secrets from environment variables or mounted files, so docker run or any container host
+    works; one command deploys to Cloud Run, the first target, with Secret Manager. Docs cover self-hosting
+    and local webhooks via gh webhook forward. One instance at first. Served by uvicorn (approved).
+  blockers:
+  - 'Head d5fc6b33 conflicts with main 34f58d51 in packages/core/src/basstler/environment.py: main''s
+    d052eb9e moved names one distribution alone uses out of core, so HubInstanceVariable and ContainerHostVariable
+    move to basstler.hub_server.environment. CI is green at d5fc6b33.'
 - id: webhook-intake
   title: The service verifies GitHub's webhooks and maps each to the plans it changes
   track: github-app

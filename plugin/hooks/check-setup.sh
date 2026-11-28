@@ -286,7 +286,7 @@ fi
 
 # %% where the notes live
 
-report notes_remote info "${NOTES_REMOTE} (from $(resolution_source claude.personalNotesRemote CLAUDE_PERSONAL_NOTES_REMOTE))"
+report notes_remote info "${NOTES_REMOTE} (from ${NOTES_REMOTE_SOURCE})"
 # The URL matters to a caller that can tell whose repository it is (a session
 # with GitHub access can, this script can't): a remote name says nothing about
 # whether it points at the reader's own fork or at a shared upstream they

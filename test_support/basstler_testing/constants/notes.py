@@ -60,6 +60,11 @@ class ClaudeLocalSection(StrEnum):
     The rules every session using basstler's skills follows.
     """
 
+    PERSONAL_NOTES = "PERSONAL-NOTES"
+    """
+    The personal notes, as loaded from the notes branch.
+    """
+
     PULL_REQUEST_PROGRESS = "PR-PROGRESS"
     """
     The current branch's pull request progress notes.

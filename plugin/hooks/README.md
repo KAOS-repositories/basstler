@@ -146,7 +146,7 @@ Or ask Claude — *"save my Claude settings"* — the same way as your notes.
 ## Configuration
 
 Three independent settings, each resolved as **git config**, then **environment variable**, then
-**default**:
+**default** - the remote, before its default, from a pointer on `origin`'s notes branch (below):
 
 | Setting | git config | Environment variable | Default |
 | --- | --- | --- | --- |
@@ -160,6 +160,20 @@ Override only what you need:
   upstream and your fork is a differently-named remote, or isn't a remote at all). Takes a remote
   name (`myfork`) or a raw URL (`https://github.com/<you>/<repo>`); the URL form needs no
   `git remote add` first, so it works in a clone that has never heard of your fork.
+- **Remote, for everyone at once** — when the project's notes live in a separate notes
+  repository, commit a pointer to it on `origin`'s notes branch, at
+  `.claude/personal/notes-repository`:
+
+  ```ini
+  [notes]
+  	repository = https://github.com/<owner>/<notes-repository>
+  ```
+
+  With neither the git config nor the variable set, session start reads it and every notes read
+  and write of the clone goes to that repository - a fresh clone needs no configuration. The
+  pointer is followed one hop: one naming `origin` itself, or naming nothing, is refused and the
+  notes stay on `origin`, and a notes repository that holds a pointer of its own is reported, never
+  followed. The session-start summary's `notes repository` line says which happened.
 - **Branch** — when several people share one remote and you don't want to collide on the default.
 - **Path** — rarely needed.
 

@@ -142,6 +142,27 @@ class ConfigurationVariable(StrEnum):
     The notes branch's directory of progress notes.
     """
 
+    NOTES_REMOTE = "NOTES_REMOTE"
+    """
+    The remote, or URL, every read and write of the notes branch goes to.
+    """
+
+    NOTES_REMOTE_SOURCE = "NOTES_REMOTE_SOURCE"
+    """
+    Which setting, pointer or default :attr:`NOTES_REMOTE` came from.
+    """
+
+    NOTES_REPOSITORY_POINTER_KEY = "NOTES_REPOSITORY_POINTER_KEY"
+    """
+    The git config key the pointer on origin's notes branch names the notes repository
+    under.
+    """
+
+    NOTES_REPOSITORY_RECORD = "NOTES_REPOSITORY_RECORD"
+    """
+    The file session start records the notes repository origin's pointer names in.
+    """
+
 
 class SearchPathVariable(EnvironmentVariable):
     """

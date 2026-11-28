@@ -28,6 +28,7 @@ from basstler.git.commands import GitCommandRunner
 from basstler.locations import PackageLocation, PluginLocation
 from basstler.shell_configuration import PersonalNotesSetting
 from basstler.shell_configuration import ShellConfigurationFunction
+from basstler.text_file import TextFile
 
 from .constants.environment import (
     ConfigurationVariable,
@@ -713,6 +714,67 @@ class ScratchRepository:
             "push", "--quiet", "origin", ScratchBranch.PERSONAL_NOTES, cwd=checkout
         )
         DirectoryTree(checkout).remove()
+
+    def publish_origin_notes_branch(
+        self, files: Mapping[str | os.PathLike[str], str]
+    ) -> None:
+        """
+        Push *files*, and nothing else, as the notes branch of ``origin``, adding
+        ``origin`` as a bare repository when the clone has none.
+
+        :param files: File contents, keyed by path relative to the branch's root.
+        """
+        if self.work_remote_path is None:
+            self.work_remote_path = initialize_bare_repository(
+                self.project_root.parent / "work-remote.git"
+            )
+            self.add_remote("origin", str(self.work_remote_path))
+        checkout = self.project_root.parent / "origin-notes-checkout"
+        DirectoryTree(checkout).remove()
+        self.run_git(
+            "init",
+            "--quiet",
+            f"--initial-branch={ScratchBranch.PERSONAL_NOTES}",
+            str(checkout),
+        )
+        self.run_git("config", "user.name", SCRATCH_IDENTITY.name, cwd=checkout)
+        self.run_git("config", "user.email", SCRATCH_IDENTITY.email, cwd=checkout)
+        self.run_git("config", "commit.gpgsign", "false", cwd=checkout)
+        for relative_path, content in files.items():
+            destination = checkout / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            TextFile(destination).write(content)
+        self.run_git("add", "--all", cwd=checkout)
+        self.run_git("commit", "--quiet", "-m", "Publish origin's notes", cwd=checkout)
+        self.run_git(
+            "push",
+            "--quiet",
+            "--force",
+            str(self.work_remote_path),
+            ScratchBranch.PERSONAL_NOTES,
+            cwd=checkout,
+        )
+        DirectoryTree(checkout).remove()
+
+    def notes_repository_pointer(self, repository: str) -> str:
+        """
+        :param repository: The notes repository the pointer is to name.
+        :return: The content of a pointer naming it, as the shell configuration reads it.
+        """
+        pointer = self.project_root.parent / "notes-repository-pointer"
+        pointer.unlink(missing_ok=True)
+        self.run_git(
+            "config",
+            "--file",
+            str(pointer),
+            self.configuration_value(
+                ConfigurationVariable.NOTES_REPOSITORY_POINTER_KEY
+            ),
+            repository,
+        )
+        content = TextFile(pointer).read()
+        pointer.unlink()
+        return content
 
     def serve_origin_as(self, clone_url: str) -> None:
         """

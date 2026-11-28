@@ -1,6 +1,7 @@
 # Sourced (not executed) by every hook and skill entry point, so all of them
 # resolve the plugin, the project and the personal-notes remote, branch and
-# path with the exact same precedence: git config > environment variable > the
+# path with the exact same precedence: git config > environment variable > (for the
+# remote) the pointer on origin's notes branch session start followed > the
 # zero-config default. See ./README.md.
 
 # HOOKS_DIR / PLUGIN_ROOT: where this plugin's own files are - derived from this
@@ -47,9 +48,6 @@ CLAUDE_CODE_REMOTE="${CLAUDE_CODE_REMOTE:-false}"
 # inside some other one, or fail outright if run from outside any repo.
 cd "${PROJECT_ROOT}"
 
-NOTES_REMOTE="$(git config --get claude.personalNotesRemote || true)"
-NOTES_REMOTE="${NOTES_REMOTE:-${CLAUDE_PERSONAL_NOTES_REMOTE:-origin}}"
-
 NOTES_BRANCH="$(git config --get claude.personalNotesBranch || true)"
 NOTES_BRANCH="${NOTES_BRANCH:-${CLAUDE_PERSONAL_NOTES_BRANCH:-claude/personal-notes}}"
 
@@ -73,6 +71,77 @@ repository_state_file() {
   common_directory="$(git -C "${PROJECT_ROOT}" rev-parse --path-format=absolute --git-common-dir)" \
     || return 1
   printf '%s\n' "${common_directory}/basstler/$1"
+}
+
+# NOTES_REPOSITORY_POINTER_PATH / NOTES_REPOSITORY_POINTER_KEY: the pointer origin's
+# notes branch holds when the notes live in a separate repository, naming it in git's
+# config format. Mirrors basstler.locations.ProjectLocation.NOTES_REPOSITORY_POINTER.
+NOTES_REPOSITORY_POINTER_PATH=".claude/personal/notes-repository"
+NOTES_REPOSITORY_POINTER_KEY="notes.repository"
+# NOTES_REPOSITORY_POINTER_REFERENCE: where origin's notes branch is fetched to read it.
+NOTES_REPOSITORY_POINTER_REFERENCE="refs/basstler/notes-repository-pointer"
+# NOTES_REPOSITORY_RECORD: the repository the pointer named when session start last
+# followed it (basstler.locations.RepositoryStateLocation.NOTES_REPOSITORY_RECORD).
+NOTES_REPOSITORY_RECORD="$(repository_state_file notes-repository)" || true
+
+# resolve_notes_remote: sets NOTES_REMOTE, the remote name or URL every read and write
+# of the notes branch goes to - git config > environment variable > the repository
+# NOTES_REPOSITORY_RECORD names > origin - and NOTES_REMOTE_SOURCE to which of them.
+resolve_notes_remote() {
+  NOTES_REMOTE="$(git config --get claude.personalNotesRemote || true)"
+  NOTES_REMOTE_SOURCE="git config claude.personalNotesRemote"
+  if [ -z "${NOTES_REMOTE}" ]; then
+    NOTES_REMOTE="${CLAUDE_PERSONAL_NOTES_REMOTE:-}"
+    NOTES_REMOTE_SOURCE="environment variable CLAUDE_PERSONAL_NOTES_REMOTE"
+  fi
+  if [ -z "${NOTES_REMOTE}" ] && [ -s "${NOTES_REPOSITORY_RECORD}" ]; then
+    NOTES_REMOTE="$(cat "${NOTES_REPOSITORY_RECORD}")"
+    NOTES_REMOTE_SOURCE="the pointer on origin's ${NOTES_BRANCH}"
+  fi
+  if [ -z "${NOTES_REMOTE}" ]; then
+    NOTES_REMOTE="origin"
+    NOTES_REMOTE_SOURCE="built-in default"
+  fi
+}
+resolve_notes_remote
+
+# follow_notes_repository_pointer: reads the pointer on origin's notes branch, records
+# the repository it names in NOTES_REPOSITORY_RECORD, and resolves NOTES_REMOTE again.
+# Sets NOTES_REPOSITORY_POINTER_STATE - overridden (a setting names the remote, so the
+# pointer is not read), not-read (origin's notes branch could not be fetched, the record
+# kept), none, followed, names-origin or unreadable (the last two refused) - and
+# NOTES_REPOSITORY_POINTED to the repository the pointer names.
+follow_notes_repository_pointer() {
+  NOTES_REPOSITORY_POINTED=""
+  if [ -n "$(git config --get claude.personalNotesRemote || true)" ] \
+      || [ -n "${CLAUDE_PERSONAL_NOTES_REMOTE:-}" ]; then
+    NOTES_REPOSITORY_POINTER_STATE="overridden"
+    return 0
+  fi
+  if ! git fetch --quiet --no-write-fetch-head origin \
+      "+refs/heads/${NOTES_BRANCH}:${NOTES_REPOSITORY_POINTER_REFERENCE}" 2>/dev/null; then
+    NOTES_REPOSITORY_POINTER_STATE="not-read"
+    return 0
+  fi
+  local pointer="${NOTES_REPOSITORY_POINTER_REFERENCE}:${NOTES_REPOSITORY_POINTER_PATH}"
+  rm -f "${NOTES_REPOSITORY_RECORD}"
+  if ! git cat-file -e "${pointer}" 2>/dev/null; then
+    NOTES_REPOSITORY_POINTER_STATE="none"
+  else
+    NOTES_REPOSITORY_POINTED="$(git config --blob "${pointer}" \
+      --get "${NOTES_REPOSITORY_POINTER_KEY}" 2>/dev/null || true)"
+    if [ -z "${NOTES_REPOSITORY_POINTED}" ]; then
+      NOTES_REPOSITORY_POINTER_STATE="unreadable"
+    elif [ "$(repository_name "${NOTES_REPOSITORY_POINTED}" | tr '[:upper:]' '[:lower:]')" \
+        = "$(repository_name origin | tr '[:upper:]' '[:lower:]')" ]; then
+      NOTES_REPOSITORY_POINTER_STATE="names-origin"
+    else
+      mkdir -p "$(dirname "${NOTES_REPOSITORY_RECORD}")"
+      printf '%s\n' "${NOTES_REPOSITORY_POINTED}" > "${NOTES_REPOSITORY_RECORD}"
+      NOTES_REPOSITORY_POINTER_STATE="followed"
+    fi
+  fi
+  resolve_notes_remote
 }
 
 # PERSONAL_SETTINGS_PATH / LOCAL_SETTINGS_RELATIVE_PATH / LOCAL_SETTINGS_JSON /

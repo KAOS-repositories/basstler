@@ -18,8 +18,13 @@ from enum import Enum, StrEnum
 from pathlib import Path, PurePath, PurePosixPath
 
 from basstler.bash import Bash
-from basstler.locations import PluginLocation, ProjectLocation
+from basstler.locations import (
+    PluginLocation,
+    ProjectLocation,
+    RepositoryStateLocation,
+)
 from basstler.plugin_root import PluginRoot
+from basstler.text_file import TextFile
 
 
 class FetchedBranchReference(StrEnum):
@@ -200,7 +205,14 @@ class PersonalNotesSettingSpecification:
 
     default: str
     """
-    The value in force when neither of the two above is set.
+    The value in force when none of the sources above and below is set.
+    """
+
+    pointer_record: RepositoryStateLocation | None = None
+    """
+    Where session start records the value origin's notes branch points to, read when
+    neither the git config key nor the variable is set; ``None`` for a setting no
+    pointer names.
     """
 
     def resolve(self, project_root: Path, environment: Mapping[str, str]) -> str:
@@ -214,7 +226,28 @@ class PersonalNotesSettingSpecification:
         configured = git_value(project_root, "config", "--get", self.git_config_key)
         if configured is not None:
             return configured
-        return environment.get(self.environment_variable) or self.default
+        variable = environment.get(self.environment_variable)
+        if variable:
+            return variable
+        return self.recorded_pointer_value(project_root) or self.default
+
+    def recorded_pointer_value(self, project_root: Path) -> str | None:
+        """
+        :param project_root: The clone session start followed the pointer in.
+        :return: The value session start last recorded from the pointer, or ``None``
+            when it recorded none.
+        """
+        if self.pointer_record is None:
+            return None
+        common_directory = git_value(
+            project_root, "rev-parse", "--path-format=absolute", "--git-common-dir"
+        )
+        if common_directory is None:
+            return None
+        record = Path(common_directory) / self.pointer_record
+        if not record.is_file():
+            return None
+        return TextFile(record).read().strip() or None
 
 
 class PersonalNotesSetting(PersonalNotesSettingSpecification, Enum):
@@ -257,6 +290,7 @@ class PersonalNotesSetting(PersonalNotesSettingSpecification, Enum):
         git_config_key="claude.personalNotesRemote",
         environment_variable="CLAUDE_PERSONAL_NOTES_REMOTE",
         default="origin",
+        pointer_record=RepositoryStateLocation.NOTES_REPOSITORY_RECORD,
     )
     """
     The remote, or raw URL, the notes branch lives on.

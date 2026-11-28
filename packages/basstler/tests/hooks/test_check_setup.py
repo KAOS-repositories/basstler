@@ -29,6 +29,8 @@ from basstler.plan_site import build_start, dispatch_check, publication
 from basstler.plan_site.dispatch_check import UNVERIFIED_PREFIX
 from basstler.plan_site.hub import HubFileKey
 from basstler.plugin_root import PluginRoot
+from basstler.shell_configuration import PersonalNotesSetting
+from basstler.text_file import TextFile
 from basstler.setup.gate import BasstlerSkill, UpstreamReviews
 from basstler.setup.report import (
     CheckResult,
@@ -668,6 +670,30 @@ def test_reports_which_source_each_resolved_setting_came_from(
     assert report.results[SetupCheck.NOTES_PATH].detail == (
         f"{ProjectLocation.PERSONAL_NOTES_DOCUMENT.as_posix()} (from built-in default)"
     )
+
+
+def test_reports_a_notes_remote_resolved_from_origin_s_pointer(
+    check_setup_repository: ScratchRepository,
+):
+    """
+    A clone whose session start followed origin's pointer reads its notes from the
+    repository the pointer named, and says so.
+    """
+    repository = check_setup_repository
+    repository.run_git("config", "--unset", PersonalNotesSetting.REMOTE.git_config_key)
+    record = Path(
+        repository.configuration_value(ConfigurationVariable.NOTES_REPOSITORY_RECORD)
+    )
+    record.parent.mkdir(parents=True, exist_ok=True)
+    TextFile(record).write(f"{repository.notes_remote_path}\n")
+    source = repository.configuration_value(ConfigurationVariable.NOTES_REMOTE_SOURCE)
+
+    report = run_check_setup(repository)
+
+    assert report.results[SetupCheck.NOTES_REMOTE].detail == (
+        f"{repository.notes_remote_path} (from {source})"
+    )
+    assert report.results[SetupCheck.NOTES_BRANCH].status == CheckStatus.OK
 
 
 def test_reports_a_setting_resolved_from_the_environment(

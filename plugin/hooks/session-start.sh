@@ -40,17 +40,41 @@ fi
 RECOVER_PLUGIN_ROOT
 fi
 
+# Before anything reads the notes: origin's pointer may name where they live.
+follow_notes_repository_pointer
+case "${NOTES_REPOSITORY_POINTER_STATE}" in
+  followed)
+    SUMMARY_NOTES_REPOSITORY="$(notes_repository_line_followed "${NOTES_REPOSITORY_POINTED}")" ;;
+  names-origin)
+    SUMMARY_NOTES_REPOSITORY="$(notes_repository_line_names_origin "${NOTES_REPOSITORY_POINTED}")" ;;
+  unreadable)
+    SUMMARY_NOTES_REPOSITORY="$(notes_repository_line_unreadable "${NOTES_REPOSITORY_POINTER_PATH}")" ;;
+  *)
+    SUMMARY_NOTES_REPOSITORY="" ;;
+esac
+
 # In a cloud session, how to attach a notes repository it cannot reach; empty otherwise.
 NOTES_ACCESS="$("${BASSTLER_PYTHON}" -m "${NOTES_ACCESS_MODULE}" \
   --retry "\"\${BASSTLER_PLUGIN_ROOT}/hooks/session-start.sh\"" 2>/dev/null || true)"
 
 if ! fetch_personal_notes_branch; then
   # Said, so a session never starts without its notes and no word why.
-  if [ -n "${NOTES_ACCESS}" ]; then
-    printf 'session-start.sh summary:\n  personal notes:  %s\n    %s\n' \
-      "$(notes_line_not_reached)" "${NOTES_ACCESS}"
+  if [ -n "${NOTES_ACCESS}" ] || [ -n "${SUMMARY_NOTES_REPOSITORY}" ]; then
+    printf 'session-start.sh summary:\n'
+    if [ -n "${NOTES_ACCESS}" ]; then
+      printf '  personal notes:  %s\n    %s\n' "$(notes_line_not_reached)" "${NOTES_ACCESS}"
+    fi
+    if [ -n "${SUMMARY_NOTES_REPOSITORY}" ]; then
+      printf '  notes repository: %s\n' "${SUMMARY_NOTES_REPOSITORY}"
+    fi
   fi
   exit 0
+fi
+
+# One hop only: a notes repository pointing on again is reported, never followed.
+if [ "${NOTES_REPOSITORY_POINTER_STATE}" = followed ] \
+    && git cat-file -e "${PERSONAL_NOTES_REFERENCE}:${NOTES_REPOSITORY_POINTER_PATH}" 2>/dev/null; then
+  SUMMARY_NOTES_REPOSITORY="$(notes_repository_line_second_pointer "${NOTES_REPOSITORY_POINTED}")"
 fi
 
 # Reads below use PERSONAL_NOTES_REFERENCE, which later fetches leave alone.
@@ -465,7 +489,8 @@ fi
 
 cat <<SUMMARY
 session-start.sh summary:
-  personal notes:  ${SUMMARY_NOTES}
+  personal notes:  ${SUMMARY_NOTES}${SUMMARY_NOTES_REPOSITORY:+
+  notes repository: ${SUMMARY_NOTES_REPOSITORY}}
   cited names:     ${SUMMARY_CITED_NAMES}
   local settings:  ${SUMMARY_SETTINGS}
   PR progress:     ${SUMMARY_PROGRESS}

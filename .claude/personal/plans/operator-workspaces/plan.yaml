@@ -1,0 +1,81 @@
+schema_version: 1
+id: operator-workspaces
+title: 'Operator workspaces: a project''s own Claude workspace built from its playbook'
+description: Close the gaps that keep basstler's playbook from building a downstream project's
+  Claude workspace, so it can take over KAOS-repositories/business_consulting's operator workspace
+  (hooks on every event, generated skills, Windows hosts, a directory that is no checkout),
+  proven by a use case its tests mimic.
+default_repository: KAOS-repositories/basstler
+tracking_issue: 329
+waves:
+- id: takeover
+  name: Takeover
+tracks:
+- id: gaps
+  name: Playbook gaps and the use case
+  wave: takeover
+items:
+- id: every-hook-event
+  title: A playbook hook can run on every Claude Code hook event
+  track: gaps
+  depends_on: []
+  status: not started
+  recommended_model: sonnet
+  notes: 'HookEvent knows only SessionStart, Stop and PreToolUse. Add every event Claude Code
+    runs hooks on (SessionEnd, UserPromptSubmit, PostToolUse, PreCompact, Notification, SubagentStop),
+    each a HookDefinition subclass with the fields its registration takes, such as SessionStart''s
+    source matcher. Gap found taking over KAOS-repositories/business_consulting''s operator workspace,
+    whose recording hook also runs on SessionEnd. release:minor.'
+- id: generated-skill-bodies
+  title: A skill whose whole SKILL.md is generated from code
+  track: gaps
+  depends_on:
+  - basstler-packages/krrood-sync
+  - basstler-packages/project-plugin-files
+  status: not started
+  recommended_model: opus
+  notes: 'basstler generates only a skill''s frontmatter and title; the body is a hand-written
+    SKILL.md the build checks exists. A project whose skills are krrood rule Sections, none
+    written by hand, needs a Skill whose body is rendered from them, with shared sections stated
+    once, and a pointer skill in another language that only says to follow it (business_consulting''s
+    start-mandate and mandat-starten, built today by its OperatorSkill and SkillWriter). release:minor.'
+- id: windows-host-hook-commands
+  title: Hook and skill commands that run when Claude on Windows drives a package in WSL
+  track: gaps
+  depends_on:
+  - basstler-packages/project-plugin-files
+  status: not started
+  recommended_model: opus
+  notes: 'Claude Desktop on Windows runs hooks and Bash commands on the Windows side, while
+    the package lives in WSL. A playbook''s commands are then run through wsl.exe and the paths
+    a hook is handed or a skill names are translated between Windows and Linux. Mirror business_consulting''s
+    ClaudeHost and WindowsPathTranslation (liquidity_planning_sources/claude_host.py). Related
+    to windows-support, which makes basstler itself run on Windows. release:minor.'
+- id: workspace-target
+  title: A playbook sets up a working directory that is no git checkout
+  track: gaps
+  depends_on:
+  - basstler-packages/project-plugin-files
+  status: not started
+  recommended_model: opus
+  notes: 'business_consulting''s operator works in a sources root of client documents, not
+    a repository. A playbook can target such a directory: it writes its CLAUDE.md and .claude/settings.json
+    (permissions allow-list, env) from templates with the paths filled in, beside the hooks
+    and skills, and basstler''s own repository hooks stay silent there. Replaces what set_up_operator_workspace.py
+    writes. release:minor.'
+- id: operator-workspace-use-case
+  title: 'Use case in the tests: a downstream operator workspace built from a playbook'
+  track: gaps
+  depends_on:
+  - every-hook-event
+  - generated-skill-bodies
+  - windows-host-hook-commands
+  - workspace-target
+  status: not started
+  recommended_model: sonnet
+  notes: 'basstler''s tests mimic KAOS-repositories/business_consulting''s operator workspace
+    as a contribution under test_support: skills generated from rule Sections with a pointer
+    in German, a recording script on SessionStart, Stop and SessionEnd fed recorded hook payloads
+    (startup and resume record a session, clear and compact do not, as kpi-collection/kpi-session-and-onboarding
+    does there), a first set-up that records an onboarding, a Windows host and the permissions.
+    It asserts the built files are what the workspace needs.'

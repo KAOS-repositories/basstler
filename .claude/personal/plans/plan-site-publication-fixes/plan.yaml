@@ -41,3 +41,11 @@ items:
     when the notes repository is private. Waits for hub-live-states so public hub and repository
     pages stay current. Open: whether to remove a workflow installed earlier on a public repository.
     Overlaps #195. A behaviour change: release:minor, not labelled bug.'
+
+- id: private-repositories-link-only
+  title: "The hub links a private repository without publishing its plans"
+  branch: null
+  track: rendering
+  depends_on: []
+  status: not started
+  recommended_model: opus

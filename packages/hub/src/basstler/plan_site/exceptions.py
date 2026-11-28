@@ -281,3 +281,27 @@ class PlanSiteTokenNotEnteredError(DataclassException, ValueError):
             "run the command in your own terminal and paste the token at its hidden "
             "prompt; never paste it into a chat, a command line or a file"
         )
+
+
+# %% serving the site on this computer
+
+
+@dataclass
+class UserServiceInstallError(DataclassException):
+    """
+    Raised when the plan site's user service cannot be installed.
+    """
+
+    reason: str
+    """
+    What systemd answered, or that there is none.
+    """
+
+    def error_message(self) -> str:
+        return f"the plan site's user service was not installed: {self.reason}"
+
+    def suggest_correction(self) -> str:
+        return (
+            "The service needs systemd; without it, run `basstler plan-site serve` "
+            "yourself."
+        )

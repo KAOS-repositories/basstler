@@ -26,6 +26,7 @@ from basstler.exit_codes import CommandFailure
 from basstler.git.commands import GitCommandResult, GitCommandRunner
 from basstler.github.login_lending import GitHubLoginLendingRunner
 from basstler.github.remote import GitHubRemote
+from basstler.github.exceptions import GitHubCallFailed
 from basstler.github.client import (
     GitHubFullClient,
     GitHubRestClient,
@@ -51,6 +52,7 @@ from basstler.plan_site.hub import PlanHub
 from basstler.plan_site.site_read import SiteReadFix
 from basstler.plan_site.site_repository import SiteRepository
 from basstler.plan_site.user_steps import (
+    LocalSiteRecommendation,
     MergeWorkflowProposal,
     PendingStep,
     PrivateRepositoryAccess,
@@ -129,6 +131,23 @@ class SymbolicReferenceListing(StrEnum):
         ).compiled()
 
 
+@dataclass(frozen=True)
+class RepositoryVisibilities:
+    """
+    The repositories the site's build reads that are not known to be public.
+    """
+
+    private_repositories: tuple[Repository, ...]
+    """
+    Those GitHub says are private.
+    """
+
+    unreadable_repositories: dict[Repository, GitHubCallFailed]
+    """
+    Those whose visibility could not be read, with why.
+    """
+
+
 @dataclass
 class PublicationReport:
     """
@@ -155,6 +174,11 @@ class PublicationReport:
     What was left out on purpose, one line each, with why.
     """
 
+    recommendations: list[str] = field(default_factory=list)
+    """
+    What is worth doing but not needed to publish, one line each.
+    """
+
     mark_viewed: MarkViewedSetup | None = None
     """
     Setting the notes repository's Actions up to mark files viewed, once run; ``None``
@@ -178,6 +202,7 @@ class PublicationReport:
         lines = [f"Plan site: {self.site_url}"]
         lines.extend(f"- {line}" for line in self.written or ["nothing to write"])
         lines.extend(f"- skipped: {line}" for line in self.skipped)
+        lines.extend(f"Recommended: {line}" for line in self.recommendations)
         if self.pending:
             lines.append("Left to you - run this command again once they are done:")
             lines.extend(step.render() for step in self.pending)
@@ -350,10 +375,13 @@ class PlanSitePublication:
             else self.site_workflow
         )
         registered = self.repositories_with_plans_of([notes_repository])
-        access = self.private_repository_access(
+        visibility = self.visibility_of(
             self.repositories_read_by_build(site_workflow.registry, registered),
             notes_details,
         )
+        if visibility.private_repositories:
+            report.recommendations.append(LocalSiteRecommendation.text)
+        access = self.private_repository_access(visibility)
         if site_branch is None:
             report.pending.extend(self.site_repository_creation(access))
             return report
@@ -601,14 +629,13 @@ class PlanSitePublication:
             )
         )
 
-    def private_repository_access(
+    def visibility_of(
         self, repositories: list[Repository], notes_details: RepositoryDetails
-    ) -> PrivateRepositoryAccess | None:
+    ) -> RepositoryVisibilities:
         """
         :param repositories: The repositories the build reads.
         :param notes_details: The notes repository's details.
-        :return: Those that are private or whose visibility cannot be read, unless
-            there are none or the site repository stores the token that reads them.
+        :return: Those that are private, and those whose visibility cannot be read.
         """
         notes_repository = self.dispatch_workflow.notes_repository
         private = [notes_repository] if notes_details.is_private else []
@@ -621,6 +648,19 @@ class PlanSitePublication:
                 unreadable[repository] = answer.failure
             elif RepositoryDetailsRead(repository).parse(answer.body).is_private:
                 private.append(repository)
+        return RepositoryVisibilities(tuple(private), unreadable)
+
+    def private_repository_access(
+        self, visibility: RepositoryVisibilities
+    ) -> PrivateRepositoryAccess | None:
+        """
+        :param visibility: Which repositories the build reads are not known to be
+            public.
+        :return: Those, unless there are none or the site repository stores the token
+            that reads them.
+        """
+        private = visibility.private_repositories
+        unreadable = visibility.unreadable_repositories
         if not private and not unreadable:
             return None
         site = self.dispatch_workflow.site
@@ -631,9 +671,9 @@ class PlanSitePublication:
             return None
         if secret.is_not_found:
             return PrivateRepositoryAccess(
-                site, tuple(private), unreadable_repositories=unreadable
+                site, private, unreadable_repositories=unreadable
             )
-        return PrivateRepositoryAccess(site, tuple(private), secret.failure, unreadable)
+        return PrivateRepositoryAccess(site, private, secret.failure, unreadable)
 
     def write_merge_workflow(
         self, notes_details: RepositoryDetails, report: PublicationReport

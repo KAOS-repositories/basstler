@@ -4,6 +4,8 @@ The files and directories the plan site names.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from basstler.locations import (
     INSTALLED_PACKAGE,
     PathEnumeration,
@@ -80,6 +82,43 @@ class SiteTemplate(PathEnumeration):
     """
     The plan page's script that reads every pull request's state from GitHub in the
     browser, and shows when the page was last refreshed.
+    """
+
+    LOCAL_SITE_BAR = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "local_site_bar.html"
+    )
+    """
+    The bar a locally served page ends with: when it was built, and the Refresh button.
+    """
+
+    USER_SERVICE = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "plan_site_user_service.service"
+    )
+    """
+    The systemd user unit that keeps the locally served site running.
+    """
+
+    REPOSITORIES_WITH_PLANS = INSTALLED_PACKAGE.shipped(
+        ShippedPath.TEMPLATES / "repositories_with_plans.graphql"
+    )
+    """
+    The query listing the viewer's repositories and whether their notes hold plans.
+    """
+
+
+class UserServiceLocation(PathEnumeration):
+    """
+    Where systemd reads a user's units from, relative to their configuration directory.
+    """
+
+    UNIT_DIRECTORY = Path("systemd") / "user"
+    """
+    The directory holding the user's units.
+    """
+
+    PLAN_SITE_UNIT = Path("basstler-plan-site.service")
+    """
+    The unit that serves the plan site.
     """
 
 

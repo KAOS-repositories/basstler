@@ -60,6 +60,7 @@ from basstler.github.run_listing import ListedRun, RunListing
 from basstler.github.states import CheckOutcome
 from basstler.github.workflows import TriggerEvent, Workflow
 from basstler.locations import ProjectLocation
+from basstler.plan_site.user_steps import LocalSiteRecommendation
 from basstler.plan_site.locations import SiteWorkflowLocation, SiteProjectLocation
 from basstler.plan.model import PlanDocument
 from basstler.plan_site import token_storage
@@ -2330,3 +2331,32 @@ def test_the_shared_token_is_stored_as_both_secrets(published):
 def test_marking_files_viewed_is_reported_after_the_plan_site(published):
     report = published_marking_viewed(published)
     assert report.render().endswith(report.mark_viewed_report)
+
+
+# %% recommending the local site
+
+
+def test_a_private_repository_gets_the_local_site_recommended(
+    private_publishing: Publishing,
+):
+    report = private_publishing.publication(
+        private_runs(private_publishing)
+    ).publish()
+
+    assert report.recommendations == [LocalSiteRecommendation.text]
+
+
+def test_public_repositories_get_no_recommendation(private_publishing: Publishing):
+    runs = private_publishing.runs(
+        DatasetLocation.WORKFLOW_RUNS_NONE, DatasetLocation.WORKFLOW_RUNS_NONE
+    )
+
+    assert private_publishing.publication(runs).publish().recommendations == []
+
+
+def test_the_report_prints_its_recommendations(private_publishing: Publishing):
+    report = private_publishing.publication(
+        private_runs(private_publishing)
+    ).publish()
+
+    assert f"Recommended: {LocalSiteRecommendation.text}" in report.render()

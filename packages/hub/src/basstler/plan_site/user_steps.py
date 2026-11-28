@@ -303,6 +303,23 @@ class UserSteps:
         )
 
 
+class LocalSiteRecommendation:
+    """
+    The advice to serve private repositories' plans on the user's own computer.
+    """
+
+    @classproperty
+    def text(cls) -> str:
+        """
+        What publishing says when the site covers a private repository.
+        """
+        return (
+            "GitHub Pages is public on a personal Free account, so to see private "
+            "repositories' plans in full run `basstler plan-site serve` on your own "
+            "computer, or `basstler plan-site install-service` to keep it running."
+        )
+
+
 @dataclass(frozen=True)
 class PrivateRepositoryAccess:
     """

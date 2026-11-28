@@ -156,9 +156,10 @@ class PlanHub:
     The hub file's content.
     """
 
-    registry: str
+    registry: str | None
     """
-    The ``owner/repo`` whose notes hold the complete list.
+    The ``owner/repo`` whose notes hold the complete list, ``None`` for a hub no
+    repository records.
     """
 
     repositories: list[str] = field(default_factory=list)

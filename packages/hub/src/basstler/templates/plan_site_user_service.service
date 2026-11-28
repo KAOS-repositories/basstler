@@ -1,0 +1,11 @@
+[Unit]
+Description=The basstler plan site, served on this computer
+After=network-online.target
+
+[Service]
+Environment={{ environment }}
+ExecStart={{ command }}
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

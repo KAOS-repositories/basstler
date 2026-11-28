@@ -138,6 +138,20 @@ class DatasetLocation(PathEnumeration):
     A workflow that runs the package's own entry point.
     """
 
+    REPOSITORIES_WITH_PLANS_FIRST_PAGE = (
+        DIRECTORY / "local-site" / "repositories-first-page.json"
+    )
+    """
+    GitHub's first page of the viewer's repositories: one with plans, one without.
+    """
+
+    REPOSITORIES_WITH_PLANS_LAST_PAGE = (
+        DIRECTORY / "local-site" / "repositories-last-page.json"
+    )
+    """
+    GitHub's last page of the viewer's repositories: one with plans.
+    """
+
     BOOTSTRAP_PLAN = DIRECTORY / "bootstrap-plan.yaml"
     """
     The item-bootstrap fixture plan: two items, a folded note, blank lines between

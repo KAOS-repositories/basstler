@@ -1,0 +1,21 @@
+query ($cursor: String, $plans: String!) {
+  viewer {
+    repositories(
+      first: 100
+      after: $cursor
+      affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER]
+      ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER]
+    ) {
+      nodes {
+        nameWithOwner
+        plans: object(expression: $plans) {
+          __typename
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "data": {
+    "viewer": {
+      "repositories": {
+        "nodes": [
+          {"nameWithOwner": "owner/private-notes", "plans": {"__typename": "Tree"}}
+        ],
+        "pageInfo": {"hasNextPage": false, "endCursor": null}
+      }
+    }
+  }
+}

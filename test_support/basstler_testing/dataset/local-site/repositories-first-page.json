@@ -1,0 +1,13 @@
+{
+  "data": {
+    "viewer": {
+      "repositories": {
+        "nodes": [
+          {"nameWithOwner": "owner/notes", "plans": {"__typename": "Tree"}},
+          {"nameWithOwner": "owner/project", "plans": null}
+        ],
+        "pageInfo": {"hasNextPage": true, "endCursor": "second-page"}
+      }
+    }
+  }
+}

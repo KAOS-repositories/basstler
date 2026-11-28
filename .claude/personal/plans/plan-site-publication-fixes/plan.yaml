@@ -46,6 +46,13 @@ items:
   title: "The hub links a private repository without publishing its plans"
   branch: null
   track: rendering
-  depends_on: []
+  depends_on:
+  - separate-notes-repository/sync-never-pushes-to-notes-repository
   status: not started
   recommended_model: opus
+  notes: 'From the business_consulting-notes setup (owner, 2026-11-28). The build reads each listed
+    repository''s visibility from the GitHub API, reusing #296''s visibility reader; private or unknown
+    gets a link-only card whatever the hub entry says and whatever PLAN_SITE_READ_TOKEN can read. Never
+    fetch, render, count or digest it. hub register writes a link-only entry for a private notes repository.
+    Test: a marker in a private plan is in no built file, site-digest.txt included. Open: ask the owner
+    before showing an item count. Docs replace the must-not-list warning.'

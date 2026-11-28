@@ -5,9 +5,9 @@
 
 ### Done
 - Branch, draft PR #330
-- WIP code and tests, commit bc6f3662, local only (not pushed)
+- WIP code and tests, commit bc6f3662, pushed
 
 ### Next
 - Fix `RepositoryListingPage` (two fields read `viewer`; nest a model), rerun tests
-- ruff, format, code-rules check, docs, real run; push and update the PR description
+- ruff, format, code-rules check, docs, real run; update the PR description
 - Confirm picked defaults: port 8765, stale after 5 minutes

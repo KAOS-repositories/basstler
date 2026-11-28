@@ -1,12 +1,14 @@
 schema_version: 1
 id: separate-notes-repository
-title: 'A private project''s plans in a separate notes repository, safe to set up and shared by a team'
-description: >
-  A private project (KAOS-repositories/business_consulting) keeps its plans in a separate notes
-  repository, like tomsch420/business_consulting-notes, so the plan site can render them and a team
-  can edit them. Setting one up leaked the private main into the public notes repository and left it
-  without a notes branch. These fixes make the separate notes repository a first-class, safe setup
-  until team-repository's plan store lands.
+title: A private project's plans in a separate notes repository, safe to set up and shared
+  by a team
+description: 'A private project (KAOS-repositories/business_consulting) keeps its plans in
+  a separate notes repository, like tomsch420/business_consulting-notes, so the plan site
+  can render them and a team can edit them. Setting one up leaked the private main into the
+  public notes repository and left it without a notes branch. These fixes make the separate
+  notes repository a first-class, safe setup until team-repository''s plan store lands.
+
+  '
 default_repository: KAOS-repositories/basstler
 tracking_issue: 291
 waves:
@@ -25,68 +27,59 @@ tracks:
   name: Plugin health
   wave: setup
 items:
-- id: sync-never-pushes-to-notes-repository
-  title: Default-branch sync never pushes the base to the notes repository, nor to a wider-visibility repository
-  track: sync-safety
-  branch: fix-sync-never-pushes-to-notes-repository
-  pull_request_number: 296
-  session: this local Claude Code session
-  depends_on: []
-  status: in progress
-  recommended_model: sonnet
-  notes: >
-    Found 2026-11-22: a git remote added for the notes repository was the clone's only non-upstream
-    remote, so RemoteResolution._select_fork took it as the fork and DefaultBranchSync.publish_to_fork
-    pushed the private upstream's main (525 commits) into the public notes repository. Exclude the
-    resolved notes remote from fork candidates, and refuse any push of the base to a repository whose
-    visibility is wider than the upstream's (private upstream, public target), reporting it instead.
-    Tests for both.
 - id: setup-creates-notes-branch-on-notes-repository
   title: Setup with a separate notes repository creates the notes branch there, not on origin
   track: notes-setup
   depends_on: []
   status: not started
   recommended_model: sonnet
-  notes: >
-    setup.personal_notes --remote https://github.com/KAOS-repositories/business_consulting-notes.git
-    said 'The notes branch already exists; left untouched' and check-setup's notes_branch row said
-    found on 'origin': it looked at the checkout's origin, so the new notes repository never got
-    claude/personal-notes. Every notes-branch lookup and creation uses the resolved notes remote URL.
+  notes: 'setup.personal_notes --remote https://github.com/KAOS-repositories/business_consulting-notes.git
+    said ''The notes branch already exists; left untouched'' and check-setup''s notes_branch
+    row said found on ''origin'': it looked at the checkout''s origin, so the new notes repository
+    never got claude/personal-notes. Every notes-branch lookup and creation uses the resolved
+    notes remote URL.
+
+    '
 - id: setup-remote-name-resolution
   title: Setup resolves a --remote given as a remote name to its GitHub repository
   track: notes-setup
   depends_on: []
   status: not started
   recommended_model: haiku
-  notes: >
-    setup.personal_notes --remote team-notes (a remote whose URL is a GitHub repository) printed
-    'it names no GitHub repository, or no GitHub token is set' and skipped the owner check. Read the
-    remote's URL before parsing it, and say which of the two causes applied.
+  notes: 'setup.personal_notes --remote team-notes (a remote whose URL is a GitHub repository)
+    printed ''it names no GitHub repository, or no GitHub token is set'' and skipped the owner
+    check. Read the remote''s URL before parsing it, and say which of the two causes applied.
+
+    '
 - id: separate-notes-repository-setup
-  title: /setup-personal-notes offers a separate notes repository for a private project, and teammates join it
+  title: /setup-personal-notes offers a separate notes repository for a private project, and
+    teammates join it
   track: notes-setup
-  depends_on: [sync-never-pushes-to-notes-repository, setup-creates-notes-branch-on-notes-repository]
+  depends_on:
+  - setup-creates-notes-branch-on-notes-repository
   status: not started
   recommended_model: opus
-  notes: >
-    For a private project with no fork, offer <owner>/<repo>-notes (organisation or personal) holding
-    only the notes branch, public or private as the user picks; create it, record it, register it on
-    the plan site. A teammate joins with one command. Interim: all members share one notes branch
-    until team-repository/team-notes-store gives each their own; plans written by several people need
-    core-robustness' concurrent-safe saves. Pilot: KAOS-repositories/business_consulting-notes.
+  notes: 'For a private project with no fork, offer <owner>/<repo>-notes (organisation or
+    personal) holding only the notes branch, public or private as the user picks; create it,
+    record it, register it on the plan site. A teammate joins with one command. Interim: all
+    members share one notes branch until team-repository/team-notes-store gives each their
+    own; plans written by several people need core-robustness'' concurrent-safe saves. Pilot:
+    KAOS-repositories/business_consulting-notes.
+
+    '
 - id: stale-plugin-copy-warning
   title: Session start warns when an older copy of the basstler plugin is also enabled
   track: plugin-health
   depends_on: []
   status: not started
   recommended_model: sonnet
-  notes: >
-    On Windows the claude.ai plugin (v4.0.3) and an old Claude Code marketplace copy
-    (~/.claude/plugins/cache/basstler, v3.10.8, enabled in ~/.claude/settings.json) were both present.
-    Running the old copy's basstler.sh against the 4.0.3 environment failed with
-    'reported no row for notes_repository_access, plan_site_access'. Name the other copy, its version
-    and how to disable it.
+  notes: 'On Windows the claude.ai plugin (v4.0.3) and an old Claude Code marketplace copy
+    (~/.claude/plugins/cache/basstler, v3.10.8, enabled in ~/.claude/settings.json) were both
+    present. Running the old copy''s basstler.sh against the 4.0.3 environment failed with
+    ''reported no row for notes_repository_access, plan_site_access''. Name the other copy,
+    its version and how to disable it.
 
+    '
 - id: notes-visibility-check
   title: Session start warns when the notes repository is more public than the project
   branch: null
@@ -94,18 +87,23 @@ items:
   recommended_model: sonnet
   track: sync-safety
   depends_on: []
-  notes: 'Found 2026-11-22: tomsch420/business_consulting-notes is public and holds PR progress for branches
-    of the private KAOS-repositories/business_consulting. Nothing compares the two visibilities, so every
-    progress note is published. Session start and /setup-personal-notes read both repositories'' visibility,
-    warn with the fix (make the notes private, or move them to a private notes repository), and setup
-    refuses such a pair unless confirmed.'
-
+  notes: 'Found 2026-11-22: tomsch420/business_consulting-notes is public and holds PR progress
+    for branches of the private KAOS-repositories/business_consulting. Nothing compares the
+    two visibilities, so every progress note is published. Session start and /setup-personal-notes
+    read both repositories'' visibility, warn with the fix (make the notes private, or move
+    them to a private notes repository), and setup refuses such a pair unless confirmed.'
 - id: notes-repository-pointer
-  title: "A fresh clone finds its separate notes repository from a pointer committed on origin's notes branch"
+  title: A fresh clone finds its separate notes repository from a pointer committed on origin's
+    notes branch
   branch: null
   track: notes-setup
-  depends_on:
-  - sync-never-pushes-to-notes-repository
+  depends_on: []
   status: not started
   recommended_model: opus
-  notes: 'Found 2026-11-28: a fresh business_consulting clone read origin''s plan-less notes branch, as the notes repository was only in per-clone git config. Choose the pointer after reading the notes-location hooks and Python code; every notes read and write follows it and notes_remote says where it came from. Lets a cloud session pasting a site command find the plans. Tests: pointer from a fresh clone, config overrides it, cycle refused. Pilot merges the two notes branches; nothing deleted or force-pushed without the owner.'
+  notes: 'Found 2026-11-28: a fresh business_consulting clone read origin''s plan-less notes
+    branch, as the notes repository was only in per-clone git config. Choose the pointer after
+    reading the notes-location hooks and Python code; every notes read and write follows it
+    and notes_remote says where it came from. Lets a cloud session pasting a site command
+    find the plans. Tests: pointer from a fresh clone, config overrides it, cycle refused.
+    Pilot merges the two notes branches; nothing deleted or force-pushed without the owner.'
+landed_item_count: 1

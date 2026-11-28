@@ -43,9 +43,11 @@ items:
     Overlaps #195. A behaviour change: release:minor, not labelled bug.'
 - id: private-repositories-link-only
   title: The public build never publishes a private repository's plans, whatever its token can read
-  branch: null
+  branch: fix/public-site-skips-private-repositories
   track: rendering
+  pull_request_number: 331
+  session: https://claude.ai/code/session_018wfiv8Q3LnSawpSqXsYsWJ
   depends_on: []
-  status: not started
+  status: in progress
   recommended_model: opus
   notes: 'From the business_consulting-notes setup (owner, 2026-11-28). The build reads each listed repository''s visibility from the GitHub API through push_visibility''s reader (#296); private or unknown is never fetched, rendered, counted or digested and shows as skipped, whatever PLAN_SITE_READ_TOKEN can read. Test: a marker in a private plan is in no built file, site-digest.txt included. Keep the check reusable by basstler-service/served-pages. No link-only card or register change: github-sign-in replaces them (owner, 2026-11-28).'

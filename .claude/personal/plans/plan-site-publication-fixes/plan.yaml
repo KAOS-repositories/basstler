@@ -42,16 +42,10 @@ items:
     pages stay current. Open: whether to remove a workflow installed earlier on a public repository.
     Overlaps #195. A behaviour change: release:minor, not labelled bug.'
 - id: private-repositories-link-only
-  title: The hub links a private repository without publishing its plans
+  title: The public build never publishes a private repository's plans, whatever its token can read
   branch: null
   track: rendering
   depends_on: []
   status: not started
   recommended_model: opus
-  notes: 'From the business_consulting-notes setup (owner, 2026-11-28). The build reads each
-    listed repository''s visibility from the GitHub API, reusing #296''s visibility reader;
-    private or unknown gets a link-only card whatever the hub entry says and whatever PLAN_SITE_READ_TOKEN
-    can read. Never fetch, render, count or digest it. hub register writes a link-only entry
-    for a private notes repository. Test: a marker in a private plan is in no built file,
-    site-digest.txt included. Open: ask the owner before showing an item count. Docs replace
-    the must-not-list warning.'
+  notes: 'From the business_consulting-notes setup (owner, 2026-11-28). The build reads each listed repository''s visibility from the GitHub API through push_visibility''s reader (#296); private or unknown is never fetched, rendered, counted or digested and shows as skipped, whatever PLAN_SITE_READ_TOKEN can read. Test: a marker in a private plan is in no built file, site-digest.txt included. Keep the check reusable by basstler-service/served-pages. No link-only card or register change: github-sign-in replaces them (owner, 2026-11-28).'

@@ -19,10 +19,11 @@ from basstler.maintenance.fast_forward import (
     ForkBaseFastForward,
     RefusedPushHandling,
 )
-from basstler.maintenance.push_visibility import (
-    PushVisibilityGuard,
+from basstler.github.repository_visibility import (
     ReaderWithoutCredential,
+    RepositoryVisibilityReader,
 )
+from basstler.maintenance.push_visibility import PushVisibilityGuard
 from basstler.stack.settings import Configuration
 
 FOLLOW_UP_ROW_INDENT = "    "
@@ -457,7 +458,7 @@ class DefaultBranchSync:
                 self.source.fork_remote,
                 self.base_branch,
                 PushVisibilityGuard(
-                    self.github,
+                    RepositoryVisibilityReader(self.github),
                     self.source.upstream_repository or self.source.fork_repository,
                     self.source.fork_repository,
                 ),

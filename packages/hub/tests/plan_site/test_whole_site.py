@@ -14,6 +14,7 @@ from basstler.locations import ProjectLocation
 from basstler.plan_site.locations import SiteProjectLocation
 from basstler.plan_site.__main__ import HubSite, SiteFile, main
 from basstler.plan_site.exceptions import RegistryUnreadableError
+from basstler.plan_site.publication_scope import EveryRepository
 from basstler.plan_site.hub import PlanHub, SiteAddress
 
 from basstler_testing.constants.paths import DatasetLocation
@@ -62,6 +63,7 @@ def built_site(remotes: Path, tmp_path: Path) -> Path:
         address=SiteAddress(hub.site_url),
         pull_request_source=RecordedPullRequestSource(),
         hub=hub,
+        publication_scope=EveryRepository(),
         remote_root=str(remotes),
     ).build(output)
     return output

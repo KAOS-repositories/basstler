@@ -25,6 +25,7 @@ from basstler.github.repository import PullRequestReference, Repository
 from basstler.plan_site.locations import SiteTemplate
 from basstler.plan.model import ItemStatus
 from basstler.plan_site.__main__ import HubSite, SiteFile
+from basstler.plan_site.publication_scope import EveryRepository
 from basstler.plan_site.hub import PlanHub, SiteAddress
 from basstler.plan_site.hub_page import (
     MAXIMUM_PULL_REQUESTS_PER_PAGE,
@@ -79,6 +80,7 @@ def hub_site(
             repositories=[str(NOTES_REPOSITORY)],
             site_url=SiteSampleText.SITE_URL.value,
         ),
+        publication_scope=EveryRepository(),
         remote_root=str(dataset_remotes),
     )
 

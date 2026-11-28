@@ -42,6 +42,10 @@ from basstler.github.pull_request_source import (
     PullRequestSource,
 )
 from basstler.github.repository import GitHubAddress, Repository
+from basstler.github.repository_visibility import (
+    ReaderWithoutCredential,
+    RepositoryVisibilityReader,
+)
 from basstler.locations import ProjectLocation
 from basstler.plan.dependencies import DependencyResolver, PlanDirectory
 from basstler.plan.exceptions import PlanValidationError
@@ -66,6 +70,10 @@ from basstler.plan_site.hub_page import (
 from basstler.plan_site.item_classifier import ItemClassifier
 from basstler.plan_site.plan_page import PlanPage, RenderedPlanPage
 from basstler.plan_site.plan_page_header import PlanPageHeader
+from basstler.plan_site.publication_scope import (
+    PublicationScope,
+    PublicRepositoriesOnly,
+)
 from basstler.regular_expression import (
     CharacterSet,
     MarkupElement,
@@ -446,6 +454,11 @@ class HubSite(SiteSection[SiteSummary]):
     The hub file, naming the repositories to publish.
     """
 
+    publication_scope: PublicationScope
+    """
+    Which of the listed repositories the site may publish.
+    """
+
     remote_root: str = GitHubAddress.WEB.value
     """
     Where the listed repositories are fetched from, as
@@ -482,13 +495,17 @@ class HubSite(SiteSection[SiteSummary]):
         :param repository: The repository to publish.
         :param scratch: A directory of its own to fetch the notes into.
         :param output: The site's root directory.
-        :return: The repository's card, with an error when its notes cannot be read.
+        :return: The repository's card, left out when the site may not publish it or its
+            notes cannot be read.
         """
+        if (exclusion := self.publication_scope.exclusion_of(repository)) is not None:
+            logger.warning(f"{repository} is not published: {exclusion}")
+            return RepositorySummary.left_out(str(repository), exclusion)
         notes = NotesBranch.fetch(
             repository, self.hub.notes_branch, self.remote_root, scratch
         )
         if notes is None:
-            return RepositorySummary.unreadable(
+            return RepositorySummary.left_out(
                 str(repository), f"cannot fetch {self.hub.notes_branch}"
             )
         try:
@@ -500,7 +517,7 @@ class HubSite(SiteSection[SiteSummary]):
             )
         except PlansCheckoutFailedError as failure:
             logger.warning(failure.error_message())
-            return RepositorySummary.unreadable(
+            return RepositorySummary.left_out(
                 str(repository), f"cannot check out its plans: {failure.error_output}"
             )
         return site.build(output)
@@ -545,6 +562,11 @@ def main() -> int:
             reads_mergeable_states=True
         ),
         hub=hub,
+        publication_scope=PublicRepositoriesOnly(
+            RepositoryVisibilityReader(
+                ReaderWithoutCredential.or_client_from_environment()
+            )
+        ),
         remote_root=arguments.remote_root,
     )
     summary = site.build(arguments.output)

@@ -18,7 +18,7 @@ from basstler.maintenance.default_branch_sync import (
     DefaultBranchSync,
 )
 from basstler.maintenance.fast_forward import FastForwardOutcome
-from basstler.maintenance.push_visibility import ReaderWithoutCredential
+from basstler.github.repository_visibility import ReaderWithoutCredential
 from basstler.shell_configuration import FetchedBranchReference
 
 from basstler_testing.constants.notes import ScratchBranch

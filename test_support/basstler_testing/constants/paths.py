@@ -529,6 +529,11 @@ class DatasetLocation(PathEnumeration):
     manifest fails validation, and the generated directory that holds no plan.
     """
 
+    SITE_PRIVATE_PLANS = DIRECTORY / "site-private-plans"
+    """
+    A ``plans`` directory holding one plan that only a private repository keeps.
+    """
+
     ACTIONS_BUDGET = DIRECTORY / "actions-budget"
     """
     A budget manifest and one small workflow per rule it holds a workflow to.

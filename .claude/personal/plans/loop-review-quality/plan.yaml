@@ -1,17 +1,17 @@
 schema_version: 1
 id: loop-review-quality
-title: 'Loop review quality: better reviews and loop runners, chosen after the first agentic loop run'
-description: Refinements to the agentic loop, reprioritised from what its first end-to-end run shows - a
-  review that finds, refutes and ranks its findings, reviews of only what changed since the last round,
-  a model of its own for the review stage, and alternative runners for the whole loop.
+title: 'Loop review quality: a better review and other ways to run the loop, after the first real run'
+description: Improvements to the agentic loop, chosen and ordered by what its first real run shows - a
+  review that checks its own findings, reviews of only the new changes, a separate model for the review,
+  and other ways to run the whole loop.
 default_repository: KAOS-repositories/basstler
 waves:
 - id: refinement
   name: Refinement after the first run
-  description: Better reviews, chosen by what the first run shows.
+  description: A better review, chosen by what the first run shows.
 - id: options
   name: Options kept in reserve
-  description: Alternative runners, taken up once the chain is proven.
+  description: Other ways to run the loop, tried once the session chain is proven.
 tracks:
 - id: review-quality
   name: Review quality
@@ -21,61 +21,57 @@ tracks:
   wave: options
 items:
 - id: review-workflow
-  title: Run the review stage as a dynamic workflow that finds, verifies and ranks
-  branch: null
+  title: Make the review check its own findings before posting them
+  track: review-quality
+  depends_on:
+  - agentic-loops/loop-end-to-end
   status: not started
   recommended_model: opus
-  track: review-quality
-  depends_on:
-  - agentic-loops/loop-end-to-end
-  notes: /plan-item-review runs a Claude Code dynamic workflow - one finder per changed file, an agent that
-    tries to refute each finding at the head SHA, then a ranking - returning a schema-checked {blocking, findings}.
-    It replaces only the /code-review and AGENTS.md judgement steps; basstler code-rules check keeps running
-    deterministically on the changed lines.
-    Shipping a workflows/ folder in the plugin needs the AGENTS.md package rule changed first; ask before.
-    Test the skill's handling of the workflow's JSON with fixtures.
+  notes: /plan-item-review runs a Claude Code dynamic workflow - one finder per changed file, one agent
+    per finding that tries to prove it wrong at the head commit, then a ranking. It returns a checked
+    {blocking, findings} result. It replaces only the /code-review and AGENTS.md steps; code-rules check
+    still runs as before. Shipping a workflows/ folder in the plugin needs an AGENTS.md rule change first,
+    so ask the user. Test the skill's handling of the result with sample JSON.
 - id: delta-review
-  title: Review only what changed since the last reviewed commit, from round 2 on
-  branch: null
-  status: not started
-  recommended_model: sonnet
+  title: From round 2, review only what changed since the last review
   track: review-quality
   depends_on:
   - agentic-loops/loop-end-to-end
-  notes: From round 2 the review reads the diff from the previous round's reviewed SHA, plus whether each
-    earlier thread was addressed, judged with the resolve's reply on it. Test that unchanged code accepted
-    in round 1 gets no new finding in round 2.
+  status: not started
+  recommended_model: sonnet
+  notes: From round 2 on, the review reads only the diff since the commit the last round reviewed, plus
+    whether each earlier finding was addressed, judged with the resolve's reply on its thread. Test that
+    code accepted in round 1 gets no new finding in round 2.
 - id: review-model
-  title: Let the review stage run on its own model
-  branch: null
-  status: not started
-  recommended_model: sonnet
+  title: Let the review run on a different model
   track: review-quality
   depends_on:
   - agentic-loops/loop-end-to-end
-  notes: An optional review model in the loop contract, passed as create_session's model in the cloud and
-    --model locally; unset keeps today's behaviour. Tests on the rendered cloud request and the local command
+  status: not started
+  recommended_model: sonnet
+  notes: An optional review model in LoopSettings, passed as create_session's model in the cloud and as
+    --model locally. If it is not set, nothing changes. Tests on the cloud request and the local command
     line.
 - id: workflow-loop-trial
-  title: Try one review-resolve loop as a single dynamic workflow beside the session chain
-  branch: null
-  status: not started
-  recommended_model: opus
+  title: Try running a whole item loop as one workflow, and compare it with the session chain
   track: loop-alternatives
   depends_on:
   - agentic-loops/loop-end-to-end
   - review-workflow
-  notes: Run one item's whole loop as a workflow with its stop rules and guardrails in the script and compare
-    it with the chain on hand-over failures, cost and whether its agents can follow the resolve skill. A new
-    loop kind - propose on agentic-loops' tracking issue first. Keep or drop it from the comparison.
-- id: event-driven-runner
-  title: Host the loop stages in a GitHub Actions runner triggered by pull request events
-  branch: null
-  status: deferred
+  status: not started
   recommended_model: opus
+  notes: Run one item's full loop as a single dynamic workflow, with its stop rules and guardrails in
+    the script. Compare it with the session chain on hand-over failures, cost, and whether its agents
+    follow the resolve skill, then keep or drop it. This is a new kind of loop, so propose it on agentic-loops'
+    tracking issue first.
+- id: event-driven-runner
+  title: Run the loop stages in GitHub Actions, started by pull request events
   track: loop-alternatives
   depends_on:
   - agentic-loops/loop-end-to-end
-  notes: Kept in reserve for loops that must outlive a closed computer or run for a team, via claude-code-action
-    on pull_request_review. Deferred because it relies on GitHub's scheduler, against the determinism rule;
-    reconsider only if the chain proves insufficient.
+  status: deferred
+  recommended_model: opus
+  notes: Kept in reserve for loops that must keep running with the computer off, or that serve a team,
+    using claude-code-action on pull_request_review. Deferred because it depends on GitHub's scheduler,
+    which breaks the rule that decisions come from data, not timing. Reconsider only if the session chain
+    is not enough.
